@@ -1,0 +1,247 @@
+.confirmar-step {
+  margin: 20px 32px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.confirmar-step__section {
+  padding: 20px 24px;
+  background: #fff;
+  border: 1px solid #e6e9ef;
+  border-radius: 10px;
+}
+
+.confirmar-step__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #323338;
+  margin: 0 0 4px;
+}
+
+.confirmar-step__subtitle {
+  font-size: 13px;
+  color: #676879;
+  margin: 0 0 16px;
+}
+
+.confirmar-step__section-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.confirmar-step__section-head .confirmar-step__subtitle {
+  margin-bottom: 0;
+}
+
+/* Button kind="secondary" es transparente de fábrica — sobre la tarjeta
+   blanca de esta sección casi no se distinguía, solo el borde. Un gris muy
+   claro (el mismo que usamos para "campos" dentro de tarjetas) lo separa
+   del fondo blanco de atrás. */
+.confirmar-step__recotizar-btn {
+  background-color: #f6f7fb !important;
+}
+
+.confirmar-step__confirm {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  background: #eef6ff;
+  border-color: #cfe3fb;
+}
+
+.confirmar-step__confirm .confirmar-step__subtitle {
+  margin-bottom: 0;
+}
+
+.confirmar-step__confirm-btn {
+  flex-shrink: 0;
+}
+
+.confirmar-step__checklist {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.confirmar-step__check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.confirmar-step__check svg {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.confirmar-step__check--ok {
+  background: #e6f9f1;
+  color: #037f4c;
+}
+
+.confirmar-step__check--missing {
+  background: #fff7f0;
+  color: #a15c00;
+}
+
+.confirmar-step__check-label {
+  font-weight: 700;
+  min-width: 120px;
+}
+
+.confirmar-step__check-value {
+  color: inherit;
+  opacity: 0.85;
+}
+
+.confirmar-step__docs {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.confirmar-step__companies {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.confirmar-step__company-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 14px;
+}
+
+.confirmar-step__company-row .confirmar-step__card {
+  flex: 1 1 200px;
+  max-width: 260px;
+}
+
+.confirmar-step__card {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 16px;
+  border: 1px solid #d0d4e4;
+  border-left-width: 4px;
+  border-radius: 10px;
+  background: #fff;
+}
+
+.confirmar-step__card--selected {
+  border-color: #0073ea;
+  background: #eef6ff;
+}
+
+.confirmar-step__card-wa {
+  position: absolute;
+  top: 12px;
+  right: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #00c875;
+  color: #fff;
+  font-size: 13px;
+}
+
+.confirmar-step__card-compania {
+  font-weight: 700;
+  color: #323338;
+  padding-right: 26px;
+}
+
+.confirmar-step__card-cobertura {
+  font-size: 13px;
+  color: #676879;
+  min-height: 32px;
+}
+
+.confirmar-step__card-total {
+  font-size: 18px;
+  font-weight: 700;
+  color: #323338;
+  margin: 4px 0 8px;
+}
+
+.confirmar-step__card-btn {
+  justify-content: center;
+  width: 100%;
+}
+
+.confirmar-step__error {
+  margin: 0;
+  color: #e2445c;
+  font-size: 13px;
+}
+
+.confirmar-step__chosen {
+  transition: opacity 0.15s ease;
+}
+
+.confirmar-step__chosen--updating {
+  opacity: 0.55;
+}
+
+.confirmar-step__chosen--updating .confirmar-step__chosen-compania,
+.confirmar-step__chosen--updating .confirmar-step__chosen-cobertura,
+.confirmar-step__chosen--updating .confirmar-step__chosen-grid strong {
+  color: #b0b4c0;
+}
+
+.confirmar-step__chosen-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.confirmar-step__chosen-compania {
+  font-size: 15px;
+  font-weight: 700;
+  color: #0073ea;
+}
+
+.confirmar-step__chosen-cobertura {
+  font-size: 14px;
+  color: #676879;
+}
+
+.confirmar-step__chosen-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+}
+
+.confirmar-step__chosen-grid > div {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: #f6f7fb;
+  border-radius: 8px;
+}
+
+.confirmar-step__chosen-grid span {
+  font-size: 11px;
+  font-weight: 600;
+  color: #676879;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.confirmar-step__chosen-grid strong {
+  font-size: 14px;
+  color: #323338;
+}

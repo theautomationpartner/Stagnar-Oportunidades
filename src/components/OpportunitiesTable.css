@@ -1,0 +1,85 @@
+.opps-table-wrap {
+  margin: 20px 32px 32px;
+  border: 1px solid #e6e9ef;
+  border-radius: 10px;
+  background: #fff;
+  overflow: hidden;
+}
+
+.opps-table-wrap__head {
+  padding: 16px 20px;
+  font-size: 13px;
+  font-weight: 600;
+  color: #323338;
+  border-bottom: 1px solid #e6e9ef;
+}
+
+/* Table/TableRow/TableCell de @vibe/core renderizan <div>, no <table>/<tr>/
+   <td> — el resto de las reglas de acá abajo apuntan a nuestras clases
+   propias puestas encima (className en TableRow) o a los wrappers internos
+   de cada celda (ClickableCell), no a selectores de tabla HTML. */
+
+.opps-table__row {
+  cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+
+.opps-table__row:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(15, 27, 60, 0.08);
+  z-index: 1;
+  position: relative;
+}
+
+.opps-table__row:focus-within {
+  outline: 2px solid #0073ea;
+  outline-offset: -2px;
+}
+
+.opps-table__clickable-cell {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 8px 0;
+}
+
+.opps-table__opp {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.opps-table__opp-id {
+  font-weight: 700;
+  color: #0073ea;
+  font-size: 13px;
+}
+
+.opps-table__opp-name {
+  color: #676879;
+  font-size: 12px;
+}
+
+.opps-table__cliente {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.opps-table__cliente-name {
+  font-weight: 600;
+}
+
+.opps-table__cliente-meta {
+  display: flex;
+  gap: 10px;
+  color: #676879;
+  font-size: 12px;
+}
+
+.opps-table__bien-meta {
+  color: #676879;
+  font-size: 12px;
+  margin-top: 2px;
+}

@@ -1,0 +1,47 @@
+// Definición única de los campos del paso "Cotizar", compartida entre el panel
+// (CotizarStepPanel, que renderiza según "kind") y OpportunityDetail (que arma las
+// mutations de guardado según "columnId"/"kind"). Ver /logica-monday-vibe.md.
+//
+// kind:
+//  - 'text' / 'number' / 'date': columna simple, se edita con un input y se guarda
+//    con change_simple_column_value.
+//  - 'dropdown' / 'status': columna con opciones fijas configuradas en monday — se
+//    edita con un Dropdown (@vibe/core) poblado con las opciones reales (optionsKey en el schema
+//    traído por boardSchema.js), y se guarda con change_simple_column_value (label).
+//  - 'connected': columna "conectada" (board_relation) — se edita con un Dropdown
+//    poblado con los items reales del tablero vinculado (Departamentos), y se guarda
+//    con change_column_value (JSON con item_ids), no con change_simple_column_value.
+//  - 'location': columna de ubicación — simplificado a edición de texto libre
+//    (sin recalcular coordenadas); se guarda con change_simple_column_value.
+export const COTIZAR_FIELDS = [
+  { key: 'ci', label: 'CI', kind: 'number', columnId: 'numeric_mm51mb0s' },
+  { key: 'anio', label: 'Año', kind: 'dropdown', columnId: 'dropdown_mm51mdmq', optionsKey: 'anios' },
+  { key: 'modelo', label: 'Modelo', kind: 'text', columnId: 'text_mm54fb7m' },
+  { key: 'marca', label: 'Marca', kind: 'dropdown', columnId: 'dropdown_mm51ykrd', optionsKey: 'marcas' },
+  {
+    key: 'combustible',
+    label: 'Combustible',
+    kind: 'dropdown',
+    columnId: 'dropdown_mm52jp01',
+    optionsKey: 'combustibles',
+  },
+  { key: 'uso', label: 'Uso', kind: 'status', columnId: 'color_mm52ey1d', optionsKey: 'uso' },
+  { key: 'tipo', label: 'Tipo', kind: 'dropdown', columnId: 'dropdown_mm5jqdk', optionsKey: 'tipo' },
+  { key: 'fechaNacimiento', label: 'Fecha de nacimiento', kind: 'date', columnId: 'date_mm516agw' },
+  { key: 'departamento', label: 'Departamento', kind: 'connected', columnId: 'board_relation_mm54tq30' },
+  { key: 'zonaCirculacion', label: 'Zona de circulación', kind: 'location', columnId: 'location_mm51e7g7' },
+]
+
+// Antes de dejar cotizar/recotizar (o guardar el formulario de edición), nos aseguramos
+// de que ningún campo base quede vacío: la automatización de monday que genera los
+// subitems depende de todos estos datos, y una cotización con datos a medias termina en
+// un subitem incompleto o en un "Error" silencioso. `values` es cualquier objeto que
+// tenga las mismas keys que COTIZAR_FIELDS — sirve tanto para el `opportunity` mapeado
+// (que trae `departamento` como nombre) como para el `form` en edición (que trae
+// `departamentoId`); para 'connected' se acepta cualquiera de los dos.
+export function getMissingCotizarFields(values) {
+  return COTIZAR_FIELDS.filter((f) => {
+    const raw = f.kind === 'connected' ? values.departamentoId ?? values.departamento : values[f.key]
+    return !String(raw ?? '').trim()
+  })
+}

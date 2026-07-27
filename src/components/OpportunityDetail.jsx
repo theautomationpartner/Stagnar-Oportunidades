@@ -1,0 +1,873 @@
+import { useEffect, useMemo, useState } from 'react'
+import {
+  MdOpenInNew,
+  MdMoreHoriz,
+  MdInfoOutline,
+  MdFileDownload,
+  MdSend,
+  MdArrowBack,
+  MdAutorenew,
+} from 'react-icons/md'
+import { Button, IconButton, EmptyState } from '@vibe/core'
+import TopBar from './TopBar'
+import ParametersPanel from './ParametersPanel'
+import CompanyGroup from './CompanyGroup'
+import StatusBadge from './StatusBadge'
+import Stepper from './Stepper'
+import CotizarStepPanel from './CotizarStepPanel'
+import ConfirmarStepPanel from './ConfirmarStepPanel'
+import EmitirStepPanel from './EmitirStepPanel'
+import WhatsAppSendModal from './WhatsAppSendModal'
+import {
+  fetchOpportunityDetail,
+  setSimpleColumnValue,
+  setConnectedColumnValue,
+  setSubitemCheckboxValue,
+  uploadFileToColumn,
+  clearFileColumn,
+  fetchLatestUpdate,
+} from '../services/mondayApi'
+import { mapOpportunityItem } from '../services/opportunityMapper'
+import { mapSubitemToRawQuote, groupQuotesByCompania } from '../services/quoteMapper'
+import { computeQuote } from '../services/pricingEngine'
+import { applyRecargoLookup } from '../services/recargoPanel'
+import { COTIZAR_FIELDS } from '../services/cotizarFields'
+import { renderQuoteImageDataUrl } from '../services/whatsappImage'
+import './OpportunityDetail.css'
+
+const ESTADO_OPORTUNIDAD_COLUMN_ID = 'deal_stage'
+const ESTADO_COTIZACION_COLUMN_ID = 'color_mm51n7aa'
+const ESTADO_ENVIO_COLUMN_ID = 'color_mm4wr1t4'
+const INCLUIR_PROPUESTA_COLUMN_ID = 'boolean_mm4wjdnw'
+const LIBRETA_CONDUCIR_COLUMN_ID = 'file_mm51jy06'
+const CARTA_AUTOMOVIL_COLUMN_ID = 'file_mm51xnxq'
+const POLIZA_COLUMN_ID = 'file_mm5bzdd4'
+const PROPUESTA_ELEGIDA_COLUMN_ID = 'boolean_mm5bn41n'
+// Opcionales de PORTO (Granizo/Cristales/Coche Cortesía) — ver handleToggleOpcional abajo
+// y pricingEngine.js#buildIncluyeBullets.
+const OPCIONAL_PORTO_COLUMN_IDS = {
+  granizo: 'boolean_mm5fsr46',
+  cristales: 'boolean_mm5fqazp',
+  cocheCortesia: 'boolean_mm5fxd9x',
+}
+const POLL_INTERVAL_MS = 4000
+// Prefijo que cada automatización debe agregar al principio del texto del Update que
+// postea sobre el ítem cuando falla (configurar así del lado del robot de cotización y
+// del escenario de Make.com de envío por WhatsApp) — ver fetchLatestUpdate en mondayApi.js.
+const ERROR_UPDATE_TAG_COTIZAR = '[COTIZAR]'
+const ERROR_UPDATE_TAG_ENVIO = '[ENVIO]'
+
+export default function OpportunityDetail({ opportunityId, onBack, schema }) {
+  const [item, setItem] = useState(null)
+  const [rawQuotes, setRawQuotes] = useState([])
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState(null)
+  const [overridesByQuoteId, setOverridesByQuoteId] = useState({})
+  const [selectedIds, setSelectedIds] = useState(new Set())
+  const [activeStep, setActiveStep] = useState('cotizar')
+  const [marking, setMarking] = useState(false)
+  const [markError, setMarkError] = useState(null)
+  const [waModalImages, setWaModalImages] = useState(null)
+  const [polling, setPolling] = useState(false)
+  const [settingElegidaId, setSettingElegidaId] = useState(null)
+  const [elegidaError, setElegidaError] = useState(null)
+  const [uploadingDoc, setUploadingDoc] = useState({})
+  const [deletingDoc, setDeletingDoc] = useState({})
+  const [docUploadError, setDocUploadError] = useState({})
+  const [confirmingPaso3, setConfirmingPaso3] = useState(false)
+  const [confirmPaso3Error, setConfirmPaso3Error] = useState(null)
+  const [sendPolling, setSendPolling] = useState(false)
+  const [cotizarErrorDetail, setCotizarErrorDetail] = useState(null)
+  const [envioErrorDetail, setEnvioErrorDetail] = useState(null)
+
+  // El robot que genera la cotización (o el escenario de Make.com que la envía) postea
+  // el detalle del error como un Update nativo de monday sobre el ítem cuando algo falla
+  // — se trae acá el texto del más reciente para mostrarlo junto al estado "Error". `tag`
+  // filtra por el prefijo que cada automatización agrega a su propio Update (ver
+  // ERROR_UPDATE_TAG_*) para que un error de cotización no tape/mezcle uno de envío o
+  // viceversa cuando los dos existen sobre el mismo ítem.
+  const loadErrorUpdate = async (tag) => {
+    try {
+      const update = await fetchLatestUpdate(opportunityId, tag)
+      return update?.text_body?.trim() || null
+    } catch {
+      return null
+    }
+  }
+
+  useEffect(() => {
+    let cancelled = false
+    setLoading(true)
+    setError(null)
+    setPolling(false)
+    setCotizarErrorDetail(null)
+    setEnvioErrorDetail(null)
+
+    fetchOpportunityDetail(opportunityId)
+      .then(async (data) => {
+        if (cancelled || !data) return
+        setItem(data)
+        const mapped = (data.subitems ?? []).map(mapSubitemToRawQuote)
+        const raws = applyRecargoLookup(mapped, schema?.recargoLookup ?? {})
+        setRawQuotes(raws)
+        setSelectedIds(new Set(raws.filter((r) => r.incluirPropuesta).map((r) => r.id)))
+
+        const estadoOportunidad = data.column_values.find(
+          (cv) => cv.id === ESTADO_OPORTUNIDAD_COLUMN_ID
+        )?.text?.trim()
+        const estadoCotizacion = data.column_values.find(
+          (cv) => cv.id === ESTADO_COTIZACION_COLUMN_ID
+        )?.text?.trim()
+        const estadoEnvio = data.column_values.find(
+          (cv) => cv.id === ESTADO_ENVIO_COLUMN_ID
+        )?.text?.trim()
+
+        if (estadoOportunidad === 'Nueva') {
+          setActiveStep('cotizar')
+        } else if (estadoOportunidad === 'Cotizacion Enviada') {
+          setActiveStep(raws.length > 0 ? 'confirmar' : 'cotizar')
+        } else if (estadoOportunidad === 'Cotizacion aceptada') {
+          setActiveStep(raws.length > 0 ? 'emitir' : 'cotizar')
+        } else {
+          setActiveStep(raws.length > 0 ? 'comparar' : 'cotizar')
+        }
+
+        // Si se dejó la pantalla a mitad de una cotización automática en curso, retomamos
+        // el polling en vivo al volver a entrar en vez de mostrar un estado congelado.
+        if (raws.length === 0 && estadoCotizacion === 'Cotizando') {
+          setPolling(true)
+        }
+        // Mismo criterio para un envío por WhatsApp que quedó "Enviando" a mitad de camino.
+        if (estadoEnvio === 'Enviando') {
+          setSendPolling(true)
+        }
+        // Si la oportunidad ya está sentada en "Error" al entrar (no solo al detectarlo
+        // durante el polling), traemos igual el detalle del último Update.
+        if (estadoCotizacion === 'Error') {
+          const detail = await loadErrorUpdate(ERROR_UPDATE_TAG_COTIZAR)
+          if (!cancelled) setCotizarErrorDetail(detail)
+        }
+        if (estadoEnvio === 'Error') {
+          const detail = await loadErrorUpdate(ERROR_UPDATE_TAG_ENVIO)
+          if (!cancelled) setEnvioErrorDetail(detail)
+        }
+      })
+      .catch((err) => {
+        if (!cancelled) setError(err.message)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
+
+    return () => {
+      cancelled = true
+    }
+  }, [opportunityId])
+
+  // Refleja en vivo los cambios de color_mm51n7aa (Estado Cotización) mientras monday
+  // procesa la cotización automática: reconsulta cada POLL_INTERVAL_MS y, apenas
+  // "Estado Cotización" === "Cotizado (Subitems)" Y "Estado Oportunidad" (deal_stage)
+  // === "Cotizacion Emitida" (las dos, no alcanza con una sola — el robot las setea
+  // juntas al terminar), corta el polling y avanza a "Comparar y enviar".
+  useEffect(() => {
+    if (!polling) return undefined
+    let cancelled = false
+
+    const tick = async () => {
+      try {
+        const data = await fetchOpportunityDetail(opportunityId)
+        if (cancelled || !data) return
+        setItem(data)
+
+        const estadoCotizacion = data.column_values.find(
+          (cv) => cv.id === ESTADO_COTIZACION_COLUMN_ID
+        )?.text?.trim()
+        const estadoOportunidad = data.column_values.find(
+          (cv) => cv.id === ESTADO_OPORTUNIDAD_COLUMN_ID
+        )?.text?.trim()
+        const mapped = (data.subitems ?? []).map(mapSubitemToRawQuote)
+        const raws = applyRecargoLookup(mapped, schema?.recargoLookup ?? {})
+
+        if (estadoCotizacion === 'Cotizado (Subitems)' && estadoOportunidad === 'Cotizacion Emitida') {
+          setRawQuotes(raws)
+          setSelectedIds(new Set(raws.filter((r) => r.incluirPropuesta).map((r) => r.id)))
+          setPolling(false)
+          setActiveStep('comparar')
+        } else if (estadoCotizacion === 'Error') {
+          setPolling(false)
+          setMarkError(
+            'La cotización automática terminó en estado "Error". Revisá la oportunidad en monday e intentá nuevamente.'
+          )
+          setCotizarErrorDetail(await loadErrorUpdate(ERROR_UPDATE_TAG_COTIZAR))
+        }
+      } catch {
+        // hiccup de red puntual: seguimos intentando en el próximo tick
+      }
+    }
+
+    // Los navegadores frenan drásticamente los setInterval de una pestaña en segundo
+    // plano (o minimizada) — si el usuario cambia de pestaña mientras espera, el
+    // polling puede tardar mucho más de POLL_INTERVAL_MS en volver a correr. Al
+    // recuperar el foco/visibilidad forzamos un tick inmediato para no depender de
+    // que el navegador decida retomar el intervalo por su cuenta.
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') tick()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', handleVisibility)
+
+    const id = setInterval(tick, POLL_INTERVAL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleVisibility)
+    }
+  }, [polling, opportunityId, schema])
+
+  // Refleja en vivo los cambios de color_mm4wr1t4 (Estado Envio) mientras Make.com
+  // procesa el envío por WhatsApp: reconsulta cada POLL_INTERVAL_MS y corta el polling
+  // apenas llega a un estado terminal ("Enviado" o "Error").
+  useEffect(() => {
+    if (!sendPolling) return undefined
+    let cancelled = false
+
+    const tick = async () => {
+      try {
+        const data = await fetchOpportunityDetail(opportunityId)
+        if (cancelled || !data) return
+        setItem(data)
+
+        const estadoEnvio = data.column_values.find(
+          (cv) => cv.id === ESTADO_ENVIO_COLUMN_ID
+        )?.text?.trim()
+
+        if (estadoEnvio === 'Enviado' || estadoEnvio === 'Error') {
+          setSendPolling(false)
+          if (estadoEnvio === 'Error') setEnvioErrorDetail(await loadErrorUpdate(ERROR_UPDATE_TAG_ENVIO))
+        }
+      } catch {
+        // hiccup de red puntual: seguimos intentando en el próximo tick
+      }
+    }
+
+    // Mismo fix que en el polling de "Estado Cotización": recuperar foco/visibilidad
+    // fuerza un tick inmediato en vez de esperar a que el navegador retome el
+    // setInterval frenado por estar la pestaña en segundo plano.
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') tick()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', handleVisibility)
+
+    const id = setInterval(tick, POLL_INTERVAL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleVisibility)
+    }
+  }, [sendPolling, opportunityId])
+
+  const statusColors = useMemo(
+    () => ({
+      estadoOportunidad: schema?.estadoOportunidad?.colorsByLabel ?? {},
+      estadoCotizacion: schema?.estadoCotizacion?.colorsByLabel ?? {},
+      estadoEnvio: schema?.estadoEnvio?.colorsByLabel ?? {},
+    }),
+    [schema]
+  )
+
+  const dropdownOptions = useMemo(
+    () => ({
+      anios: schema?.anios ?? [],
+      marcas: schema?.marcas ?? [],
+      combustibles: schema?.combustibles ?? [],
+      uso: schema?.uso?.options ?? [],
+      tipo: schema?.tipo ?? [],
+    }),
+    [schema]
+  )
+
+  const rcOptions = schema?.rc ?? []
+
+  const departamentos = schema?.departamentos ?? []
+
+  const opportunity = useMemo(
+    () => (item ? mapOpportunityItem(item, statusColors) : null),
+    [item, statusColors]
+  )
+
+  const groups = useMemo(() => {
+    // Uso y Año Vehículo ya no se leen del subitem (se sacaron esas columnas por
+    // duplicar datos que ya vienen de la oportunidad) — se inyectan acá para no tener
+    // que tocar QuoteCard/whatsappImage.js, que siguen leyendo raw.uso/raw.anioVehiculo.
+    const panelContext = {
+      incluyeLookup: schema?.incluyeLookup ?? {},
+      repuestosOriginalesMinYear: schema?.repuestosOriginalesMinYear,
+      reposicion0kmMinYear: schema?.reposicion0kmMinYear,
+      serviciosIlimitadosPortoMinYear: schema?.serviciosIlimitadosPortoMinYear,
+      preciosOpcionalesPorto: schema?.preciosOpcionalesPorto ?? {},
+    }
+    const withQuotes = rawQuotes.map((raw) => {
+      const effectiveRaw = { ...raw, uso: opportunity?.uso ?? '', anioVehiculo: opportunity?.anio ?? '' }
+      return {
+        raw: effectiveRaw,
+        quote: computeQuote(effectiveRaw, overridesByQuoteId[raw.id] ?? {}, panelContext),
+      }
+    })
+    return groupQuotesByCompania(rawQuotes).map((g) => ({
+      ...g,
+      entries: withQuotes.filter((e) => e.raw.compania === g.compania),
+    }))
+  }, [rawQuotes, overridesByQuoteId, opportunity, schema])
+
+  const hasQuotes = rawQuotes.length > 0
+
+  const toggleSelected = (id) => {
+    setSelectedIds((prev) => {
+      const next = new Set(prev)
+      if (next.has(id)) next.delete(id)
+      else next.add(id)
+      return next
+    })
+  }
+
+  const handleApplyQuoteOverrides = (quoteId, values) => {
+    setOverridesByQuoteId((prev) => ({ ...prev, [quoteId]: values }))
+  }
+
+  const handleResetQuoteOverrides = (quoteId) => {
+    setOverridesByQuoteId((prev) => {
+      const next = { ...prev }
+      delete next[quoteId]
+      return next
+    })
+  }
+
+  // Opcionales de PORTO (Granizo/Cristales/Coche Cortesía): a diferencia de Bonificación/
+  // Descuento/RC (parámetros de prueba locales, ver overridesByQuoteId), esto es un dato
+  // real de la cotización — si el cliente ya tiene o quiere el opcional — así que se
+  // escribe directo en monday al tildar/destildar, igual que "Propuesta elegida".
+  const handleToggleOpcional = async (rawId, field, checked) => {
+    await setSubitemCheckboxValue(rawId, OPCIONAL_PORTO_COLUMN_IDS[field], checked)
+    setRawQuotes((prev) => prev.map((r) => (r.id === rawId ? { ...r, [field]: checked } : r)))
+  }
+
+  // "Aplicar a toda [Compañía]": la misma configuración de parámetros (Bonificación,
+  // Descuento, deducible/edad específico) se replica en todas las cotizaciones de esa
+  // compañía, no solo en la tarjeta desde la que se apretó el botón.
+  const handleApplyCompanyOverrides = (compania, values) => {
+    setOverridesByQuoteId((prev) => {
+      const next = { ...prev }
+      for (const raw of rawQuotes) {
+        if (raw.compania === compania) next[raw.id] = values
+      }
+      return next
+    })
+  }
+
+  const handleMarcarParaCotizar = async () => {
+    setMarking(true)
+    setMarkError(null)
+    setCotizarErrorDetail(null)
+    try {
+      await setSimpleColumnValue(opportunityId, ESTADO_COTIZACION_COLUMN_ID, 'Cotizar')
+      setItem((prev) => ({
+        ...prev,
+        column_values: prev.column_values.map((cv) =>
+          cv.id === ESTADO_COTIZACION_COLUMN_ID ? { ...cv, text: 'Cotizar' } : cv
+        ),
+      }))
+      setPolling(true)
+    } catch (err) {
+      setMarkError(err.message)
+    } finally {
+      setMarking(false)
+    }
+  }
+
+  // "Propuesta elegida" es de único valor por oportunidad: si había otra marcada, la
+  // desmarcamos en monday antes de marcar la nueva, para no dejar dos subitems en true.
+  const handleSetElegida = async (rawId) => {
+    setSettingElegidaId(rawId)
+    setElegidaError(null)
+    try {
+      const current = rawQuotes.find((r) => r.id === rawId)
+      if (current?.propuestaElegida) {
+        // Ya estaba elegida: clickear de nuevo la destilda (toggle off), no vuelve a marcarla.
+        await setSubitemCheckboxValue(rawId, PROPUESTA_ELEGIDA_COLUMN_ID, false)
+        setRawQuotes((prev) =>
+          prev.map((r) => (r.id === rawId ? { ...r, propuestaElegida: false } : r))
+        )
+      } else {
+        const previous = rawQuotes.find((r) => r.propuestaElegida && r.id !== rawId)
+        if (previous) {
+          await setSubitemCheckboxValue(previous.id, PROPUESTA_ELEGIDA_COLUMN_ID, false)
+        }
+        await setSubitemCheckboxValue(rawId, PROPUESTA_ELEGIDA_COLUMN_ID, true)
+        setRawQuotes((prev) => prev.map((r) => ({ ...r, propuestaElegida: r.id === rawId })))
+      }
+    } catch (err) {
+      setElegidaError(err.message)
+    } finally {
+      setSettingElegidaId(null)
+    }
+  }
+
+  // Marca en monday las cotizaciones recién enviadas por WhatsApp como "Incluir Propuesta",
+  // para que el paso Confirmar pueda listarlas como "enviadas" de forma persistente.
+  const handleWhatsAppSent = async (sentEntries) => {
+    const idsToMark = sentEntries.map((e) => e.raw.id).filter((id) => {
+      const raw = rawQuotes.find((r) => r.id === id)
+      return raw && !raw.incluirPropuesta
+    })
+    if (idsToMark.length > 0) {
+      await Promise.all(
+        idsToMark.map((id) => setSubitemCheckboxValue(id, INCLUIR_PROPUESTA_COLUMN_ID, true))
+      )
+      setRawQuotes((prev) =>
+        prev.map((r) => (idsToMark.includes(r.id) ? { ...r, incluirPropuesta: true } : r))
+      )
+    }
+
+    // El envío en sí lo procesa el escenario de Make.com (ver services/makeWebhook.js);
+    // acá solo dejamos registrado en monday que arrancó ("Enviando") y prendemos el
+    // polling en vivo de color_mm4wr1t4 para reflejar cuando Make lo marque
+    // Enviado/Error — mismo patrón que "Cotizar" con Estado Cotización.
+    setEnvioErrorDetail(null)
+    await setSimpleColumnValue(opportunityId, ESTADO_ENVIO_COLUMN_ID, 'Enviando')
+    setItem((prev) => ({
+      ...prev,
+      column_values: prev.column_values.map((cv) =>
+        cv.id === ESTADO_ENVIO_COLUMN_ID ? { ...cv, text: 'Enviando' } : cv
+      ),
+    }))
+    setSendPolling(true)
+  }
+
+  // Sube Libreta de Conducir / Carta Automóvil (paso 3, columnas "file" de la
+  // oportunidad) directo a monday. El check visual del paso 3 depende de que el `text`
+  // de la columna deje de estar vacío, así que actualizamos el `item` en memoria con el
+  // nombre del archivo apenas la mutation confirma el upload (sin esperar a un refetch).
+  const handleUploadDocument = async (columnId, file) => {
+    setUploadingDoc((prev) => ({ ...prev, [columnId]: true }))
+    setDocUploadError((prev) => ({ ...prev, [columnId]: null }))
+    try {
+      await uploadFileToColumn(opportunityId, columnId, file)
+      setItem((prev) => ({
+        ...prev,
+        column_values: prev.column_values.map((cv) =>
+          cv.id === columnId ? { ...cv, text: file.name } : cv
+        ),
+      }))
+    } catch (err) {
+      setDocUploadError((prev) => ({ ...prev, [columnId]: err.message }))
+    } finally {
+      setUploadingDoc((prev) => ({ ...prev, [columnId]: false }))
+    }
+  }
+
+  // Botón "Eliminar" de cualquier columna file (Libreta/Carta en paso 3, Póliza en paso
+  // 4): update_assets_on_item con "files: []" vacía la columna (ver mondayApi.js —
+  // change_simple_column_value no soporta columnas file). Genérico por columnId, igual
+  // que handleUploadDocument.
+  const handleDeleteDocument = async (columnId) => {
+    setDeletingDoc((prev) => ({ ...prev, [columnId]: true }))
+    setDocUploadError((prev) => ({ ...prev, [columnId]: null }))
+    try {
+      await clearFileColumn(opportunityId, columnId)
+      setItem((prev) => ({
+        ...prev,
+        column_values: prev.column_values.map((cv) => (cv.id === columnId ? { ...cv, text: '' } : cv)),
+      }))
+    } catch (err) {
+      setDocUploadError((prev) => ({ ...prev, [columnId]: err.message }))
+    } finally {
+      setDeletingDoc((prev) => ({ ...prev, [columnId]: false }))
+    }
+  }
+
+  // Paso 4: subir la póliza (file_mm5bzdd4) cierra el flujo — a pedido, una vez que la
+  // mutation de subida confirma, la oportunidad pasa directo a "Concretada" (mismo
+  // helper setSimpleColumnValue que ya usa "Cotizar", apuntando a Estado Oportunidad en
+  // vez de Estado Cotización).
+  const handleUploadPoliza = async (file) => {
+    setUploadingDoc((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: true }))
+    setDocUploadError((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: null }))
+    try {
+      await uploadFileToColumn(opportunityId, POLIZA_COLUMN_ID, file)
+      await setSimpleColumnValue(opportunityId, ESTADO_OPORTUNIDAD_COLUMN_ID, 'Concretada')
+      setItem((prev) => ({
+        ...prev,
+        column_values: prev.column_values.map((cv) => {
+          if (cv.id === POLIZA_COLUMN_ID) return { ...cv, text: file.name }
+          if (cv.id === ESTADO_OPORTUNIDAD_COLUMN_ID) return { ...cv, text: 'Concretada' }
+          return cv
+        }),
+      }))
+    } catch (err) {
+      setDocUploadError((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: err.message }))
+    } finally {
+      setUploadingDoc((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: false }))
+    }
+  }
+
+  // Botón "Confirmar" del paso 3: la validación de datos/documentación ya la hizo
+  // ConfirmarStepPanel antes de llamar a esto — acá solo queda dejar registrado en
+  // monday que la cotización fue aceptada (mismo estado real "Cotizacion aceptada" que
+  // ya hace aterrizar directo en el paso 4 al reabrir la oportunidad) y avanzar la UI.
+  const handleConfirmarPaso3 = async () => {
+    setConfirmingPaso3(true)
+    setConfirmPaso3Error(null)
+    try {
+      await setSimpleColumnValue(opportunityId, ESTADO_OPORTUNIDAD_COLUMN_ID, 'Cotizacion aceptada')
+      setItem((prev) => ({
+        ...prev,
+        column_values: prev.column_values.map((cv) =>
+          cv.id === ESTADO_OPORTUNIDAD_COLUMN_ID ? { ...cv, text: 'Cotizacion aceptada' } : cv
+        ),
+      }))
+      setActiveStep('emitir')
+    } catch (err) {
+      setConfirmPaso3Error(err.message)
+    } finally {
+      setConfirmingPaso3(false)
+    }
+  }
+
+  const handleSaveCotizarFields = async (formValues) => {
+    const currentDeptId = departamentos.find((d) => d.name === opportunity.departamento)?.id ?? ''
+
+    for (const field of COTIZAR_FIELDS) {
+      if (field.kind === 'connected') continue
+      const newValue = formValues[field.key] ?? ''
+      const oldValue = opportunity[field.key] ?? ''
+      if (newValue === oldValue) continue
+      await setSimpleColumnValue(opportunityId, field.columnId, newValue)
+    }
+
+    if (formValues.departamentoId !== currentDeptId) {
+      const deptField = COTIZAR_FIELDS.find((f) => f.key === 'departamento')
+      const ids = formValues.departamentoId ? [Number(formValues.departamentoId)] : []
+      await setConnectedColumnValue(opportunityId, deptField.columnId, ids)
+    }
+
+    const nuevoDepartamentoNombre =
+      departamentos.find((d) => d.id === formValues.departamentoId)?.name ?? ''
+
+    const textByColumnId = {
+      numeric_mm51mb0s: formValues.ci,
+      dropdown_mm51mdmq: formValues.anio,
+      text_mm54fb7m: formValues.modelo,
+      dropdown_mm51ykrd: formValues.marca,
+      dropdown_mm52jp01: formValues.combustible,
+      color_mm52ey1d: formValues.uso,
+      dropdown_mm5jqdk: formValues.tipo,
+      date_mm516agw: formValues.fechaNacimiento,
+      location_mm51e7g7: formValues.zonaCirculacion,
+    }
+
+    setItem((prev) => ({
+      ...prev,
+      column_values: prev.column_values.map((cv) => {
+        if (cv.id in textByColumnId) return { ...cv, text: textByColumnId[cv.id] }
+        // Departamento es board_relation: el mapper lee `display_value`, no `text`
+        // (ver opportunityMapper.js#boardRelationDisplayOf) — hay que actualizar ese
+        // campo para que el optimistic update se vea reflejado.
+        if (cv.id === 'board_relation_mm54tq30') return { ...cv, display_value: nuevoDepartamentoNombre }
+        return cv
+      }),
+    }))
+  }
+
+  const handleOpenWhatsAppModal = () => {
+    const selectedEntries = groups
+      .flatMap((g) => g.entries)
+      .filter((e) => selectedIds.has(e.raw.id))
+    const images = selectedEntries.map((e) => ({
+      raw: e.raw,
+      quote: e.quote,
+      imageDataUrl: renderQuoteImageDataUrl(opportunity, e.raw, e.quote),
+    }))
+    setWaModalImages(images)
+  }
+
+  const tieneElegida = rawQuotes.some((r) => r.propuestaElegida)
+  const emitirDone = opportunity?.estadoLabel === 'Concretada'
+  // El paso 2 se marca cumplido cuando la oportunidad ya avanzó a "Cotizacion Enviada"
+  // (o a un estado posterior del mismo flujo) — no alcanza con tener cotizaciones
+  // cargadas, hace falta que efectivamente ya se le hayan mandado al cliente.
+  const compararDone = ['Cotizacion Enviada', 'Cotizacion aceptada', 'Concretada', 'No Concretada'].includes(
+    opportunity?.estadoLabel
+  )
+  const confirmarDone = tieneElegida || emitirDone
+  // El paso 4 se marca cumplido recién cuando la póliza ya quedó cargada y la
+  // oportunidad pasó a "Concretada" — antes de eso, está "activo" apenas se acepta la
+  // cotización (o ya se cargó la póliza pero el estado todavía no refrescó).
+  const emitirActive =
+    !emitirDone && (opportunity?.estadoLabel === 'Cotizacion aceptada' || Boolean(opportunity?.poliza))
+
+  const steps = [
+    { key: 'cotizar', label: 'Cotizar', status: hasQuotes ? 'done' : 'active', clickable: true },
+    {
+      key: 'comparar',
+      label: 'Comparar y enviar',
+      status: compararDone ? 'done' : hasQuotes ? 'active' : 'pending',
+      clickable: true,
+    },
+    {
+      key: 'confirmar',
+      label: 'Confirmar',
+      status: confirmarDone ? 'done' : hasQuotes ? 'active' : 'pending',
+      clickable: true,
+    },
+    {
+      key: 'emitir',
+      label: 'Emitir · cargar PDF',
+      status: emitirDone ? 'done' : emitirActive ? 'active' : 'pending',
+      clickable: true,
+    },
+  ]
+
+  return (
+    <div className="app">
+      <TopBar />
+
+      <div className="opp-detail__breadcrumb">
+        <Button kind="tertiary" className="opp-detail__back-btn" onClick={onBack}>
+          <MdArrowBack /> Volver a Oportunidades
+        </Button>
+        <span className="opp-detail__breadcrumb-trail">
+          <span> &gt; </span>
+          <span>
+            {opportunity ? `${opportunity.oppNumber} · ${opportunity.clienteNombre}` : '...'}
+          </span>
+        </span>
+      </div>
+
+      {loading && <div className="opp-detail__status">Cargando cotizaciones...</div>}
+      {error && <div className="opp-detail__status opp-detail__status--error">Error: {error}</div>}
+
+      {!loading && !error && opportunity && (
+        <>
+          <div className="opp-detail__header">
+            <div>
+              <h1 className="opp-detail__title">Cotizaciones</h1>
+              <p className="opp-detail__subtitle">
+                Cotizá, comparalá y enviá las mejores opciones a tu cliente.
+              </p>
+            </div>
+            <div className="opp-detail__header-actions">
+              <Button kind="secondary">
+                <MdOpenInNew /> Ver en la oportunidad
+              </Button>
+              <IconButton icon={MdMoreHoriz} aria-label="Más opciones" />
+            </div>
+          </div>
+
+          <div className="opp-detail__client-card">
+            <div className="opp-detail__client-avatar">{opportunity.clienteNombre.slice(0, 2).toUpperCase()}</div>
+            <div className="opp-detail__client-info">
+              <span className="opp-detail__client-name">{opportunity.clienteNombre}</span>
+              <span className="opp-detail__client-meta">
+                {opportunity.bienLinea1} {opportunity.bienLinea2 && `· ${opportunity.bienLinea2}`}
+              </span>
+              {opportunity.ci && <span className="opp-detail__client-meta">CI {opportunity.ci}</span>}
+            </div>
+            <StatusBadge
+              label={opportunity.estadoCotizacion || 'Sin estado'}
+              color={opportunity.estadoCotizacionColor}
+            />
+          </div>
+
+          <Stepper steps={steps} activeKey={activeStep} onSelect={setActiveStep} />
+
+          {activeStep === 'cotizar' && (
+            <CotizarStepPanel
+              opportunity={opportunity}
+              hasQuotes={hasQuotes}
+              onMarcarParaCotizar={handleMarcarParaCotizar}
+              marking={marking}
+              markError={markError}
+              dropdownOptions={dropdownOptions}
+              departamentos={departamentos}
+              onSave={handleSaveCotizarFields}
+              estadoCotizacion={opportunity.estadoCotizacion}
+              estadoCotizacionColor={opportunity.estadoCotizacionColor}
+              polling={polling}
+              errorDetail={cotizarErrorDetail}
+            />
+          )}
+
+          {activeStep === 'comparar' && !hasQuotes && (
+            <div className="opp-detail__no-quotes">
+              <EmptyState
+                title="Todavía no hay nada para comparar"
+                description='No hay ninguna cotización cargada para esta oportunidad — no hay nada para comparar o enviar.'
+                mainAction={{ text: 'Ir al paso 1 (Cotizar)', onClick: () => setActiveStep('cotizar') }}
+              />
+            </div>
+          )}
+
+          {activeStep === 'comparar' && hasQuotes && (
+            <>
+              <div className="opp-detail__info-bar">
+                <span>
+                  <MdInfoOutline /> Cada cotización puede ajustar sus propios parámetros (edad,
+                  bonificación, descuento, recargo, deducible) con el botón "Parámetros" de su
+                  tarjeta.
+                </span>
+                <Button kind="secondary" className="opp-detail__recotizar-btn" onClick={() => setActiveStep('cotizar')}>
+                  <MdAutorenew /> Recotizar
+                </Button>
+              </div>
+
+              <div className="opp-detail__body">
+                <ParametersPanel
+                  context={{
+                    edad: opportunity.edad,
+                    bien: opportunity.bienLinea1,
+                    combustible: opportunity.combustible,
+                    ci: opportunity.ci,
+                    telefono: opportunity.telefono,
+                    nombre: opportunity.clienteNombre,
+                  }}
+                />
+
+                <div className="opp-detail__quotes">
+                  {groups.map((g, index) => (
+                    <CompanyGroup
+                      key={g.compania}
+                      compania={g.compania}
+                      entries={g.entries}
+                      selectedIds={selectedIds}
+                      onToggleSelected={toggleSelected}
+                      defaultOpen={index === 0}
+                      overridesByQuoteId={overridesByQuoteId}
+                      onApplyOverrides={handleApplyQuoteOverrides}
+                      onResetOverrides={handleResetQuoteOverrides}
+                      onApplyToCompany={handleApplyCompanyOverrides}
+                      onToggleOpcional={handleToggleOpcional}
+                      rcOptions={rcOptions}
+                    />
+                  ))}
+                </div>
+              </div>
+
+              {envioErrorDetail && (
+                <div className="opp-detail__error-detail">
+                  <strong>Detalle del error de envío (último update en la oportunidad):</strong>
+                  <pre>{envioErrorDetail}</pre>
+                </div>
+              )}
+
+              <div className="opp-detail__footer">
+                <div className="opp-detail__footer-status">
+                  <span>{selectedIds.size} opciones seleccionadas</span>
+                  {opportunity.estadoEnvio && (
+                    <span className="opp-detail__envio-status">
+                      {sendPolling && (
+                        <span className="opp-detail__envio-spinner" aria-hidden="true" />
+                      )}
+                      <StatusBadge label={opportunity.estadoEnvio} color={opportunity.estadoEnvioColor} />
+                    </span>
+                  )}
+                </div>
+                <div className="opp-detail__footer-actions">
+                  <Button kind="secondary">
+                    <MdFileDownload /> Descargar comparativo
+                  </Button>
+                  <Button
+                    kind="primary"
+                    color="positive"
+                    onClick={handleOpenWhatsAppModal}
+                    disabled={selectedIds.size === 0}
+                  >
+                    <MdSend /> Enviar seleccionadas por WhatsApp
+                  </Button>
+                </div>
+              </div>
+            </>
+          )}
+
+          {activeStep === 'confirmar' && !hasQuotes && (
+            <div className="opp-detail__no-quotes">
+              <EmptyState
+                title="Todavía no hay nada que confirmar"
+                description="No hay ninguna cotización cargada para esta oportunidad."
+                mainAction={{ text: 'Ir al paso 1 (Cotizar)', onClick: () => setActiveStep('cotizar') }}
+              />
+            </div>
+          )}
+
+          {activeStep === 'confirmar' && hasQuotes && (
+            <ConfirmarStepPanel
+              opportunity={opportunity}
+              groups={groups}
+              onSetElegida={handleSetElegida}
+              settingElegidaId={settingElegidaId}
+              elegidaError={elegidaError}
+              onRecotizar={() => setActiveStep('cotizar')}
+              documentos={[
+                {
+                  key: 'libretaConducir',
+                  label: 'Libreta de Conducir',
+                  columnId: LIBRETA_CONDUCIR_COLUMN_ID,
+                  fileName: opportunity.libretaConducir,
+                },
+                {
+                  key: 'cartaAutomovil',
+                  label: 'Carta Automóvil',
+                  columnId: CARTA_AUTOMOVIL_COLUMN_ID,
+                  fileName: opportunity.cartaAutomovil,
+                },
+              ]}
+              uploadingDoc={uploadingDoc}
+              deletingDoc={deletingDoc}
+              docUploadError={docUploadError}
+              onUploadDocument={handleUploadDocument}
+              onDeleteDocument={handleDeleteDocument}
+              confirming={confirmingPaso3}
+              confirmError={confirmPaso3Error}
+              onConfirmar={handleConfirmarPaso3}
+            />
+          )}
+
+          {activeStep === 'emitir' && !hasQuotes && (
+            <div className="opp-detail__no-quotes">
+              <EmptyState
+                title="Todavía no hay nada que emitir"
+                description="No hay ninguna cotización cargada para esta oportunidad."
+                mainAction={{ text: 'Ir al paso 1 (Cotizar)', onClick: () => setActiveStep('cotizar') }}
+              />
+            </div>
+          )}
+
+          {activeStep === 'emitir' && hasQuotes && (
+            <EmitirStepPanel
+              opportunity={opportunity}
+              groups={groups}
+              concretada={emitirDone}
+              polizaFileName={opportunity.poliza}
+              uploading={Boolean(uploadingDoc[POLIZA_COLUMN_ID])}
+              deleting={Boolean(deletingDoc[POLIZA_COLUMN_ID])}
+              error={docUploadError[POLIZA_COLUMN_ID]}
+              onUploadPoliza={handleUploadPoliza}
+              onDeletePoliza={() => handleDeleteDocument(POLIZA_COLUMN_ID)}
+            />
+          )}
+        </>
+      )}
+
+      {waModalImages && (
+        <WhatsAppSendModal
+          opportunity={opportunity}
+          images={waModalImages}
+          onClose={() => setWaModalImages(null)}
+          onSent={handleWhatsAppSent}
+        />
+      )}
+    </div>
+  )
+}

@@ -1,0 +1,93 @@
+.doc-upload-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  border: 1px solid transparent;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.doc-upload-row--ok {
+  background: #e6f9f1;
+  color: #037f4c;
+}
+
+.doc-upload-row--missing {
+  background: #fff7f0;
+  color: #a15c00;
+  border: 1px dashed #f0c48a;
+}
+
+.doc-upload-row--drag-over {
+  background: #eef6ff;
+  border-color: #0073ea;
+  color: #0073ea;
+}
+
+.doc-upload-row__info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.doc-upload-row__info svg {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.doc-upload-row__label {
+  font-weight: 700;
+  min-width: 150px;
+  flex-shrink: 0;
+}
+
+.doc-upload-row__value {
+  opacity: 0.85;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.doc-upload-row__btn {
+  flex-shrink: 0;
+}
+
+/* Button kind="secondary" es transparente de fábrica — sobre el fondo verde
+   de la fila "ok" casi no se distinguía. Fondo blanco sólido para que se
+   diferencie del fondo de atrás. */
+.doc-upload-row__delete-btn {
+  color: #e2445c;
+  border-color: #f3c1cb;
+  background-color: #fff !important;
+}
+
+.doc-upload-row__delete-btn:hover {
+  background: #fdf1f2;
+  border-color: #e2445c;
+}
+
+.doc-upload-row__spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #fde3c4;
+  border-top-color: #a15c00;
+  flex-shrink: 0;
+  animation: doc-upload-row-spin 0.8s linear infinite;
+}
+
+@keyframes doc-upload-row-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.doc-upload-row__error {
+  margin: 0;
+  color: #e2445c;
+  font-size: 12px;
+}

@@ -1,0 +1,62 @@
+/* El overlay, la caja del modal, el header con el título y el botón de
+   cerrar, los banners de warning/éxito y la fila de acciones ahora los
+   provee Modal/ModalHeader/ModalFooter/AttentionBox de @vibe/core — acá
+   solo queda el contenido propio: el campo de teléfono y la grilla de
+   preview de imágenes. */
+
+.wa-modal__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #676879;
+  margin-bottom: 18px;
+}
+
+.wa-modal__field input {
+  padding: 10px 12px;
+  border: 1px solid #d0d4e4;
+  border-radius: 8px;
+  font-size: 14px;
+  color: #323338;
+}
+
+.wa-modal__preview-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #323338;
+  margin-bottom: 10px;
+}
+
+.wa-modal__preview-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+
+.wa-modal__preview-item {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.wa-modal__preview-item img {
+  width: 100%;
+  border: 1px solid #e6e9ef;
+  border-radius: 8px;
+  display: block;
+}
+
+.wa-modal__preview-item span {
+  font-size: 11px;
+  color: #676879;
+  text-align: center;
+}
+
+.wa-modal__error {
+  color: #e2445c;
+  font-size: 13px;
+  margin: 0 0 12px;
+}

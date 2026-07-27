@@ -1,0 +1,5 @@
+node_modules
+dist
+.env
+vite-dev.log
+panel_incluye.json
