@@ -1,5 +1,9 @@
-export const OPPORTUNITIES_BOARD_ID = 18420863013
-export const SUBITEMS_BOARD_ID = 18420863061
+// Configurables por variable de entorno (VITE_ para que el navegador las lea) para
+// poder apuntar un deploy de Vercel (ej. Preview, para que otras personas testeen) a un
+// tablero de prueba distinto del real de producción, sin tocar código. Sin configurar,
+// caen al tablero real actual.
+export const OPPORTUNITIES_BOARD_ID = Number(import.meta.env.VITE_MONDAY_BOARD_ID) || 18420863013
+export const SUBITEMS_BOARD_ID = Number(import.meta.env.VITE_MONDAY_SUBITEMS_BOARD_ID) || 18420863061
 
 const OPPORTUNITY_COLUMN_IDS = [
   'text_mm51b055', // Nombre

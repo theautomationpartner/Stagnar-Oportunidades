@@ -27,8 +27,8 @@ export default function WhatsAppSendModal({ opportunity, images, onClose, onSent
 
   return (
     <Modal id="whatsapp-send-modal" show onClose={onClose} size="medium">
-      <ModalHeader title="Enviar por WhatsApp" />
-      <ModalContent>
+      <ModalHeader title="Enviar por WhatsApp" className="wa-modal__header" />
+      <ModalContent className="wa-modal__content">
         {!webhookConfigured && (
           <AttentionBox type="warning">
             Falta configurar <code>VITE_MAKE_WEBHOOK_URL</code> en <code>app/.env</code> con la URL

@@ -1,8 +1,25 @@
-/* El overlay, la caja del modal, el header con el título y el botón de
-   cerrar, los banners de warning/éxito y la fila de acciones ahora los
-   provee Modal/ModalHeader/ModalFooter/AttentionBox de @vibe/core — acá
-   solo queda el contenido propio: el campo de teléfono y la grilla de
-   preview de imágenes. */
+/* El overlay, la caja del modal, el título y el botón de cerrar, los
+   banners de warning/éxito y la fila de acciones ahora los provee
+   Modal/ModalHeader/ModalFooter/AttentionBox de @vibe/core — pero a
+   diferencia de ModalFooter (que trae su propio padding de fábrica),
+   ModalHeader y ModalContent son un <div> sin padding ni scroll propios:
+   sin esto el título y el contenido quedaban pegados contra el borde
+   redondeado del modal (que además recorta con overflow:hidden), dando el
+   efecto de "cortado en los bordes". */
+.wa-modal__header {
+  padding: 24px 60px 12px 32px;
+}
+
+.wa-modal__content {
+  /* Modal es un flex-column con overflow:hidden y max-height fijo — sin
+     flex:1 + min-height:0 el contenido no encoge para tomar su propio
+     scroll y termina recortado por el overflow:hidden del modal en vez de
+     scrollear internamente. */
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0 32px 24px;
+  overflow-y: auto;
+}
 
 .wa-modal__field {
   display: flex;
