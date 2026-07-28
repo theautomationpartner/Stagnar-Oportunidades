@@ -7,3 +7,15 @@ body {
   font-family: 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
   background: #f6f7fb;
 }
+
+/* Los popups de @vibe/core (menú de Dropdown, tooltips, etc.) se portalean a
+   document.body con position:fixed pero sin z-index propio — quedan a merced del
+   orden del DOM y contenido posicionado de la página (ej. filas de tabla con hover)
+   los puede tapar. "monday-style-dialog-content-wrapper" es una clase estable que
+   vibe le pone a todos estos popups (a diferencia de las clases con hash, que
+   cambian entre versiones), así que forzar el z-index acá cubre cualquier
+   Dropdown/tooltip de la app, no solo uno puntual. Por debajo del z-index de Modal
+   (10000) a propósito, para que un modal siga ganando si algún día coexisten. */
+.monday-style-dialog-content-wrapper {
+  z-index: 9999;
+}
