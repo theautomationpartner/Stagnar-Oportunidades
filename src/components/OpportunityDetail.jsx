@@ -38,7 +38,7 @@ import './OpportunityDetail.css'
 const ESTADO_OPORTUNIDAD_COLUMN_ID = 'deal_stage'
 const ESTADO_COTIZACION_COLUMN_ID = 'color_mm51n7aa'
 const ESTADO_ENVIO_COLUMN_ID = 'color_mm4wr1t4'
-const ESTADO_CREACION_COLUMN_ID = 'color_mm4w54ga'
+const ESTADO_CREACION_COLUMN_ID = 'color_mm5ejysv'
 const INCLUIR_PROPUESTA_COLUMN_ID = 'boolean_mm4wjdnw'
 const LIBRETA_CONDUCIR_COLUMN_ID = 'file_mm51jy06'
 const CARTA_AUTOMOVIL_COLUMN_ID = 'file_mm51xnxq'
@@ -80,6 +80,8 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   const [confirmPaso3Error, setConfirmPaso3Error] = useState(null)
   const [sendPolling, setSendPolling] = useState(false)
   const [polizaPolling, setPolizaPolling] = useState(false)
+  const [confirmandoEmision, setConfirmandoEmision] = useState(false)
+  const [confirmarEmisionError, setConfirmarEmisionError] = useState(null)
   const [cotizarErrorDetail, setCotizarErrorDetail] = useState(null)
   const [envioErrorDetail, setEnvioErrorDetail] = useState(null)
   const [polizaErrorDetail, setPolizaErrorDetail] = useState(null)
@@ -285,9 +287,9 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
     }
   }, [sendPolling, opportunityId])
 
-  // Refleja en vivo los cambios de color_mm4w54ga (Estado Creacion) mientras se procesa
-  // la creación de la póliza tras subir el archivo: reconsulta cada POLL_INTERVAL_MS y
-  // corta el polling apenas llega a un estado terminal ("Poliza Creada" o "Error").
+  // Refleja en vivo los cambios de color_mm5ejysv (Crear Poliza) mientras se procesa la
+  // emisión de la póliza tras confirmarla: reconsulta cada POLL_INTERVAL_MS y corta el
+  // polling apenas llega a un estado terminal ("Creada" o "Error").
   useEffect(() => {
     if (!polizaPolling) return undefined
     let cancelled = false
@@ -302,7 +304,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
           (cv) => cv.id === ESTADO_CREACION_COLUMN_ID
         )?.text?.trim()
 
-        if (estadoCreacion === 'Poliza Creada' || estadoCreacion === 'Error') {
+        if (estadoCreacion === 'Creada' || estadoCreacion === 'Error') {
           setPolizaPolling(false)
           if (estadoCreacion === 'Error') {
             setPolizaErrorDetail(await loadErrorUpdate(ERROR_UPDATE_TAG_CREAR_POLIZA))
@@ -558,7 +560,6 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   const handleUploadPoliza = async (file) => {
     setUploadingDoc((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: true }))
     setDocUploadError((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: null }))
-    setPolizaErrorDetail(null)
     try {
       await uploadFileToColumn(opportunityId, POLIZA_COLUMN_ID, file)
       await setSimpleColumnValue(opportunityId, ESTADO_OPORTUNIDAD_COLUMN_ID, 'Concretada')
@@ -570,14 +571,33 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
           return cv
         }),
       }))
-      // La carga del archivo dispara del lado de monday la automatización que crea la
-      // póliza (color_mm4w54ga, Estado Creacion) — prendemos el mismo polling en vivo
-      // que ya usamos para Estado Cotización/Estado Envio.
-      setPolizaPolling(true)
     } catch (err) {
       setDocUploadError((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: err.message }))
     } finally {
       setUploadingDoc((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: false }))
+    }
+  }
+
+  // Botón "Confirmar emisión de póliza": dispara la automatización que crea/emite la
+  // póliza (color_mm5ejysv, "Crear Poliza") poniéndola en "Crear" — mismo mecanismo que
+  // "Cotizar" sobre Estado Cotización — y prende el polling en vivo de esa columna.
+  const handleConfirmarEmision = async () => {
+    setConfirmandoEmision(true)
+    setConfirmarEmisionError(null)
+    setPolizaErrorDetail(null)
+    try {
+      await setSimpleColumnValue(opportunityId, ESTADO_CREACION_COLUMN_ID, 'Crear')
+      setItem((prev) => ({
+        ...prev,
+        column_values: prev.column_values.map((cv) =>
+          cv.id === ESTADO_CREACION_COLUMN_ID ? { ...cv, text: 'Crear' } : cv
+        ),
+      }))
+      setPolizaPolling(true)
+    } catch (err) {
+      setConfirmarEmisionError(err.message)
+    } finally {
+      setConfirmandoEmision(false)
     }
   }
 
@@ -927,6 +947,9 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
               estadoCreacionColor={opportunity.estadoCreacionColor}
               polling={polizaPolling}
               errorDetail={polizaErrorDetail}
+              onConfirmarEmision={handleConfirmarEmision}
+              confirmandoEmision={confirmandoEmision}
+              confirmarEmisionError={confirmarEmisionError}
             />
           )}
         </>

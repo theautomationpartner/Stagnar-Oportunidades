@@ -10,7 +10,7 @@ const STATUS_COLUMNS = {
   estadoCotizacion: 'color_mm51n7aa',
   tipoSujeto: 'color_mm51mm5v',
   estadoEnvio: 'color_mm4wr1t4',
-  estadoCreacion: 'color_mm4w54ga',
+  estadoCreacion: 'color_mm5ejysv',
   uso: 'color_mm52ey1d',
 }
 

@@ -30,7 +30,7 @@ const OPPORTUNITY_COLUMN_IDS = [
   'file_mm51jy06', // Libreta de Conducir
   'file_mm51xnxq', // Carta Automovil
   'file_mm5bzdd4', // Poliza
-  'color_mm4w54ga', // Estado Creacion
+  'color_mm5ejysv', // Crear Poliza (estado)
 ]
 
 const ITEMS_QUERY = `

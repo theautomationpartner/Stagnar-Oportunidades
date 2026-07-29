@@ -119,6 +119,19 @@
   margin-bottom: 12px;
 }
 
+.emitir-step__confirmar-emision {
+  margin-top: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.emitir-step__error {
+  margin: 0;
+  color: #e2445c;
+  font-size: 13px;
+}
+
 .emitir-step__spinner {
   width: 16px;
   height: 16px;

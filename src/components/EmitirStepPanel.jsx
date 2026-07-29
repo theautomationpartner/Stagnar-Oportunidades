@@ -1,4 +1,5 @@
-import { AttentionBox } from '@vibe/core'
+import { MdCheckCircle } from 'react-icons/md'
+import { AttentionBox, Button } from '@vibe/core'
 import { formatMoney } from '../services/format'
 import { accentForCompania } from '../services/companyColors'
 import DocumentUploadRow from './DocumentUploadRow'
@@ -39,6 +40,9 @@ export default function EmitirStepPanel({
   estadoCreacionColor,
   polling,
   errorDetail,
+  onConfirmarEmision,
+  confirmandoEmision,
+  confirmarEmisionError,
 }) {
   const elegida = groups.flatMap((g) => g.entries).find((e) => e.raw.propuestaElegida)
   const accent = elegida ? accentForCompania(elegida.raw.compania) : null
@@ -150,6 +154,21 @@ export default function EmitirStepPanel({
           onUpload={onUploadPoliza}
           onDelete={onDeletePoliza}
         />
+        {polizaFileName && estadoCreacion !== 'Creada' && (
+          <div className="emitir-step__confirmar-emision">
+            <Button
+              kind="primary"
+              onClick={onConfirmarEmision}
+              disabled={confirmandoEmision || polling}
+            >
+              <MdCheckCircle />{' '}
+              {confirmandoEmision ? 'Confirmando...' : 'Confirmar emisión de póliza'}
+            </Button>
+            {confirmarEmisionError && (
+              <p className="emitir-step__error">Error: {confirmarEmisionError}</p>
+            )}
+          </div>
+        )}
         {polling && (
           <AttentionBox type="warning" icon={false}>
             <span className="emitir-step__spinner" aria-hidden="true" />
