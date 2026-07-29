@@ -38,6 +38,7 @@ import './OpportunityDetail.css'
 const ESTADO_OPORTUNIDAD_COLUMN_ID = 'deal_stage'
 const ESTADO_COTIZACION_COLUMN_ID = 'color_mm51n7aa'
 const ESTADO_ENVIO_COLUMN_ID = 'color_mm4wr1t4'
+const ESTADO_CREACION_COLUMN_ID = 'color_mm4w54ga'
 const INCLUIR_PROPUESTA_COLUMN_ID = 'boolean_mm4wjdnw'
 const LIBRETA_CONDUCIR_COLUMN_ID = 'file_mm51jy06'
 const CARTA_AUTOMOVIL_COLUMN_ID = 'file_mm51xnxq'
@@ -56,6 +57,7 @@ const POLL_INTERVAL_MS = 4000
 // del escenario de Make.com de envío por WhatsApp) — ver fetchLatestUpdate en mondayApi.js.
 const ERROR_UPDATE_TAG_COTIZAR = '[COTIZAR]'
 const ERROR_UPDATE_TAG_ENVIO = '[ENVIO]'
+const ERROR_UPDATE_TAG_CREAR_POLIZA = '[CREAR_POLIZA]'
 
 export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   const [item, setItem] = useState(null)
@@ -77,8 +79,10 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   const [confirmingPaso3, setConfirmingPaso3] = useState(false)
   const [confirmPaso3Error, setConfirmPaso3Error] = useState(null)
   const [sendPolling, setSendPolling] = useState(false)
+  const [polizaPolling, setPolizaPolling] = useState(false)
   const [cotizarErrorDetail, setCotizarErrorDetail] = useState(null)
   const [envioErrorDetail, setEnvioErrorDetail] = useState(null)
+  const [polizaErrorDetail, setPolizaErrorDetail] = useState(null)
 
   // El robot que genera la cotización (o el escenario de Make.com que la envía) postea
   // el detalle del error como un Update nativo de monday sobre el ítem cuando algo falla
@@ -102,6 +106,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
     setPolling(false)
     setCotizarErrorDetail(null)
     setEnvioErrorDetail(null)
+    setPolizaErrorDetail(null)
 
     fetchOpportunityDetail(opportunityId)
       .then(async (data) => {
@@ -120,6 +125,9 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
         )?.text?.trim()
         const estadoEnvio = data.column_values.find(
           (cv) => cv.id === ESTADO_ENVIO_COLUMN_ID
+        )?.text?.trim()
+        const estadoCreacion = data.column_values.find(
+          (cv) => cv.id === ESTADO_CREACION_COLUMN_ID
         )?.text?.trim()
 
         if (estadoOportunidad === 'Nueva') {
@@ -141,6 +149,10 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
         if (estadoEnvio === 'Enviando') {
           setSendPolling(true)
         }
+        // Mismo criterio para una creación de póliza que quedó "Creando" a mitad de camino.
+        if (estadoCreacion === 'Creando') {
+          setPolizaPolling(true)
+        }
         // Si la oportunidad ya está sentada en "Error" al entrar (no solo al detectarlo
         // durante el polling), traemos igual el detalle del último Update.
         if (estadoCotizacion === 'Error') {
@@ -150,6 +162,10 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
         if (estadoEnvio === 'Error') {
           const detail = await loadErrorUpdate(ERROR_UPDATE_TAG_ENVIO)
           if (!cancelled) setEnvioErrorDetail(detail)
+        }
+        if (estadoCreacion === 'Error') {
+          const detail = await loadErrorUpdate(ERROR_UPDATE_TAG_CREAR_POLIZA)
+          if (!cancelled) setPolizaErrorDetail(detail)
         }
       })
       .catch((err) => {
@@ -269,11 +285,58 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
     }
   }, [sendPolling, opportunityId])
 
+  // Refleja en vivo los cambios de color_mm4w54ga (Estado Creacion) mientras se procesa
+  // la creación de la póliza tras subir el archivo: reconsulta cada POLL_INTERVAL_MS y
+  // corta el polling apenas llega a un estado terminal ("Poliza Creada" o "Error").
+  useEffect(() => {
+    if (!polizaPolling) return undefined
+    let cancelled = false
+
+    const tick = async () => {
+      try {
+        const data = await fetchOpportunityDetail(opportunityId)
+        if (cancelled || !data) return
+        setItem(data)
+
+        const estadoCreacion = data.column_values.find(
+          (cv) => cv.id === ESTADO_CREACION_COLUMN_ID
+        )?.text?.trim()
+
+        if (estadoCreacion === 'Poliza Creada' || estadoCreacion === 'Error') {
+          setPolizaPolling(false)
+          if (estadoCreacion === 'Error') {
+            setPolizaErrorDetail(await loadErrorUpdate(ERROR_UPDATE_TAG_CREAR_POLIZA))
+          }
+        }
+      } catch {
+        // hiccup de red puntual: seguimos intentando en el próximo tick
+      }
+    }
+
+    // Mismo fix que en los otros dos polling: recuperar foco/visibilidad fuerza un tick
+    // inmediato en vez de esperar a que el navegador retome el setInterval frenado por
+    // estar la pestaña en segundo plano.
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') tick()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', handleVisibility)
+
+    const id = setInterval(tick, POLL_INTERVAL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleVisibility)
+    }
+  }, [polizaPolling, opportunityId])
+
   const statusColors = useMemo(
     () => ({
       estadoOportunidad: schema?.estadoOportunidad?.colorsByLabel ?? {},
       estadoCotizacion: schema?.estadoCotizacion?.colorsByLabel ?? {},
       estadoEnvio: schema?.estadoEnvio?.colorsByLabel ?? {},
+      estadoCreacion: schema?.estadoCreacion?.colorsByLabel ?? {},
     }),
     [schema]
   )
@@ -495,6 +558,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   const handleUploadPoliza = async (file) => {
     setUploadingDoc((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: true }))
     setDocUploadError((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: null }))
+    setPolizaErrorDetail(null)
     try {
       await uploadFileToColumn(opportunityId, POLIZA_COLUMN_ID, file)
       await setSimpleColumnValue(opportunityId, ESTADO_OPORTUNIDAD_COLUMN_ID, 'Concretada')
@@ -506,6 +570,10 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
           return cv
         }),
       }))
+      // La carga del archivo dispara del lado de monday la automatización que crea la
+      // póliza (color_mm4w54ga, Estado Creacion) — prendemos el mismo polling en vivo
+      // que ya usamos para Estado Cotización/Estado Envio.
+      setPolizaPolling(true)
     } catch (err) {
       setDocUploadError((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: err.message }))
     } finally {
@@ -855,6 +923,10 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
               error={docUploadError[POLIZA_COLUMN_ID]}
               onUploadPoliza={handleUploadPoliza}
               onDeletePoliza={() => handleDeleteDocument(POLIZA_COLUMN_ID)}
+              estadoCreacion={opportunity.estadoCreacion}
+              estadoCreacionColor={opportunity.estadoCreacionColor}
+              polling={polizaPolling}
+              errorDetail={polizaErrorDetail}
             />
           )}
         </>

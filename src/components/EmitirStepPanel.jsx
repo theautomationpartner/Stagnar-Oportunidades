@@ -2,6 +2,7 @@ import { AttentionBox } from '@vibe/core'
 import { formatMoney } from '../services/format'
 import { accentForCompania } from '../services/companyColors'
 import DocumentUploadRow from './DocumentUploadRow'
+import StatusBadge from './StatusBadge'
 import './EmitirStepPanel.css'
 
 // Resumen final de todos los datos con los que se cerró la oportunidad: cliente, bien
@@ -34,6 +35,10 @@ export default function EmitirStepPanel({
   error,
   onUploadPoliza,
   onDeletePoliza,
+  estadoCreacion,
+  estadoCreacionColor,
+  polling,
+  errorDetail,
 }) {
   const elegida = groups.flatMap((g) => g.entries).find((e) => e.raw.propuestaElegida)
   const accent = elegida ? accentForCompania(elegida.raw.compania) : null
@@ -130,6 +135,12 @@ export default function EmitirStepPanel({
           Subí el PDF (u otro archivo) de la póliza emitida por la compañía. Al cargarla, la
           oportunidad pasa automáticamente a "Concretada".
         </p>
+        {estadoCreacion && (
+          <div className="emitir-step__estado">
+            <span>Estado de creación:</span>
+            <StatusBadge label={estadoCreacion} color={estadoCreacionColor} />
+          </div>
+        )}
         <DocumentUploadRow
           label="Póliza"
           fileName={polizaFileName}
@@ -139,6 +150,19 @@ export default function EmitirStepPanel({
           onUpload={onUploadPoliza}
           onDelete={onDeletePoliza}
         />
+        {polling && (
+          <AttentionBox type="warning" icon={false}>
+            <span className="emitir-step__spinner" aria-hidden="true" />
+            Creando la póliza... esto puede tardar unos segundos. La pantalla se va a
+            actualizar sola apenas esté lista.
+          </AttentionBox>
+        )}
+        {!polling && errorDetail && (
+          <div className="emitir-step__error-detail">
+            <strong>Detalle del error (último update en la oportunidad):</strong>
+            <pre>{errorDetail}</pre>
+          </div>
+        )}
       </div>
     </div>
   )

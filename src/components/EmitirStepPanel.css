@@ -108,3 +108,56 @@
   color: #a15c00;
   margin: 4px 0 0;
 }
+
+.emitir-step__estado {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #676879;
+  margin-bottom: 12px;
+}
+
+.emitir-step__spinner {
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  border: 2px solid #fde3c4;
+  border-top-color: #a15c00;
+  flex-shrink: 0;
+  animation: emitir-step-spin 0.8s linear infinite;
+}
+
+@keyframes emitir-step-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.emitir-step__error-detail {
+  margin-top: 16px;
+  background: #fdf1f2;
+  border: 1px solid #f7c6cc;
+  border-radius: 8px;
+  padding: 14px 16px;
+  color: #a41f36;
+  font-size: 12px;
+}
+
+.emitir-step__error-detail strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.emitir-step__error-detail pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 2;
+  max-height: 220px;
+  overflow-y: auto;
+}
