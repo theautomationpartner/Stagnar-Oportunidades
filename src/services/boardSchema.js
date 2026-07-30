@@ -11,6 +11,7 @@ const STATUS_COLUMNS = {
   tipoSujeto: 'color_mm51mm5v',
   estadoEnvio: 'color_mm4wr1t4',
   estadoCreacion: 'color_mm5ejysv',
+  estadoLectura: 'color_mm5rzrhk',
   uso: 'color_mm52ey1d',
 }
 

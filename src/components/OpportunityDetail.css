@@ -225,3 +225,23 @@
   display: flex;
   gap: 12px;
 }
+
+.opp-detail__lectura-gate {
+  margin: 20px 32px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.opp-detail__lectura-gate-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.opp-detail__lectura-gate-row > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}

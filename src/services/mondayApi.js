@@ -31,6 +31,8 @@ const OPPORTUNITY_COLUMN_IDS = [
   'file_mm5pc008', // Cedula
   'file_mm5bzdd4', // Poliza
   'color_mm5ejysv', // Crear Poliza (estado)
+  'color_mm51n4j', // Posee Vehiculo?
+  'color_mm5rzrhk', // Leer Cedula y Archivo Automovil
 ]
 
 const ITEMS_QUERY = `

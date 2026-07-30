@@ -7,8 +7,9 @@ import {
   MdSend,
   MdArrowBack,
   MdAutorenew,
+  MdWarningAmber,
 } from 'react-icons/md'
-import { Button, IconButton, EmptyState } from '@vibe/core'
+import { Button, IconButton, EmptyState, AttentionBox } from '@vibe/core'
 import TopBar from './TopBar'
 import ParametersPanel from './ParametersPanel'
 import CompanyGroup from './CompanyGroup'
@@ -39,6 +40,8 @@ const ESTADO_OPORTUNIDAD_COLUMN_ID = 'deal_stage'
 const ESTADO_COTIZACION_COLUMN_ID = 'color_mm51n7aa'
 const ESTADO_ENVIO_COLUMN_ID = 'color_mm4wr1t4'
 const ESTADO_CREACION_COLUMN_ID = 'color_mm5ejysv'
+const POSEE_VEHICULO_COLUMN_ID = 'color_mm51n4j'
+const ESTADO_LECTURA_COLUMN_ID = 'color_mm5rzrhk'
 const INCLUIR_PROPUESTA_COLUMN_ID = 'boolean_mm4wjdnw'
 const LIBRETA_CONDUCIR_COLUMN_ID = 'file_mm51jy06'
 const CEDULA_COLUMN_ID = 'file_mm5pc008'
@@ -58,6 +61,7 @@ const POLL_INTERVAL_MS = 4000
 const ERROR_UPDATE_TAG_COTIZAR = '[COTIZAR]'
 const ERROR_UPDATE_TAG_ENVIO = '[ENVIO]'
 const ERROR_UPDATE_TAG_CREAR_POLIZA = '[CREAR_POLIZA]'
+const ERROR_UPDATE_TAG_LEER = '[LEER]'
 
 export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   const [item, setItem] = useState(null)
@@ -82,9 +86,12 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   const [polizaPolling, setPolizaPolling] = useState(false)
   const [confirmandoEmision, setConfirmandoEmision] = useState(false)
   const [confirmarEmisionError, setConfirmarEmisionError] = useState(null)
+  const [lecturaPolling, setLecturaPolling] = useState(false)
+  const [lecturaDismissed, setLecturaDismissed] = useState(false)
   const [cotizarErrorDetail, setCotizarErrorDetail] = useState(null)
   const [envioErrorDetail, setEnvioErrorDetail] = useState(null)
   const [polizaErrorDetail, setPolizaErrorDetail] = useState(null)
+  const [lecturaErrorDetail, setLecturaErrorDetail] = useState(null)
 
   // El robot que genera la cotización (o el escenario de Make.com que la envía) postea
   // el detalle del error como un Update nativo de monday sobre el ítem cuando algo falla
@@ -106,9 +113,11 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
     setLoading(true)
     setError(null)
     setPolling(false)
+    setLecturaDismissed(false)
     setCotizarErrorDetail(null)
     setEnvioErrorDetail(null)
     setPolizaErrorDetail(null)
+    setLecturaErrorDetail(null)
 
     fetchOpportunityDetail(opportunityId)
       .then(async (data) => {
@@ -130,6 +139,15 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
         )?.text?.trim()
         const estadoCreacion = data.column_values.find(
           (cv) => cv.id === ESTADO_CREACION_COLUMN_ID
+        )?.text?.trim()
+        // El gate de "Leer Cédula y Archivo Automóvil" solo aplica cuando la oportunidad
+        // "Posee Vehículo" (si no, esos documentos se piden directo en el paso 3
+        // Confirmar, sin pasar por ninguna lectura automática).
+        const poseeVehiculo = data.column_values.find(
+          (cv) => cv.id === POSEE_VEHICULO_COLUMN_ID
+        )?.text?.trim()
+        const estadoLectura = data.column_values.find(
+          (cv) => cv.id === ESTADO_LECTURA_COLUMN_ID
         )?.text?.trim()
 
         if (estadoOportunidad === 'Nueva') {
@@ -155,6 +173,11 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
         if (estadoCreacion === 'Creando') {
           setPolizaPolling(true)
         }
+        // Mismo criterio para una lectura de Cédula/Archivo Automóvil que quedó
+        // "Leyendo" a mitad de camino — solo si aplica (Posee Vehículo === "Si").
+        if (poseeVehiculo === 'Si' && estadoLectura === 'Leyendo') {
+          setLecturaPolling(true)
+        }
         // Si la oportunidad ya está sentada en "Error" al entrar (no solo al detectarlo
         // durante el polling), traemos igual el detalle del último Update.
         if (estadoCotizacion === 'Error') {
@@ -168,6 +191,10 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
         if (estadoCreacion === 'Error') {
           const detail = await loadErrorUpdate(ERROR_UPDATE_TAG_CREAR_POLIZA)
           if (!cancelled) setPolizaErrorDetail(detail)
+        }
+        if (poseeVehiculo === 'Si' && estadoLectura === 'Error') {
+          const detail = await loadErrorUpdate(ERROR_UPDATE_TAG_LEER)
+          if (!cancelled) setLecturaErrorDetail(detail)
         }
       })
       .catch((err) => {
@@ -333,12 +360,60 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
     }
   }, [polizaPolling, opportunityId])
 
+  // Refleja en vivo los cambios de color_mm5rzrhk (Leer Cédula y Archivo Automóvil)
+  // mientras se procesa la lectura automática de esos documentos: reconsulta cada
+  // POLL_INTERVAL_MS y corta el polling apenas llega a un estado terminal ("Leidos" o
+  // "Error"). Solo se prende cuando aplica (ver mount effect — Posee Vehículo === "Si").
+  useEffect(() => {
+    if (!lecturaPolling) return undefined
+    let cancelled = false
+
+    const tick = async () => {
+      try {
+        const data = await fetchOpportunityDetail(opportunityId)
+        if (cancelled || !data) return
+        setItem(data)
+
+        const estadoLectura = data.column_values.find(
+          (cv) => cv.id === ESTADO_LECTURA_COLUMN_ID
+        )?.text?.trim()
+
+        if (estadoLectura === 'Leidos' || estadoLectura === 'Error') {
+          setLecturaPolling(false)
+          if (estadoLectura === 'Error') {
+            setLecturaErrorDetail(await loadErrorUpdate(ERROR_UPDATE_TAG_LEER))
+          }
+        }
+      } catch {
+        // hiccup de red puntual: seguimos intentando en el próximo tick
+      }
+    }
+
+    // Mismo fix que en los otros polling: recuperar foco/visibilidad fuerza un tick
+    // inmediato en vez de esperar a que el navegador retome el setInterval frenado por
+    // estar la pestaña en segundo plano.
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') tick()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', handleVisibility)
+
+    const id = setInterval(tick, POLL_INTERVAL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleVisibility)
+    }
+  }, [lecturaPolling, opportunityId])
+
   const statusColors = useMemo(
     () => ({
       estadoOportunidad: schema?.estadoOportunidad?.colorsByLabel ?? {},
       estadoCotizacion: schema?.estadoCotizacion?.colorsByLabel ?? {},
       estadoEnvio: schema?.estadoEnvio?.colorsByLabel ?? {},
       estadoCreacion: schema?.estadoCreacion?.colorsByLabel ?? {},
+      estadoLectura: schema?.estadoLectura?.colorsByLabel ?? {},
     }),
     [schema]
   )
@@ -709,6 +784,15 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   const emitirActive =
     !emitirDone && (opportunity?.estadoLabel === 'Cotizacion aceptada' || Boolean(opportunity?.poliza))
 
+  // Gate previo al paso 1: solo aplica si la oportunidad "Posee Vehículo" (si no, esos
+  // documentos se piden directo en el paso 3 Confirmar, sin lectura automática de por
+  // medio). Mientras esté "Leyendo" no se puede saltear; en "Error" se puede continuar
+  // igual a mano (por si la lectura automática falló y hay que cargar los datos a mano).
+  const lecturaGateActive =
+    opportunity?.poseeVehiculo === 'Si' &&
+    (opportunity?.estadoLectura === 'Leyendo' || opportunity?.estadoLectura === 'Error') &&
+    !lecturaDismissed
+
   const steps = [
     { key: 'cotizar', label: 'Cotizar', status: hasQuotes ? 'done' : 'active', clickable: true },
     {
@@ -782,9 +866,39 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
             />
           </div>
 
-          <Stepper steps={steps} activeKey={activeStep} onSelect={setActiveStep} />
+          {lecturaGateActive ? (
+            <div className="opp-detail__lectura-gate">
+              {opportunity.estadoLectura === 'Leyendo' && (
+                <AttentionBox type="warning" icon={false}>
+                  <span className="opp-detail__envio-spinner" aria-hidden="true" />
+                  Leyendo Cédula y Carta Automóvil... esto puede tardar unos segundos. La
+                  pantalla se va a actualizar sola apenas esté lista.
+                </AttentionBox>
+              )}
+              {opportunity.estadoLectura === 'Error' && (
+                <AttentionBox type="negative">
+                  <div className="opp-detail__lectura-gate-row">
+                    <span>
+                      <MdWarningAmber /> No se pudieron leer los documentos automáticamente.
+                    </span>
+                    <Button kind="secondary" onClick={() => setLecturaDismissed(true)}>
+                      Continuar de todas formas
+                    </Button>
+                  </div>
+                </AttentionBox>
+              )}
+              {opportunity.estadoLectura === 'Error' && lecturaErrorDetail && (
+                <div className="opp-detail__error-detail">
+                  <strong>Detalle del error (último update en la oportunidad):</strong>
+                  <pre>{lecturaErrorDetail}</pre>
+                </div>
+              )}
+            </div>
+          ) : (
+            <>
+              <Stepper steps={steps} activeKey={activeStep} onSelect={setActiveStep} />
 
-          {activeStep === 'cotizar' && (
+              {activeStep === 'cotizar' && (
             <CotizarStepPanel
               opportunity={opportunity}
               hasQuotes={hasQuotes}
@@ -964,6 +1078,8 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
               confirmandoEmision={confirmandoEmision}
               confirmarEmisionError={confirmarEmisionError}
             />
+          )}
+            </>
           )}
         </>
       )}

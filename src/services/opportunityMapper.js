@@ -65,6 +65,9 @@ export function mapOpportunityItem(item, statusColors = {}) {
   const estadoEnvioColor = statusColors.estadoEnvio?.[estadoEnvio] ?? DEFAULT_COLOR
   const estadoCreacion = textOf(cv, 'color_mm5ejysv')
   const estadoCreacionColor = statusColors.estadoCreacion?.[estadoCreacion] ?? DEFAULT_COLOR
+  const poseeVehiculo = textOf(cv, 'color_mm51n4j')
+  const estadoLectura = textOf(cv, 'color_mm5rzrhk')
+  const estadoLecturaColor = statusColors.estadoLectura?.[estadoLectura] ?? DEFAULT_COLOR
 
   return {
     id: item.id,
@@ -97,6 +100,9 @@ export function mapOpportunityItem(item, statusColors = {}) {
     estadoEnvioColor,
     estadoCreacion,
     estadoCreacionColor,
+    poseeVehiculo,
+    estadoLectura,
+    estadoLecturaColor,
     ultimaCotizacion,
     asignado,
     asignadoIniciales: initialsOf(asignado),
