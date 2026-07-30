@@ -27,8 +27,8 @@ const OPPORTUNITY_COLUMN_IDS = [
   'date_mm516agw', // Fecha Nacimiento
   'board_relation_mm54tq30', // Departamento
   'location_mm51e7g7', // Ubicación Circulacion
-  'file_mm51jy06', // Libreta de Conducir
-  'file_mm51xnxq', // Carta Automovil
+  'file_mm51jy06', // Libreta de Conducir / Carta Automovil
+  'file_mm5pc008', // Cedula
   'file_mm5bzdd4', // Poliza
   'color_mm5ejysv', // Crear Poliza (estado)
 ]
@@ -181,6 +181,38 @@ const DEPARTAMENTOS_QUERY = `
     }
   }
 `
+
+// Modelo (board_relation_mm5422v9) conecta con estos dos tableros de Autodata, que
+// combinados superan los 15.000 ítems — a diferencia de Departamentos, no se pueden
+// precargar enteros. V1 y V2 tienen cobertura de marcas/modelos distinta (no son
+// duplicados uno del otro, confirmado contra la API real), así que hay que buscar en
+// los dos y unir los resultados.
+const AUTODATA_BOARD_IDS = [18421913144, 18421911963]
+
+const SEARCH_AUTODATA_QUERY = `
+  query SearchAutodata($boardId: ID!, $searchText: String!) {
+    boards(ids: [$boardId]) {
+      items_page(
+        limit: 12
+        query_params: { rules: [{ column_id: "name", compare_value: [$searchText], operator: contains_text }] }
+      ) {
+        items {
+          id
+          name
+        }
+      }
+    }
+  }
+`
+
+export async function searchAutodataModelos(searchText) {
+  const term = (searchText ?? '').trim()
+  if (term.length < 2) return []
+  const results = await Promise.all(
+    AUTODATA_BOARD_IDS.map((boardId) => callMondayApi(SEARCH_AUTODATA_QUERY, { boardId, searchText: term }))
+  )
+  return results.flatMap((data) => data.boards[0]?.items_page.items ?? [])
+}
 
 // Tablero "PANEL": tarifario de recargos por compañía + cantidad de cuotas, textos
 // INCLUYE por compañía + cobertura, y valores de configuración (todo centralizado acá,

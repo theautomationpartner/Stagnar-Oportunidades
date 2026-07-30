@@ -83,7 +83,7 @@ export function mapOpportunityItem(item, statusColors = {}) {
     departamento: boardRelationDisplayOf(cv, 'board_relation_mm54tq30'),
     zonaCirculacion: textOf(cv, 'location_mm51e7g7'),
     libretaConducir: textOf(cv, 'file_mm51jy06'),
-    cartaAutomovil: textOf(cv, 'file_mm51xnxq'),
+    cedula: textOf(cv, 'file_mm5pc008'),
     poliza: textOf(cv, 'file_mm5bzdd4'),
     bienLinea1,
     bienLinea2: bienLinea2 || (coberturas.length ? coberturas.join(' / ') : ''),

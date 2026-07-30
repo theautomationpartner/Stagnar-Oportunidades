@@ -41,7 +41,7 @@ const ESTADO_ENVIO_COLUMN_ID = 'color_mm4wr1t4'
 const ESTADO_CREACION_COLUMN_ID = 'color_mm5ejysv'
 const INCLUIR_PROPUESTA_COLUMN_ID = 'boolean_mm4wjdnw'
 const LIBRETA_CONDUCIR_COLUMN_ID = 'file_mm51jy06'
-const CARTA_AUTOMOVIL_COLUMN_ID = 'file_mm51xnxq'
+const CEDULA_COLUMN_ID = 'file_mm5pc008'
 const POLIZA_COLUMN_ID = 'file_mm5bzdd4'
 const PROPUESTA_ELEGIDA_COLUMN_ID = 'boolean_mm5bn41n'
 // Opcionales de PORTO (Granizo/Cristales/Coche Cortesía) — ver handleToggleOpcional abajo
@@ -511,7 +511,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
     setSendPolling(true)
   }
 
-  // Sube Libreta de Conducir / Carta Automóvil (paso 3, columnas "file" de la
+  // Sube Libreta de Conducir/Carta Automóvil y Cédula (paso 3, columnas "file" de la
   // oportunidad) directo a monday. El check visual del paso 3 depende de que el `text`
   // de la columna deje de estar vacío, así que actualizamos el `item` en memoria con el
   // nombre del archivo apenas la mutation confirma el upload (sin esperar a un refetch).
@@ -533,7 +533,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
     }
   }
 
-  // Botón "Eliminar" de cualquier columna file (Libreta/Carta en paso 3, Póliza en paso
+  // Botón "Eliminar" de cualquier columna file (Libreta/Cédula en paso 3, Póliza en paso
   // 4): update_assets_on_item con "files: []" vacía la columna (ver mondayApi.js —
   // change_simple_column_value no soporta columnas file). Genérico por columnId, igual
   // que handleUploadDocument.
@@ -628,7 +628,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
     const currentDeptId = departamentos.find((d) => d.name === opportunity.departamento)?.id ?? ''
 
     for (const field of COTIZAR_FIELDS) {
-      if (field.kind === 'connected') continue
+      if (field.kind === 'connected' || field.kind === 'autodata') continue
       const newValue = formValues[field.key] ?? ''
       const oldValue = opportunity[field.key] ?? ''
       if (newValue === oldValue) continue
@@ -641,13 +641,26 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
       await setConnectedColumnValue(opportunityId, deptField.columnId, ids)
     }
 
+    // Modelo (Autodata): solo se escribe si en esta edición se eligió uno nuevo del
+    // buscador — se guarda como conexión (igual que Departamento), no como texto. El
+    // texto real de `text_mm54fb7m` lo termina asentando la automatización de
+    // "Cotizar" (que además vacía esta conexión) — acá solo dejamos la elección hecha.
+    if (formValues.modeloSeleccion) {
+      const modeloField = COTIZAR_FIELDS.find((f) => f.key === 'modelo')
+      await setConnectedColumnValue(opportunityId, modeloField.connectedColumnId, [
+        Number(formValues.modeloSeleccion.id),
+      ])
+    }
+
     const nuevoDepartamentoNombre =
       departamentos.find((d) => d.id === formValues.departamentoId)?.name ?? ''
 
     const textByColumnId = {
       numeric_mm51mb0s: formValues.ci,
       dropdown_mm51mdmq: formValues.anio,
-      text_mm54fb7m: formValues.modelo,
+      // Muestra ya la elección nueva del buscador Autodata si se hizo una; si no, sigue
+      // mostrando el texto real actual tal cual estaba.
+      text_mm54fb7m: formValues.modeloSeleccion?.name ?? formValues.modelo,
       dropdown_mm51ykrd: formValues.marca,
       dropdown_mm52jp01: formValues.combustible,
       color_mm52ey1d: formValues.uso,
@@ -900,15 +913,15 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
               documentos={[
                 {
                   key: 'libretaConducir',
-                  label: 'Libreta de Conducir',
+                  label: 'Libreta de Conducir / Carta Automóvil',
                   columnId: LIBRETA_CONDUCIR_COLUMN_ID,
                   fileName: opportunity.libretaConducir,
                 },
                 {
-                  key: 'cartaAutomovil',
-                  label: 'Carta Automóvil',
-                  columnId: CARTA_AUTOMOVIL_COLUMN_ID,
-                  fileName: opportunity.cartaAutomovil,
+                  key: 'cedula',
+                  label: 'Cédula',
+                  columnId: CEDULA_COLUMN_ID,
+                  fileName: opportunity.cedula,
                 },
               ]}
               uploadingDoc={uploadingDoc}

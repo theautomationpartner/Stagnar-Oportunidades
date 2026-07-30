@@ -11,12 +11,27 @@
 //  - 'connected': columna "conectada" (board_relation) — se edita con un Dropdown
 //    poblado con los items reales del tablero vinculado (Departamentos), y se guarda
 //    con change_column_value (JSON con item_ids), no con change_simple_column_value.
+//  - 'autodata': caso especial de "connected" solo para Modelo — a diferencia de
+//    Departamento, el tablero vinculado (board_relation_mm5422v9, AUTODATA V1+V2) tiene
+//    más de 15.000 ítems combinados, así que no se puede precargar: se busca en vivo por
+//    texto (ver mondayApi.js#searchAutodataModelos). Se guarda igual que 'connected'
+//    (change_column_value), pero el VALOR REAL para mostrar/validar sigue viviendo en
+//    `text_mm54fb7m` (columnId de este field), no en la columna conectada — la
+//    automatización de "Cotizar" lee la conexión, deja el nombre del modelo asentado en
+//    ese texto, y vacía la conexión después (para no acumular conexiones de
+//    board_relation). Ver CotizarStepPanel.jsx#AutodataModeloSelect.
 //  - 'location': columna de ubicación — simplificado a edición de texto libre
 //    (sin recalcular coordenadas); se guarda con change_simple_column_value.
 export const COTIZAR_FIELDS = [
   { key: 'ci', label: 'CI', kind: 'number', columnId: 'numeric_mm51mb0s' },
   { key: 'anio', label: 'Año', kind: 'dropdown', columnId: 'dropdown_mm51mdmq', optionsKey: 'anios' },
-  { key: 'modelo', label: 'Modelo', kind: 'text', columnId: 'text_mm54fb7m' },
+  {
+    key: 'modelo',
+    label: 'Modelo',
+    kind: 'autodata',
+    columnId: 'text_mm54fb7m',
+    connectedColumnId: 'board_relation_mm5422v9',
+  },
   { key: 'marca', label: 'Marca', kind: 'dropdown', columnId: 'dropdown_mm51ykrd', optionsKey: 'marcas' },
   {
     key: 'combustible',

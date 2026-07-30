@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   MdCheckCircle,
   MdSend,
@@ -10,6 +10,7 @@ import {
 } from 'react-icons/md'
 import { Button, Dropdown, AttentionBox } from '@vibe/core'
 import { COTIZAR_FIELDS, getMissingCotizarFields } from '../services/cotizarFields'
+import { searchAutodataModelos } from '../services/mondayApi'
 import StatusBadge from './StatusBadge'
 import './CotizarStepPanel.css'
 
@@ -19,6 +20,10 @@ function buildInitialForm(opportunity, departamentos) {
     ci: opportunity.ci,
     anio: opportunity.anio,
     modelo: opportunity.modelo,
+    // Solo se completa si en esta edición se elige un modelo nuevo del buscador
+    // Autodata (ver AutodataModeloSelect) — null significa "no se tocó", se sigue
+    // usando el `modelo` (texto) real de arriba tal cual está.
+    modeloSeleccion: null,
     marca: opportunity.marca,
     combustible: opportunity.combustible,
     uso: opportunity.uso,
@@ -34,7 +39,61 @@ function buildInitialForm(opportunity, departamentos) {
 // string/id suelto como nuestro estado de formulario — la conversión de ida
 // y vuelta pasa toda acá adentro, el resto del componente sigue viendo
 // strings/ids comunes (mismo patrón ya usado en FilterPanel.jsx).
-function FieldControl({ field, value, onChange, options, departamentos }) {
+// Modelo (Autodata): a diferencia de Departamento, el tablero vinculado (AUTODATA V1 +
+// V2) tiene más de 15.000 ítems combinados — no se puede precargar como el resto de
+// los "connected". Se busca en vivo por texto (mínimo 2 caracteres, debounce 300ms)
+// contra la API real (ver mondayApi.js#searchAutodataModelos) y se muestra hasta ~24
+// coincidencias. `value` es la selección NUEVA hecha en esta edición ({id, name} o
+// null si no se tocó) — el texto real actual (`currentLabel`) se muestra como
+// placeholder para que se vea qué modelo tiene cargado hoy la oportunidad.
+function AutodataModeloSelect({ currentLabel, value, onChange }) {
+  const [inputValue, setInputValue] = useState('')
+  const [options, setOptions] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const term = inputValue.trim()
+    if (term.length < 2) {
+      setOptions([])
+      setLoading(false)
+      return undefined
+    }
+    let cancelled = false
+    setLoading(true)
+    const timer = setTimeout(() => {
+      searchAutodataModelos(term)
+        .then((results) => {
+          if (!cancelled) setOptions(results.map((r) => ({ value: r.id, label: r.name })))
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false)
+        })
+    }, 300)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [inputValue])
+
+  const selected = value ? { value: value.id, label: value.name } : null
+
+  return (
+    <Dropdown
+      searchable
+      options={options}
+      value={selected}
+      loading={loading}
+      onInputChange={(input) => setInputValue(input ?? '')}
+      placeholder={currentLabel ? `Actual: ${currentLabel}` : 'Buscar modelo...'}
+      noOptionsMessage={inputValue.trim().length < 2 ? 'Escribí para buscar' : 'Sin resultados'}
+      clearable
+      onClear={() => onChange(null)}
+      onChange={(option) => onChange(option ? { id: option.value, name: option.label } : null)}
+    />
+  )
+}
+
+function FieldControl({ field, value, onChange, options, departamentos, currentModelo }) {
   if (field.kind === 'text' || field.kind === 'location') {
     return <input type="text" value={value} onChange={(e) => onChange(e.target.value)} />
   }
@@ -71,6 +130,9 @@ function FieldControl({ field, value, onChange, options, departamentos }) {
         onChange={(option) => onChange(option?.value ?? '')}
       />
     )
+  }
+  if (field.kind === 'autodata') {
+    return <AutodataModeloSelect currentLabel={currentModelo} value={value} onChange={onChange} />
   }
   return null
 }
@@ -174,10 +236,21 @@ export default function CotizarStepPanel({
               <span className="cotizar-step__field-label">{f.label}</span>
               <FieldControl
                 field={f}
-                value={f.key === 'departamento' ? form.departamentoId : form[f.key]}
-                onChange={(v) => handleFieldChange(f.key === 'departamento' ? 'departamentoId' : f.key, v)}
+                value={
+                  f.key === 'departamento'
+                    ? form.departamentoId
+                    : f.key === 'modelo'
+                      ? form.modeloSeleccion
+                      : form[f.key]
+                }
+                onChange={(v) => {
+                  if (f.key === 'departamento') return handleFieldChange('departamentoId', v)
+                  if (f.key === 'modelo') return handleFieldChange('modeloSeleccion', v)
+                  return handleFieldChange(f.key, v)
+                }}
                 options={dropdownOptions[f.optionsKey] ?? []}
                 departamentos={departamentos}
+                currentModelo={opportunity.modelo}
               />
             </label>
           ))}
