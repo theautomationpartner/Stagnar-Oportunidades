@@ -544,6 +544,7 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                     options={marcaOptions}
                     value={marcaOptions.find((o) => o.value === form.marca) ?? null}
                     placeholder="Escribe para buscar resultados"
+                    searchable
                     onChange={(option) => handleChange('marca', option?.value ?? '')}
                   />
                 </label>
@@ -552,7 +553,8 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                   <RequiredDropdown
                     options={anioOptions}
                     value={anioOptions.find((o) => o.value === form.anio) ?? null}
-                    placeholder="Selecciona una opción"
+                    placeholder="Escribe para buscar resultados"
+                    searchable
                     onChange={(option) => handleChange('anio', option?.value ?? '')}
                   />
                 </label>
@@ -570,7 +572,8 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                   <RequiredDropdown
                     options={usoOptions}
                     value={usoOptions.find((o) => o.value === form.uso) ?? null}
-                    placeholder="Selecciona una opción"
+                    placeholder="Escribe para buscar resultados"
+                    searchable
                     onChange={(option) => handleChange('uso', option?.value ?? '')}
                   />
                 </label>
@@ -579,7 +582,8 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                   <RequiredDropdown
                     options={tipoOptions}
                     value={tipoOptions.find((o) => o.value === form.tipo) ?? null}
-                    placeholder="Selecciona una opción"
+                    placeholder="Escribe para buscar resultados"
+                    searchable
                     onChange={(option) => handleChange('tipo', option?.value ?? '')}
                   />
                 </label>
