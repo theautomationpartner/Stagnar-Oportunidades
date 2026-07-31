@@ -1,0 +1,80 @@
+.landing {
+  padding: 40px 32px;
+  max-width: 760px;
+  margin: 0 auto;
+}
+
+.landing__title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #323338;
+  margin: 0 0 4px;
+}
+
+.landing__subtitle {
+  color: #676879;
+  font-size: 14px;
+  margin: 0 0 32px;
+}
+
+.landing__cards {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+}
+
+@media (max-width: 640px) {
+  .landing__cards {
+    grid-template-columns: 1fr;
+  }
+}
+
+.landing__card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 10px;
+  padding: 28px 24px;
+  background: #fff;
+  border: 1px solid #d0d4e4;
+  border-radius: 10px;
+}
+
+.landing__card--primary {
+  border-color: #0073ea;
+}
+
+.landing__card-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  font-size: 24px;
+  margin-bottom: 4px;
+}
+
+.landing__card-icon--primary {
+  background: #eef6ff;
+  color: #0073ea;
+}
+
+.landing__card-icon--secondary {
+  background: #e6f9f1;
+  color: #037f4c;
+}
+
+.landing__card-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #323338;
+  margin: 0;
+}
+
+.landing__card-desc {
+  font-size: 13px;
+  color: #676879;
+  margin: 0 0 12px;
+  min-height: 34px;
+}

@@ -169,6 +169,52 @@ const CLEAR_FILE_COLUMN_MUTATION = `
   }
 `
 
+// Crea la oportunidad desde el formulario "Agregar Oportunidades" — SIN column_values.
+// Ojo, esto es a propósito: si el create_item incluye column_values en el mismo
+// mutation, monday no dispara las automatizaciones de "cuando cambia esta columna"
+// (ni siquiera algunas de "cuando se crea el ítem" si dependen del valor inicial de una
+// columna) — el valor queda asentado como estado inicial, no como un "cambio" real que
+// el motor de automatizaciones pueda escuchar. Confirmado por el problema real: la
+// automatización de "cuando se crea el ítem, hacer algo" no disparaba con el
+// create_item viejo que sí mandaba column_values. Por eso ahora el ítem se crea pelado
+// y todos los valores se asientan después, en un segundo mutation separado
+// (setMultipleColumnValues) — eso sí genera eventos de cambio reales.
+const CREATE_ITEM_MUTATION = `
+  mutation CreateOpportunity($boardId: ID!, $itemName: String!) {
+    create_item(board_id: $boardId, item_name: $itemName) {
+      id
+    }
+  }
+`
+
+export async function createOpportunityItem(itemName) {
+  const data = await callMondayApi(CREATE_ITEM_MUTATION, {
+    boardId: OPPORTUNITIES_BOARD_ID,
+    itemName,
+  })
+  return data.create_item
+}
+
+// column_values va como JSON *stringificado* (mismo motivo que change_column_value: el
+// scalar "JSON" de monday espera un string con el JSON adentro, no un objeto anidado,
+// confirmado ya varias veces contra la API real).
+const CHANGE_MULTIPLE_COLUMN_VALUES_MUTATION = `
+  mutation ChangeMultipleColumnValues($boardId: ID!, $itemId: ID!, $columnValues: JSON!) {
+    change_multiple_column_values(board_id: $boardId, item_id: $itemId, column_values: $columnValues) {
+      id
+    }
+  }
+`
+
+export async function setMultipleColumnValues(itemId, columnValues) {
+  const data = await callMondayApi(CHANGE_MULTIPLE_COLUMN_VALUES_MUTATION, {
+    boardId: OPPORTUNITIES_BOARD_ID,
+    itemId,
+    columnValues: JSON.stringify(columnValues),
+  })
+  return data.change_multiple_column_values
+}
+
 const DEPARTAMENTOS_BOARD_ID = 18384987039
 
 const DEPARTAMENTOS_QUERY = `
@@ -184,6 +230,11 @@ const DEPARTAMENTOS_QUERY = `
   }
 `
 
+// Localidad (board_relation_mm5sqf8t, "📍Localidades") en el formulario de "Agregar
+// Oportunidades" — tablero de referencia chico (igual que Departamentos), se puede
+// precargar entero. Reusa la misma query genérica de {id, name} que Departamentos.
+const LOCALIDADES_BOARD_ID = 18424578859
+
 // Modelo (board_relation_mm5422v9) conecta con estos dos tableros de Autodata, que
 // combinados superan los 15.000 ítems — a diferencia de Departamentos, no se pueden
 // precargar enteros. V1 y V2 tienen cobertura de marcas/modelos distinta (no son
@@ -191,13 +242,13 @@ const DEPARTAMENTOS_QUERY = `
 // los dos y unir los resultados.
 const AUTODATA_BOARD_IDS = [18421913144, 18421911963]
 
+// $rules/$operator van tipados como los input types reales de la API (ItemsQueryRule/
+// ItemsQueryOperator), no como un JSON genérico — confirmado que se puede pasar un
+// array de reglas armado dinámicamente en JS como variable GraphQL normal.
 const SEARCH_AUTODATA_QUERY = `
-  query SearchAutodata($boardId: ID!, $searchText: String!) {
+  query SearchAutodata($boardId: ID!, $rules: [ItemsQueryRule!], $operator: ItemsQueryOperator) {
     boards(ids: [$boardId]) {
-      items_page(
-        limit: 12
-        query_params: { rules: [{ column_id: "name", compare_value: [$searchText], operator: contains_text }] }
-      ) {
+      items_page(limit: 12, query_params: { rules: $rules, operator: $operator }) {
         items {
           id
           name
@@ -207,13 +258,30 @@ const SEARCH_AUTODATA_QUERY = `
   }
 `
 
+async function searchAutodataOnBoards(rules, operator) {
+  const results = await Promise.all(
+    AUTODATA_BOARD_IDS.map((boardId) => callMondayApi(SEARCH_AUTODATA_QUERY, { boardId, rules, operator }))
+  )
+  return results.flatMap((data) => data.boards[0]?.items_page.items ?? [])
+}
+
+// A pedido: un solo contains_text con el texto completo era muy frágil (un carácter de
+// más/de menos, o las palabras en otro orden, y no encontraba nada). Ahora separa por
+// palabras y arma una regla "contains_text" por cada una, combinadas con AND — así
+// "corolla toyota" encuentra igual "TOYOTA - Corolla 1.6..." sin importar el orden. Si
+// el AND no encuentra nada (typo raro, término que no matchea ninguna combinación),
+// reintenta una vez con OR (alguna de las palabras, en cualquiera de los dos tableros)
+// para no dejar la lista vacía de una.
 export async function searchAutodataModelos(searchText) {
   const term = (searchText ?? '').trim()
   if (term.length < 2) return []
-  const results = await Promise.all(
-    AUTODATA_BOARD_IDS.map((boardId) => callMondayApi(SEARCH_AUTODATA_QUERY, { boardId, searchText: term }))
-  )
-  return results.flatMap((data) => data.boards[0]?.items_page.items ?? [])
+  const words = term.split(/\s+/).filter(Boolean)
+  const rules = words.map((word) => ({ column_id: 'name', compare_value: [word], operator: 'contains_text' }))
+
+  const andResults = await searchAutodataOnBoards(rules, 'and')
+  if (andResults.length > 0 || words.length < 2) return andResults
+
+  return searchAutodataOnBoards(rules, 'or')
 }
 
 // Tablero "PANEL": tarifario de recargos por compañía + cantidad de cuotas, textos
@@ -390,6 +458,11 @@ export async function fetchLatestUpdate(itemId, tag) {
 
 export async function fetchDepartamentos() {
   const data = await callMondayApi(DEPARTAMENTOS_QUERY, { boardId: DEPARTAMENTOS_BOARD_ID })
+  return data.boards[0]?.items_page.items ?? []
+}
+
+export async function fetchLocalidades() {
+  const data = await callMondayApi(DEPARTAMENTOS_QUERY, { boardId: LOCALIDADES_BOARD_ID })
   return data.boards[0]?.items_page.items ?? []
 }
 

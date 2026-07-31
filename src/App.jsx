@@ -4,7 +4,9 @@ import PageHeader from './components/PageHeader'
 import FilterPanel from './components/FilterPanel'
 import OpportunitiesTable from './components/OpportunitiesTable'
 import OpportunityDetail from './components/OpportunityDetail'
-import { fetchOpportunities, fetchDepartamentos } from './services/mondayApi'
+import LandingScreen from './components/LandingScreen'
+import CrearOportunidadForm from './components/CrearOportunidadForm'
+import { fetchOpportunities, fetchDepartamentos, fetchLocalidades } from './services/mondayApi'
 import { mapOpportunities } from './services/opportunityMapper'
 import { fetchFilterAndStatusSchema } from './services/boardSchema'
 import { fetchPanelData } from './services/recargoPanel'
@@ -31,6 +33,11 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [openOpportunityId, setOpenOpportunityId] = useState(null)
+  // Pantalla previa a la tabla: elegir entre crear una oportunidad nueva o ver las ya
+  // existentes. 'landing' | 'table' | 'create' — se puede ir de una a otra directo,
+  // sin pasar necesariamente por 'landing' de nuevo (botón "Nueva oportunidad" en la
+  // tabla, y "Ver oportunidades existentes" desde el formulario de creación).
+  const [view, setView] = useState('landing')
 
   useEffect(() => {
     let cancelled = false
@@ -39,11 +46,12 @@ export default function App() {
       fetchOpportunities(ITEMS_LIMIT),
       fetchFilterAndStatusSchema(),
       fetchDepartamentos(),
+      fetchLocalidades(),
       fetchPanelData(),
     ])
-      .then(([items, fetchedSchema, departamentos, panelData]) => {
+      .then(([items, fetchedSchema, departamentos, localidades, panelData]) => {
         if (cancelled) return
-        setSchema({ ...fetchedSchema, departamentos, ...panelData })
+        setSchema({ ...fetchedSchema, departamentos, localidades, ...panelData })
         setOpportunities(
           mapOpportunities(items, {
             estadoOportunidad: fetchedSchema.estadoOportunidad.colorsByLabel,
@@ -117,10 +125,36 @@ export default function App() {
     )
   }
 
+  if (view === 'landing') {
+    return (
+      <div className="app">
+        <TopBar />
+        <LandingScreen onCreateNew={() => setView('create')} onSearchExisting={() => setView('table')} />
+      </div>
+    )
+  }
+
+  if (view === 'create') {
+    return (
+      <div className="app">
+        <TopBar />
+        <CrearOportunidadForm
+          schema={schema}
+          onCancel={() => setView('landing')}
+          onVerOportunidades={() => setView('table')}
+          onCreated={(newItemId) => {
+            setView('table')
+            setOpenOpportunityId(newItemId)
+          }}
+        />
+      </div>
+    )
+  }
+
   return (
     <div className="app">
       <TopBar />
-      <PageHeader />
+      <PageHeader onCreateNew={() => setView('create')} />
       <FilterPanel
         searchTerm={searchTerm}
         onSearchTermChange={setSearchTerm}

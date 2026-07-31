@@ -13,6 +13,7 @@ const STATUS_COLUMNS = {
   estadoCreacion: 'color_mm5ejysv',
   estadoLectura: 'color_mm5rzrhk',
   uso: 'color_mm52ey1d',
+  tipoRiesgo: 'color_mm5atxav',
 }
 
 const DROPDOWN_COLUMNS = {
