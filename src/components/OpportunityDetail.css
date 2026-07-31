@@ -233,6 +233,15 @@
   gap: 16px;
 }
 
+.opp-detail__lectura-gate-estado {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #676879;
+}
+
 .opp-detail__lectura-gate-row {
   display: flex;
   align-items: center;

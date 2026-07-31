@@ -174,8 +174,12 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
           setPolizaPolling(true)
         }
         // Mismo criterio para una lectura de Cédula/Archivo Automóvil que quedó
-        // "Leyendo" a mitad de camino — solo si aplica (Posee Vehículo === "Si").
-        if (poseeVehiculo === 'Si' && estadoLectura === 'Leyendo') {
+        // "Leer" (en cola, todavía no la tomó el robot) o "Leyendo" (en curso) a mitad
+        // de camino — solo si aplica (Posee Vehículo === "Si"). Ojo: si acá solo se
+        // contemplara "Leyendo", entrar a la oportunidad mientras todavía está en
+        // "Leer" nunca prendería el polling, y la pantalla se quedaría congelada sin
+        // enterarse jamás de que después pasó a "Leidos".
+        if (poseeVehiculo === 'Si' && (estadoLectura === 'Leer' || estadoLectura === 'Leyendo')) {
           setLecturaPolling(true)
         }
         // Si la oportunidad ya está sentada en "Error" al entrar (no solo al detectarlo
@@ -786,11 +790,14 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
 
   // Gate previo al paso 1: solo aplica si la oportunidad "Posee Vehículo" (si no, esos
   // documentos se piden directo en el paso 3 Confirmar, sin lectura automática de por
-  // medio). Mientras esté "Leyendo" no se puede saltear; en "Error" se puede continuar
-  // igual a mano (por si la lectura automática falló y hay que cargar los datos a mano).
+  // medio). Cubre "Leer" (en cola) y "Leyendo" (en curso) — no se puede saltear ninguno
+  // de los dos a mano; en "Error" sí se puede continuar igual (por si la lectura
+  // automática falló y hay que cargar los datos a mano).
   const lecturaGateActive =
     opportunity?.poseeVehiculo === 'Si' &&
-    (opportunity?.estadoLectura === 'Leyendo' || opportunity?.estadoLectura === 'Error') &&
+    (opportunity?.estadoLectura === 'Leer' ||
+      opportunity?.estadoLectura === 'Leyendo' ||
+      opportunity?.estadoLectura === 'Error') &&
     !lecturaDismissed
 
   const steps = [
@@ -868,11 +875,18 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
 
           {lecturaGateActive ? (
             <div className="opp-detail__lectura-gate">
-              {opportunity.estadoLectura === 'Leyendo' && (
+              <div className="opp-detail__lectura-gate-estado">
+                <span>Estado de lectura:</span>
+                <StatusBadge label={opportunity.estadoLectura} color={opportunity.estadoLecturaColor} />
+              </div>
+              {(opportunity.estadoLectura === 'Leer' || opportunity.estadoLectura === 'Leyendo') && (
                 <AttentionBox type="warning" icon={false}>
                   <span className="opp-detail__envio-spinner" aria-hidden="true" />
-                  Leyendo Cédula y Carta Automóvil... esto puede tardar unos segundos. La
-                  pantalla se va a actualizar sola apenas esté lista.
+                  {opportunity.estadoLectura === 'Leer'
+                    ? 'En cola para leer Cédula y Carta Automóvil...'
+                    : 'Leyendo Cédula y Carta Automóvil...'}{' '}
+                  esto puede tardar unos segundos. La pantalla se va a actualizar sola apenas
+                  esté lista.
                 </AttentionBox>
               )}
               {opportunity.estadoLectura === 'Error' && (
