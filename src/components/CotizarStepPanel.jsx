@@ -14,9 +14,8 @@ import { searchAutodataModelos } from '../services/mondayApi'
 import StatusBadge from './StatusBadge'
 import './CotizarStepPanel.css'
 
-function buildInitialForm(opportunity, departamentos) {
-  const currentDept = departamentos.find((d) => d.name === opportunity.departamento)
-  return {
+function buildInitialForm(opportunity, dropdownOptions) {
+  const form = {
     ci: opportunity.ci,
     anio: opportunity.anio,
     modelo: opportunity.modelo,
@@ -29,9 +28,19 @@ function buildInitialForm(opportunity, departamentos) {
     uso: opportunity.uso,
     tipo: opportunity.tipo,
     fechaNacimiento: opportunity.fechaNacimiento,
-    zonaCirculacion: opportunity.zonaCirculacion,
-    departamentoId: currentDept?.id ?? '',
   }
+  // Campos "connected" (Departamento, Zona de circulación/Localidad): el form necesita
+  // el ID real (para el Dropdown y para guardar), no solo el nombre que ya trae
+  // `opportunity` — se busca por nombre en la lista real de cada uno (dropdownOptions,
+  // ver idKey/optionsKey en cotizarFields.js).
+  for (const field of COTIZAR_FIELDS) {
+    if (field.kind !== 'connected') continue
+    const options = dropdownOptions[field.optionsKey] ?? []
+    const current = options.find((o) => o.name === opportunity[field.key])
+    form[field.key] = opportunity[field.key]
+    form[field.idKey] = current?.id ?? ''
+  }
+  return form
 }
 
 // Adaptador Dropdown (de @vibe/core) <-> nuestros campos de string/id plano:
@@ -93,8 +102,8 @@ function AutodataModeloSelect({ currentLabel, value, onChange }) {
   )
 }
 
-function FieldControl({ field, value, onChange, options, departamentos, currentModelo }) {
-  if (field.kind === 'text' || field.kind === 'location') {
+function FieldControl({ field, value, onChange, options, currentModelo }) {
+  if (field.kind === 'text') {
     return <input type="text" value={value} onChange={(e) => onChange(e.target.value)} />
   }
   if (field.kind === 'number') {
@@ -118,11 +127,14 @@ function FieldControl({ field, value, onChange, options, departamentos, currentM
     )
   }
   if (field.kind === 'connected') {
-    const deptOptions = departamentos.map((d) => ({ value: d.id, label: d.name }))
-    const selected = deptOptions.find((o) => o.value === value) ?? null
+    // A diferencia de 'dropdown'/'status' (donde `options` son strings sueltos), acá
+    // vienen como {id, name} — mismo campo `options` (dropdownOptions[f.optionsKey]),
+    // distinto shape según el tipo real de la columna.
+    const connectedOptions = options.map((o) => ({ value: o.id, label: o.name }))
+    const selected = connectedOptions.find((o) => o.value === value) ?? null
     return (
       <Dropdown
-        options={deptOptions}
+        options={connectedOptions}
         value={selected}
         placeholder="Sin definir"
         clearable
@@ -144,7 +156,6 @@ export default function CotizarStepPanel({
   marking,
   markError,
   dropdownOptions,
-  departamentos,
   onSave,
   estadoCotizacion,
   estadoCotizacionColor,
@@ -152,7 +163,7 @@ export default function CotizarStepPanel({
   errorDetail,
 }) {
   const [editing, setEditing] = useState(false)
-  const [form, setForm] = useState(() => buildInitialForm(opportunity, departamentos))
+  const [form, setForm] = useState(() => buildInitialForm(opportunity, dropdownOptions))
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
   const [confirmingRecotizar, setConfirmingRecotizar] = useState(false)
@@ -168,7 +179,7 @@ export default function CotizarStepPanel({
   }
 
   const startEditing = () => {
-    setForm(buildInitialForm(opportunity, departamentos))
+    setForm(buildInitialForm(opportunity, dropdownOptions))
     setSaveError(null)
     setEditing(true)
   }
@@ -237,19 +248,18 @@ export default function CotizarStepPanel({
               <FieldControl
                 field={f}
                 value={
-                  f.key === 'departamento'
-                    ? form.departamentoId
+                  f.kind === 'connected'
+                    ? form[f.idKey]
                     : f.key === 'modelo'
                       ? form.modeloSeleccion
                       : form[f.key]
                 }
                 onChange={(v) => {
-                  if (f.key === 'departamento') return handleFieldChange('departamentoId', v)
+                  if (f.kind === 'connected') return handleFieldChange(f.idKey, v)
                   if (f.key === 'modelo') return handleFieldChange('modeloSeleccion', v)
                   return handleFieldChange(f.key, v)
                 }}
                 options={dropdownOptions[f.optionsKey] ?? []}
-                departamentos={departamentos}
                 currentModelo={opportunity.modelo}
               />
             </label>

@@ -84,7 +84,7 @@ export function mapOpportunityItem(item, statusColors = {}) {
     edad: textOf(cv, 'numeric_mm527wpm'),
     fechaNacimiento: textOf(cv, 'date_mm516agw'),
     departamento: boardRelationDisplayOf(cv, 'board_relation_mm54tq30'),
-    zonaCirculacion: textOf(cv, 'location_mm51e7g7'),
+    zonaCirculacion: boardRelationDisplayOf(cv, 'board_relation_mm5sqf8t'),
     libretaConducir: textOf(cv, 'file_mm51jy06'),
     cedula: textOf(cv, 'file_mm5pc008'),
     poliza: textOf(cv, 'file_mm5bzdd4'),

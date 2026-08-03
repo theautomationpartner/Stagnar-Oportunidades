@@ -1,14 +1,23 @@
 import { useEffect, useRef, useState } from 'react'
 import { MdClose, MdUploadFile, MdClear } from 'react-icons/md'
-import { Button, Dropdown } from '@vibe/core'
+import { Button, Dropdown, AttentionBox } from '@vibe/core'
 import {
   createOpportunityItem,
   setMultipleColumnValues,
   uploadFileToColumn,
   setSimpleColumnValue,
-  searchAutodataModelos,
+  dropdownColumnValue,
+  fetchAutodataModelosByAnioMarca,
+  fetchOpportunityDetail,
+  fetchLatestUpdate,
 } from '../services/mondayApi'
 import './CrearOportunidadForm.css'
+
+// Mismo tag que postea (como Update nativo de monday) el robot que lee Cédula/Carta
+// Automóvil cuando falla — ver OpportunityDetail.jsx (ERROR_UPDATE_TAG_LEER), reusado acá
+// para mostrar el mismo detalle de error sin duplicar convención.
+const ERROR_UPDATE_TAG_LEER = '[LEER]'
+const POLL_INTERVAL_MS = 4000
 
 const STEPS = [
   { key: 'personales', label: 'Datos personales' },
@@ -93,41 +102,52 @@ function telefonoError(value, codigoPais) {
   return null
 }
 
-// Modelo (Autodata): mismo componente/mecanismo que en CotizarStepPanel.jsx — el
-// tablero vinculado (AUTODATA V1 + V2, board_relation_mm5422v9) tiene más de 15.000
-// ítems combinados, así que no se puede precargar como Departamento/Localidad. Se
-// busca en vivo por texto (mínimo 2 caracteres, debounce 300ms) contra los dos
-// tableros reales.
-function AutodataModeloSelect({ value, onChange }) {
-  const [inputValue, setInputValue] = useState('')
+// Modelo (Autodata), a partir de Año + Marca ya conocidos — se usa en los dos casos de
+// Posee Vehículo: "No" (elegidos a mano) y "Sí" (completados por la lectura automática
+// de la Carta Automóvil, ver handleCartaAutomovilChange). Solo muestra los modelos
+// reales que existen para esa combinación exacta en cualquiera de los dos tableros de
+// Autodata (V1 + V2, board_relation_mm5422v9, +15.000 ítems combinados — no se puede
+// precargar como Departamento/Localidad, ni dejar buscar cualquier texto libre).
+//
+// tipo/combustible (opcionales): cuando además se conocen de antemano (caso "Sí" — los
+// completa la lectura automática antes de elegir Modelo), se usan para acotar más la
+// lista adentro de ese Año+Marca — cada resultado ya trae su propio combustible/tipo,
+// así que el matcheo es client-side, sin pegarle una consulta extra a la API. Si el
+// filtro estricto no deja ningún modelo (dato incompleto/ruidoso en Autodata), se cae al
+// listado amplio de Año+Marca en vez de dejar al usuario sin opciones para elegir.
+function AutodataModeloPorAnioMarca({ anio, marca, tipo, combustible, value, onChange }) {
   const [options, setOptions] = useState([])
   const [loading, setLoading] = useState(false)
 
   useEffect(() => {
-    const term = inputValue.trim()
-    if (term.length < 2) {
+    if (!anio || !marca) {
       setOptions([])
-      setLoading(false)
       return undefined
     }
     let cancelled = false
     setLoading(true)
-    const timer = setTimeout(() => {
-      searchAutodataModelos(term)
-        .then((results) => {
-          if (!cancelled) setOptions(results.map((r) => ({ value: r.id, label: r.name })))
-        })
-        .finally(() => {
-          if (!cancelled) setLoading(false)
-        })
-    }, 300)
+    fetchAutodataModelosByAnioMarca(anio, marca)
+      .then((results) => {
+        if (cancelled) return
+        // Mismo cuidado que en AutodataModeloSelect: combustible/tipo tienen que viajar
+        // colgados de la opción, si no se pierden antes de llegar al autocompletado.
+        const mapped = results.map((r) => ({ value: r.id, label: r.name, combustible: r.combustible, tipo: r.tipo }))
+        const matchesLeido = (o) =>
+          (!tipo || (o.tipo && o.tipo.toLowerCase() === tipo.toLowerCase())) &&
+          (!combustible || (o.combustible && o.combustible.toLowerCase() === combustible.toLowerCase()))
+        const strict = tipo || combustible ? mapped.filter(matchesLeido) : mapped
+        setOptions(strict.length > 0 ? strict : mapped)
+      })
+      .finally(() => {
+        if (!cancelled) setLoading(false)
+      })
     return () => {
       cancelled = true
-      clearTimeout(timer)
     }
-  }, [inputValue])
+  }, [anio, marca, tipo, combustible])
 
   const selected = value ? { value: value.id, label: value.name } : null
+  const disabled = !anio || !marca
 
   return (
     <Dropdown
@@ -136,10 +156,12 @@ function AutodataModeloSelect({ value, onChange }) {
       options={options}
       value={selected}
       loading={loading}
-      onInputChange={(input) => setInputValue(input ?? '')}
-      placeholder="Buscar modelo..."
-      noOptionsMessage={inputValue.trim().length < 2 ? 'Escribí para buscar' : 'Sin resultados'}
-      onChange={(option) => onChange(option ? { id: option.value, name: option.label } : null)}
+      disabled={disabled}
+      placeholder={disabled ? 'Elegí primero Año y Marca' : 'Selecciona un modelo'}
+      noOptionsMessage={loading ? 'Buscando...' : 'Sin modelos para esa combinación'}
+      onChange={(option) =>
+        onChange(option ? { id: option.value, name: option.label, combustible: option.combustible, tipo: option.tipo } : null)
+      }
     />
   )
 }
@@ -153,15 +175,19 @@ function buildInitialForm() {
     codigoPais: '+598',
     telefono: '',
     localidadId: '',
+    departamentoId: '',
     tipoRiesgo: '',
     poseeVehiculo: '',
     // Modelo (Autodata) — se pide siempre que sea Automóvil, sin importar la respuesta
     // de Posee Vehículo.
     modeloSeleccion: null,
-    // Posee Vehículo === "Si": se cargan estos dos archivos en vez de tipear los datos.
+    // Posee Vehículo === "Si": Carta Automóvil obligatoria (dispara la lectura
+    // automática que completa marca/anio/tipo más abajo); Cédula Identidad opcional.
     cartaAutomovil: null,
     cedulaIdentidad: null,
     // Posee Vehículo === "No": no hay archivo que leer, se tipean estos 5 campos a mano.
+    // Posee Vehículo === "Si": marca/anio/tipo los completa la lectura automática de la
+    // Carta Automóvil en vez de tipearlos (ver handleCartaAutomovilChange); uso no aplica.
     marca: '',
     anio: '',
     combustible: '',
@@ -199,11 +225,11 @@ function formatFechaInput(raw) {
 // esto solo guarda el File en memoria — la subida real a la columna correspondiente
 // (file_mm51jy06 / file_mm5pc008) se hace más adelante, cuando se sepa en qué paso se
 // crea efectivamente el ítem.
-function FileField({ label, file, onChange }) {
+function FileField({ label, file, onChange, required = true }) {
   const inputRef = useRef(null)
   return (
     <label className="crear-op__field">
-      <span>{label} *</span>
+      <span>{label}{required ? ' *' : ''}</span>
       <div className="crear-op__file">
         <input
           ref={inputRef}
@@ -238,10 +264,29 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
 
+  // Posee Vehículo === "Sí": a diferencia del resto del formulario, este flujo necesita
+  // que el ítem ya exista en monday ANTES de terminar el paso 2 (subir la Carta
+  // Automóvil, disparar la lectura automática vía color_mm5rzrhk, y esperar a que
+  // complete Marca/Año/Tipo) — se crea apenas se sube ese archivo, no recién al hacer
+  // clic en "Guardar" como en el resto de los casos (ver ensureItemId más abajo).
+  const [createdItemId, setCreatedItemId] = useState(null)
+  const [lecturaEstado, setLecturaEstado] = useState('')
+  const [lecturaError, setLecturaError] = useState(null)
+  const [cedulaSubiendo, setCedulaSubiendo] = useState(false)
+
   const handleChange = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
 
+  const departamentos = schema?.departamentos ?? []
+  const departamentoOptions = departamentos.map((d) => ({ value: d.id, label: d.name }))
+  const selectedDepartamento = departamentoOptions.find((o) => o.value === form.departamentoId) ?? null
+
+  // Filtro interactivo: sin Departamento elegido, se ven todas las localidades; una vez
+  // elegido, solo las de ese departamento (texto plano de la propia Localidad,
+  // text_mm5wbef5 — no hace falta ir a buscar el board_relation).
   const localidades = schema?.localidades ?? []
-  const localidadOptions = localidades.map((l) => ({ value: l.id, label: l.name }))
+  const localidadOptions = localidades
+    .filter((l) => !selectedDepartamento || l.departamento === selectedDepartamento.label)
+    .map((l) => ({ value: l.id, label: l.name }))
   const selectedLocalidad = localidadOptions.find((o) => o.value === form.localidadId) ?? null
 
   const selectedPoseeVehiculo = POSEE_VEHICULO_OPTIONS.find((o) => o.value === form.poseeVehiculo) ?? null
@@ -255,6 +300,41 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
   const combustibleOptions = (schema?.combustibles ?? []).map((opt) => ({ value: opt, label: opt }))
   const usoOptions = (schema?.uso?.options ?? []).map((opt) => ({ value: opt, label: opt }))
   const tipoOptions = (schema?.tipo ?? []).map((opt) => ({ value: opt, label: opt }))
+
+  // Matchea sin distinguir mayúsculas — el dato real de Autodata a veces difiere en
+  // casing de nuestra opción real (ej. "Diesel" vs nuestro "DIesel"). Si no hay dato o
+  // no matchea ninguna opción real, devuelve vacío en vez de forzar un valor inventado.
+  const matchOption = (options, rawValue) => {
+    if (!rawValue) return ''
+    return options.find((o) => o.value.toLowerCase() === rawValue.toLowerCase())?.value ?? ''
+  }
+
+  // Al elegir un Modelo (Autodata), autocompleta Combustible y Tipo del formulario con
+  // lo que sepa ese ítem — si no tiene el dato, o no coincide con ninguna de nuestras
+  // opciones reales, se deja vacío (se avisa en el campo, ver JSX) en vez de forzar
+  // cualquier cosa.
+  const handleModeloChange = (modelo) => {
+    setForm((prev) => ({
+      ...prev,
+      modeloSeleccion: modelo,
+      combustible: matchOption(combustibleOptions, modelo?.combustible),
+      tipo: matchOption(tipoOptions, modelo?.tipo),
+    }))
+  }
+
+  // Caso Posee Vehículo === "Sí": a esta altura Tipo (y a veces Combustible) ya viene
+  // completado por la lectura automática de la Carta Automóvil (ver polling de
+  // lecturaEstado más abajo) — a diferencia de handleModeloChange (que siempre pisa con
+  // lo que sepa el modelo elegido), acá el dato leído automáticamente tiene prioridad y
+  // el del modelo de Autodata solo se usa como respaldo si ese campo vino vacío.
+  const handleModeloChangeConOcr = (modelo) => {
+    setForm((prev) => ({
+      ...prev,
+      modeloSeleccion: modelo,
+      combustible: prev.combustible || matchOption(combustibleOptions, modelo?.combustible),
+      tipo: prev.tipo || matchOption(tipoOptions, modelo?.tipo),
+    }))
+  }
 
   // Válido para avanzar de este paso al siguiente — todos los campos son obligatorios
   // (no vacíos) y, para CI/Fecha Nacimiento/Teléfono, además tienen que tener un
@@ -272,13 +352,20 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
           form.telefono &&
           !telefonoError(form.telefono, form.codigoPais) &&
           form.localidadId &&
+          form.departamentoId &&
           form.tipoRiesgo
       )
     }
     if (index === 1) {
       if (!esAutomovil) return true
-      if (!form.poseeVehiculo || !form.modeloSeleccion) return false
-      if (form.poseeVehiculo === 'Si') return Boolean(form.cartaAutomovil && form.cedulaIdentidad)
+      if (!form.poseeVehiculo) return false
+      if (form.poseeVehiculo === 'Si') {
+        // Hay que esperar a que la lectura automática termine ("Leidos") antes de poder
+        // elegir Modelo — mientras está "Leer"/"Leyendo"/"Error" todavía no hay Marca/Año
+        // confiables con qué filtrar Autodata.
+        return Boolean(form.cartaAutomovil && lecturaEstado === 'Leidos' && form.modeloSeleccion)
+      }
+      if (!form.modeloSeleccion) return false
       return Boolean(form.marca && form.anio && form.combustible && form.uso && form.tipo)
     }
     return false
@@ -297,59 +384,168 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
     setStepIndex((i) => i + 1)
   }
 
-  // Se crea el ítem PELADO (solo el nombre) y recién después se asientan todas las
-  // columnas en un mutation separado (change_multiple_column_values) — si van juntas en
-  // el mismo create_item, monday no dispara las automatizaciones que dependen de un
-  // cambio de columna real (incluida la de "cuando se crea el ítem, hacer algo", si esa
-  // automatización mira el valor de alguna columna). Recién con el ítem ya creado (tiene
-  // id real) se suben los archivos de Carta Automóvil/Cédula si corresponde (la subida
-  // de archivos necesita un item_id existente, no se puede hacer antes).
+  // Todo lo que ya se sabe antes de llegar a Modelo/Combustible/Uso/Tipo — se usa tanto
+  // para crear el ítem apenas se sube la Carta Automóvil (caso "Sí", ver
+  // handleCartaAutomovilChange) como en el guardado final, para no duplicar la lista de
+  // columnas en dos lugares.
+  const buildBaseColumnValues = () => {
+    const columnValues = {
+      deal_stage: 'Nueva',
+      text_mm51b055: form.nombre,
+      text_mm51ez7e: form.apellido,
+      numeric_mm51mb0s: form.ci,
+      date_mm516agw: toIsoDate(form.fechaNacimiento),
+      phone_mm519m27: {
+        phone: `${form.codigoPais.replace('+', '')}${form.telefono.replace(/\D/g, '')}`,
+        countryShortName: COUNTRY_SHORT_NAMES[form.codigoPais] ?? 'UY',
+      },
+      color_mm5atxav: form.tipoRiesgo,
+      board_relation_mm5sqf8t: { item_ids: [Number(form.localidadId)] },
+      board_relation_mm54tq30: { item_ids: [Number(form.departamentoId)] },
+    }
+    if (esAutomovil) columnValues.color_mm51n4j = form.poseeVehiculo
+    return columnValues
+  }
+
+  // Se crea el ítem PELADO (solo el nombre) y recién después se asientan las columnas en
+  // un mutation separado (change_multiple_column_values) — si van juntas en el mismo
+  // create_item, monday no dispara las automatizaciones que dependen de un cambio de
+  // columna real. Memoiza el id creado (createdItemId) para no crear un ítem duplicado
+  // si esto se llama más de una vez (pasa en el caso "Sí": una vez al subir la Carta
+  // Automóvil, y de nuevo al hacer clic en "Guardar").
+  const ensureItemId = async () => {
+    if (createdItemId) return createdItemId
+    const itemName = `${form.nombre} ${form.apellido}`.trim()
+    const created = await createOpportunityItem(itemName)
+    setCreatedItemId(created.id)
+    return created.id
+  }
+
+  // Posee Vehículo === "Sí": ya no se piden Marca/Año/Tipo a mano — se suben la Carta
+  // Automóvil, se dispara la lectura automática (color_mm5rzrhk = "Leer") y se espera a
+  // que ese robot complete esos 3 campos directo en el tablero (mismo mecanismo/gate que
+  // OpportunityDetail.jsx). Recién ahí se puede filtrar Autodata por Año+Marca y mostrar
+  // los modelos candidatos (ver AutodataModeloPorAnioMarca en el JSX).
+  const handleCartaAutomovilChange = async (file) => {
+    handleChange('cartaAutomovil', file)
+    if (!file) return
+    setLecturaEstado('subiendo')
+    setLecturaError(null)
+    setForm((prev) => ({ ...prev, modeloSeleccion: null, marca: '', anio: '', tipo: '' }))
+    try {
+      const itemId = await ensureItemId()
+      await setMultipleColumnValues(itemId, buildBaseColumnValues())
+      await uploadFileToColumn(itemId, 'file_mm51jy06', file)
+      await setSimpleColumnValue(itemId, 'color_mm5rzrhk', 'Leer')
+      setLecturaEstado('Leer')
+    } catch (err) {
+      setLecturaEstado('Error')
+      setLecturaError(err.message)
+    }
+  }
+
+  // Cédula Identidad ahora es opcional (ya no bloquea el guardado) — como el ítem ya
+  // existe para cuando este campo aparece (recién se muestra después de "Leidos"), se
+  // sube directo apenas se elige el archivo en vez de esperar a "Guardar".
+  const handleCedulaIdentidadChange = async (file) => {
+    handleChange('cedulaIdentidad', file)
+    if (!file || !createdItemId) return
+    setCedulaSubiendo(true)
+    try {
+      await uploadFileToColumn(createdItemId, 'file_mm5pc008', file)
+    } catch (err) {
+      setSaveError(err.message)
+    } finally {
+      setCedulaSubiendo(false)
+    }
+  }
+
+  // Refleja en vivo los cambios de color_mm5rzrhk mientras se procesa la lectura
+  // automática de la Carta Automóvil: reconsulta cada POLL_INTERVAL_MS y corta el
+  // polling apenas llega a un estado terminal ("Leidos" o "Error"). Al llegar a "Leidos"
+  // trae Marca/Año/Tipo ya completados por el robot para poder filtrar Autodata.
+  useEffect(() => {
+    if (lecturaEstado !== 'Leer' && lecturaEstado !== 'Leyendo') return undefined
+    if (!createdItemId) return undefined
+    let cancelled = false
+
+    const tick = async () => {
+      try {
+        const data = await fetchOpportunityDetail(createdItemId)
+        if (cancelled || !data) return
+        const estado = data.column_values.find((cv) => cv.id === 'color_mm5rzrhk')?.text?.trim()
+        if (!estado || estado === lecturaEstado) return
+        setLecturaEstado(estado)
+        if (estado === 'Leidos') {
+          const marca = data.column_values.find((cv) => cv.id === 'dropdown_mm51ykrd')?.text?.trim() || ''
+          const anio = data.column_values.find((cv) => cv.id === 'dropdown_mm51mdmq')?.text?.trim() || ''
+          const tipo = data.column_values.find((cv) => cv.id === 'dropdown_mm5jqdk')?.text?.trim() || ''
+          // El robot también completa Combustible directo en el tablero (no solo
+          // Marca/Año/Tipo) — matchOption lo normaliza contra las opciones reales por si
+          // difiere en casing (ver el mismo cuidado en handleModeloChange).
+          const combustibleLeido = data.column_values.find((cv) => cv.id === 'dropdown_mm52jp01')?.text?.trim() || ''
+          setForm((prev) => ({
+            ...prev,
+            marca,
+            anio,
+            tipo,
+            combustible: matchOption(combustibleOptions, combustibleLeido),
+          }))
+        }
+        if (estado === 'Error') {
+          try {
+            const update = await fetchLatestUpdate(createdItemId, ERROR_UPDATE_TAG_LEER)
+            if (!cancelled) setLecturaError(update?.text_body?.trim() || null)
+          } catch {
+            // sin detalle disponible, se muestra igual el estado "Error" pelado
+          }
+        }
+      } catch {
+        // hiccup de red puntual: se reintenta en el próximo tick
+      }
+    }
+
+    tick()
+    const id = setInterval(tick, POLL_INTERVAL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+    }
+  }, [lecturaEstado, createdItemId])
+
   const handleGuardar = async () => {
     if (!canAdvance || saving) return
     setSaving(true)
     setSaveError(null)
     try {
-      const itemName = `${form.nombre} ${form.apellido}`.trim()
-      const created = await createOpportunityItem(itemName)
+      const itemId = await ensureItemId()
+      await setMultipleColumnValues(itemId, buildBaseColumnValues())
 
-      const columnValues = {
-        deal_stage: 'Nueva',
-        text_mm51b055: form.nombre,
-        text_mm51ez7e: form.apellido,
-        numeric_mm51mb0s: form.ci,
-        date_mm516agw: toIsoDate(form.fechaNacimiento),
-        phone_mm519m27: {
-          phone: `${form.codigoPais.replace('+', '')}${form.telefono.replace(/\D/g, '')}`,
-          countryShortName: COUNTRY_SHORT_NAMES[form.codigoPais] ?? 'UY',
-        },
-        color_mm5atxav: form.tipoRiesgo,
-        board_relation_mm5sqf8t: { item_ids: [Number(form.localidadId)] },
-      }
       if (esAutomovil) {
-        columnValues.color_mm51n4j = form.poseeVehiculo
-        columnValues.board_relation_mm5422v9 = { item_ids: [Number(form.modeloSeleccion.id)] }
-        if (form.poseeVehiculo === 'No') {
-          columnValues.dropdown_mm51ykrd = form.marca
-          columnValues.dropdown_mm51mdmq = form.anio
-          columnValues.dropdown_mm52jp01 = form.combustible
-          columnValues.color_mm52ey1d = form.uso
-          columnValues.dropdown_mm5jqdk = form.tipo
+        const extra = {
+          board_relation_mm5422v9: { item_ids: [Number(form.modeloSeleccion.id)] },
+          // El paso Cotizar muestra el Modelo desde text_mm54fb7m, no desde la conexión
+          // (que la automatización de "Cotizar" vacía después de usarla) — como en este
+          // punto todavía no se cotizó nada, si no escribimos esto acá el campo queda en
+          // "—" hasta la primera cotización.
+          text_mm54fb7m: form.modeloSeleccion.name,
         }
+        if (form.combustible) extra.dropdown_mm52jp01 = dropdownColumnValue(form.combustible)
+        if (form.tipo) extra.dropdown_mm5jqdk = dropdownColumnValue(form.tipo)
+        if (form.poseeVehiculo === 'No') {
+          extra.dropdown_mm51ykrd = dropdownColumnValue(form.marca)
+          // Año es un label puramente numérico ("2006") — mandarlo como string pelado
+          // hace que monday lo confunda con un ID de label interno y lo descarte en
+          // silencio (ver dropdownColumnValue en mondayApi.js).
+          extra.dropdown_mm51mdmq = dropdownColumnValue(form.anio)
+          extra.color_mm52ey1d = form.uso
+        }
+        // Caso "Sí": Marca/Año ya los completó la lectura automática directo en el
+        // tablero (ver polling de arriba) — no hace falta reescribirlos acá.
+        await setMultipleColumnValues(itemId, extra)
       }
-      await setMultipleColumnValues(created.id, columnValues)
 
-      if (esAutomovil && form.poseeVehiculo === 'Si') {
-        await Promise.all([
-          uploadFileToColumn(created.id, 'file_mm51jy06', form.cartaAutomovil),
-          uploadFileToColumn(created.id, 'file_mm5pc008', form.cedulaIdentidad),
-        ])
-        // Dispara la lectura automática de Cédula/Carta Automóvil (color_mm5rzrhk) —
-        // mismo mecanismo/gate ya armado en OpportunityDetail.jsx (Leer/Leyendo/
-        // Leidos/Error), que ahora va a arrancar a pollear apenas se abra la oportunidad.
-        await setSimpleColumnValue(created.id, 'color_mm5rzrhk', 'Leer')
-      }
-
-      onCreated?.(created.id)
+      onCreated?.(itemId)
     } catch (err) {
       setSaveError(err.message)
     } finally {
@@ -467,11 +663,30 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
               )}
             </label>
             <label className="crear-op__field">
+              <span>Departamento *</span>
+              <RequiredDropdown
+                options={departamentoOptions}
+                value={selectedDepartamento}
+                placeholder="Escribe para buscar resultados"
+                searchable
+                onChange={(option) => {
+                  // Al cambiar el departamento, se limpia la Localidad elegida — puede
+                  // ya no pertenecer al departamento nuevo (el dropdown de acá abajo se
+                  // filtra por esto mismo).
+                  handleChange('departamentoId', option?.value ?? '')
+                  handleChange('localidadId', '')
+                }}
+              />
+            </label>
+            <label className="crear-op__field">
               <span>Localidad *</span>
               <RequiredDropdown
                 options={localidadOptions}
                 value={selectedLocalidad}
-                placeholder="Escribe para buscar resultados"
+                placeholder={
+                  selectedDepartamento ? 'Escribe para buscar resultados' : 'Elegí primero un departamento'
+                }
+                disabled={!selectedDepartamento}
                 searchable
                 onChange={(option) => handleChange('localidadId', option?.value ?? '')}
               />
@@ -508,46 +723,77 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
               </p>
             )}
 
-            {esAutomovil && (
-              <label className="crear-op__field">
-                {/* Se pide siempre que sea Automóvil, sin importar Posee Vehículo — el
-                    tablero vinculado (AUTODATA V1+V2) tiene >15.000 ítems combinados,
-                    ver AutodataModeloSelect. */}
-                <span>Modelo *</span>
-                <AutodataModeloSelect
-                  value={form.modeloSeleccion}
-                  onChange={(v) => handleChange('modeloSeleccion', v)}
-                />
-              </label>
-            )}
-
             {esAutomovil && form.poseeVehiculo === 'Si' && (
               <>
                 <FileField
                   label="Carta Automóvil / Cédula Automovil"
                   file={form.cartaAutomovil}
-                  onChange={(file) => handleChange('cartaAutomovil', file)}
+                  onChange={handleCartaAutomovilChange}
                 />
-                <FileField
-                  label="Cédula Identidad"
-                  file={form.cedulaIdentidad}
-                  onChange={(file) => handleChange('cedulaIdentidad', file)}
-                />
+
+                {(lecturaEstado === 'subiendo' ||
+                  lecturaEstado === 'Leer' ||
+                  lecturaEstado === 'Leyendo') && (
+                  <AttentionBox type="warning" icon={false}>
+                    <span className="crear-op__lectura-spinner" aria-hidden="true" />
+                    {lecturaEstado === 'subiendo' && 'Subiendo Carta Automóvil...'}
+                    {lecturaEstado === 'Leer' && 'En cola para leer Cédula y Carta Automóvil...'}
+                    {lecturaEstado === 'Leyendo' && 'Leyendo Cédula y Carta Automóvil...'}{' '}
+                    Esto puede tardar unos segundos, la pantalla se actualiza sola.
+                  </AttentionBox>
+                )}
+
+                {lecturaEstado === 'Error' && (
+                  <AttentionBox type="negative">
+                    No se pudieron leer los documentos automáticamente. Podés volver a
+                    subir el archivo para reintentar.
+                  </AttentionBox>
+                )}
+                {lecturaEstado === 'Error' && lecturaError && (
+                  <div className="crear-op__error-detail">
+                    <strong>Detalle del error:</strong>
+                    <pre>{lecturaError}</pre>
+                  </div>
+                )}
+
+                {lecturaEstado === 'Leidos' && (
+                  <>
+                    <p className="crear-op__autofill">
+                      Datos leídos automáticamente — Marca: {form.marca || '—'}
+                      {' · '}Año: {form.anio || '—'}
+                      {' · '}Tipo: {form.tipo || '—'}
+                      {' · '}Combustible: {form.combustible || '—'}
+                    </p>
+                    <label className="crear-op__field">
+                      <span>Modelo *</span>
+                      <AutodataModeloPorAnioMarca
+                        anio={form.anio}
+                        marca={form.marca}
+                        tipo={form.tipo}
+                        combustible={form.combustible}
+                        value={form.modeloSeleccion}
+                        onChange={handleModeloChangeConOcr}
+                      />
+                    </label>
+                    {form.modeloSeleccion && !form.combustible && (
+                      <span className="crear-op__autofill-note">
+                        No se pudo determinar el Combustible automáticamente.
+                      </span>
+                    )}
+                    <FileField
+                      label="Cédula Identidad"
+                      required={false}
+                      file={form.cedulaIdentidad}
+                      onChange={handleCedulaIdentidadChange}
+                    />
+                    {cedulaSubiendo && <p className="crear-op__autofill">Subiendo Cédula Identidad...</p>}
+                  </>
+                )}
               </>
             )}
 
             {esAutomovil && form.poseeVehiculo === 'No' && (
               <>
-                <label className="crear-op__field">
-                  <span>Marca *</span>
-                  <RequiredDropdown
-                    options={marcaOptions}
-                    value={marcaOptions.find((o) => o.value === form.marca) ?? null}
-                    placeholder="Escribe para buscar resultados"
-                    searchable
-                    onChange={(option) => handleChange('marca', option?.value ?? '')}
-                  />
-                </label>
                 <label className="crear-op__field">
                   <span>Año *</span>
                   <RequiredDropdown
@@ -555,7 +801,44 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                     value={anioOptions.find((o) => o.value === form.anio) ?? null}
                     placeholder="Escribe para buscar resultados"
                     searchable
-                    onChange={(option) => handleChange('anio', option?.value ?? '')}
+                    onChange={(option) => {
+                      // Cambiar Año/Marca invalida el Modelo elegido (se filtra por esos
+                      // dos) y lo que se haya autocompletado a partir de él.
+                      setForm((prev) => ({
+                        ...prev,
+                        anio: option?.value ?? '',
+                        modeloSeleccion: null,
+                        combustible: '',
+                        tipo: '',
+                      }))
+                    }}
+                  />
+                </label>
+                <label className="crear-op__field">
+                  <span>Marca *</span>
+                  <RequiredDropdown
+                    options={marcaOptions}
+                    value={marcaOptions.find((o) => o.value === form.marca) ?? null}
+                    placeholder="Escribe para buscar resultados"
+                    searchable
+                    onChange={(option) => {
+                      setForm((prev) => ({
+                        ...prev,
+                        marca: option?.value ?? '',
+                        modeloSeleccion: null,
+                        combustible: '',
+                        tipo: '',
+                      }))
+                    }}
+                  />
+                </label>
+                <label className="crear-op__field">
+                  <span>Modelo *</span>
+                  <AutodataModeloPorAnioMarca
+                    anio={form.anio}
+                    marca={form.marca}
+                    value={form.modeloSeleccion}
+                    onChange={handleModeloChange}
                   />
                 </label>
                 <label className="crear-op__field">
@@ -566,16 +849,11 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                     placeholder="Selecciona una opción"
                     onChange={(option) => handleChange('combustible', option?.value ?? '')}
                   />
-                </label>
-                <label className="crear-op__field">
-                  <span>Uso *</span>
-                  <RequiredDropdown
-                    options={usoOptions}
-                    value={usoOptions.find((o) => o.value === form.uso) ?? null}
-                    placeholder="Escribe para buscar resultados"
-                    searchable
-                    onChange={(option) => handleChange('uso', option?.value ?? '')}
-                  />
+                  {form.modeloSeleccion && !form.combustible && (
+                    <span className="crear-op__autofill-note">
+                      No se pudo autocompletar con el modelo elegido — completalo a mano.
+                    </span>
+                  )}
                 </label>
                 <label className="crear-op__field">
                   <span>Tipo *</span>
@@ -585,6 +863,21 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                     placeholder="Escribe para buscar resultados"
                     searchable
                     onChange={(option) => handleChange('tipo', option?.value ?? '')}
+                  />
+                  {form.modeloSeleccion && !form.tipo && (
+                    <span className="crear-op__autofill-note">
+                      No se pudo autocompletar con el modelo elegido — completalo a mano.
+                    </span>
+                  )}
+                </label>
+                <label className="crear-op__field">
+                  <span>Uso *</span>
+                  <RequiredDropdown
+                    options={usoOptions}
+                    value={usoOptions.find((o) => o.value === form.uso) ?? null}
+                    placeholder="Escribe para buscar resultados"
+                    searchable
+                    onChange={(option) => handleChange('uso', option?.value ?? '')}
                   />
                 </label>
               </>

@@ -26,7 +26,7 @@ const OPPORTUNITY_COLUMN_IDS = [
   'dropdown_mm5jqdk', // Tipo
   'date_mm516agw', // Fecha Nacimiento
   'board_relation_mm54tq30', // Departamento
-  'location_mm51e7g7', // Ubicación Circulacion
+  'board_relation_mm5sqf8t', // Localidad (reemplaza a la vieja Ubicación Circulacion)
   'file_mm51jy06', // Libreta de Conducir / Carta Automovil
   'file_mm5pc008', // Cedula
   'file_mm5bzdd4', // Poliza
@@ -231,57 +231,144 @@ const DEPARTAMENTOS_QUERY = `
 `
 
 // Localidad (board_relation_mm5sqf8t, "📍Localidades") en el formulario de "Agregar
-// Oportunidades" — tablero de referencia chico (igual que Departamentos), se puede
-// precargar entero. Reusa la misma query genérica de {id, name} que Departamentos.
+// Oportunidades" — 475 ítems (confirmado contra la API real), se puede precargar
+// entero de una sola vez (limit 500, por debajo del máximo de items_page). A
+// diferencia de Departamentos, acá también hace falta la columna "Departamento"
+// (text_mm5wbef5, texto simple con el nombre — no el board_relation
+// board_relation_mm5sq5km, que devuelve `text: null` como cualquier board_relation) para
+// poder filtrar las localidades por el departamento elegido en el formulario.
 const LOCALIDADES_BOARD_ID = 18424578859
+const LOCALIDAD_DEPARTAMENTO_COLUMN_ID = 'text_mm5wbef5'
 
-// Modelo (board_relation_mm5422v9) conecta con estos dos tableros de Autodata, que
-// combinados superan los 15.000 ítems — a diferencia de Departamentos, no se pueden
-// precargar enteros. V1 y V2 tienen cobertura de marcas/modelos distinta (no son
-// duplicados uno del otro, confirmado contra la API real), así que hay que buscar en
-// los dos y unir los resultados.
-const AUTODATA_BOARD_IDS = [18421913144, 18421911963]
-
-// $rules/$operator van tipados como los input types reales de la API (ItemsQueryRule/
-// ItemsQueryOperator), no como un JSON genérico — confirmado que se puede pasar un
-// array de reglas armado dinámicamente en JS como variable GraphQL normal.
-const SEARCH_AUTODATA_QUERY = `
-  query SearchAutodata($boardId: ID!, $rules: [ItemsQueryRule!], $operator: ItemsQueryOperator) {
+const LOCALIDADES_QUERY = `
+  query GetLocalidades($boardId: ID!) {
     boards(ids: [$boardId]) {
-      items_page(limit: 12, query_params: { rules: $rules, operator: $operator }) {
+      items_page(limit: 500) {
         items {
           id
           name
+          column_values(ids: ["${LOCALIDAD_DEPARTAMENTO_COLUMN_ID}"]) {
+            id
+            text
+          }
         }
       }
     }
   }
 `
 
-async function searchAutodataOnBoards(rules, operator) {
-  const results = await Promise.all(
-    AUTODATA_BOARD_IDS.map((boardId) => callMondayApi(SEARCH_AUTODATA_QUERY, { boardId, rules, operator }))
-  )
-  return results.flatMap((data) => data.boards[0]?.items_page.items ?? [])
+// Modelo (board_relation_mm5422v9) conecta con estos dos tableros de Autodata, que
+// combinados superan los 15.000 ítems — a diferencia de Departamentos, no se pueden
+// precargar enteros. V1 y V2 tienen cobertura de marcas/modelos distinta (no son
+// duplicados uno del otro, confirmado contra la API real) y usan IDs DE COLUMNA
+// DISTINTOS para los mismos conceptos, así que todo lo de Autodata queda parametrizado
+// por tablero acá en vez de asumir una columna compartida.
+const AUTODATA_BOARDS = [
+  {
+    boardId: 18421913144,
+    modeloColumnId: 'text_mm58391w', // "Modelo" (texto simple, más preciso que "name" para buscar)
+    marcaColumnId: 'dropdown_mm581chr',
+    anioColumnId: 'dropdown_mm584cbx',
+    combustibleColumnId: 'dropdown_mm5wybn4',
+    tipoColumnId: 'dropdown_mm5w8xbm',
+  },
+  {
+    boardId: 18421911963,
+    modeloColumnId: 'text_mm58pyh1',
+    marcaColumnId: 'dropdown_mm5861x5',
+    anioColumnId: 'dropdown_mm583r6w',
+    combustibleColumnId: 'dropdown_mm5w74r6',
+    tipoColumnId: 'dropdown_mm5wx4s6',
+  },
+]
+
+// $rules/$operator van tipados como los input types reales de la API (ItemsQueryRule/
+// ItemsQueryOperator), no como un JSON genérico — confirmado que se puede pasar un
+// array de reglas armado dinámicamente en JS como variable GraphQL normal. $columnIds
+// trae Combustible/Tipo del ítem elegido, para autocompletar esos campos del
+// formulario (ver CrearOportunidadForm.jsx).
+const SEARCH_AUTODATA_QUERY = `
+  query SearchAutodata($boardId: ID!, $rules: [ItemsQueryRule!], $operator: ItemsQueryOperator, $columnIds: [String!], $limit: Int!) {
+    boards(ids: [$boardId]) {
+      items_page(limit: $limit, query_params: { rules: $rules, operator: $operator }) {
+        items {
+          id
+          name
+          column_values(ids: $columnIds) {
+            id
+            text
+          }
+        }
+      }
+    }
+  }
+`
+
+// Selecciona el ÍTEM entero (id + name, para la conexión board_relation) aunque el
+// filtro haya sido sobre la columna "Modelo" puntual, no sobre "name" — más
+// combustible/tipo ya resueltos para autocompletar.
+function mapAutodataItem(item, board) {
+  const cv = Object.fromEntries(item.column_values.map((c) => [c.id, c.text]))
+  return {
+    id: item.id,
+    name: item.name,
+    combustible: cv[board.combustibleColumnId] || null,
+    tipo: cv[board.tipoColumnId] || null,
+  }
 }
 
-// A pedido: un solo contains_text con el texto completo era muy frágil (un carácter de
-// más/de menos, o las palabras en otro orden, y no encontraba nada). Ahora separa por
-// palabras y arma una regla "contains_text" por cada una, combinadas con AND — así
-// "corolla toyota" encuentra igual "TOYOTA - Corolla 1.6..." sin importar el orden. Si
-// el AND no encuentra nada (typo raro, término que no matchea ninguna combinación),
-// reintenta una vez con OR (alguna de las palabras, en cualquiera de los dos tableros)
-// para no dejar la lista vacía de una.
+async function queryAutodataBoards(buildRules, operator, limit) {
+  const results = await Promise.all(
+    AUTODATA_BOARDS.map(async (board) => {
+      const data = await callMondayApi(SEARCH_AUTODATA_QUERY, {
+        boardId: board.boardId,
+        rules: buildRules(board),
+        operator,
+        limit,
+        columnIds: [board.combustibleColumnId, board.tipoColumnId],
+      })
+      const items = data.boards[0]?.items_page.items ?? []
+      return items.map((item) => mapAutodataItem(item, board))
+    })
+  )
+  return results.flat()
+}
+
+// A pedido: la búsqueda apunta puntualmente a la columna "Modelo" de cada tablero
+// (texto simple, ej. "Corolla") en vez de "name" (que trae de arreastre la marca y la
+// ficha completa, ej. "TOYOTA  - Corolla 1.6 4p. (E20)") — más preciso para buscar,
+// aunque lo que se selecciona/guarda sigue siendo el ítem entero. Separa por palabras
+// (AND) para no depender del orden ni de coincidencia exacta del texto completo; si no
+// encuentra nada, reintenta con OR. Como ya es una búsqueda por texto bastante
+// específica, alcanza con un límite chico.
 export async function searchAutodataModelos(searchText) {
   const term = (searchText ?? '').trim()
   if (term.length < 2) return []
   const words = term.split(/\s+/).filter(Boolean)
-  const rules = words.map((word) => ({ column_id: 'name', compare_value: [word], operator: 'contains_text' }))
+  const buildRules = (board) =>
+    words.map((word) => ({ column_id: board.modeloColumnId, compare_value: [word], operator: 'contains_text' }))
 
-  const andResults = await searchAutodataOnBoards(rules, 'and')
+  const andResults = await queryAutodataBoards(buildRules, 'and', 12)
   if (andResults.length > 0 || words.length < 2) return andResults
 
-  return searchAutodataOnBoards(rules, 'or')
+  return queryAutodataBoards(buildRules, 'or', 12)
+}
+
+// Modelo cuando "Posee Vehículo" = "No": en vez de buscar por texto libre, se arma con
+// Año + Marca ya elegidos en el formulario, mostrando solo los modelos reales que
+// existen para esa combinación en cualquiera de los dos tableros de Autodata. contains_text
+// funciona sobre columnas dropdown, no hace falta resolver el id interno de la label
+// (que además difiere entre V1 y V2 para la misma marca/año). Límite más alto que la
+// búsqueda por texto: confirmado contra la API real que Marca+Año solos (sin "Modelo")
+// pueden matchear más de 20 variantes (ej. Peugeot 2006) — con el límite bajo de antes,
+// el modelo buscado quedaba afuera de la lista sin que se notara que existía.
+export async function fetchAutodataModelosByAnioMarca(anio, marca) {
+  if (!anio || !marca) return []
+  const buildRules = (board) => [
+    { column_id: board.marcaColumnId, compare_value: [marca], operator: 'contains_text' },
+    { column_id: board.anioColumnId, compare_value: [anio], operator: 'contains_text' },
+  ]
+  return queryAutodataBoards(buildRules, 'and', 100)
 }
 
 // Tablero "PANEL": tarifario de recargos por compañía + cantidad de cuotas, textos
@@ -388,6 +475,21 @@ export async function setSimpleColumnValue(itemId, columnId, value) {
   return data.change_simple_column_value
 }
 
+// Para columnas tipo "dropdown" NO alcanza con change_simple_column_value/un string
+// pelado: confirmado contra la API real que si el label es una cadena puramente
+// numérica (ej. un Año como "2006"), monday lo interpreta como el ID interno del label
+// en vez de buscarlo por nombre — como esos IDs no coinciden con los reales, el campo
+// queda vacío en silencio (no tira error, así que el resto del guardado se ve exitoso).
+// El formato que sí resuelve por nombre de forma confiable es el objeto {"labels": [...]}
+// vía change_multiple_column_values.
+export function dropdownColumnValue(label) {
+  return { labels: label ? [label] : [] }
+}
+
+export async function setDropdownColumnValue(itemId, columnId, label) {
+  return setMultipleColumnValues(itemId, { [columnId]: dropdownColumnValue(label) })
+}
+
 export async function setConnectedColumnValue(itemId, columnId, linkedItemIds) {
   const data = await callMondayApi(CHANGE_COLUMN_VALUE_MUTATION, {
     boardId: OPPORTUNITIES_BOARD_ID,
@@ -462,8 +564,13 @@ export async function fetchDepartamentos() {
 }
 
 export async function fetchLocalidades() {
-  const data = await callMondayApi(DEPARTAMENTOS_QUERY, { boardId: LOCALIDADES_BOARD_ID })
-  return data.boards[0]?.items_page.items ?? []
+  const data = await callMondayApi(LOCALIDADES_QUERY, { boardId: LOCALIDADES_BOARD_ID })
+  const items = data.boards[0]?.items_page.items ?? []
+  return items.map((item) => ({
+    id: item.id,
+    name: item.name,
+    departamento: item.column_values.find((cv) => cv.id === LOCALIDAD_DEPARTAMENTO_COLUMN_ID)?.text ?? '',
+  }))
 }
 
 export async function fetchPanelItems() {

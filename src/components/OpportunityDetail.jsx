@@ -22,6 +22,7 @@ import WhatsAppSendModal from './WhatsAppSendModal'
 import {
   fetchOpportunityDetail,
   setSimpleColumnValue,
+  setDropdownColumnValue,
   setConnectedColumnValue,
   setSubitemCheckboxValue,
   uploadFileToColumn,
@@ -429,13 +430,16 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
       combustibles: schema?.combustibles ?? [],
       uso: schema?.uso?.options ?? [],
       tipo: schema?.tipo ?? [],
+      // A diferencia de los de arriba (listas de strings), estos dos son listas de
+      // {id, name} — los campos "connected" del paso Cotizar (Departamento, Zona de
+      // circulación/Localidad) los necesitan así para armar la conexión real.
+      departamentos: schema?.departamentos ?? [],
+      localidades: schema?.localidades ?? [],
     }),
     [schema]
   )
 
   const rcOptions = schema?.rc ?? []
-
-  const departamentos = schema?.departamentos ?? []
 
   const opportunity = useMemo(
     () => (item ? mapOpportunityItem(item, statusColors) : null),
@@ -704,20 +708,37 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   }
 
   const handleSaveCotizarFields = async (formValues) => {
-    const currentDeptId = departamentos.find((d) => d.name === opportunity.departamento)?.id ?? ''
-
     for (const field of COTIZAR_FIELDS) {
       if (field.kind === 'connected' || field.kind === 'autodata') continue
       const newValue = formValues[field.key] ?? ''
       const oldValue = opportunity[field.key] ?? ''
       if (newValue === oldValue) continue
-      await setSimpleColumnValue(opportunityId, field.columnId, newValue)
+      // Las columnas "dropdown" (a diferencia de "status"/"number"/"date") no se pueden
+      // escribir con un string pelado vía change_simple_column_value: si el label es
+      // puramente numérico (Año, ej. "2006"), monday lo confunde con el ID interno del
+      // label en vez de buscarlo por nombre y el valor queda vacío en silencio. Ver
+      // dropdownColumnValue en mondayApi.js.
+      if (field.kind === 'dropdown') {
+        await setDropdownColumnValue(opportunityId, field.columnId, newValue)
+      } else {
+        await setSimpleColumnValue(opportunityId, field.columnId, newValue)
+      }
     }
 
-    if (formValues.departamentoId !== currentDeptId) {
-      const deptField = COTIZAR_FIELDS.find((f) => f.key === 'departamento')
-      const ids = formValues.departamentoId ? [Number(formValues.departamentoId)] : []
-      await setConnectedColumnValue(opportunityId, deptField.columnId, ids)
+    // Campos "connected" (Departamento, Zona de circulación/Localidad): cada uno se
+    // guarda como conexión (change_column_value con item_ids), no como texto — solo si
+    // realmente cambió respecto al que ya tenía la oportunidad (matcheado por nombre
+    // contra la lista real, ya que `opportunity[field.key]` guarda el nombre, no el id).
+    const connectedNameByColumnId = {}
+    for (const field of COTIZAR_FIELDS) {
+      if (field.kind !== 'connected') continue
+      const options = dropdownOptions[field.optionsKey] ?? []
+      const currentId = options.find((o) => o.name === opportunity[field.key])?.id ?? ''
+      const newId = formValues[field.idKey] ?? ''
+      if (newId !== currentId) {
+        await setConnectedColumnValue(opportunityId, field.columnId, newId ? [Number(newId)] : [])
+      }
+      connectedNameByColumnId[field.columnId] = options.find((o) => o.id === newId)?.name ?? ''
     }
 
     // Modelo (Autodata): solo se escribe si en esta edición se eligió uno nuevo del
@@ -731,9 +752,6 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
       ])
     }
 
-    const nuevoDepartamentoNombre =
-      departamentos.find((d) => d.id === formValues.departamentoId)?.name ?? ''
-
     const textByColumnId = {
       numeric_mm51mb0s: formValues.ci,
       dropdown_mm51mdmq: formValues.anio,
@@ -745,17 +763,16 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
       color_mm52ey1d: formValues.uso,
       dropdown_mm5jqdk: formValues.tipo,
       date_mm516agw: formValues.fechaNacimiento,
-      location_mm51e7g7: formValues.zonaCirculacion,
     }
 
     setItem((prev) => ({
       ...prev,
       column_values: prev.column_values.map((cv) => {
         if (cv.id in textByColumnId) return { ...cv, text: textByColumnId[cv.id] }
-        // Departamento es board_relation: el mapper lee `display_value`, no `text`
+        // Los "connected" son board_relation: el mapper lee `display_value`, no `text`
         // (ver opportunityMapper.js#boardRelationDisplayOf) — hay que actualizar ese
         // campo para que el optimistic update se vea reflejado.
-        if (cv.id === 'board_relation_mm54tq30') return { ...cv, display_value: nuevoDepartamentoNombre }
+        if (cv.id in connectedNameByColumnId) return { ...cv, display_value: connectedNameByColumnId[cv.id] }
         return cv
       }),
     }))
@@ -920,7 +937,6 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
               marking={marking}
               markError={markError}
               dropdownOptions={dropdownOptions}
-              departamentos={departamentos}
               onSave={handleSaveCotizarFields}
               estadoCotizacion={opportunity.estadoCotizacion}
               estadoCotizacionColor={opportunity.estadoCotizacionColor}
