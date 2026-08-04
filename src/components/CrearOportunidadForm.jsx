@@ -205,7 +205,8 @@ function buildInitialForm() {
     // de Posee Vehículo.
     modeloSeleccion: null,
     // Posee Vehículo === "Si": Carta Automóvil obligatoria (dispara la lectura
-    // automática que completa marca/anio/tipo más abajo); Cédula Identidad opcional.
+    // automática que completa marca/anio/tipo más abajo). Cédula Identidad es opcional
+    // en los dos casos (Sí y No).
     cartaAutomovil: null,
     cedulaIdentidad: null,
     // Posee Vehículo === "No": no hay archivo que leer, se tipean estos 5 campos a mano.
@@ -343,6 +344,11 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
   const [lecturaEstado, setLecturaEstado] = useState('')
   const [lecturaError, setLecturaError] = useState(null)
   const [cedulaSubiendo, setCedulaSubiendo] = useState(false)
+  // true una vez que la Cédula ya se subió (caso "Sí": se sube apenas se elige, porque
+  // el ítem ya existe a esa altura) — evita que handleGuardar la vuelva a subir de
+  // nuevo al final. En el caso "No" (el ítem recién se crea al guardar) esto se queda en
+  // false, así que el archivo elegido acá se sube recién en handleGuardar.
+  const [cedulaSubida, setCedulaSubida] = useState(false)
 
   const handleChange = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
 
@@ -491,14 +497,20 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
     return created.id
   }
 
-  // Posee Vehículo === "Sí": ya no se piden Marca/Año/Tipo a mano — se suben la Carta
-  // Automóvil, se dispara la lectura automática (color_mm5rzrhk = "Leer") y se espera a
-  // que ese robot complete esos 3 campos directo en el tablero (mismo mecanismo/gate que
-  // OpportunityDetail.jsx). Recién ahí se puede filtrar Autodata por Año+Marca y mostrar
-  // los modelos candidatos (ver AutodataModeloPorAnioMarca en el JSX).
+  // Posee Vehículo === "Sí": ya no se piden Marca/Año/Tipo a mano — se leen del archivo.
+  // A pedido, subir el archivo NO dispara la lectura automática sola/todavía: se sube y
+  // queda en "subido" (ver JSX) hasta que el usuario confirma con el botón "Confirmar
+  // lectura" (handleConfirmarLectura), recién ahí se pone color_mm5rzrhk = "Leer" y
+  // arranca el robot que completa Marca/Año/Tipo/Combustible directo en el tablero
+  // (mismo mecanismo/gate que OpportunityDetail.jsx). Antes de esto se podía subir sin
+  // querer un archivo equivocado y ya arrancaba la lectura sin poder frenarla.
   const handleCartaAutomovilChange = async (file) => {
     handleChange('cartaAutomovil', file)
-    if (!file) return
+    if (!file) {
+      setLecturaEstado('')
+      setLecturaError(null)
+      return
+    }
     setLecturaEstado('subiendo')
     setLecturaError(null)
     setForm((prev) => ({ ...prev, modeloSeleccion: null, marca: '', anio: '', tipo: '' }))
@@ -506,7 +518,21 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
       const itemId = await ensureItemId()
       await setMultipleColumnValues(itemId, buildBaseColumnValues())
       await uploadFileToColumn(itemId, 'file_mm51jy06', file)
-      await setSimpleColumnValue(itemId, 'color_mm5rzrhk', 'Leer')
+      setLecturaEstado('subido')
+    } catch (err) {
+      setLecturaEstado('Error')
+      setLecturaError(err.message)
+    }
+  }
+
+  // Recién acá se dispara la lectura automática — el usuario ya vio que el archivo
+  // subió bien y confirma explícitamente antes de que el robot lo procese.
+  const handleConfirmarLectura = async () => {
+    if (!createdItemId) return
+    setLecturaEstado('confirmando')
+    setLecturaError(null)
+    try {
+      await setSimpleColumnValue(createdItemId, 'color_mm5rzrhk', 'Leer')
       setLecturaEstado('Leer')
     } catch (err) {
       setLecturaEstado('Error')
@@ -514,15 +540,20 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
     }
   }
 
-  // Cédula Identidad ahora es opcional (ya no bloquea el guardado) — como el ítem ya
-  // existe para cuando este campo aparece (recién se muestra después de "Leidos"), se
-  // sube directo apenas se elige el archivo en vez de esperar a "Guardar".
+  // Cédula Identidad es opcional en los dos casos de Posee Vehículo (Sí y No) — no
+  // bloquea el guardado. Caso "Sí": el ítem ya existe para cuando este campo aparece
+  // (recién se muestra después de "Leidos"), así que se sube directo apenas se elige.
+  // Caso "No": el ítem todavía no existe (recién se crea en handleGuardar), así que acá
+  // solo se guarda el File en memoria — handleGuardar la sube una vez que ya hay item_id
+  // (mismo mecanismo que Carta Automóvil antes del rework del caso "Sí").
   const handleCedulaIdentidadChange = async (file) => {
     handleChange('cedulaIdentidad', file)
+    setCedulaSubida(false)
     if (!file || !createdItemId) return
     setCedulaSubiendo(true)
     try {
       await uploadFileToColumn(createdItemId, 'file_mm5pc008', file)
+      setCedulaSubida(true)
     } catch (err) {
       setSaveError(err.message)
     } finally {
@@ -613,6 +644,13 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
         // Caso "Sí": Marca/Año ya los completó la lectura automática directo en el
         // tablero (ver polling de arriba) — no hace falta reescribirlos acá.
         await setMultipleColumnValues(itemId, extra)
+      }
+
+      // Caso "No": la Cédula (si se eligió) todavía no se subió — el ítem no existía
+      // cuando se seleccionó el archivo (ver handleCedulaIdentidadChange). Caso "Sí": ya
+      // se subió apenas se eligió, así que cedulaSubida corta acá para no duplicarla.
+      if (form.cedulaIdentidad && !cedulaSubida) {
+        await uploadFileToColumn(itemId, 'file_mm5pc008', form.cedulaIdentidad)
       }
 
       onCreated?.(itemId)
@@ -824,15 +862,29 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                 />
 
                 {(lecturaEstado === 'subiendo' ||
+                  lecturaEstado === 'confirmando' ||
                   lecturaEstado === 'Leer' ||
                   lecturaEstado === 'Leyendo') && (
                   <AttentionBox type="warning" icon={false}>
                     <span className="crear-op__lectura-spinner" aria-hidden="true" />
                     {lecturaEstado === 'subiendo' && 'Subiendo Carta Automóvil...'}
+                    {lecturaEstado === 'confirmando' && 'Confirmando...'}
                     {lecturaEstado === 'Leer' && 'En cola para leer Cédula y Carta Automóvil...'}
                     {lecturaEstado === 'Leyendo' && 'Leyendo Cédula y Carta Automóvil...'}{' '}
                     Esto puede tardar unos segundos, la pantalla se actualiza sola.
                   </AttentionBox>
+                )}
+
+                {/* A pedido: subir el archivo NO dispara la lectura sola — queda en
+                    "subido" hasta que se confirma acá, para poder revisar que se subió
+                    lo que corresponde antes de que el robot lo procese. */}
+                {lecturaEstado === 'subido' && (
+                  <AttentionBox
+                    type="primary"
+                    icon={false}
+                    text="Archivo subido. Confirmá para iniciar la lectura automática de Carta Automóvil / Cédula Automovil."
+                    action={{ text: 'Confirmar lectura', onClick: handleConfirmarLectura }}
+                  />
                 )}
 
                 {lecturaEstado === 'Error' && (
@@ -975,6 +1027,13 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                     onChange={(option) => handleChange('uso', option?.value ?? '')}
                   />
                 </label>
+                <FileField
+                  label="Cédula Identidad"
+                  required={false}
+                  file={form.cedulaIdentidad}
+                  onChange={handleCedulaIdentidadChange}
+                />
+                {cedulaSubiendo && <p className="crear-op__autofill">Subiendo Cédula Identidad...</p>}
               </>
             )}
           </div>
