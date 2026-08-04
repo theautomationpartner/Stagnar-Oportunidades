@@ -38,6 +38,7 @@ const OPPORTUNITY_COLUMN_IDS = [
 const ITEMS_QUERY = `
   query GetOpportunities($boardId: ID!, $limit: Int!, $columnIds: [String!]) {
     boards(ids: [$boardId]) {
+      items_count
       items_page(limit: $limit) {
         items {
           id
@@ -439,13 +440,19 @@ async function callMondayApi(query, variables) {
   return payload.data
 }
 
-export async function fetchOpportunities(limit = 10) {
+// 500 es el máximo real que acepta items_page por página en la API de monday — con eso
+// alcanza de sobra para el tamaño actual del tablero (una sola consulta, sin paginar por
+// cursor). Devuelve también items_count (el total REAL del tablero, sin el límite) para
+// poder avisar si algún día se llega a superar ese techo en vez de truncar en silencio
+// (ver App.jsx, boardTotalCount).
+export async function fetchOpportunities(limit = 500) {
   const data = await callMondayApi(ITEMS_QUERY, {
     boardId: OPPORTUNITIES_BOARD_ID,
     limit,
     columnIds: OPPORTUNITY_COLUMN_IDS,
   })
-  return data.boards[0]?.items_page.items ?? []
+  const board = data.boards[0]
+  return { items: board?.items_page.items ?? [], totalCount: board?.items_count ?? 0 }
 }
 
 export async function fetchOpportunityDetail(itemId) {

@@ -21,6 +21,16 @@
   overflow-y: auto;
 }
 
+@media (max-width: 640px) {
+  .wa-modal__header {
+    padding: 18px 44px 10px 16px;
+  }
+
+  .wa-modal__content {
+    padding: 0 16px 18px;
+  }
+}
+
 .wa-modal__field {
   display: flex;
   flex-direction: column;

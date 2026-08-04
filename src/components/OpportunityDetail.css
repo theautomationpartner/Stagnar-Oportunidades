@@ -2,7 +2,7 @@
   display: flex;
   align-items: center;
   gap: 4px;
-  padding: 16px 32px 0;
+  padding: 16px var(--page-gutter) 0;
   font-size: 13px;
   color: #676879;
 }
@@ -31,7 +31,8 @@
   display: flex;
   justify-content: space-between;
   align-items: flex-start;
-  padding: 8px 32px 0;
+  padding: 8px var(--page-gutter) 0;
+  gap: 12px;
 }
 
 .opp-detail__title {
@@ -39,6 +40,20 @@
   font-weight: 700;
   color: #323338;
   margin: 0 0 4px;
+}
+
+@media (max-width: 640px) {
+  .opp-detail__header {
+    flex-direction: column;
+  }
+
+  .opp-detail__title {
+    font-size: 20px;
+  }
+
+  .opp-detail__header-actions {
+    flex-wrap: wrap;
+  }
 }
 
 .opp-detail__subtitle {
@@ -53,7 +68,7 @@
 }
 
 .opp-detail__client-card {
-  margin: 16px 32px 0;
+  margin: 16px var(--page-gutter) 0;
   padding: 16px 20px;
   background: #fff;
   border: 1px solid #e6e9ef;
@@ -94,7 +109,7 @@
 }
 
 .opp-detail__info-bar {
-  margin: 16px 32px 0;
+  margin: 16px var(--page-gutter) 0;
   padding: 12px 16px;
   background: #eef6ff;
   border: 1px solid #cfe3fb;
@@ -102,8 +117,20 @@
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   font-size: 13px;
   color: #323338;
+}
+
+@media (max-width: 640px) {
+  .opp-detail__info-bar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .opp-detail__recotizar-btn {
+    width: 100%;
+  }
 }
 
 .opp-detail__info-bar > span {
@@ -126,13 +153,19 @@
 }
 
 .opp-detail__no-quotes {
-  margin: 20px 32px 32px;
+  margin: 20px var(--page-gutter) 32px;
   padding: 32px;
   background: #fff;
   border: 1px dashed #d0d4e4;
   border-radius: 10px;
   text-align: center;
   color: #676879;
+}
+
+@media (max-width: 640px) {
+  .opp-detail__no-quotes {
+    padding: 20px;
+  }
 }
 
 .opp-detail__no-quotes p {
@@ -143,7 +176,7 @@
 .opp-detail__body {
   display: flex;
   gap: 20px;
-  margin: 20px 32px 32px;
+  margin: 20px var(--page-gutter) 32px;
   align-items: flex-start;
 }
 
@@ -152,15 +185,25 @@
   min-width: 0;
 }
 
+/* ParametersPanel (sidebar de 260px fijos, ver ParametersPanel.css) no entra al lado
+   de la lista de cotizaciones en un celular — pasa a apilarse arriba/abajo a ancho
+   completo en vez de angostar el contenido principal hasta lo ilegible. */
+@media (max-width: 720px) {
+  .opp-detail__body {
+    flex-direction: column;
+  }
+}
+
 .opp-detail__footer {
   position: sticky;
   bottom: 0;
   background: #fff;
   border-top: 1px solid #e6e9ef;
-  padding: 14px 32px;
+  padding: 14px var(--page-gutter);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   font-size: 13px;
   color: #323338;
   font-weight: 600;
@@ -170,6 +213,25 @@
   display: flex;
   align-items: center;
   gap: 14px;
+}
+
+@media (max-width: 640px) {
+  .opp-detail__footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .opp-detail__footer-status {
+    flex-wrap: wrap;
+  }
+
+  .opp-detail__footer-actions {
+    justify-content: stretch;
+  }
+
+  .opp-detail__footer-actions > * {
+    flex: 1;
+  }
 }
 
 .opp-detail__envio-status {
@@ -195,7 +257,7 @@
 }
 
 .opp-detail__error-detail {
-  margin: 0 32px 20px;
+  margin: 0 var(--page-gutter) 20px;
   background: #fdf1f2;
   border: 1px solid #f7c6cc;
   border-radius: 8px;
@@ -227,7 +289,7 @@
 }
 
 .opp-detail__lectura-gate {
-  margin: 20px 32px 32px;
+  margin: 20px var(--page-gutter) 32px;
   display: flex;
   flex-direction: column;
   gap: 16px;
@@ -253,4 +315,11 @@
   display: inline-flex;
   align-items: center;
   gap: 8px;
+}
+
+@media (max-width: 480px) {
+  .opp-detail__lectura-gate-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }

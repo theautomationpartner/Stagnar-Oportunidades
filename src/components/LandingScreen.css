@@ -4,6 +4,16 @@
   margin: 0 auto;
 }
 
+@media (max-width: 640px) {
+  .landing {
+    padding: 24px 16px;
+  }
+
+  .landing__title {
+    font-size: 22px;
+  }
+}
+
 .landing__title {
   font-size: 28px;
   font-weight: 700;

@@ -8,6 +8,12 @@
   height: fit-content;
 }
 
+@media (max-width: 720px) {
+  .parameters-panel {
+    width: 100%;
+  }
+}
+
 .parameters-panel--collapsed {
   width: auto;
 }

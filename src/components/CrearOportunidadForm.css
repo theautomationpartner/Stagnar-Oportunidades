@@ -13,6 +13,16 @@
   padding: 24px 32px 28px;
 }
 
+@media (max-width: 640px) {
+  .crear-op {
+    padding: 12px;
+  }
+
+  .crear-op__card {
+    padding: 18px 16px 20px;
+  }
+}
+
 .crear-op__header {
   display: flex;
   align-items: flex-start;
@@ -49,7 +59,8 @@
 
 .crear-op__steps {
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 8px 16px;
   margin-bottom: 8px;
 }
 
@@ -140,6 +151,20 @@
   flex-shrink: 0;
 }
 
+@media (max-width: 400px) {
+  .crear-op__phone {
+    flex-wrap: wrap;
+  }
+
+  .crear-op__phone-code {
+    width: 100%;
+  }
+
+  .crear-op__phone input {
+    flex-basis: 100%;
+  }
+}
+
 .crear-op__phone input {
   flex: 1;
   min-width: 0;
@@ -191,6 +216,12 @@
   border-radius: 8px;
   font-size: 13px;
   margin: 0;
+}
+
+@media (max-width: 640px) {
+  .crear-op__empty {
+    padding: 20px;
+  }
 }
 
 .crear-op__error {
@@ -257,4 +288,22 @@
 .crear-op__footer-actions {
   display: flex;
   gap: 12px;
+}
+
+/* 3 botones ("Ver oportunidades existentes" + Atrás/Cancelar + Guardar) con texto
+   largo no entran en una fila de celular — se apilan, con las acciones principales
+   (footer-actions) arriba y "ver existentes" como salida secundaria abajo. */
+@media (max-width: 640px) {
+  .crear-op__footer {
+    flex-direction: column-reverse;
+    align-items: stretch;
+  }
+
+  .crear-op__footer-actions {
+    justify-content: stretch;
+  }
+
+  .crear-op__footer-actions > * {
+    flex: 1;
+  }
 }

@@ -1,5 +1,5 @@
 .confirmar-step {
-  margin: 20px 32px 32px;
+  margin: 20px var(--page-gutter) 32px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -10,6 +10,22 @@
   background: #fff;
   border: 1px solid #e6e9ef;
   border-radius: 10px;
+}
+
+@media (max-width: 640px) {
+  .confirmar-step__section {
+    padding: 16px;
+  }
+
+  .confirmar-step__section-head,
+  .confirmar-step__confirm {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .confirmar-step__confirm-btn {
+    width: 100%;
+  }
 }
 
 .confirmar-step__title {
@@ -67,6 +83,12 @@
   gap: 12px;
 }
 
+@media (max-width: 640px) {
+  .confirmar-step__checklist {
+    grid-template-columns: 1fr;
+  }
+}
+
 .confirmar-step__check {
   display: flex;
   align-items: center;
@@ -122,6 +144,16 @@
 .confirmar-step__company-row .confirmar-step__card {
   flex: 1 1 200px;
   max-width: 260px;
+}
+
+@media (max-width: 480px) {
+  .confirmar-step__company-row .confirmar-step__card {
+    max-width: none;
+  }
+
+  .confirmar-step__check-label {
+    min-width: 0;
+  }
 }
 
 .confirmar-step__card {
@@ -222,6 +254,18 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 14px;
+}
+
+@media (max-width: 640px) {
+  .confirmar-step__chosen-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 400px) {
+  .confirmar-step__chosen-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .confirmar-step__chosen-grid > div {

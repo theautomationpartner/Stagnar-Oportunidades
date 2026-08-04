@@ -7,6 +7,13 @@
   background: #ffffff;
 }
 
+@media (max-width: 640px) {
+  .topbar {
+    gap: 12px;
+    padding: 10px var(--page-gutter);
+  }
+}
+
 .topbar__brand {
   display: flex;
   align-items: center;

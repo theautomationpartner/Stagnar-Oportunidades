@@ -12,7 +12,11 @@ import { fetchFilterAndStatusSchema } from './services/boardSchema'
 import { fetchPanelData } from './services/recargoPanel'
 import './App.css'
 
-const ITEMS_LIMIT = 10
+// Techo real de la API de monday para items_page en una sola página (ver
+// fetchOpportunities en mondayApi.js) — con esto se trae el tablero completo de una,
+// nada de "solo los primeros 10" (los filtros/búsqueda de FilterPanel son client-side
+// sobre lo ya cargado, así que si no está cargado no aparece por más que matchee).
+const ITEMS_FETCH_LIMIT = 500
 
 const EMPTY_FILTERS = {
   marca: '',
@@ -27,6 +31,7 @@ const EMPTY_FILTERS = {
 
 export default function App() {
   const [opportunities, setOpportunities] = useState([])
+  const [boardTotalCount, setBoardTotalCount] = useState(0)
   const [schema, setSchema] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -43,15 +48,16 @@ export default function App() {
     let cancelled = false
 
     Promise.all([
-      fetchOpportunities(ITEMS_LIMIT),
+      fetchOpportunities(ITEMS_FETCH_LIMIT),
       fetchFilterAndStatusSchema(),
       fetchDepartamentos(),
       fetchLocalidades(),
       fetchPanelData(),
     ])
-      .then(([items, fetchedSchema, departamentos, localidades, panelData]) => {
+      .then(([{ items, totalCount }, fetchedSchema, departamentos, localidades, panelData]) => {
         if (cancelled) return
         setSchema({ ...fetchedSchema, departamentos, localidades, ...panelData })
+        setBoardTotalCount(totalCount)
         setOpportunities(
           mapOpportunities(items, {
             estadoOportunidad: fetchedSchema.estadoOportunidad.colorsByLabel,
@@ -168,6 +174,8 @@ export default function App() {
       />
       <OpportunitiesTable
         opportunities={filteredOpportunities}
+        totalLoaded={opportunities.length}
+        boardTotalCount={boardTotalCount}
         loading={loading}
         error={error}
         onOpenOpportunity={setOpenOpportunityId}

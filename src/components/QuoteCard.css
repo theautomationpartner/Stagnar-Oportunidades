@@ -10,6 +10,18 @@
   background: #fff;
 }
 
+@media (max-width: 640px) {
+  .quote-card {
+    grid-template-columns: 1fr;
+    padding: 14px 16px;
+  }
+
+  .quote-card__total {
+    align-items: flex-start;
+    text-align: left;
+  }
+}
+
 .quote-card--selected {
   border-color: #0073ea;
   box-shadow: 0 0 0 1px #0073ea inset;

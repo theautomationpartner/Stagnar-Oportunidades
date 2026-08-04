@@ -1,7 +1,30 @@
 .stepper {
   display: flex;
   align-items: center;
-  margin: 20px 32px 0;
+  margin: 20px var(--page-gutter) 0;
+}
+
+/* 4 pasos con labels largos ("Comparar y enviar", "Emitir · cargar PDF") no entran en
+   ~340px útiles de un celular promedio ni achicando fuente — se ocultan los labels y
+   queda solo el rosario de círculos numerados + líneas de progreso (el título del paso
+   activo ya se ve en el heading de arriba de cada panel). */
+@media (max-width: 640px) {
+  .stepper {
+    margin-top: 12px;
+  }
+
+  .stepper__label {
+    display: none;
+  }
+
+  button.stepper__step {
+    padding: 6px;
+    margin: -6px;
+  }
+
+  .stepper__line {
+    margin: 0 4px;
+  }
 }
 
 .stepper__item {

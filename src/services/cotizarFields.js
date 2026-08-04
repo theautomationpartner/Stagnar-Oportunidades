@@ -52,7 +52,7 @@ export const COTIZAR_FIELDS = [
   },
   {
     key: 'zonaCirculacion',
-    label: 'Zona de circulación',
+    label: 'Localidad',
     kind: 'connected',
     columnId: 'board_relation_mm5sqf8t',
     idKey: 'localidadId',

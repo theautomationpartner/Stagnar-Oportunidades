@@ -40,11 +40,37 @@ function ClickableCell({ children, onOpen, focusable, ariaLabel }) {
   )
 }
 
-export default function OpportunitiesTable({ opportunities, loading, error, onOpenOpportunity }) {
+export default function OpportunitiesTable({
+  opportunities,
+  totalLoaded,
+  boardTotalCount,
+  loading,
+  error,
+  onOpenOpportunity,
+}) {
+  // opportunities ya viene filtrado (búsqueda/filtros de FilterPanel, client-side sobre
+  // lo cargado) — totalLoaded es cuántas oportunidades se trajeron del tablero antes de
+  // filtrar, y boardTotalCount es el total REAL del tablero (items_count, sin el límite
+  // de la consulta). Si coinciden, se cargó todo y el conteo de abajo es sobre el
+  // universo completo; si boardTotalCount > totalLoaded, se llegó al techo de la
+  // consulta (500) y hay que avisar en vez de dejar creer que se buscó sobre todo.
+  const isFiltered = opportunities.length !== totalLoaded
+  const hitFetchCap = boardTotalCount > totalLoaded
+
   return (
     <section className="opps-table-wrap">
       <div className="opps-table-wrap__head">
-        <span>Oportunidades encontradas ({opportunities.length})</span>
+        <span>
+          {isFiltered
+            ? `${opportunities.length} resultado${opportunities.length === 1 ? '' : 's'} de ${totalLoaded} oportunidades`
+            : `Oportunidades encontradas (${opportunities.length})`}
+        </span>
+        {hitFetchCap && (
+          <span className="opps-table-wrap__cap-warning">
+            Mostrando {totalLoaded} de {boardTotalCount} — hay más oportunidades en el
+            tablero de las que se pueden cargar de una.
+          </span>
+        )}
       </div>
 
       {/* size="large" (48px) no alcanza para 2 líneas de texto + avatar de

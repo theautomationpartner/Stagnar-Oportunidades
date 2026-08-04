@@ -1,9 +1,15 @@
 .cotizar-step {
-  margin: 20px 32px 32px;
+  margin: 20px var(--page-gutter) 32px;
   padding: 20px 24px;
   background: #fff;
   border: 1px solid #e6e9ef;
   border-radius: 10px;
+}
+
+@media (max-width: 640px) {
+  .cotizar-step {
+    padding: 16px;
+  }
 }
 
 .cotizar-step__head {
@@ -41,6 +47,18 @@
   grid-template-columns: repeat(3, 1fr);
   gap: 18px;
   margin-bottom: 24px;
+}
+
+@media (max-width: 720px) {
+  .cotizar-step__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 480px) {
+  .cotizar-step__grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .cotizar-step__field {
@@ -98,6 +116,14 @@
   align-items: center;
   justify-content: space-between;
   gap: 16px;
+}
+
+@media (max-width: 480px) {
+  .cotizar-step__head,
+  .cotizar-step__banner-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }
 
 .cotizar-step__banner-row > span,

@@ -106,10 +106,10 @@ function drawContent(ctx, opportunity, raw, quote, canvasHeight) {
   ctx.fillText(`Año: ${raw.anioVehiculo || opportunity.anio || '—'}`, 50, y)
   y += 45
 
-  // Circulación / Uso / RC
+  // Localidad / Uso / RC
   ctx.font = '20px Arial'
   ctx.fillStyle = '#333333'
-  ctx.fillText(`Circulación: ${opportunity.zonaCirculacion || opportunity.departamento || '—'}`, 50, y)
+  ctx.fillText(`Localidad: ${opportunity.zonaCirculacion || opportunity.departamento || '—'}`, 50, y)
   y += 32
   ctx.fillText(`Uso: ${raw.uso || '—'}      RC: ${quote.rc || '—'}`, 50, y)
   y += 32

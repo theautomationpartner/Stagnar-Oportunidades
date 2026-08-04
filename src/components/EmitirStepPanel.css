@@ -1,5 +1,5 @@
 .emitir-step {
-  margin: 20px 32px 32px;
+  margin: 20px var(--page-gutter) 32px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -10,6 +10,12 @@
   background: #fff;
   border: 1px solid #e6e9ef;
   border-radius: 10px;
+}
+
+@media (max-width: 640px) {
+  .emitir-step__section {
+    padding: 16px;
+  }
 }
 
 .emitir-step__title {

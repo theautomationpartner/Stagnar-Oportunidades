@@ -2,6 +2,22 @@
   box-sizing: border-box;
 }
 
+/* Margen horizontal de página, reusado por casi todas las secciones (filtros, tabla,
+   pasos de Cotizar/Confirmar/Emitir, header, etc.) — variable en vez de "32px" repetido
+   en cada .css para poder achicarlo una sola vez en el breakpoint de celular en vez de
+   tener que pisarlo archivo por archivo. 640px como corte "celular promedio" (portrait,
+   ~375-430px de ancho real + boclas del navegador) es el mismo breakpoint que ya se
+   venía usando en LandingScreen.css/EmitirStepPanel.css antes de esta pasada. */
+:root {
+  --page-gutter: 32px;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --page-gutter: 16px;
+  }
+}
+
 body {
   margin: 0;
   font-family: 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
