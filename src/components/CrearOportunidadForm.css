@@ -37,6 +37,13 @@
   margin: 0;
 }
 
+.crear-op__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 .crear-op__close {
   display: flex;
   align-items: center;
@@ -60,8 +67,9 @@
 .crear-op__steps {
   display: flex;
   flex-wrap: wrap;
-  gap: 8px 16px;
+  gap: 8px;
   margin-bottom: 8px;
+  justify-content: space-between;
 }
 
 .crear-op__step {
@@ -139,6 +147,38 @@
   font-size: 14px;
   color: #323338;
   font-weight: 400;
+  width: 100%;
+}
+
+/* Wrapper de ClearableInput — relative para poder posicionar la "x" de borrar adentro
+   del input en vez de al lado (así no rompe el layout de flex/grid del campo). */
+.crear-op__input-wrap {
+  position: relative;
+  display: flex;
+}
+
+.crear-op__input-wrap input {
+  padding-right: 32px;
+}
+
+.crear-op__input-clear {
+  position: absolute;
+  right: 6px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: #9699a6;
+  cursor: pointer;
+  padding: 4px;
+  font-size: 15px;
+}
+
+.crear-op__input-clear:hover {
+  color: #e2445c;
 }
 
 .crear-op__phone {
@@ -151,6 +191,11 @@
   flex-shrink: 0;
 }
 
+.crear-op__phone .crear-op__input-wrap {
+  flex: 1;
+  min-width: 0;
+}
+
 @media (max-width: 400px) {
   .crear-op__phone {
     flex-wrap: wrap;
@@ -160,14 +205,9 @@
     width: 100%;
   }
 
-  .crear-op__phone input {
+  .crear-op__phone .crear-op__input-wrap {
     flex-basis: 100%;
   }
-}
-
-.crear-op__phone input {
-  flex: 1;
-  min-width: 0;
 }
 
 .crear-op__file {
@@ -175,6 +215,21 @@
   align-items: center;
   gap: 12px;
   flex-wrap: wrap;
+  padding: 8px;
+  border: 1px dashed transparent;
+  border-radius: 8px;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.crear-op__file--drag-over {
+  background: #eef6ff;
+  border-color: #0073ea;
+}
+
+.crear-op__file-hint {
+  font-size: 12px;
+  font-weight: 400;
+  color: #9699a6;
 }
 
 .crear-op__file-input {
@@ -278,7 +333,7 @@
 .crear-op__footer {
   display: flex;
   align-items: center;
-  justify-content: space-between;
+  justify-content: flex-end;
   gap: 16px;
   margin-top: 28px;
   padding-top: 20px;
@@ -290,17 +345,9 @@
   gap: 12px;
 }
 
-/* 3 botones ("Ver oportunidades existentes" + Atrás/Cancelar + Guardar) con texto
-   largo no entran en una fila de celular — se apilan, con las acciones principales
-   (footer-actions) arriba y "ver existentes" como salida secundaria abajo. */
-@media (max-width: 640px) {
-  .crear-op__footer {
-    flex-direction: column-reverse;
-    align-items: stretch;
-  }
-
+@media (max-width: 480px) {
   .crear-op__footer-actions {
-    justify-content: stretch;
+    width: 100%;
   }
 
   .crear-op__footer-actions > * {

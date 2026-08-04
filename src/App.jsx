@@ -148,6 +148,7 @@ export default function App() {
           schema={schema}
           onCancel={() => setView('landing')}
           onVerOportunidades={() => setView('table')}
+          onHome={() => setView('landing')}
           onCreated={(newItemId) => {
             setView('table')
             setOpenOpportunityId(newItemId)
@@ -160,7 +161,7 @@ export default function App() {
   return (
     <div className="app">
       <TopBar />
-      <PageHeader onCreateNew={() => setView('create')} />
+      <PageHeader onCreateNew={() => setView('create')} onHome={() => setView('landing')} />
       <FilterPanel
         searchTerm={searchTerm}
         onSearchTermChange={setSearchTerm}

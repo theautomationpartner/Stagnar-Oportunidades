@@ -359,17 +359,18 @@ export async function searchAutodataModelos(searchText) {
 // Año + Marca ya elegidos en el formulario, mostrando solo los modelos reales que
 // existen para esa combinación en cualquiera de los dos tableros de Autodata. contains_text
 // funciona sobre columnas dropdown, no hace falta resolver el id interno de la label
-// (que además difiere entre V1 y V2 para la misma marca/año). Límite más alto que la
-// búsqueda por texto: confirmado contra la API real que Marca+Año solos (sin "Modelo")
-// pueden matchear más de 20 variantes (ej. Peugeot 2006) — con el límite bajo de antes,
-// el modelo buscado quedaba afuera de la lista sin que se notara que existía.
+// (que además difiere entre V1 y V2 para la misma marca/año). 500 (el máximo real de
+// items_page por página) en vez de 100: confirmado contra la API real que Marca+Año
+// solos (sin "Modelo") pueden matchear MUCHO más de 100 variantes — Peugeot 2006 solo en
+// V1 son 135 — con el límite de 100 de antes, un modelo real (ej. "Boxer Minibus 1905cc
+// Turbo Diesel") quedaba afuera de la lista sin que se notara que existía.
 export async function fetchAutodataModelosByAnioMarca(anio, marca) {
   if (!anio || !marca) return []
   const buildRules = (board) => [
     { column_id: board.marcaColumnId, compare_value: [marca], operator: 'contains_text' },
     { column_id: board.anioColumnId, compare_value: [anio], operator: 'contains_text' },
   ]
-  return queryAutodataBoards(buildRules, 'and', 100)
+  return queryAutodataBoards(buildRules, 'and', 500)
 }
 
 // Tablero "PANEL": tarifario de recargos por compañía + cantidad de cuotas, textos

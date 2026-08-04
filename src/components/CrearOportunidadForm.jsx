@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { MdClose, MdUploadFile, MdClear } from 'react-icons/md'
-import { Button, Dropdown, AttentionBox } from '@vibe/core'
+import { MdClose, MdUploadFile, MdClear, MdSearch, MdHome } from 'react-icons/md'
+import { Button, IconButton, Dropdown, AttentionBox } from '@vibe/core'
 import {
   createOpportunityItem,
   setMultipleColumnValues,
@@ -63,11 +63,21 @@ function toIsoDate(ddmmyyyy) {
   return `${y}-${m}-${d}`
 }
 
+// El campo CI acepta puntos/guion para que se pueda tipear como está impreso en el
+// documento (ver placeholder "Ej: 4.123.456-7" y ciError más abajo) — pero
+// numeric_mm51mb0s es una columna NUMÉRICA real de monday, que rechaza cualquier cosa
+// que no sea dígitos puros ("invalid value, please check our API documentation...").
+// Se usa esto para limpiar el valor recién al guardar, nunca en el input (ahí se
+// necesita crudo, con los puntos/guion, para no romper mientras se está tipeando).
+function stripCi(value) {
+  return value.replace(/[.\-\s]/g, '')
+}
+
 // Validaciones con mensaje — a diferencia del resto (que solo chequean "no vacío"),
 // estos 3 campos necesitan validar el FORMATO del dato, no solo su presencia.
 function ciError(value) {
   if (!value) return null
-  const digits = value.replace(/[.\-\s]/g, '')
+  const digits = stripCi(value)
   if (!/^\d+$/.test(digits)) return 'El CI debe contener solo números (podés incluir puntos y guion).'
   return null
 }
@@ -115,6 +125,18 @@ function telefonoError(value, codigoPais) {
 // así que el matcheo es client-side, sin pegarle una consulta extra a la API. Si el
 // filtro estricto no deja ningún modelo (dato incompleto/ruidoso en Autodata), se cae al
 // listado amplio de Año+Marca en vez de dejar al usuario sin opciones para elegir.
+// Búsqueda "amigable" por palabra: cada palabra escrita tiene que aparecer en algún
+// lugar del nombre (no en orden, no necesariamente al principio) — a diferencia del
+// filtro por defecto del Dropdown (arranca a matchear desde el principio del texto), acá
+// alcanza con escribir "Boxer Minibus" para encontrar "PEUGEOT  - Boxer Minibus 1905 cc
+// Turbo Diesel" aunque "Boxer" no sea la primera palabra del nombre.
+function matchesModeloQuery(label, query) {
+  const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
+  if (!words.length) return true
+  const haystack = label.toLowerCase()
+  return words.every((word) => haystack.includes(word))
+}
+
 function AutodataModeloPorAnioMarca({ anio, marca, tipo, combustible, value, onChange }) {
   const [options, setOptions] = useState([])
   const [loading, setLoading] = useState(false)
@@ -153,6 +175,7 @@ function AutodataModeloPorAnioMarca({ anio, marca, tipo, combustible, value, onC
     <Dropdown
       clearable={false}
       searchable
+      filterOption={(option, inputValue) => matchesModeloQuery(option.label, inputValue)}
       options={options}
       value={selected}
       loading={loading}
@@ -196,15 +219,16 @@ function buildInitialForm() {
   }
 }
 
-// Todos los campos son obligatorios (sin excepción) — con datos requeridos no tiene
-// sentido "clearable". OJO: @vibe/core's Dropdown viene con clearable=true POR DEFECTO
-// (no alcanza con simplemente no pasar la prop) — hay que pasar clearable={false}
-// explícito. Con la "x" de limpiar visible, quedaba pegada justo donde el usuario
-// clickeaba para reabrir y cambiar el valor, y terminaba borrando el dato por error en
-// vez de dejarlo reelegir. Sin clearable, click en el control siempre abre el menú para
-// elegir otra opción directo, sin ese paso intermedio de "borrar primero".
-function RequiredDropdown(props) {
-  return <Dropdown clearable={false} {...props} />
+// A pedido, la "x" de limpiar vuelve a estar activa acá (clearable) — con el mismo
+// onChange de cada campo alcanza para armar el onClear: se lo llama con null, y como
+// todos los onChange ya resuelven "option?.value ?? ''"/resetean los campos que
+// dependen de este, limpiar hace exactamente lo mismo que elegir "nada". OJO: la
+// primera vez que probamos esto (antes de este pedido) la "x" quedaba pegada justo
+// donde se clickeaba para reabrir el dropdown y lo vaciaba por error en vez de dejar
+// reelegir — por eso se lo había sacado. Si vuelve a pasar avisar para revisarlo de
+// nuevo en vez de convivir con el bug.
+function RequiredDropdown({ onChange, onClear, ...props }) {
+  return <Dropdown clearable onChange={onChange} onClear={onClear ?? (() => onChange(null))} {...props} />
 }
 
 // dd/mm/aaaa con auto-inserción de "/" a medida que se escribe, en vez de un
@@ -221,16 +245,61 @@ function formatFechaInput(raw) {
   return out
 }
 
+// Input de texto con una "x" para borrar el contenido de una — sin esto había que
+// seleccionar todo el texto a mano o borrar letra por letra para corregir un campo. Solo
+// se usa en los inputs de texto plano (Nombre/Apellido/CI/Fecha/Teléfono); los Dropdown
+// del formulario a propósito NO tienen "clearable" (ver RequiredDropdown más arriba —
+// ahí la "x" superpuesta con el click de reabrir el menú terminaba borrando el valor por
+// error), así que no se les agrega esto.
+function ClearableInput({ value, onChange, onClear, ...inputProps }) {
+  return (
+    <div className="crear-op__input-wrap">
+      <input value={value} onChange={onChange} {...inputProps} />
+      {value && (
+        <button
+          type="button"
+          className="crear-op__input-clear"
+          onClick={onClear}
+          aria-label="Borrar campo"
+        >
+          <MdClear />
+        </button>
+      )}
+    </div>
+  )
+}
+
 // Sin ítem de monday creado todavía (recién se está completando el formulario), así que
 // esto solo guarda el File en memoria — la subida real a la columna correspondiente
 // (file_mm51jy06 / file_mm5pc008) se hace más adelante, cuando se sepa en qué paso se
 // crea efectivamente el ítem.
 function FileField({ label, file, onChange, required = true }) {
   const inputRef = useRef(null)
+  const [dragOver, setDragOver] = useState(false)
+
+  const handleDragOver = (e) => {
+    e.preventDefault()
+    setDragOver(true)
+  }
+
+  const handleDragLeave = () => setDragOver(false)
+
+  const handleDrop = (e) => {
+    e.preventDefault()
+    setDragOver(false)
+    const dropped = e.dataTransfer.files?.[0]
+    if (dropped) onChange(dropped)
+  }
+
   return (
     <label className="crear-op__field">
       <span>{label}{required ? ' *' : ''}</span>
-      <div className="crear-op__file">
+      <div
+        className={dragOver ? 'crear-op__file crear-op__file--drag-over' : 'crear-op__file'}
+        onDragOver={handleDragOver}
+        onDragLeave={handleDragLeave}
+        onDrop={handleDrop}
+      >
         <input
           ref={inputRef}
           type="file"
@@ -240,6 +309,7 @@ function FileField({ label, file, onChange, required = true }) {
         <Button kind="secondary" onClick={() => inputRef.current?.click()}>
           <MdUploadFile /> {file ? 'Cambiar archivo' : 'Subir archivo'}
         </Button>
+        {!file && <span className="crear-op__file-hint">o arrastrá el archivo acá</span>}
         {file && (
           <span className="crear-op__file-name">
             {file.name}
@@ -258,7 +328,7 @@ function FileField({ label, file, onChange, required = true }) {
   )
 }
 
-export default function CrearOportunidadForm({ schema, onCancel, onVerOportunidades, onCreated }) {
+export default function CrearOportunidadForm({ schema, onCancel, onVerOportunidades, onHome, onCreated }) {
   const [stepIndex, setStepIndex] = useState(0)
   const [form, setForm] = useState(buildInitialForm)
   const [saving, setSaving] = useState(false)
@@ -393,7 +463,7 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
       deal_stage: 'Nueva',
       text_mm51b055: form.nombre,
       text_mm51ez7e: form.apellido,
-      numeric_mm51mb0s: form.ci,
+      numeric_mm51mb0s: stripCi(form.ci),
       date_mm516agw: toIsoDate(form.fechaNacimiento),
       phone_mm519m27: {
         phone: `${form.codigoPais.replace('+', '')}${form.telefono.replace(/\D/g, '')}`,
@@ -566,27 +636,44 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
       <div className="crear-op__card">
         <div className="crear-op__header">
           <h1 className="crear-op__title">Agregar Oportunidades</h1>
-          <button className="crear-op__close" onClick={onCancel} aria-label="Cerrar">
-            <MdClose />
-          </button>
+          <div className="crear-op__header-actions">
+            <IconButton
+              icon={MdSearch}
+              kind="secondary"
+              aria-label="Buscar oportunidad"
+              onClick={onVerOportunidades}
+            />
+            <IconButton icon={MdHome} kind="secondary" aria-label="Ir al inicio" onClick={onHome} />
+            <button className="crear-op__close" onClick={onCancel} aria-label="Cerrar">
+              <MdClose />
+            </button>
+          </div>
         </div>
 
         <div className="crear-op__progress">
           <div className="crear-op__steps">
-            {STEPS.map((s, index) => (
-              <button
-                key={s.key}
-                type="button"
-                className={
-                  index === stepIndex
-                    ? 'crear-op__step crear-op__step--active'
-                    : 'crear-op__step'
-                }
-                onClick={() => handleStepClick(index)}
-              >
-                Paso {index + 1} — {stepLabels[index]}
-              </button>
-            ))}
+            {STEPS.map((s, index) => {
+              // El paso 2 recién se muestra una vez que el paso 1 está completo — antes
+              // de eso no hay a dónde ir (handleStepClick ya lo bloqueaba), así que
+              // mostrar la pill sin poder usarla solo confundía. Al ocultarla en vez de
+              // solo deshabilitarla, el paso 1 queda pegado a la izquierda con el mismo
+              // gap de siempre entre pills (crear-op__steps), no un hueco vacío al lado.
+              if (index === 1 && !isStepValid(0)) return null
+              return (
+                <button
+                  key={s.key}
+                  type="button"
+                  className={
+                    index === stepIndex
+                      ? 'crear-op__step crear-op__step--active'
+                      : 'crear-op__step'
+                  }
+                  onClick={() => handleStepClick(index)}
+                >
+                  Paso {index + 1} — {stepLabels[index]}
+                </button>
+              )
+            })}
           </div>
           <div className="crear-op__progress-bar">
             <div
@@ -600,40 +687,44 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
           <div className="crear-op__fields">
             <label className="crear-op__field">
               <span>Nombre *</span>
-              <input
+              <ClearableInput
                 type="text"
                 placeholder="Ingresa el nombre"
                 value={form.nombre}
                 onChange={(e) => handleChange('nombre', e.target.value)}
+                onClear={() => handleChange('nombre', '')}
               />
             </label>
             <label className="crear-op__field">
               <span>Apellido *</span>
-              <input
+              <ClearableInput
                 type="text"
                 placeholder="Ingresa el apellido"
                 value={form.apellido}
                 onChange={(e) => handleChange('apellido', e.target.value)}
+                onClear={() => handleChange('apellido', '')}
               />
             </label>
             <label className="crear-op__field">
               <span>CI *</span>
-              <input
+              <ClearableInput
                 type="text"
                 placeholder="Ej: 4.123.456-7"
                 value={form.ci}
                 onChange={(e) => handleChange('ci', e.target.value)}
+                onClear={() => handleChange('ci', '')}
               />
               {ciError(form.ci) && <span className="crear-op__field-error">{ciError(form.ci)}</span>}
             </label>
             <label className="crear-op__field">
               <span>Fecha Nacimiento *</span>
-              <input
+              <ClearableInput
                 type="text"
                 inputMode="numeric"
                 placeholder="dd/mm/aaaa"
                 value={form.fechaNacimiento}
                 onChange={(e) => handleChange('fechaNacimiento', formatFechaInput(e.target.value))}
+                onClear={() => handleChange('fechaNacimiento', '')}
               />
               {fechaError(form.fechaNacimiento) && (
                 <span className="crear-op__field-error">{fechaError(form.fechaNacimiento)}</span>
@@ -649,11 +740,12 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                     onChange={(option) => handleChange('codigoPais', option?.value ?? '')}
                   />
                 </div>
-                <input
+                <ClearableInput
                   type="text"
                   placeholder="Ej: 099 123 456"
                   value={form.telefono}
                   onChange={(e) => handleChange('telefono', e.target.value)}
+                  onClear={() => handleChange('telefono', '')}
                 />
               </div>
               {telefonoError(form.telefono, form.codigoPais) && (
@@ -777,7 +869,8 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                     </label>
                     {form.modeloSeleccion && !form.combustible && (
                       <span className="crear-op__autofill-note">
-                        No se pudo determinar el Combustible automáticamente.
+                        No fue posible completar este campo automáticamente con el modelo
+                        seleccionado. Por favor, complételo manualmente.
                       </span>
                     )}
                     <FileField
@@ -851,7 +944,8 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                   />
                   {form.modeloSeleccion && !form.combustible && (
                     <span className="crear-op__autofill-note">
-                      No se pudo autocompletar con el modelo elegido — completalo a mano.
+                      No fue posible completar este campo automáticamente con el modelo
+                      seleccionado. Por favor, complételo manualmente.
                     </span>
                   )}
                 </label>
@@ -866,7 +960,8 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                   />
                   {form.modeloSeleccion && !form.tipo && (
                     <span className="crear-op__autofill-note">
-                      No se pudo autocompletar con el modelo elegido — completalo a mano.
+                      No fue posible completar este campo automáticamente con el modelo
+                      seleccionado. Por favor, complételo manualmente.
                     </span>
                   )}
                 </label>
@@ -888,9 +983,6 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
         {saveError && <p className="crear-op__error">Error: {saveError}</p>}
 
         <div className="crear-op__footer">
-          <Button kind="tertiary" onClick={onVerOportunidades} disabled={saving}>
-            Ver oportunidades existentes
-          </Button>
           <div className="crear-op__footer-actions">
             {stepIndex === 0 ? (
               <Button kind="secondary" onClick={onCancel} disabled={saving}>
