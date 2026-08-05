@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { MdClose, MdUploadFile, MdClear, MdSearch, MdHome } from 'react-icons/md'
+import { MdUploadFile, MdClear, MdSearch, MdHome } from 'react-icons/md'
 import { Button, IconButton, Dropdown, AttentionBox } from '@vibe/core'
 import {
   createOpportunityItem,
@@ -329,6 +329,119 @@ function FileField({ label, file, onChange, required = true }) {
   )
 }
 
+// Año/Marca/Modelo/Combustible/Tipo/Uso a mano — se usa en dos casos: Posee Vehículo =
+// "No" (nunca hubo archivo que leer) y Posee Vehículo = "Sí" con lectura en "Error" (el
+// robot no pudo terminar; se completa/corrige lo que haga falta a mano en vez de trabar
+// el formulario). `onModeloChange` varía según el caso: en "No" siempre pisa Combustible/
+// Tipo con lo que sepa el modelo elegido (handleModeloChange); en el fallback de "Sí" se
+// prioriza lo que ya se haya leído automáticamente (handleModeloChangeConOcr).
+function VehiculoManualFields({
+  form,
+  setForm,
+  handleChange,
+  anioOptions,
+  marcaOptions,
+  combustibleOptions,
+  tipoOptions,
+  usoOptions,
+  onModeloChange,
+}) {
+  return (
+    <>
+      <label className="crear-op__field">
+        <span>Año *</span>
+        <RequiredDropdown
+          options={anioOptions}
+          value={anioOptions.find((o) => o.value === form.anio) ?? null}
+          placeholder="Escribe para buscar resultados"
+          searchable
+          onChange={(option) => {
+            // Cambiar Año/Marca invalida el Modelo elegido (se filtra por esos dos) y lo
+            // que se haya autocompletado a partir de él.
+            setForm((prev) => ({
+              ...prev,
+              anio: option?.value ?? '',
+              modeloSeleccion: null,
+              combustible: '',
+              tipo: '',
+            }))
+          }}
+        />
+      </label>
+      <label className="crear-op__field">
+        <span>Marca *</span>
+        <RequiredDropdown
+          options={marcaOptions}
+          value={marcaOptions.find((o) => o.value === form.marca) ?? null}
+          placeholder="Escribe para buscar resultados"
+          searchable
+          onChange={(option) => {
+            setForm((prev) => ({
+              ...prev,
+              marca: option?.value ?? '',
+              modeloSeleccion: null,
+              combustible: '',
+              tipo: '',
+            }))
+          }}
+        />
+      </label>
+      <label className="crear-op__field">
+        <span>Modelo *</span>
+        <AutodataModeloPorAnioMarca
+          anio={form.anio}
+          marca={form.marca}
+          tipo={form.tipo}
+          combustible={form.combustible}
+          value={form.modeloSeleccion}
+          onChange={onModeloChange}
+        />
+      </label>
+      <label className="crear-op__field">
+        <span>Combustible *</span>
+        <RequiredDropdown
+          options={combustibleOptions}
+          value={combustibleOptions.find((o) => o.value === form.combustible) ?? null}
+          placeholder="Selecciona una opción"
+          onChange={(option) => handleChange('combustible', option?.value ?? '')}
+        />
+        {form.modeloSeleccion && !form.combustible && (
+          <span className="crear-op__autofill-note">
+            No fue posible completar este campo automáticamente con el modelo
+            seleccionado. Por favor, complételo manualmente.
+          </span>
+        )}
+      </label>
+      <label className="crear-op__field">
+        <span>Tipo *</span>
+        <RequiredDropdown
+          options={tipoOptions}
+          value={tipoOptions.find((o) => o.value === form.tipo) ?? null}
+          placeholder="Escribe para buscar resultados"
+          searchable
+          onChange={(option) => handleChange('tipo', option?.value ?? '')}
+        />
+        {form.modeloSeleccion && !form.tipo && (
+          <span className="crear-op__autofill-note">
+            No fue posible completar este campo automáticamente con el modelo
+            seleccionado. Por favor, complételo manualmente.
+          </span>
+        )}
+      </label>
+      <label className="crear-op__field">
+        <span>Uso *</span>
+        <RequiredDropdown
+          options={usoOptions}
+          value={usoOptions.find((o) => o.value === form.uso) ?? null}
+          placeholder="Escribe para buscar resultados"
+          searchable
+          onChange={(option) => handleChange('uso', option?.value ?? '')}
+        />
+      </label>
+    </>
+  )
+}
+
 export default function CrearOportunidadForm({ schema, onCancel, onVerOportunidades, onHome, onCreated }) {
   const [stepIndex, setStepIndex] = useState(0)
   const [form, setForm] = useState(buildInitialForm)
@@ -436,10 +549,20 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
       if (!esAutomovil) return true
       if (!form.poseeVehiculo) return false
       if (form.poseeVehiculo === 'Si') {
-        // Hay que esperar a que la lectura automática termine ("Leidos") antes de poder
-        // elegir Modelo — mientras está "Leer"/"Leyendo"/"Error" todavía no hay Marca/Año
-        // confiables con qué filtrar Autodata.
-        return Boolean(form.cartaAutomovil && lecturaEstado === 'Leidos' && form.modeloSeleccion)
+        if (!form.cartaAutomovil) return false
+        // Camino feliz: la lectura automática terminó bien ("Leidos"), solo falta elegir
+        // Modelo. Mientras está "Leer"/"Leyendo"/"subido"/"subiendo" todavía no hay
+        // Marca/Año confiables con qué filtrar Autodata, así que no se puede avanzar.
+        if (lecturaEstado === 'Leidos') return Boolean(form.modeloSeleccion)
+        // A pedido: si la lectura terminó en "Error", en vez de trabar el formulario se
+        // muestra lo que se haya alcanzado a extraer (puede venir vacío) y se completa a
+        // mano el resto — mismos campos y misma validación que el caso "No".
+        if (lecturaEstado === 'Error') {
+          return Boolean(
+            form.marca && form.anio && form.modeloSeleccion && form.combustible && form.uso && form.tipo
+          )
+        }
+        return false
       }
       if (!form.modeloSeleccion) return false
       return Boolean(form.marca && form.anio && form.combustible && form.uso && form.tipo)
@@ -577,13 +700,14 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
         const estado = data.column_values.find((cv) => cv.id === 'color_mm5rzrhk')?.text?.trim()
         if (!estado || estado === lecturaEstado) return
         setLecturaEstado(estado)
-        if (estado === 'Leidos') {
+        // A pedido: aunque termine en "Error", se trae lo que el robot haya alcanzado a
+        // completar antes de fallar (puede ser parcial, ej. Marca sí y Tipo no) — mismo
+        // dato que en "Leidos", solo que acá puede venir incompleto. matchOption normaliza
+        // Combustible contra las opciones reales por si difiere en casing.
+        if (estado === 'Leidos' || estado === 'Error') {
           const marca = data.column_values.find((cv) => cv.id === 'dropdown_mm51ykrd')?.text?.trim() || ''
           const anio = data.column_values.find((cv) => cv.id === 'dropdown_mm51mdmq')?.text?.trim() || ''
           const tipo = data.column_values.find((cv) => cv.id === 'dropdown_mm5jqdk')?.text?.trim() || ''
-          // El robot también completa Combustible directo en el tablero (no solo
-          // Marca/Año/Tipo) — matchOption lo normaliza contra las opciones reales por si
-          // difiere en casing (ver el mismo cuidado en handleModeloChange).
           const combustibleLeido = data.column_values.find((cv) => cv.id === 'dropdown_mm52jp01')?.text?.trim() || ''
           setForm((prev) => ({
             ...prev,
@@ -633,7 +757,11 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
         }
         if (form.combustible) extra.dropdown_mm52jp01 = dropdownColumnValue(form.combustible)
         if (form.tipo) extra.dropdown_mm5jqdk = dropdownColumnValue(form.tipo)
-        if (form.poseeVehiculo === 'No') {
+        // Caso "No", y caso "Sí" con lectura en "Error": Marca/Año/Uso se completaron (o
+        // corrigieron) a mano en el formulario, hay que escribirlos. Caso "Sí" con
+        // "Leidos": ya los completó la lectura automática directo en el tablero (ver
+        // polling de arriba), no hace falta reescribirlos.
+        if (form.poseeVehiculo === 'No' || lecturaEstado === 'Error') {
           extra.dropdown_mm51ykrd = dropdownColumnValue(form.marca)
           // Año es un label puramente numérico ("2006") — mandarlo como string pelado
           // hace que monday lo confunda con un ID de label interno y lo descarte en
@@ -641,8 +769,6 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
           extra.dropdown_mm51mdmq = dropdownColumnValue(form.anio)
           extra.color_mm52ey1d = form.uso
         }
-        // Caso "Sí": Marca/Año ya los completó la lectura automática directo en el
-        // tablero (ver polling de arriba) — no hace falta reescribirlos acá.
         await setMultipleColumnValues(itemId, extra)
       }
 
@@ -682,9 +808,6 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
               onClick={onVerOportunidades}
             />
             <IconButton icon={MdHome} kind="secondary" aria-label="Ir al inicio" onClick={onHome} />
-            <button className="crear-op__close" onClick={onCancel} aria-label="Cerrar">
-              <MdClose />
-            </button>
           </div>
         </div>
 
@@ -890,7 +1013,8 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                 {lecturaEstado === 'Error' && (
                   <AttentionBox type="negative">
                     No se pudieron leer los documentos automáticamente. Podés volver a
-                    subir el archivo para reintentar.
+                    subir el archivo para reintentar, o cambiar manualmente los
+                    siguientes campos.
                   </AttentionBox>
                 )}
                 {lecturaEstado === 'Error' && lecturaError && (
@@ -898,6 +1022,38 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                     <strong>Detalle del error:</strong>
                     <pre>{lecturaError}</pre>
                   </div>
+                )}
+
+                {/* A pedido: si la lectura falla, en vez de trabar el formulario se
+                    muestra lo que se haya alcanzado a extraer (puede venir vacío) y se
+                    completa/corrige el resto a mano — mismos campos que el caso "No". */}
+                {lecturaEstado === 'Error' && (
+                  <>
+                    <p className="crear-op__autofill">
+                      Datos que se pudieron extraer — Marca: {form.marca || '—'}
+                      {' · '}Año: {form.anio || '—'}
+                      {' · '}Tipo: {form.tipo || '—'}
+                      {' · '}Combustible: {form.combustible || '—'}
+                    </p>
+                    <VehiculoManualFields
+                      form={form}
+                      setForm={setForm}
+                      handleChange={handleChange}
+                      anioOptions={anioOptions}
+                      marcaOptions={marcaOptions}
+                      combustibleOptions={combustibleOptions}
+                      tipoOptions={tipoOptions}
+                      usoOptions={usoOptions}
+                      onModeloChange={handleModeloChangeConOcr}
+                    />
+                    <FileField
+                      label="Cédula Identidad"
+                      required={false}
+                      file={form.cedulaIdentidad}
+                      onChange={handleCedulaIdentidadChange}
+                    />
+                    {cedulaSubiendo && <p className="crear-op__autofill">Subiendo Cédula Identidad...</p>}
+                  </>
                 )}
 
                 {lecturaEstado === 'Leidos' && (
@@ -939,94 +1095,17 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
 
             {esAutomovil && form.poseeVehiculo === 'No' && (
               <>
-                <label className="crear-op__field">
-                  <span>Año *</span>
-                  <RequiredDropdown
-                    options={anioOptions}
-                    value={anioOptions.find((o) => o.value === form.anio) ?? null}
-                    placeholder="Escribe para buscar resultados"
-                    searchable
-                    onChange={(option) => {
-                      // Cambiar Año/Marca invalida el Modelo elegido (se filtra por esos
-                      // dos) y lo que se haya autocompletado a partir de él.
-                      setForm((prev) => ({
-                        ...prev,
-                        anio: option?.value ?? '',
-                        modeloSeleccion: null,
-                        combustible: '',
-                        tipo: '',
-                      }))
-                    }}
-                  />
-                </label>
-                <label className="crear-op__field">
-                  <span>Marca *</span>
-                  <RequiredDropdown
-                    options={marcaOptions}
-                    value={marcaOptions.find((o) => o.value === form.marca) ?? null}
-                    placeholder="Escribe para buscar resultados"
-                    searchable
-                    onChange={(option) => {
-                      setForm((prev) => ({
-                        ...prev,
-                        marca: option?.value ?? '',
-                        modeloSeleccion: null,
-                        combustible: '',
-                        tipo: '',
-                      }))
-                    }}
-                  />
-                </label>
-                <label className="crear-op__field">
-                  <span>Modelo *</span>
-                  <AutodataModeloPorAnioMarca
-                    anio={form.anio}
-                    marca={form.marca}
-                    value={form.modeloSeleccion}
-                    onChange={handleModeloChange}
-                  />
-                </label>
-                <label className="crear-op__field">
-                  <span>Combustible *</span>
-                  <RequiredDropdown
-                    options={combustibleOptions}
-                    value={combustibleOptions.find((o) => o.value === form.combustible) ?? null}
-                    placeholder="Selecciona una opción"
-                    onChange={(option) => handleChange('combustible', option?.value ?? '')}
-                  />
-                  {form.modeloSeleccion && !form.combustible && (
-                    <span className="crear-op__autofill-note">
-                      No fue posible completar este campo automáticamente con el modelo
-                      seleccionado. Por favor, complételo manualmente.
-                    </span>
-                  )}
-                </label>
-                <label className="crear-op__field">
-                  <span>Tipo *</span>
-                  <RequiredDropdown
-                    options={tipoOptions}
-                    value={tipoOptions.find((o) => o.value === form.tipo) ?? null}
-                    placeholder="Escribe para buscar resultados"
-                    searchable
-                    onChange={(option) => handleChange('tipo', option?.value ?? '')}
-                  />
-                  {form.modeloSeleccion && !form.tipo && (
-                    <span className="crear-op__autofill-note">
-                      No fue posible completar este campo automáticamente con el modelo
-                      seleccionado. Por favor, complételo manualmente.
-                    </span>
-                  )}
-                </label>
-                <label className="crear-op__field">
-                  <span>Uso *</span>
-                  <RequiredDropdown
-                    options={usoOptions}
-                    value={usoOptions.find((o) => o.value === form.uso) ?? null}
-                    placeholder="Escribe para buscar resultados"
-                    searchable
-                    onChange={(option) => handleChange('uso', option?.value ?? '')}
-                  />
-                </label>
+                <VehiculoManualFields
+                  form={form}
+                  setForm={setForm}
+                  handleChange={handleChange}
+                  anioOptions={anioOptions}
+                  marcaOptions={marcaOptions}
+                  combustibleOptions={combustibleOptions}
+                  tipoOptions={tipoOptions}
+                  usoOptions={usoOptions}
+                  onModeloChange={handleModeloChange}
+                />
                 <FileField
                   label="Cédula Identidad"
                   required={false}

@@ -44,22 +44,6 @@
   flex-shrink: 0;
 }
 
-.crear-op__close {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: none;
-  color: #676879;
-  cursor: pointer;
-  padding: 0;
-  font-size: 18px;
-}
-
-.crear-op__close:hover {
-  color: #323338;
-}
-
 .crear-op__progress {
   margin: 16px 0 24px;
 }
