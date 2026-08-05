@@ -82,15 +82,11 @@ export default function DocumentUploadRow({
           <MdWarningAmber />
         )}
         <span className="doc-upload-row__label">{label}</span>
-        <span className="doc-upload-row__value">
-          {uploading
-            ? 'Subiendo...'
-            : deleting
-              ? 'Eliminando...'
-              : uploaded
-                ? displayFileName(fileName)
-                : 'Falta cargar — arrastrá el archivo acá o'}
-        </span>
+        {(uploading || deleting || uploaded) && (
+          <span className="doc-upload-row__value">
+            {uploading ? 'Subiendo...' : deleting ? 'Eliminando...' : displayFileName(fileName)}
+          </span>
+        )}
       </div>
       {/* El input real queda oculto — el Button nativo dispara el selector de
           archivos del sistema operativo haciendo click en él por ref, en vez

@@ -1063,7 +1063,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
                 },
                 {
                   key: 'cedula',
-                  label: 'Cédula',
+                  label: 'Cédula de Identidad',
                   columnId: CEDULA_COLUMN_ID,
                   fileName: opportunity.cedula,
                 },
