@@ -7,6 +7,7 @@ import {
   MdTune,
   MdRefresh,
   MdBusiness,
+  MdClearAll,
 } from 'react-icons/md'
 import { Button, IconButton, Dropdown, Checkbox } from '@vibe/core'
 import { formatMoney } from '../services/format'
@@ -133,6 +134,7 @@ export default function QuoteCard({
   onApplyOverrides,
   onResetOverrides,
   onApplyToCompany,
+  onClearCompany,
   onToggleOpcional,
   rcOptions,
 }) {
@@ -184,6 +186,15 @@ export default function QuoteCard({
   const handleReset = () => {
     setForm(buildInitialForm(raw, {}, fields))
     onResetOverrides()
+  }
+
+  // Contraparte de "Aplicar a toda {compania}": saca los parámetros de prueba de todas
+  // las cotizaciones de la compañía de una, no solo la de esta tarjeta — también resetea
+  // el form local de esta tarjeta (si no, quedaría mostrando valores viejos hasta volver
+  // a abrir/cerrar Parámetros).
+  const handleClearCompany = () => {
+    setForm(buildInitialForm(raw, {}, fields))
+    onClearCompany()
   }
 
   // A diferencia de "Aplicar a esta cotización" (que solo guarda lo que cambió respecto
@@ -357,6 +368,9 @@ export default function QuoteCard({
             </Button>
             <Button kind="secondary" onClick={handleApplyToCompany}>
               <MdBusiness /> Aplicar a toda {raw.compania}
+            </Button>
+            <Button kind="secondary" onClick={handleClearCompany}>
+              <MdClearAll /> Limpiar toda {raw.compania}
             </Button>
             <Button kind="secondary" onClick={handleReset} disabled={!hasCustomOverrides}>
               Restablecer

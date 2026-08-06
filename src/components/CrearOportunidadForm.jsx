@@ -310,7 +310,6 @@ function FileField({ label, file, onChange, required = true }) {
         <Button kind="secondary" onClick={() => inputRef.current?.click()}>
           <MdUploadFile /> {file ? 'Cambiar archivo' : 'Subir archivo'}
         </Button>
-        {!file && <span className="crear-op__file-hint">o arrastrá el archivo acá</span>}
         {file && (
           <span className="crear-op__file-name">
             {file.name}

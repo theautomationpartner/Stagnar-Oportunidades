@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { MdSend, MdCheckCircle } from 'react-icons/md'
 import { Modal, ModalHeader, ModalContent, ModalFooter, AttentionBox } from '@vibe/core'
 import { sendQuotesToWhatsApp, getMakeWebhookUrl } from '../services/makeWebhook'
@@ -25,6 +25,14 @@ export default function WhatsAppSendModal({ opportunity, images, onClose, onSent
     }
   }
 
+  // Confirmación breve en vez de dejar el modal esperando a que lo cierren a mano — se
+  // cierra sola a los 2 segundos de mostrar el éxito.
+  useEffect(() => {
+    if (!sent) return undefined
+    const timer = setTimeout(() => onClose?.(), 2000)
+    return () => clearTimeout(timer)
+  }, [sent, onClose])
+
   return (
     <Modal id="whatsapp-send-modal" show onClose={onClose} size="medium">
       <ModalHeader title="Enviar por WhatsApp" className="wa-modal__header" />
@@ -39,7 +47,8 @@ export default function WhatsAppSendModal({ opportunity, images, onClose, onSent
 
         {sent ? (
           <AttentionBox type="positive">
-            <MdCheckCircle /> Enviado a Make.com correctamente.
+            <MdCheckCircle /> Cotización enviada correctamente. En breve le llega por
+            WhatsApp.
           </AttentionBox>
         ) : (
           <>

@@ -15,6 +15,7 @@ export default function CompanyGroup({
   onApplyOverrides,
   onResetOverrides,
   onApplyToCompany,
+  onClearCompany,
   onToggleOpcional,
   rcOptions,
 }) {
@@ -40,6 +41,7 @@ export default function CompanyGroup({
               onApplyOverrides={(values) => onApplyOverrides(raw.id, values)}
               onResetOverrides={() => onResetOverrides(raw.id)}
               onApplyToCompany={(values) => onApplyToCompany(compania, values)}
+              onClearCompany={() => onClearCompany(compania)}
               onToggleOpcional={(field, checked) => onToggleOpcional(raw.id, field, checked)}
               rcOptions={rcOptions}
             />

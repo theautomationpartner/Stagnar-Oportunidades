@@ -515,6 +515,19 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
     })
   }
 
+  // Contraparte de "Aplicar a toda [Compañía]": saca los parámetros de prueba de TODAS
+  // las cotizaciones de esa compañía de una, en vez de tener que abrir tarjeta por
+  // tarjeta y apretar "Restablecer" en cada una.
+  const handleClearCompanyOverrides = (compania) => {
+    setOverridesByQuoteId((prev) => {
+      const next = { ...prev }
+      for (const raw of rawQuotes) {
+        if (raw.compania === compania) delete next[raw.id]
+      }
+      return next
+    })
+  }
+
   const handleMarcarParaCotizar = async () => {
     setMarking(true)
     setMarkError(null)
@@ -592,6 +605,10 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
       ),
     }))
     setSendPolling(true)
+    // A pedido: al cerrarse el mensaje de éxito del modal de WhatsApp (a mano o solo a
+    // los 2 segundos), se pasa directo al paso 3 (Confirmar) en vez de dejar a quien lo
+    // manda en el paso 2 (Comparar y enviar).
+    setActiveStep('confirmar')
   }
 
   // Sube Libreta de Conducir/Carta Automóvil y Cédula (paso 3, columnas "file" de la
@@ -993,6 +1010,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
                       onApplyOverrides={handleApplyQuoteOverrides}
                       onResetOverrides={handleResetQuoteOverrides}
                       onApplyToCompany={handleApplyCompanyOverrides}
+                      onClearCompany={handleClearCompanyOverrides}
                       onToggleOpcional={handleToggleOpcional}
                       rcOptions={rcOptions}
                     />
