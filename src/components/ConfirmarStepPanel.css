@@ -17,7 +17,6 @@
     padding: 16px;
   }
 
-  .confirmar-step__section-head,
   .confirmar-step__confirm {
     flex-direction: column;
     align-items: stretch;
@@ -41,25 +40,6 @@
   margin: 0 0 16px;
 }
 
-.confirmar-step__section-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.confirmar-step__section-head .confirmar-step__subtitle {
-  margin-bottom: 0;
-}
-
-/* Button kind="secondary" es transparente de fábrica — sobre la tarjeta
-   blanca de esta sección casi no se distinguía, solo el borde. Un gris muy
-   claro (el mismo que usamos para "campos" dentro de tarjetas) lo separa
-   del fondo blanco de atrás. */
-.confirmar-step__recotizar-btn {
-  background-color: #f6f7fb !important;
-}
-
 .confirmar-step__confirm {
   display: flex;
   align-items: center;
@@ -77,56 +57,17 @@
   flex-shrink: 0;
 }
 
-.confirmar-step__checklist {
+/* A pedido: los 2 documentos uno al lado del otro en vez de apilados. */
+.confirmar-step__docs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 12px;
 }
 
 @media (max-width: 640px) {
-  .confirmar-step__checklist {
+  .confirmar-step__docs {
     grid-template-columns: 1fr;
   }
-}
-
-.confirmar-step__check {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  font-size: 13px;
-}
-
-.confirmar-step__check svg {
-  font-size: 18px;
-  flex-shrink: 0;
-}
-
-.confirmar-step__check--ok {
-  background: #e6f9f1;
-  color: #037f4c;
-}
-
-.confirmar-step__check--missing {
-  background: #fff7f0;
-  color: #a15c00;
-}
-
-.confirmar-step__check-label {
-  font-weight: 700;
-  min-width: 120px;
-}
-
-.confirmar-step__check-value {
-  color: inherit;
-  opacity: 0.85;
-}
-
-.confirmar-step__docs {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
 }
 
 .confirmar-step__companies {
@@ -149,10 +90,6 @@
 @media (max-width: 480px) {
   .confirmar-step__company-row .confirmar-step__card {
     max-width: none;
-  }
-
-  .confirmar-step__check-label {
-    min-width: 0;
   }
 }
 

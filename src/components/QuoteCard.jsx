@@ -11,6 +11,7 @@ import {
 } from 'react-icons/md'
 import { Button, IconButton, Dropdown, Checkbox } from '@vibe/core'
 import { formatMoney } from '../services/format'
+import { accentForCompania } from '../services/companyColors'
 import './QuoteCard.css'
 
 const CUOTA_COUNTS = [3, 6, 8, 10]
@@ -146,6 +147,7 @@ export default function QuoteCard({
   const [opcionalError, setOpcionalError] = useState(null)
 
   const hasCustomOverrides = Object.keys(overrides).length > 0
+  const accent = accentForCompania(raw.compania)
 
   const handleToggleOpcional = async (field, checked) => {
     setSavingOpcional(field)
@@ -222,8 +224,11 @@ export default function QuoteCard({
 
   if (quote.blocked) {
     return (
-      <div className="quote-card quote-card--blocked">
+      <div className="quote-card quote-card--blocked" style={{ borderLeftColor: accent }}>
         <div className="quote-card__title-row">
+          <span className="quote-card__company" style={{ color: accent }}>
+            {raw.compania}
+          </span>
           <span className="quote-card__title">{raw.cobertura || raw.name}</span>
         </div>
         <p className="quote-card__blocked-msg">
@@ -234,7 +239,10 @@ export default function QuoteCard({
   }
 
   return (
-    <div className={selected ? 'quote-card quote-card--selected' : 'quote-card'}>
+    <div
+      className={selected ? 'quote-card quote-card--selected' : 'quote-card'}
+      style={{ borderLeftColor: accent }}
+    >
       <div className="quote-card__main">
         <div className="quote-card__title-row">
           <IconButton
@@ -243,6 +251,9 @@ export default function QuoteCard({
             onClick={onToggleSelected}
             aria-label="Seleccionar opción"
           />
+          <span className="quote-card__company" style={{ color: accent }}>
+            {raw.compania}
+          </span>
           <span className="quote-card__title">{raw.cobertura || raw.name}</span>
           {hasCustomOverrides && <span className="quote-card__custom-tag">Parámetros propios</span>}
         </div>

@@ -160,8 +160,8 @@ export default function App() {
 
   return (
     <div className="app">
-      <TopBar />
-      <PageHeader onCreateNew={() => setView('create')} onHome={() => setView('landing')} />
+      <TopBar onCreateNew={() => setView('create')} onHome={() => setView('landing')} />
+      <PageHeader />
       <FilterPanel
         searchTerm={searchTerm}
         onSearchTermChange={setSearchTerm}

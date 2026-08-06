@@ -1,18 +1,15 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
   MdOpenInNew,
-  MdMoreHoriz,
-  MdInfoOutline,
   MdFileDownload,
   MdSend,
   MdArrowBack,
   MdAutorenew,
   MdWarningAmber,
 } from 'react-icons/md'
-import { Button, IconButton, EmptyState, AttentionBox } from '@vibe/core'
+import { Button, EmptyState, AttentionBox } from '@vibe/core'
 import TopBar from './TopBar'
-import ParametersPanel from './ParametersPanel'
-import CompanyGroup from './CompanyGroup'
+import QuoteCard from './QuoteCard'
 import StatusBadge from './StatusBadge'
 import Stepper from './Stepper'
 import CotizarStepPanel from './CotizarStepPanel'
@@ -864,47 +861,72 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
         <Button kind="tertiary" className="opp-detail__back-btn" onClick={onBack}>
           <MdArrowBack /> Volver a Oportunidades
         </Button>
-        <span className="opp-detail__breadcrumb-trail">
-          <span> &gt; </span>
-          <span>
-            {opportunity ? `${opportunity.oppNumber} · ${opportunity.clienteNombre}` : '...'}
-          </span>
-        </span>
+        {!loading && !error && opportunity && !lecturaGateActive && (
+          <Stepper steps={steps} activeKey={activeStep} onSelect={setActiveStep} />
+        )}
+        {!loading && !error && opportunity && (
+          <Button kind="secondary" className="opp-detail__ver-monday-btn">
+            <MdOpenInNew /> Ver en Monday
+          </Button>
+        )}
       </div>
 
-      {loading && <div className="opp-detail__status">Cargando cotizaciones...</div>}
+      {loading && (
+        <div className="opp-detail__status">
+          <span className="opp-detail__loading-spinner" aria-hidden="true" />
+          Cargando cotizaciones...
+        </div>
+      )}
       {error && <div className="opp-detail__status opp-detail__status--error">Error: {error}</div>}
 
       {!loading && !error && opportunity && (
         <>
           <div className="opp-detail__header">
-            <div>
-              <h1 className="opp-detail__title">Cotizaciones</h1>
-              <p className="opp-detail__subtitle">
-                Cotizá, comparalá y enviá las mejores opciones a tu cliente.
-              </p>
-            </div>
-            <div className="opp-detail__header-actions">
-              <Button kind="secondary">
-                <MdOpenInNew /> Ver en la oportunidad
-              </Button>
-              <IconButton icon={MdMoreHoriz} aria-label="Más opciones" />
-            </div>
+            <h1 className="opp-detail__title">Cotizaciones</h1>
+            <p className="opp-detail__subtitle">
+              Cotizá, comparalá y enviá las mejores opciones a tu cliente.
+            </p>
           </div>
 
           <div className="opp-detail__client-card">
-            <div className="opp-detail__client-avatar">{opportunity.clienteNombre.slice(0, 2).toUpperCase()}</div>
-            <div className="opp-detail__client-info">
-              <span className="opp-detail__client-name">{opportunity.clienteNombre}</span>
-              <span className="opp-detail__client-meta">
-                {opportunity.bienLinea1} {opportunity.bienLinea2 && `· ${opportunity.bienLinea2}`}
-              </span>
-              {opportunity.ci && <span className="opp-detail__client-meta">CI {opportunity.ci}</span>}
+            <div className="opp-detail__client-card-main">
+              <div className="opp-detail__client-avatar">{opportunity.clienteNombre.slice(0, 2).toUpperCase()}</div>
+              <div className="opp-detail__client-info">
+                <span className="opp-detail__client-name">{opportunity.clienteNombre}</span>
+                <span className="opp-detail__client-meta">
+                  {opportunity.bienLinea1} {opportunity.bienLinea2 && `· ${opportunity.bienLinea2}`}
+                </span>
+                {opportunity.ci && <span className="opp-detail__client-meta">CI {opportunity.ci}</span>}
+              </div>
+
+              {/* A pedido: en vez de la aclaración de "Parámetros", acá va la lista de
+                  datos de la oportunidad (Edad, Combustible, Teléfono — antes en el
+                  panel lateral eliminado), en una sola línea para no sumar alto; el
+                  botón "Recotizar" sigue al lado, en el mismo renglón que
+                  Nombre/Bien/CI. En el paso "Confirmar" (antes tenía su propio botón
+                  "Recotizar" más abajo, junto a la sección "Datos del cliente" que se
+                  eliminó) solo se sube el botón, sin la lista de datos. */}
+              {(activeStep === 'comparar' || activeStep === 'confirmar') && hasQuotes && (
+                <div
+                  className={
+                    activeStep === 'comparar'
+                      ? 'opp-detail__client-card-note'
+                      : 'opp-detail__client-card-note opp-detail__client-card-note--btn-only'
+                  }
+                >
+                  {activeStep === 'comparar' && (
+                    <span className="opp-detail__client-card-data">
+                      <span>Edad: {opportunity.edad ? `${opportunity.edad} años` : '—'}</span>
+                      <span>Combustible: {opportunity.combustible || '—'}</span>
+                      <span>Teléfono: {opportunity.telefono || '—'}</span>
+                    </span>
+                  )}
+                  <Button kind="secondary" className="opp-detail__recotizar-btn" onClick={() => setActiveStep('cotizar')}>
+                    <MdAutorenew /> Recotizar
+                  </Button>
+                </div>
+              )}
             </div>
-            <StatusBadge
-              label={opportunity.estadoCotizacion || 'Sin estado'}
-              color={opportunity.estadoCotizacionColor}
-            />
           </div>
 
           {lecturaGateActive ? (
@@ -944,8 +966,6 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
             </div>
           ) : (
             <>
-              <Stepper steps={steps} activeKey={activeStep} onSelect={setActiveStep} />
-
               {activeStep === 'cotizar' && (
             <CotizarStepPanel
               opportunity={opportunity}
@@ -974,47 +994,29 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
 
           {activeStep === 'comparar' && hasQuotes && (
             <>
-              <div className="opp-detail__info-bar">
-                <span>
-                  <MdInfoOutline /> Cada cotización puede ajustar sus propios parámetros (edad,
-                  bonificación, descuento, recargo, deducible) con el botón "Parámetros" de su
-                  tarjeta.
-                </span>
-                <Button kind="secondary" className="opp-detail__recotizar-btn" onClick={() => setActiveStep('cotizar')}>
-                  <MdAutorenew /> Recotizar
-                </Button>
-              </div>
-
               <div className="opp-detail__body">
-                <ParametersPanel
-                  context={{
-                    edad: opportunity.edad,
-                    bien: opportunity.bienLinea1,
-                    combustible: opportunity.combustible,
-                    ci: opportunity.ci,
-                    telefono: opportunity.telefono,
-                    nombre: opportunity.clienteNombre,
-                  }}
-                />
-
+                {/* A pedido: sin solapas/acordeón por compañía — todas las cotizaciones
+                    en una sola grilla de a 2 por renglón, con la compañía de cada una
+                    mostrada adentro de su propia tarjeta (ver QuoteCard). */}
                 <div className="opp-detail__quotes">
-                  {groups.map((g, index) => (
-                    <CompanyGroup
-                      key={g.compania}
-                      compania={g.compania}
-                      entries={g.entries}
-                      selectedIds={selectedIds}
-                      onToggleSelected={toggleSelected}
-                      defaultOpen={index === 0}
-                      overridesByQuoteId={overridesByQuoteId}
-                      onApplyOverrides={handleApplyQuoteOverrides}
-                      onResetOverrides={handleResetQuoteOverrides}
-                      onApplyToCompany={handleApplyCompanyOverrides}
-                      onClearCompany={handleClearCompanyOverrides}
-                      onToggleOpcional={handleToggleOpcional}
-                      rcOptions={rcOptions}
-                    />
-                  ))}
+                  {groups.flatMap((g) =>
+                    g.entries.map(({ raw, quote }) => (
+                      <QuoteCard
+                        key={raw.id}
+                        raw={raw}
+                        quote={quote}
+                        selected={selectedIds.has(raw.id)}
+                        onToggleSelected={() => toggleSelected(raw.id)}
+                        overrides={overridesByQuoteId[raw.id] ?? {}}
+                        onApplyOverrides={(values) => handleApplyQuoteOverrides(raw.id, values)}
+                        onResetOverrides={() => handleResetQuoteOverrides(raw.id)}
+                        onApplyToCompany={(values) => handleApplyCompanyOverrides(g.compania, values)}
+                        onClearCompany={() => handleClearCompanyOverrides(g.compania)}
+                        onToggleOpcional={(field, checked) => handleToggleOpcional(raw.id, field, checked)}
+                        rcOptions={rcOptions}
+                      />
+                    ))
+                  )}
                 </div>
               </div>
 
@@ -1071,7 +1073,6 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
               onSetElegida={handleSetElegida}
               settingElegidaId={settingElegidaId}
               elegidaError={elegidaError}
-              onRecotizar={() => setActiveStep('cotizar')}
               documentos={[
                 {
                   key: 'libretaConducir',

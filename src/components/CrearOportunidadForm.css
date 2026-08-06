@@ -2,15 +2,33 @@
   padding: 32px;
   display: flex;
   justify-content: center;
+  /* A pedido: botones (Button de @vibe/core) un poco más redondeados — la librería usa
+     border-radius: var(--border-radius-small) (4px) para sus botones; pisar la variable
+     acá adentro (en vez de globalmente en :root) sube el radio de los botones de este
+     formulario sin afectar el resto de la app. */
+  --border-radius-small: 8px;
+}
+
+/* ModalHeader/ModalContent (@vibe/core) son <div> sin padding propio — sin esto el
+   título y el texto quedan pegados contra el borde redondeado del Modal. */
+.crear-op__duplicado-modal-header {
+  padding: 24px 32px 12px;
+}
+
+.crear-op__duplicado-modal-content {
+  padding: 0 32px 28px;
 }
 
 .crear-op__card {
   width: 100%;
-  max-width: 640px;
+  /* A pedido: que use más el ancho de la página en vez de quedar angosto en el centro —
+     antes 640px, ahora deja lugar de sobra para 2 columnas cómodas en desktop. Sigue
+     siendo 100% + max-width, así que en pantallas chicas se sigue achicando igual. */
+  max-width: 1040px;
   background: #fff;
   border: 1px solid #e6e9ef;
   border-radius: 10px;
-  padding: 24px 32px 28px;
+  padding: 28px 36px 32px;
 }
 
 @media (max-width: 640px) {
@@ -20,6 +38,12 @@
 
   .crear-op__card {
     padding: 18px 16px 20px;
+  }
+
+  /* La grilla de 2 columnas de campos (ver .crear-op__fields--grid) no entra cómoda en
+     celular — se apila en 1 columna, mismo criterio que el resto de la app. */
+  .crear-op__fields--grid {
+    grid-template-columns: 1fr;
   }
 }
 
@@ -31,7 +55,7 @@
 }
 
 .crear-op__title {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   color: #323338;
   margin: 0;
@@ -93,6 +117,22 @@
   gap: 16px;
 }
 
+/* A pedido, solo en el paso 1: Nombre/Apellido, CI/Fecha Nacimiento y Departamento/
+   Localidad van de a 2 por renglón en vez de uno abajo del otro — con campos cortos como
+   estos, una sola columna dejaba mucho espacio vacío a los costados y obligaba a
+   scrollear de más. Teléfono y Tipo de Riesgo se marcan con --full para que sigan
+   ocupando el renglón entero (ver JSX). El paso 2 no usa esta grilla — sigue en una sola
+   columna, tal cual estaba. */
+.crear-op__fields--grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 24px;
+}
+
+.crear-op__field--full {
+  grid-column: 1 / -1;
+}
+
 .crear-op__field-error {
   color: #e2445c;
   font-size: 12px;
@@ -115,23 +155,61 @@
   font-weight: 400;
 }
 
+/* Fila de cada resultado en ClienteExistenteSearch (optionRenderer) — nombre a la
+   izquierda, Cédula resaltada en azul a la derecha, para distinguir rápido resultados
+   con nombres parecidos. */
+.crear-op__cliente-option {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+}
+
+.crear-op__cliente-option-ci {
+  color: #0073ea;
+  font-weight: 600;
+  font-size: 13px;
+  flex-shrink: 0;
+}
+
 .crear-op__field {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 13px;
+  font-size: 14px;
   font-weight: 600;
   color: #323338;
 }
 
 .crear-op__field input {
-  padding: 10px 12px;
+  padding: 11px 14px;
   border: 1px solid #d0d4e4;
   border-radius: 8px;
-  font-size: 14px;
+  font-size: 15px;
   color: #323338;
   font-weight: 400;
   width: 100%;
+  transition: border-color 0.15s ease;
+}
+
+/* Marca sutil de validación (ver fieldStateClass) — solo el borde cambia de color, nada
+   más llamativo, para no competir con el mensaje de error en rojo debajo del campo. */
+.crear-op__field--valid input {
+  border-color: #9fd8b8;
+}
+
+.crear-op__field--invalid input {
+  border-color: #f0a3ae;
+}
+
+/* El campo que se está completando/editando ahora mismo se marca en azul — va después
+   de --valid/--invalid a propósito, para que el foco gane mientras se está escribiendo
+   incluso si el campo ya tiene marca verde/roja (que vuelve a verse apenas se sale). */
+.crear-op__field input:focus {
+  outline: none;
+  border-color: #0073ea;
+  box-shadow: 0 0 0 3px rgba(0, 115, 234, 0.15);
 }
 
 /* Wrapper de ClearableInput — relative para poder posicionar la "x" de borrar adentro
@@ -161,6 +239,39 @@
   font-size: 15px;
 }
 
+/* Igual que .crear-op__input-wrap/__input-clear, pero para <input type="date"> — no se
+   puede reusar tal cual: el navegador ya reserva su propio espacio a la derecha para el
+   ícono nativo del calendario, así que la "x" propia va más a la izquierda (right: 34px)
+   con más padding-right en el input para no superponerse ni comerse el ícono nativo. */
+.crear-op__date-wrap {
+  position: relative;
+  display: flex;
+}
+
+.crear-op__date-wrap input {
+  padding-right: 56px;
+}
+
+.crear-op__date-clear {
+  position: absolute;
+  right: 34px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: #9699a6;
+  cursor: pointer;
+  padding: 4px;
+  font-size: 15px;
+}
+
+.crear-op__date-clear:hover {
+  color: #e2445c;
+}
+
 .crear-op__input-clear:hover {
   color: #e2445c;
 }
@@ -170,14 +281,18 @@
   gap: 8px;
 }
 
+/* Antes 160px: el nombre del país ("(+595) Paraguay") quedaba cortado y no se distinguía
+   cuál era a simple vista. Más ancho acá + el número con un tope (en vez de flex:1
+   estirándose a lo ancho de todo el renglón, que en un form más ancho quedaba
+   larguísimo) — entre los dos alcanza y sobra sin llegar a ocupar el renglón entero. */
 .crear-op__phone-code {
-  width: 160px;
+  width: 210px;
   flex-shrink: 0;
 }
 
 .crear-op__phone .crear-op__input-wrap {
-  flex: 1;
-  min-width: 0;
+  flex: 0 1 220px;
+  min-width: 160px;
 }
 
 @media (max-width: 400px) {

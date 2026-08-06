@@ -87,6 +87,18 @@
   border-color: #e2445c;
 }
 
+/* Variante compacta (compactDelete): solo la cruz roja, sin texto "Eliminar" — para
+   cuando 2 documentos van uno al lado del otro (ver .confirmar-step__docs) y no hay
+   tanto ancho para un botón con label. */
+.doc-upload-row__delete-icon-btn {
+  color: #e2445c !important;
+  flex-shrink: 0;
+}
+
+.doc-upload-row__delete-icon-btn:hover {
+  background: #fdf1f2 !important;
+}
+
 .doc-upload-row__spinner {
   width: 16px;
   height: 16px;

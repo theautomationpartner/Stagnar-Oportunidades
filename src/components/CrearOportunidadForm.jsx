@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { MdUploadFile, MdClear, MdSearch, MdHome } from 'react-icons/md'
-import { Button, IconButton, Dropdown, AttentionBox } from '@vibe/core'
+import { Button, Dropdown, AttentionBox, Modal, ModalHeader, ModalContent, ModalFooter } from '@vibe/core'
 import {
   createOpportunityItem,
   setMultipleColumnValues,
@@ -10,6 +10,9 @@ import {
   fetchAutodataModelosByAnioMarca,
   fetchOpportunityDetail,
   fetchLatestUpdate,
+  searchClientes,
+  findClienteByCedula,
+  countOportunidadesByCedula,
 } from '../services/mondayApi'
 import './CrearOportunidadForm.css'
 
@@ -35,6 +38,14 @@ const POSEE_VEHICULO_OPTIONS = [
   { value: 'No', label: 'No' },
 ]
 
+// Primera decisión del paso 1, antes de tipear/buscar nada — no es una columna real de
+// monday, solo determina cómo se completan Nombre/Apellido/CI (buscando un Cliente ya
+// cargado, o a mano).
+const CLIENTE_EXISTE_OPTIONS = [
+  { value: 'Si', label: 'Si' },
+  { value: 'No', label: 'No' },
+]
+
 // Uruguay por default (mercado principal de la app), pero editable por si hace falta
 // cargar un cliente con otro código — no hay columna real de monday detrás todavía.
 const CODIGO_PAIS_OPTIONS = [
@@ -53,14 +64,6 @@ const COUNTRY_SHORT_NAMES = {
   '+55': 'BR',
   '+595': 'PY',
   '+56': 'CL',
-}
-
-// El input de Fecha Nacimiento guarda "dd/mm/aaaa" (ver formatFechaInput) — monday
-// espera "aaaa-mm-dd" para columnas date (mismo formato que ya escribe
-// CotizarStepPanel/handleSaveCotizarFields para esta misma columna).
-function toIsoDate(ddmmyyyy) {
-  const [d, m, y] = ddmmyyyy.split('/')
-  return `${y}-${m}-${d}`
 }
 
 // El campo CI acepta puntos/guion para que se pueda tipear como está impreso en el
@@ -82,15 +85,35 @@ function ciError(value) {
   return null
 }
 
+// A pedido: <input type="date"> nativo (calendario desplegable) en vez del texto
+// enmascarado dd/mm/aaaa de antes — el value que entrega el navegador ya viene en
+// "aaaa-mm-dd", el mismo formato que espera monday para columnas date (mismo que ya
+// escribe CotizarStepPanel/handleSaveCotizarFields para esta columna), así que no hace
+// falta convertirlo al guardar. El navegador ya impide fechas inválidas al elegir del
+// calendario; esto solo cubre el rango de año razonable.
 function fechaError(value) {
   if (!value) return null
-  if (!/^\d{2}\/\d{2}\/\d{4}$/.test(value)) return 'Completá el día, mes y año.'
-  const [d, m, y] = value.split('/').map(Number)
-  const daysInMonth = new Date(y, m, 0).getDate()
-  if (m < 1 || m > 12 || d < 1 || d > daysInMonth) return 'Fecha inválida.'
+  const [y, m, d] = value.split('-').map(Number)
   const currentYear = new Date().getFullYear()
-  if (y < 1900 || y > currentYear) return 'Año inválido.'
+  if (!y || y < 1900 || y > currentYear) return 'Año inválido.'
+  // A pedido: no se puede cargar un cliente menor de 18 años.
+  const today = new Date()
+  const birth = new Date(y, m - 1, d)
+  let age = today.getFullYear() - birth.getFullYear()
+  const yaCumplioEsteAnio =
+    today.getMonth() > birth.getMonth() ||
+    (today.getMonth() === birth.getMonth() && today.getDate() >= birth.getDate())
+  if (!yaCumplioEsteAnio) age -= 1
+  if (age < 18) return 'Debe ser mayor de 18 años.'
   return null
+}
+
+// "max" del calendario nativo: directo la fecha de hace 18 años, para que ni se pueda
+// elegir un día que dé menor de edad (en vez de solo avisar después con fechaError).
+function maxFechaNacimiento() {
+  const d = new Date()
+  d.setFullYear(d.getFullYear() - 18)
+  return d.toISOString().slice(0, 10)
 }
 
 // Cantidad de dígitos esperada del número (sin el código de país) para cada país
@@ -112,6 +135,13 @@ function telefonoError(value, codigoPais) {
   return null
 }
 
+// Marca sutilmente el campo (borde verde/rojo) según su estado — sin tocar todavía, ni
+// error, ni válido: no hay nada que señalar antes de que el usuario haya cargado algo.
+function fieldStateClass(value, error) {
+  if (!value) return ''
+  return error ? ' crear-op__field--invalid' : ' crear-op__field--valid'
+}
+
 // Modelo (Autodata), a partir de Año + Marca ya conocidos — se usa en los dos casos de
 // Posee Vehículo: "No" (elegidos a mano) y "Sí" (completados por la lectura automática
 // de la Carta Automóvil, ver handleCartaAutomovilChange). Solo muestra los modelos
@@ -126,11 +156,13 @@ function telefonoError(value, codigoPais) {
 // filtro estricto no deja ningún modelo (dato incompleto/ruidoso en Autodata), se cae al
 // listado amplio de Año+Marca en vez de dejar al usuario sin opciones para elegir.
 // Búsqueda "amigable" por palabra: cada palabra escrita tiene que aparecer en algún
-// lugar del nombre (no en orden, no necesariamente al principio) — a diferencia del
+// lugar de la opción (no en orden, no necesariamente al principio) — a diferencia del
 // filtro por defecto del Dropdown (arranca a matchear desde el principio del texto), acá
 // alcanza con escribir "Boxer Minibus" para encontrar "PEUGEOT  - Boxer Minibus 1905 cc
-// Turbo Diesel" aunque "Boxer" no sea la primera palabra del nombre.
-function matchesModeloQuery(label, query) {
+// Turbo Diesel" aunque "Boxer" no sea la primera palabra. La usan tanto Modelo
+// (matchesModeloQuery, campo puntual) como RequiredDropdown (todos los demás
+// searchable del formulario, ver más abajo).
+function matchesSearchQuery(label, query) {
   const words = query.trim().toLowerCase().split(/\s+/).filter(Boolean)
   if (!words.length) return true
   const haystack = label.toLowerCase()
@@ -175,7 +207,7 @@ function AutodataModeloPorAnioMarca({ anio, marca, tipo, combustible, value, onC
     <Dropdown
       clearable={false}
       searchable
-      filterOption={(option, inputValue) => matchesModeloQuery(option.label, inputValue)}
+      filterOption={(option, inputValue) => matchesSearchQuery(option.label, inputValue)}
       options={options}
       value={selected}
       loading={loading}
@@ -189,8 +221,85 @@ function AutodataModeloPorAnioMarca({ anio, marca, tipo, combustible, value, onC
   )
 }
 
+// El tablero Clientes no tiene columnas separadas de Nombre/Apellido, solo el nombre del
+// ítem entero (ej. "Lucía Soledad Martínez") — se parte en la primera palabra (Nombre) y
+// el resto (Apellido) para precargar el formulario. Es una aproximación (nombres
+// compuestos pueden partirse distinto a como se cargaron originalmente), pero los 2
+// campos quedan editables después así que se puede corregir a mano si hace falta.
+function splitNombreApellido(fullName) {
+  const parts = fullName.trim().split(/\s+/).filter(Boolean)
+  if (parts.length <= 1) return { nombre: fullName.trim(), apellido: '' }
+  return { nombre: parts[0], apellido: parts.slice(1).join(' ') }
+}
+
+// Búsqueda en vivo del tablero Clientes (18420863014) para precargar Nombre/Apellido/CI
+// de un cliente que ya existe, en vez de tipear todo de nuevo — el modo de búsqueda
+// (nombre vs. Cédula) lo decide searchClientes según lo que se tipeó. Cada opción se
+// muestra con el nombre a la izquierda y la Cédula resaltada en azul a la derecha
+// (optionRenderer), para distinguir rápido entre resultados con nombres parecidos.
+function ClienteExistenteSearch({ value, onChange }) {
+  const [inputValue, setInputValue] = useState('')
+  const [options, setOptions] = useState([])
+  const [loading, setLoading] = useState(false)
+
+  useEffect(() => {
+    const term = inputValue.trim()
+    if (term.length < 2) {
+      setOptions([])
+      setLoading(false)
+      return undefined
+    }
+    let cancelled = false
+    setLoading(true)
+    const timer = setTimeout(() => {
+      searchClientes(term)
+        .then((results) => {
+          if (!cancelled) {
+            setOptions(results.map((c) => ({ value: c.id, label: c.name, ci: c.ci })))
+          }
+        })
+        .finally(() => {
+          if (!cancelled) setLoading(false)
+        })
+    }, 300)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [inputValue])
+
+  const selected = value ? { value: value.id, label: value.name, ci: value.ci } : null
+
+  return (
+    <Dropdown
+      clearable={false}
+      searchable
+      options={options}
+      value={selected}
+      loading={loading}
+      onInputChange={(input) => setInputValue(input ?? '')}
+      placeholder="Escribí un nombre o una cédula..."
+      noOptionsMessage={
+        inputValue.trim().length < 2 ? 'Escribí para buscar (letras: nombre, números: cédula)' : 'Sin resultados'
+      }
+      optionRenderer={(option) => (
+        <div className="crear-op__cliente-option">
+          <span>{option.label}</span>
+          {option.ci && <span className="crear-op__cliente-option-ci">{option.ci}</span>}
+        </div>
+      )}
+      onChange={(option) =>
+        onChange(option ? { id: option.value, name: option.label, ci: option.ci } : null)
+      }
+    />
+  )
+}
+
 function buildInitialForm() {
   return {
+    // Primera pregunta del paso 1 — determina si Nombre/Apellido/CI se completan
+    // buscando un Cliente ya cargado o a mano (ver ClienteExistenteSearch en el JSX).
+    clienteExiste: '',
     nombre: '',
     apellido: '',
     ci: '',
@@ -220,30 +329,47 @@ function buildInitialForm() {
   }
 }
 
-// A pedido, la "x" de limpiar vuelve a estar activa acá (clearable) — con el mismo
-// onChange de cada campo alcanza para armar el onClear: se lo llama con null, y como
-// todos los onChange ya resuelven "option?.value ?? ''"/resetean los campos que
-// dependen de este, limpiar hace exactamente lo mismo que elegir "nada". OJO: la
-// primera vez que probamos esto (antes de este pedido) la "x" quedaba pegada justo
-// donde se clickeaba para reabrir el dropdown y lo vaciaba por error en vez de dejar
-// reelegir — por eso se lo había sacado. Si vuelve a pasar avisar para revisarlo de
-// nuevo en vez de convivir con el bug.
-function RequiredDropdown({ onChange, onClear, ...props }) {
-  return <Dropdown clearable onChange={onChange} onClear={onClear ?? (() => onChange(null))} {...props} />
-}
+// clearable={false} SIEMPRE acá — van 2 veces que se prueba activarlo (con la "x" nativa
+// del Dropdown) y las 2 terminó en un dato bueno borrándose solo: la primera vez al
+// clickear para reabrir y elegir otro valor, esta segunda con solo hacer click afuera
+// (blur) después de elegir uno. En vez de perseguir un tercer caso raro de la librería,
+// mejor no usar su "clearable" en absoluto — reelegir otra opción (click → abre el menú)
+// ya cubre el 100% de los casos reales en un formulario donde todo es obligatorio.
+//
+// Además, en los campos con `searchable`: 1) filtra por palabra en cualquier lugar de la
+// opción (no solo desde el principio, igual que Modelo — ver matchesSearchQuery) y 2) al
+// apretar Enter, si hay algo tipeado, elige directo la primera opción que matchea (antes
+// había que bajar con la flecha para resaltarla).
+function RequiredDropdown({ onChange, onClear, searchable, options, ...props }) {
+  const [query, setQuery] = useState('')
 
-// dd/mm/aaaa con auto-inserción de "/" a medida que se escribe, en vez de un
-// <input type="date"> nativo — a pedido: el date input nativo no dejaba completar el
-// día "24" derecho (typing rápido de dos dígitos se comía uno). Reconstruir el string
-// siempre desde los dígitos puros (sin guardar las "/" como parte del estado real)
-// evita el problema por completo, en vez de depender del manejo de segmentos del
-// navegador.
-function formatFechaInput(raw) {
-  const digits = raw.replace(/\D/g, '').slice(0, 8)
-  let out = digits.slice(0, 2)
-  if (digits.length > 2) out += '/' + digits.slice(2, 4)
-  if (digits.length > 4) out += '/' + digits.slice(4, 8)
-  return out
+  const handleKeyDown = (e) => {
+    if (e.key !== 'Enter' || !searchable || !query.trim()) return
+    const match = (options ?? []).find((o) => matchesSearchQuery(o.label, query))
+    if (match) {
+      e.preventDefault()
+      onChange(match)
+      setQuery('')
+    }
+  }
+
+  return (
+    <div onKeyDown={handleKeyDown}>
+      <Dropdown
+        clearable={false}
+        searchable={searchable}
+        options={options}
+        filterOption={searchable ? (option, inputValue) => matchesSearchQuery(option.label, inputValue) : undefined}
+        onInputChange={searchable ? (input) => setQuery(input ?? '') : undefined}
+        onChange={(option) => {
+          setQuery('')
+          onChange(option)
+        }}
+        onClear={onClear ?? (() => onChange(null))}
+        {...props}
+      />
+    </div>
+  )
 }
 
 // Input de texto con una "x" para borrar el contenido de una — sin esto había que
@@ -346,7 +472,7 @@ function VehiculoManualFields({
   onModeloChange,
 }) {
   return (
-    <>
+    <div className="crear-op__fields--grid">
       <label className="crear-op__field">
         <span>Año *</span>
         <RequiredDropdown
@@ -385,7 +511,7 @@ function VehiculoManualFields({
           }}
         />
       </label>
-      <label className="crear-op__field">
+      <label className="crear-op__field crear-op__field--full">
         <span>Modelo *</span>
         <AutodataModeloPorAnioMarca
           anio={form.anio}
@@ -396,7 +522,7 @@ function VehiculoManualFields({
           onChange={onModeloChange}
         />
       </label>
-      <label className="crear-op__field">
+      <label className="crear-op__field crear-op__field--full">
         <span>Combustible *</span>
         <RequiredDropdown
           options={combustibleOptions}
@@ -437,7 +563,7 @@ function VehiculoManualFields({
           onChange={(option) => handleChange('uso', option?.value ?? '')}
         />
       </label>
-    </>
+    </div>
   )
 }
 
@@ -461,8 +587,95 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
   // nuevo al final. En el caso "No" (el ítem recién se crea al guardar) esto se queda en
   // false, así que el archivo elegido acá se sube recién en handleGuardar.
   const [cedulaSubida, setCedulaSubida] = useState(false)
+  // Mismo mecanismo que cedulaSubiendo/cedulaSubida, pero para la Carta Automóvil del
+  // caso "No" (ver handleCartaAutomovilManualChange) — en el caso "Sí" esto también se
+  // usa (handleCartaAutomovilChange), aunque ahí el ítem siempre existe para cuando se
+  // sube, así que en la práctica cartaSubida ya queda en true de una.
+  const [cartaSubiendo, setCartaSubiendo] = useState(false)
+  const [cartaSubida, setCartaSubida] = useState(false)
+  // Cliente elegido en ClienteExistenteSearch (caso clienteExiste === "Si") — se guarda
+  // aparte del form para poder mostrar "Cliente seleccionado: X" y el botón de cambiar,
+  // sin tener que reconstruirlo desde nombre/apellido/ci por separado.
+  const [clienteSeleccionado, setClienteSeleccionado] = useState(null)
+  // Caso clienteExiste === "No": si ya existe un Cliente y/o ya hay Oportunidades con
+  // esta Cédula, se avisa acá (ver el useEffect debounced más abajo).
+  const [duplicadoCheck, setDuplicadoCheck] = useState(null)
+  // A pedido: el aviso de arriba se muestra como popup (no como cartelito inline) y hay
+  // que cerrarlo a mano con "Entendido" — se prende solo cuando llega un resultado nuevo
+  // con algo para avisar (ver el useEffect debounced más abajo), no en cada render.
+  const [showDuplicadoModal, setShowDuplicadoModal] = useState(false)
 
   const handleChange = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
+
+  // Cambiar la respuesta reinicia Nombre/Apellido/CI (y lo que se haya buscado/avisado)
+  // para no arrastrar datos de un modo al otro si el usuario va y viene.
+  const handleClienteExisteChange = (value) => {
+    setForm((prev) => ({ ...prev, clienteExiste: value, nombre: '', apellido: '', ci: '' }))
+    setClienteSeleccionado(null)
+    setDuplicadoCheck(null)
+    setShowDuplicadoModal(false)
+  }
+
+  const handleClienteSeleccionado = (cliente) => {
+    setClienteSeleccionado(cliente)
+    if (!cliente) return
+    const { nombre, apellido } = splitNombreApellido(cliente.name)
+    setForm((prev) => ({ ...prev, nombre, apellido, ci: cliente.ci || prev.ci }))
+  }
+
+  // Caso "no existe": avisa (sin bloquear) si la Cédula que se está tipeando ya está
+  // cargada como Cliente y/o ya tiene Oportunidades — debounced, recién dispara con una
+  // Cédula con formato válido para no pegarle a la API en cada tecla.
+  useEffect(() => {
+    if (form.clienteExiste !== 'No') {
+      setDuplicadoCheck(null)
+      return undefined
+    }
+    const digits = stripCi(form.ci)
+    if (!digits || ciError(form.ci)) {
+      setDuplicadoCheck(null)
+      return undefined
+    }
+    let cancelled = false
+    const timer = setTimeout(() => {
+      Promise.all([findClienteByCedula(digits), countOportunidadesByCedula(digits)])
+        .then(([cliente, count]) => {
+          if (cancelled) return
+          setDuplicadoCheck({ cliente, count })
+          if (cliente || count > 0) setShowDuplicadoModal(true)
+        })
+        .catch(() => {
+          if (!cancelled) setDuplicadoCheck(null)
+        })
+    }, 500)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+    }
+  }, [form.ci, form.clienteExiste])
+
+  // A pedido: apenas carga el schema, el formulario arranca con Tipo de Riesgo =
+  // Automóvil (el único con "Datos del riesgo" definidos hasta ahora), Departamento/
+  // Localidad = Montevideo y Uso = Particular (los casos más comunes) — se puede cambiar
+  // libremente, esto solo evita elegirlos a mano en el caso típico. El guard de abajo
+  // evita pisar algo que el usuario ya haya tocado (ej. si el schema tarda en llegar y
+  // mientras tanto ya eligió un departamento distinto a mano).
+  useEffect(() => {
+    if (!schema) return
+    setForm((prev) => {
+      if (prev.tipoRiesgo || prev.departamentoId || prev.localidadId) return prev
+      const defaultDepartamento = (schema.departamentos ?? []).find((d) => d.name === 'Montevideo')
+      const defaultLocalidad = (schema.localidades ?? []).find((l) => l.name === 'Montevideo - CP11500')
+      const defaultUso = (schema.uso?.options ?? []).find((o) => o.toLowerCase() === 'particular')
+      return {
+        ...prev,
+        tipoRiesgo: TIPO_RIESGO_AUTOMOVIL,
+        departamentoId: defaultDepartamento?.id ?? '',
+        localidadId: defaultLocalidad?.id ?? '',
+        uso: defaultUso ?? prev.uso,
+      }
+    })
+  }, [schema])
 
   const departamentos = schema?.departamentos ?? []
   const departamentoOptions = departamentos.map((d) => ({ value: d.id, label: d.name }))
@@ -530,7 +743,8 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
   const isStepValid = (index) => {
     if (index === 0) {
       return Boolean(
-        form.nombre &&
+        form.clienteExiste &&
+          form.nombre &&
           form.apellido &&
           form.ci &&
           !ciError(form.ci) &&
@@ -548,6 +762,8 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
       if (!esAutomovil) return true
       if (!form.poseeVehiculo) return false
       if (form.poseeVehiculo === 'Si') {
+        // Cédula Identidad se pide junto con Carta Automóvil pero es opcional (no
+        // bloquea), en los dos casos (Sí y No).
         if (!form.cartaAutomovil) return false
         // Camino feliz: la lectura automática terminó bien ("Leidos"), solo falta elegir
         // Modelo. Mientras está "Leer"/"Leyendo"/"subido"/"subiendo" todavía no hay
@@ -592,7 +808,7 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
       text_mm51b055: form.nombre,
       text_mm51ez7e: form.apellido,
       numeric_mm51mb0s: stripCi(form.ci),
-      date_mm516agw: toIsoDate(form.fechaNacimiento),
+      date_mm516agw: form.fechaNacimiento,
       phone_mm519m27: {
         phone: `${form.codigoPais.replace('+', '')}${form.telefono.replace(/\D/g, '')}`,
         countryShortName: COUNTRY_SHORT_NAMES[form.codigoPais] ?? 'UY',
@@ -628,6 +844,7 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
   // querer un archivo equivocado y ya arrancaba la lectura sin poder frenarla.
   const handleCartaAutomovilChange = async (file) => {
     handleChange('cartaAutomovil', file)
+    setCartaSubida(false)
     if (!file) {
       setLecturaEstado('')
       setLecturaError(null)
@@ -640,10 +857,30 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
       const itemId = await ensureItemId()
       await setMultipleColumnValues(itemId, buildBaseColumnValues())
       await uploadFileToColumn(itemId, 'file_mm51jy06', file)
+      setCartaSubida(true)
       setLecturaEstado('subido')
     } catch (err) {
       setLecturaEstado('Error')
       setLecturaError(err.message)
+    }
+  }
+
+  // Caso "No": acá no hay lectura automática que disparar (ver handleCartaAutomovilChange
+  // para el caso "Sí") — a pedido, se pide este archivo junto con Cédula Identidad, mismo
+  // patrón que esa: si el ítem todavía no existe, se guarda el File en memoria nomás y
+  // handleGuardar lo sube una vez creado el ítem; si ya existe, se sube directo.
+  const handleCartaAutomovilManualChange = async (file) => {
+    handleChange('cartaAutomovil', file)
+    setCartaSubida(false)
+    if (!file || !createdItemId) return
+    setCartaSubiendo(true)
+    try {
+      await uploadFileToColumn(createdItemId, 'file_mm51jy06', file)
+      setCartaSubida(true)
+    } catch (err) {
+      setSaveError(err.message)
+    } finally {
+      setCartaSubiendo(false)
     }
   }
 
@@ -662,12 +899,12 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
     }
   }
 
-  // Cédula Identidad es opcional en los dos casos de Posee Vehículo (Sí y No) — no
-  // bloquea el guardado. Caso "Sí": el ítem ya existe para cuando este campo aparece
-  // (recién se muestra después de "Leidos"), así que se sube directo apenas se elige.
-  // Caso "No": el ítem todavía no existe (recién se crea en handleGuardar), así que acá
-  // solo se guarda el File en memoria — handleGuardar la sube una vez que ya hay item_id
-  // (mismo mecanismo que Carta Automóvil antes del rework del caso "Sí").
+  // Cédula Identidad es opcional en los dos casos (Sí y No) — no bloquea el guardado.
+  // Caso "Sí": se pide junto con Carta Automóvil desde el principio, pero el ítem recién
+  // existe una vez que ESA se sube (ensureItemId), así que acá puede tocar cualquiera de
+  // las 2 ramas de abajo según el orden en que se elijan los archivos. Caso "No": el
+  // ítem todavía no existe (recién se crea en handleGuardar), así que acá solo se guarda
+  // el File en memoria — handleGuardar la sube una vez que ya hay item_id.
   const handleCedulaIdentidadChange = async (file) => {
     handleChange('cedulaIdentidad', file)
     setCedulaSubida(false)
@@ -771,11 +1008,16 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
         await setMultipleColumnValues(itemId, extra)
       }
 
-      // Caso "No": la Cédula (si se eligió) todavía no se subió — el ítem no existía
-      // cuando se seleccionó el archivo (ver handleCedulaIdentidadChange). Caso "Sí": ya
-      // se subió apenas se eligió, así que cedulaSubida corta acá para no duplicarla.
+      // Caso "No": la Cédula y/o la Carta Automóvil (si se eligieron) todavía no se
+      // subieron — el ítem no existía cuando se seleccionó el archivo (ver
+      // handleCedulaIdentidadChange/handleCartaAutomovilManualChange). Caso "Sí": ya se
+      // subieron apenas se eligieron, así que cartaSubida/cedulaSubida cortan acá para no
+      // duplicarlas.
       if (form.cedulaIdentidad && !cedulaSubida) {
         await uploadFileToColumn(itemId, 'file_mm5pc008', form.cedulaIdentidad)
+      }
+      if (form.cartaAutomovil && !cartaSubida) {
+        await uploadFileToColumn(itemId, 'file_mm51jy06', form.cartaAutomovil)
       }
 
       onCreated?.(itemId)
@@ -800,13 +1042,12 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
         <div className="crear-op__header">
           <h1 className="crear-op__title">Agregar Oportunidades</h1>
           <div className="crear-op__header-actions">
-            <IconButton
-              icon={MdSearch}
-              kind="secondary"
-              aria-label="Buscar oportunidad"
-              onClick={onVerOportunidades}
-            />
-            <IconButton icon={MdHome} kind="secondary" aria-label="Ir al inicio" onClick={onHome} />
+            <Button kind="secondary" onClick={onVerOportunidades}>
+              <MdSearch /> Buscar Oportunidad
+            </Button>
+            <Button kind="secondary" onClick={onHome}>
+              <MdHome /> Inicio
+            </Button>
           </div>
         </div>
 
@@ -844,8 +1085,58 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
         </div>
 
         {stepIndex === 0 && (
-          <div className="crear-op__fields">
-            <label className="crear-op__field">
+          <div className="crear-op__fields crear-op__fields--grid">
+            <label className="crear-op__field crear-op__field--full">
+              <span>¿El cliente ya existe? *</span>
+              <RequiredDropdown
+                options={CLIENTE_EXISTE_OPTIONS}
+                value={CLIENTE_EXISTE_OPTIONS.find((o) => o.value === form.clienteExiste) ?? null}
+                placeholder="Selecciona una opción"
+                onChange={(option) => handleClienteExisteChange(option?.value ?? '')}
+              />
+            </label>
+
+            {form.clienteExiste === 'Si' && (
+              <label className="crear-op__field crear-op__field--full">
+                <span>Buscar cliente *</span>
+                <ClienteExistenteSearch value={clienteSeleccionado} onChange={handleClienteSeleccionado} />
+                {clienteSeleccionado && (
+                  <span className="crear-op__autofill">
+                    Cliente seleccionado: {clienteSeleccionado.name} — se completaron Nombre/Apellido/CI
+                    abajo, revisalos antes de continuar.
+                  </span>
+                )}
+              </label>
+            )}
+
+            {/* A pedido: el aviso de Cédula duplicada es un popup grande con botón
+                "Entendido" para cerrarlo, en vez de un cartelito chico inline — así no
+                pasa desapercibido. */}
+            {form.clienteExiste === 'No' && showDuplicadoModal && duplicadoCheck && (
+              <Modal id="duplicado-cedula-modal" show onClose={() => setShowDuplicadoModal(false)} size="medium">
+                <ModalHeader title="Esta cédula ya tiene actividad cargada" className="crear-op__duplicado-modal-header" />
+                <ModalContent className="crear-op__duplicado-modal-content">
+                  <AttentionBox type="warning">
+                    {duplicadoCheck.cliente && (
+                      <div>Ya existe un cliente con esta cédula: {duplicadoCheck.cliente.name}.</div>
+                    )}
+                    {duplicadoCheck.count > 0 && (
+                      <div>
+                        Esta cédula tiene {duplicadoCheck.count}{' '}
+                        {duplicadoCheck.count === 1 ? 'oportunidad consultada' : 'oportunidades consultadas'}.
+                      </div>
+                    )}
+                  </AttentionBox>
+                </ModalContent>
+                <ModalFooter
+                  primaryButton={{ text: 'Entendido', onClick: () => setShowDuplicadoModal(false) }}
+                />
+              </Modal>
+            )}
+
+            {form.clienteExiste && (
+              <>
+            <label className={`crear-op__field${fieldStateClass(form.nombre, false)}`}>
               <span>Nombre *</span>
               <ClearableInput
                 type="text"
@@ -855,7 +1146,7 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                 onClear={() => handleChange('nombre', '')}
               />
             </label>
-            <label className="crear-op__field">
+            <label className={`crear-op__field${fieldStateClass(form.apellido, false)}`}>
               <span>Apellido *</span>
               <ClearableInput
                 type="text"
@@ -865,7 +1156,7 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                 onClear={() => handleChange('apellido', '')}
               />
             </label>
-            <label className="crear-op__field">
+            <label className={`crear-op__field${fieldStateClass(form.ci, ciError(form.ci))}`}>
               <span>CI *</span>
               <ClearableInput
                 type="text"
@@ -876,21 +1167,33 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
               />
               {ciError(form.ci) && <span className="crear-op__field-error">{ciError(form.ci)}</span>}
             </label>
-            <label className="crear-op__field">
+            <label className={`crear-op__field${fieldStateClass(form.fechaNacimiento, fechaError(form.fechaNacimiento))}`}>
               <span>Fecha Nacimiento *</span>
-              <ClearableInput
-                type="text"
-                inputMode="numeric"
-                placeholder="dd/mm/aaaa"
-                value={form.fechaNacimiento}
-                onChange={(e) => handleChange('fechaNacimiento', formatFechaInput(e.target.value))}
-                onClear={() => handleChange('fechaNacimiento', '')}
-              />
+              <div className="crear-op__date-wrap">
+                <input
+                  type="date"
+                  value={form.fechaNacimiento}
+                  max={maxFechaNacimiento()}
+                  onChange={(e) => handleChange('fechaNacimiento', e.target.value)}
+                />
+                {form.fechaNacimiento && (
+                  <button
+                    type="button"
+                    className="crear-op__date-clear"
+                    onClick={() => handleChange('fechaNacimiento', '')}
+                    aria-label="Borrar campo"
+                  >
+                    <MdClear />
+                  </button>
+                )}
+              </div>
               {fechaError(form.fechaNacimiento) && (
                 <span className="crear-op__field-error">{fechaError(form.fechaNacimiento)}</span>
               )}
             </label>
-            <label className="crear-op__field">
+            <label
+              className={`crear-op__field crear-op__field--full${fieldStateClass(form.telefono, telefonoError(form.telefono, form.codigoPais))}`}
+            >
               <span>Teléfono *</span>
               <div className="crear-op__phone">
                 <div className="crear-op__phone-code">
@@ -943,7 +1246,7 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                 onChange={(option) => handleChange('localidadId', option?.value ?? '')}
               />
             </label>
-            <label className="crear-op__field">
+            <label className="crear-op__field crear-op__field--full">
               <span>Tipo de Riesgo *</span>
               <RequiredDropdown
                 options={tipoRiesgoOptions}
@@ -952,6 +1255,8 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                 onChange={(option) => handleChange('tipoRiesgo', option?.value ?? '')}
               />
             </label>
+              </>
+            )}
           </div>
         )}
 
@@ -959,7 +1264,7 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
           <div className="crear-op__fields">
             {esAutomovil && (
               <label className="crear-op__field">
-                <span>Posee Vehículo? *</span>
+                <span>Tenes Carta Automóvil / Cédula Automovil? *</span>
                 <RequiredDropdown
                   options={POSEE_VEHICULO_OPTIONS}
                   value={selectedPoseeVehiculo}
@@ -977,11 +1282,23 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
 
             {esAutomovil && form.poseeVehiculo === 'Si' && (
               <>
-                <FileField
-                  label="Carta Automóvil / Cédula Automovil"
-                  file={form.cartaAutomovil}
-                  onChange={handleCartaAutomovilChange}
-                />
+                {/* A pedido: los 2 archivos se piden juntos de entrada (Cédula Identidad
+                    opcional, no bloquea nada) — antes recién aparecía después de que la
+                    lectura terminaba, muy tarde en el flujo. */}
+                <div className="crear-op__fields--grid">
+                  <FileField
+                    label="Carta Automóvil / Cédula Automovil"
+                    file={form.cartaAutomovil}
+                    onChange={handleCartaAutomovilChange}
+                  />
+                  <FileField
+                    label="Cédula Identidad"
+                    required={false}
+                    file={form.cedulaIdentidad}
+                    onChange={handleCedulaIdentidadChange}
+                  />
+                </div>
+                {cedulaSubiendo && <p className="crear-op__autofill">Subiendo Cédula Identidad...</p>}
 
                 {(lecturaEstado === 'subiendo' ||
                   lecturaEstado === 'confirmando' ||
@@ -1045,13 +1362,6 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                       usoOptions={usoOptions}
                       onModeloChange={handleModeloChangeConOcr}
                     />
-                    <FileField
-                      label="Cédula Identidad"
-                      required={false}
-                      file={form.cedulaIdentidad}
-                      onChange={handleCedulaIdentidadChange}
-                    />
-                    {cedulaSubiendo && <p className="crear-op__autofill">Subiendo Cédula Identidad...</p>}
                   </>
                 )}
 
@@ -1080,13 +1390,6 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                         seleccionado. Por favor, complételo manualmente.
                       </span>
                     )}
-                    <FileField
-                      label="Cédula Identidad"
-                      required={false}
-                      file={form.cedulaIdentidad}
-                      onChange={handleCedulaIdentidadChange}
-                    />
-                    {cedulaSubiendo && <p className="crear-op__autofill">Subiendo Cédula Identidad...</p>}
                   </>
                 )}
               </>
@@ -1105,12 +1408,24 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                   usoOptions={usoOptions}
                   onModeloChange={handleModeloChange}
                 />
-                <FileField
-                  label="Cédula Identidad"
-                  required={false}
-                  file={form.cedulaIdentidad}
-                  onChange={handleCedulaIdentidadChange}
-                />
+                {/* A pedido: se piden los 2 archivos a la vez acá (antes solo se pedía
+                    Cédula Identidad en este caso) — los dos opcionales, no bloquean el
+                    guardado. */}
+                <div className="crear-op__fields--grid">
+                  <FileField
+                    label="Carta Automóvil / Cédula Automovil"
+                    required={false}
+                    file={form.cartaAutomovil}
+                    onChange={handleCartaAutomovilManualChange}
+                  />
+                  <FileField
+                    label="Cédula Identidad"
+                    required={false}
+                    file={form.cedulaIdentidad}
+                    onChange={handleCedulaIdentidadChange}
+                  />
+                </div>
+                {cartaSubiendo && <p className="crear-op__autofill">Subiendo Carta Automóvil...</p>}
                 {cedulaSubiendo && <p className="crear-op__autofill">Subiendo Cédula Identidad...</p>}
               </>
             )}

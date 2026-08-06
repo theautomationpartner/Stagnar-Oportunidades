@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
-import { MdCheckCircle, MdWarningAmber, MdUploadFile, MdDeleteOutline } from 'react-icons/md'
-import { Button } from '@vibe/core'
+import { MdCheckCircle, MdWarningAmber, MdUploadFile, MdDeleteOutline, MdClose } from 'react-icons/md'
+import { Button, IconButton } from '@vibe/core'
 import './DocumentUploadRow.css'
 
 // El `text` de una columna "file" de monday no es el nombre del archivo — es la URL
@@ -30,6 +30,7 @@ export default function DocumentUploadRow({
   error,
   onUpload,
   onDelete,
+  compactDelete,
 }) {
   const uploaded = Boolean(fileName)
   const busy = uploading || deleting
@@ -98,15 +99,24 @@ export default function DocumentUploadRow({
           <MdUploadFile /> Subir archivo
         </Button>
       )}
-      {uploaded && !busy && (
-        <Button
-          kind="secondary"
-          className="doc-upload-row__btn doc-upload-row__delete-btn"
-          onClick={onDelete}
-        >
-          <MdDeleteOutline /> Eliminar
-        </Button>
-      )}
+      {uploaded &&
+        !busy &&
+        (compactDelete ? (
+          <IconButton
+            className="doc-upload-row__delete-icon-btn"
+            icon={MdClose}
+            onClick={onDelete}
+            aria-label="Eliminar documento"
+          />
+        ) : (
+          <Button
+            kind="secondary"
+            className="doc-upload-row__btn doc-upload-row__delete-btn"
+            onClick={onDelete}
+          >
+            <MdDeleteOutline /> Eliminar
+          </Button>
+        ))}
       {error && <p className="doc-upload-row__error">Error: {error}</p>}
     </div>
   )

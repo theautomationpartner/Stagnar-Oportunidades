@@ -1,7 +1,19 @@
 .stepper {
   display: flex;
   align-items: center;
-  margin: 20px var(--page-gutter) 0;
+  /* Sin margen de página propio — ahora vive adentro de .opp-detail__breadcrumb, que ya
+     tiene su propio padding/gap (ver OpportunityDetail.css). */
+  min-width: 0;
+}
+
+/* Las líneas de 150px entre pasos (ver .stepper__line) quedan bien en desktop, pero el
+   Stepper comparte renglón con "Volver"/"Ver en Monday" (.opp-detail__breadcrumb) — en
+   tablet/celular ese ancho no entra ni cerca, así que se va achicando en 2 escalones. */
+@media (max-width: 900px) {
+  .stepper__line {
+    width: 40px;
+    margin: 0 8px;
+  }
 }
 
 /* 4 pasos con labels largos ("Comparar y enviar", "Emitir · cargar PDF") no entran en
@@ -9,10 +21,6 @@
    queda solo el rosario de círculos numerados + líneas de progreso (el título del paso
    activo ya se ve en el heading de arriba de cada panel). */
 @media (max-width: 640px) {
-  .stepper {
-    margin-top: 12px;
-  }
-
   .stepper__label {
     display: none;
   }
@@ -23,6 +31,7 @@
   }
 
   .stepper__line {
+    width: 16px;
     margin: 0 4px;
   }
 }
@@ -30,10 +39,10 @@
 .stepper__item {
   display: flex;
   align-items: center;
-  flex: 1;
-}
-
-.stepper__item:last-child {
+  /* Antes flex:1 — con el Stepper ahora compartiendo renglón con "Volver" y "Ver en
+     Monday" (en vez de ocupar la página entera para él solo), estirar cada tramo a lo
+     que sobre de espacio quedaba viéndose innecesariamente separado. Ancho fijo, más
+     compacto (ver .stepper__line más abajo). */
   flex: 0 0 auto;
 }
 
@@ -132,11 +141,14 @@ button.stepper__step--viewing {
 }
 
 .stepper__line {
-  flex: 1;
+  /* Antes flex:1 + min-width:24px (se estiraba a lo que sobrara de ancho) — ancho fijo
+     para que el Stepper quede compacto al lado de "Volver"/"Ver en Monday" en vez de
+     todo separado, pero no tan corto como para que los pasos queden pegados entre sí. */
+  flex: 0 0 auto;
+  width: 150px;
   height: 2px;
   background: #e6e9ef;
-  margin: 0 12px;
-  min-width: 24px;
+  margin: 0 10px;
 }
 
 .stepper__line--done {

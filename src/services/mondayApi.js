@@ -585,3 +585,87 @@ export async function fetchPanelItems() {
   const data = await callMondayApi(PANEL_ITEMS_QUERY, { boardId: PANEL_BOARD_ID })
   return data.boards[0]?.items_page.items ?? []
 }
+
+// Tablero "Clientes" — se usa en el formulario de "Agregar Oportunidades" para buscar un
+// cliente ya cargado (en vez de tipear todo de nuevo) y para avisar si una Cédula nueva
+// ya existe. `name` es el nombre del ítem de monday (acá guardan Nombre+Apellido juntos,
+// sin columnas separadas) y sí admite contains_text como cualquier otra columna
+// (confirmado contra la API real).
+const CLIENTES_BOARD_ID = 18420863014
+const CLIENTE_CEDULA_COLUMN_ID = 'text_mm4vk9aq'
+
+const SEARCH_CLIENTES_QUERY = `
+  query SearchClientes($boardId: ID!, $rules: [ItemsQueryRule!], $limit: Int!) {
+    boards(ids: [$boardId]) {
+      items_page(limit: $limit, query_params: { rules: $rules, operator: and }) {
+        items {
+          id
+          name
+          column_values(ids: ["${CLIENTE_CEDULA_COLUMN_ID}"]) {
+            text
+          }
+        }
+      }
+    }
+  }
+`
+
+function mapClienteItem(item) {
+  return { id: item.id, name: item.name, ci: item.column_values[0]?.text?.trim() || '' }
+}
+
+// A pedido: el modo de búsqueda depende de qué se tipeó — si tiene algún dígito, se
+// busca por Cédula; si es todo letras, por Nombre. No hace falta mezclar los dos modos
+// en la misma consulta.
+export async function searchClientes(term) {
+  const query = (term ?? '').trim()
+  if (query.length < 2) return []
+  const isNumeric = /\d/.test(query)
+  const rules = isNumeric
+    ? [{ column_id: CLIENTE_CEDULA_COLUMN_ID, compare_value: [query.replace(/\D/g, '')], operator: 'contains_text' }]
+    : [{ column_id: 'name', compare_value: [query], operator: 'contains_text' }]
+  const data = await callMondayApi(SEARCH_CLIENTES_QUERY, { boardId: CLIENTES_BOARD_ID, rules, limit: 20 })
+  const items = data.boards[0]?.items_page.items ?? []
+  return items.map(mapClienteItem)
+}
+
+// Caso "el cliente no existe": antes de crear la oportunidad se avisa si esa Cédula YA
+// está cargada como Cliente, para no duplicar sin darse cuenta. Filtra por coincidencia
+// EXACTA después de la consulta (contains_text por sí solo matchearía de más, ej. "593"
+// contra "45934226").
+export async function findClienteByCedula(ci) {
+  const digits = (ci ?? '').replace(/\D/g, '')
+  if (!digits) return null
+  const data = await callMondayApi(SEARCH_CLIENTES_QUERY, {
+    boardId: CLIENTES_BOARD_ID,
+    rules: [{ column_id: CLIENTE_CEDULA_COLUMN_ID, compare_value: [digits], operator: 'contains_text' }],
+    limit: 5,
+  })
+  const items = data.boards[0]?.items_page.items ?? []
+  return items.map(mapClienteItem).find((c) => c.ci === digits) ?? null
+}
+
+const COUNT_OPORTUNIDADES_BY_CI_QUERY = `
+  query CountOportunidadesByCi($boardId: ID!, $rules: [ItemsQueryRule!]) {
+    boards(ids: [$boardId]) {
+      items_page(limit: 100, query_params: { rules: $rules, operator: and }) {
+        items {
+          id
+        }
+      }
+    }
+  }
+`
+
+// Mismo caso "no existe": además de avisar si ya hay un Cliente con esa Cédula, se avisa
+// cuántas Oportunidades ya se cargaron con ella (puede haber Oportunidades sin que exista
+// todavía un Cliente formal, así que es una consulta aparte, no derivada de la anterior).
+export async function countOportunidadesByCedula(ci) {
+  const digits = (ci ?? '').replace(/\D/g, '')
+  if (!digits) return 0
+  const data = await callMondayApi(COUNT_OPORTUNIDADES_BY_CI_QUERY, {
+    boardId: OPPORTUNITIES_BOARD_ID,
+    rules: [{ column_id: 'numeric_mm51mb0s', compare_value: [digits], operator: 'contains_text' }],
+  })
+  return data.boards[0]?.items_page.items.length ?? 0
+}

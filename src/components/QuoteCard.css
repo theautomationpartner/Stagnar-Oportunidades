@@ -1,3 +1,6 @@
+/* border-left-color se pisa inline por tarjeta (accentForCompania) — mismo criterio de
+   color por compañía que el paso 3 "Confirmar" (ver companyColors.js), pero más fina
+   (2px vs. 4px) y con el borde redondeado en vez de a filo recto. */
 .quote-card {
   display: grid;
   grid-template-columns: 1.6fr 1.2fr 0.9fr;
@@ -5,8 +8,8 @@
   align-items: start;
   padding: 16px 20px;
   border: 1px solid #e6e9ef;
+  border-left-width: 2px;
   border-radius: 8px;
-  margin-bottom: 12px;
   background: #fff;
 }
 
@@ -22,9 +25,14 @@
   }
 }
 
+/* Antes un box-shadow inset de 1px alrededor de toda la tarjeta marcaba la selección
+   — se superponía con la línea de color de compañía (border-left, ver más arriba) y
+   quedaban 2 líneas apretadas una al lado de la otra en el borde izquierdo. El
+   border-left-color sigue siendo el de la compañía (viene inline, gana sobre este
+   border-color); acá solo se resaltan los otros 3 lados + un tinte de fondo. */
 .quote-card--selected {
   border-color: #0073ea;
-  box-shadow: 0 0 0 1px #0073ea inset;
+  background: #f7fbff;
 }
 
 .quote-card--blocked {
@@ -45,8 +53,22 @@
 .quote-card__title-row {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 10px;
   margin-bottom: 10px;
+}
+
+/* Sin acordeón por compañía (ver .opp-detail__quotes), la compañía de cada
+   cotización se muestra acá adentro de la tarjeta en vez de en un encabezado
+   de grupo aparte. */
+.quote-card__company {
+  font-size: 10px;
+  font-weight: 700;
+  background: #f6f7fb;
+  border-radius: 10px;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
 }
 
 /* IconButton (@vibe/core) ya pone el reset de botón/cursor/padding — acá

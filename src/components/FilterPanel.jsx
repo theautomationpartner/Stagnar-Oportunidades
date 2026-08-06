@@ -14,6 +14,7 @@ function FilterSelect({ label, field, value, options, onChange, placeholder }) {
     <label className="filter-field">
       <span>{label}</span>
       <Dropdown
+        size="small"
         options={dropdownOptions}
         value={selected}
         placeholder={placeholder}
@@ -54,13 +55,7 @@ export default function FilterPanel({
       <div className="filter-panel__head">
         <div className="filter-panel__title-row">
           <span className="filter-panel__step">1</span>
-          <div>
-            <h2 className="filter-panel__title">Seleccionar oportunidad</h2>
-            <p className="filter-panel__subtitle">
-              Buscá y filtrá para encontrar la oportunidad sobre la cual querés ver las posibles
-              cotizaciones.
-            </p>
-          </div>
+          <h2 className="filter-panel__title">Seleccionar oportunidad</h2>
         </div>
         <Button
           kind="secondary"

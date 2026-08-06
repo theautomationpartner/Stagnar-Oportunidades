@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { MdCheckCircle, MdWarningAmber, MdAutorenew } from 'react-icons/md'
+import { MdCheckCircle, MdWarningAmber } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
 import { Button } from '@vibe/core'
 import { formatMoney } from '../services/format'
@@ -156,7 +156,6 @@ export default function ConfirmarStepPanel({
   onSetElegida,
   settingElegidaId,
   elegidaError,
-  onRecotizar,
   documentos,
   uploadingDoc,
   deletingDoc,
@@ -175,8 +174,8 @@ export default function ConfirmarStepPanel({
   // extra en un encabezado.
   const sortedGroups = [...groups].sort((a, b) => a.compania.localeCompare(b.compania))
 
-  // El botón "Confirmar" verifica los mismos requisitos que ya se muestran arriba
-  // (checklist de datos del cliente + documentación cargada) más que haya una
+  // El botón "Confirmar" verifica los datos del cliente (CHECKLIST_FIELDS, ya no se
+  // muestran como checklist visual, a pedido) + documentación cargada + que haya una
   // "Propuesta elegida" marcada (sección "Propuestas") antes de dejar avanzar al paso 4
   // — si falta algo, se lista qué falta en vez de dejar pasar con datos a medias.
   const handleConfirmClick = () => {
@@ -195,40 +194,6 @@ export default function ConfirmarStepPanel({
   return (
     <div className="confirmar-step">
       <div className="confirmar-step__section">
-        <div className="confirmar-step__section-head">
-          <div>
-            <h2 className="confirmar-step__title">Datos del cliente</h2>
-            <p className="confirmar-step__subtitle">
-              Verificá que estos datos estén completos antes de emitir la póliza.
-            </p>
-          </div>
-          <Button kind="secondary" className="confirmar-step__recotizar-btn" onClick={onRecotizar}>
-            <MdAutorenew /> Recotizar
-          </Button>
-        </div>
-        <div className="confirmar-step__checklist">
-          {CHECKLIST_FIELDS.map((f) => {
-            const value = opportunity[f.key]
-            const ok = Boolean(value)
-            return (
-              <div
-                className={
-                  ok
-                    ? 'confirmar-step__check confirmar-step__check--ok'
-                    : 'confirmar-step__check confirmar-step__check--missing'
-                }
-                key={f.key}
-              >
-                {ok ? <MdCheckCircle /> : <MdWarningAmber />}
-                <span className="confirmar-step__check-label">{f.label}</span>
-                <span className="confirmar-step__check-value">{value || 'Falta cargar'}</span>
-              </div>
-            )
-          })}
-        </div>
-      </div>
-
-      <div className="confirmar-step__section">
         <h2 className="confirmar-step__title">Documentación</h2>
         <p className="confirmar-step__subtitle">
           Verificá que estén cargados los documentos del asegurado. Si falta alguno, se puede
@@ -245,6 +210,7 @@ export default function ConfirmarStepPanel({
               error={docUploadError[doc.columnId]}
               onUpload={(file) => onUploadDocument(doc.columnId, file)}
               onDelete={() => onDeleteDocument(doc.columnId)}
+              compactDelete
             />
           ))}
         </div>
