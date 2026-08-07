@@ -1,8 +1,8 @@
 // Agrupa las coberturas (columna dropdown_mm4w8n8p del tablero de subitems) en 2
 // familias de negocio — GLOBAL (cobertura todo riesgo) y TRIPLE (cobertura parcial) —
 // para las solapas "General / GLOBAL / TRIPLE" del paso "Comparar y enviar". Verificado
-// contra las labels reales del dropdown (settings_str vía API): las 17 labels activas
-// caen todas en una de las 2 familias, sin ambigüedad ni dependencia de la compañía.
+// contra las labels reales del dropdown (settings_str vía API). "TOTAL C/ MOV" (SURA)
+// se sacó de GLOBAL a pedido — queda sin familia, solo aparece en "General".
 const GLOBAL_COBERTURAS = new Set([
   'GLOBAL - ANUAL',
   'GLOBAL - 3X2',
@@ -13,7 +13,6 @@ const GLOBAL_COBERTURAS = new Set([
   'TOTAL 1500',
   'TOTAL 2500',
   'TOTAL',
-  'TOTAL C/ MOV',
   'TOTAL PLUS',
 ])
 
