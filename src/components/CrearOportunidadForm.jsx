@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { MdUploadFile, MdClear, MdSearch, MdHome } from 'react-icons/md'
+import { MdUploadFile, MdClear, MdSearch, MdHome, MdArrowForward } from 'react-icons/md'
 import { Button, Dropdown, AttentionBox, Modal, ModalHeader, ModalContent, ModalFooter } from '@vibe/core'
 import {
   createOpportunityItem,
@@ -11,6 +11,7 @@ import {
   fetchOpportunityDetail,
   fetchLatestUpdate,
   searchClientes,
+  searchOportunidades,
   findClienteByCedula,
   countOportunidadesByCedula,
 } from '../services/mondayApi'
@@ -38,14 +39,6 @@ const POSEE_VEHICULO_OPTIONS = [
   { value: 'No', label: 'No' },
 ]
 
-// Primera decisión del paso 1, antes de tipear/buscar nada — no es una columna real de
-// monday, solo determina cómo se completan Nombre/Apellido/CI (buscando un Cliente ya
-// cargado, o a mano).
-const CLIENTE_EXISTE_OPTIONS = [
-  { value: 'Si', label: 'Si' },
-  { value: 'No', label: 'No' },
-]
-
 // Uruguay por default (mercado principal de la app), pero editable por si hace falta
 // cargar un cliente con otro código — no hay columna real de monday detrás todavía.
 const CODIGO_PAIS_OPTIONS = [
@@ -64,6 +57,27 @@ const COUNTRY_SHORT_NAMES = {
   '+55': 'BR',
   '+595': 'PY',
   '+56': 'CL',
+}
+
+// Sentido inverso de COUNTRY_SHORT_NAMES — para cuando se autocompleta el Teléfono a
+// partir de una Oportunidad ya cargada (esa columna solo trae countryShortName, no el
+// código de país con el "+").
+const CODIGO_PAIS_BY_COUNTRY_SHORT_NAME = Object.fromEntries(
+  Object.entries(COUNTRY_SHORT_NAMES).map(([codigo, short]) => [short, codigo])
+)
+
+// El teléfono de una Oportunidad ya cargada viene como un solo string de dígitos con el
+// código de país pegado adelante, sin separador (ej. "5492281580112") — para
+// autocompletar el campo de acá (que espera el código de país aparte, ver Teléfono más
+// abajo) hay que sacarle esos dígitos del principio. Si el código de país no se reconoce
+// o no matchea el prefijo, se devuelve tal cual — mejor mostrar el dato crudo (y que la
+// validación existente avise si no cierra) que perder el teléfono directamente.
+function splitTelefono(rawPhone, countryShortName) {
+  const codigoPais = CODIGO_PAIS_BY_COUNTRY_SHORT_NAME[countryShortName]
+  if (!codigoPais || !rawPhone) return { codigoPais: codigoPais || '', telefono: rawPhone || '' }
+  const prefix = codigoPais.replace('+', '')
+  const telefono = rawPhone.startsWith(prefix) ? rawPhone.slice(prefix.length) : rawPhone
+  return { codigoPais, telefono }
 }
 
 // El campo CI acepta puntos/guion para que se pueda tipear como está impreso en el
@@ -232,12 +246,16 @@ function splitNombreApellido(fullName) {
   return { nombre: parts[0], apellido: parts.slice(1).join(' ') }
 }
 
-// Búsqueda en vivo del tablero Clientes (18420863014) para precargar Nombre/Apellido/CI
-// de un cliente que ya existe, en vez de tipear todo de nuevo — el modo de búsqueda
-// (nombre vs. Cédula) lo decide searchClientes según lo que se tipeó. Cada opción se
-// muestra con el nombre a la izquierda y la Cédula resaltada en azul a la derecha
-// (optionRenderer), para distinguir rápido entre resultados con nombres parecidos.
-function ClienteExistenteSearch({ value, onChange }) {
+// Búsqueda en vivo contra los 2 tableros a la vez (Clientes 18420863014 y Oportunidades)
+// para precargar Nombre/Apellido/CI de un registro que ya existe, en vez de tipear todo
+// de nuevo — el modo de búsqueda (nombre vs. Cédula) lo decide cada función según lo que
+// se tipeó (ver searchClientes/searchOportunidades). Cada opción se muestra con una
+// etiqueta de a qué tablero pertenece + el nombre a la izquierda, y la Cédula resaltada
+// en azul a la derecha (optionRenderer), para distinguir rápido entre resultados
+// parecidos y de qué fuente viene cada uno. Al elegir una, onChange recibe la opción
+// entera (source/id/name/ci, +nombre/apellido si es de Oportunidad) — se arma en
+// handleResultadoSeleccionado.
+function ExistingRecordSearch({ value, onChange }) {
   const [inputValue, setInputValue] = useState('')
   const [options, setOptions] = useState([])
   const [loading, setLoading] = useState(false)
@@ -252,11 +270,31 @@ function ClienteExistenteSearch({ value, onChange }) {
     let cancelled = false
     setLoading(true)
     const timer = setTimeout(() => {
-      searchClientes(term)
-        .then((results) => {
-          if (!cancelled) {
-            setOptions(results.map((c) => ({ value: c.id, label: c.name, ci: c.ci })))
-          }
+      Promise.all([searchClientes(term), searchOportunidades(term)])
+        .then(([clientes, oportunidades]) => {
+          if (cancelled) return
+          const clienteOptions = clientes.map((c) => ({
+            value: `cliente:${c.id}`,
+            label: c.name,
+            ci: c.ci,
+            source: 'cliente',
+            id: c.id,
+            name: c.name,
+          }))
+          const oportunidadOptions = oportunidades.map((o) => ({
+            value: `oportunidad:${o.id}`,
+            label: o.name,
+            ci: o.ci,
+            source: 'oportunidad',
+            id: o.id,
+            name: o.name,
+            nombre: o.nombre,
+            apellido: o.apellido,
+            fechaNacimiento: o.fechaNacimiento,
+            telefono: o.telefono,
+            telefonoCountryShortName: o.telefonoCountryShortName,
+          }))
+          setOptions([...clienteOptions, ...oportunidadOptions])
         })
         .finally(() => {
           if (!cancelled) setLoading(false)
@@ -268,12 +306,20 @@ function ClienteExistenteSearch({ value, onChange }) {
     }
   }, [inputValue])
 
-  const selected = value ? { value: value.id, label: value.name, ci: value.ci } : null
+  const selected = value ? { value: `${value.source}:${value.id}`, label: value.name, ci: value.ci, source: value.source } : null
 
   return (
     <Dropdown
       clearable={false}
       searchable
+      // Sin esto, el Dropdown vuelve a filtrar por su cuenta las opciones ya devueltas
+      // por la búsqueda del servidor contra el texto tipeado — que matchea desde el
+      // principio del `label` (mismo default que documenta RequiredDropdown más arriba).
+      // Con una Cédula (el label es el nombre, no el número) eso descartaba TODOS los
+      // resultados aunque la búsqueda real sí los hubiera encontrado. `options` acá ya
+      // viene filtrado por searchClientes/searchOportunidades, así que no hace falta (ni
+      // conviene) que el Dropdown filtre una segunda vez.
+      filterOption={() => true}
       options={options}
       value={selected}
       loading={loading}
@@ -284,22 +330,22 @@ function ClienteExistenteSearch({ value, onChange }) {
       }
       optionRenderer={(option) => (
         <div className="crear-op__cliente-option">
-          <span>{option.label}</span>
+          <span className="crear-op__cliente-option-main">
+            <span className={`crear-op__source-tag crear-op__source-tag--${option.source}`}>
+              {option.source === 'cliente' ? 'Cliente' : 'Oportunidad'}
+            </span>
+            {option.label}
+          </span>
           {option.ci && <span className="crear-op__cliente-option-ci">{option.ci}</span>}
         </div>
       )}
-      onChange={(option) =>
-        onChange(option ? { id: option.value, name: option.label, ci: option.ci } : null)
-      }
+      onChange={(option) => onChange(option ?? null)}
     />
   )
 }
 
 function buildInitialForm() {
   return {
-    // Primera pregunta del paso 1 — determina si Nombre/Apellido/CI se completan
-    // buscando un Cliente ya cargado o a mano (ver ClienteExistenteSearch en el JSX).
-    clienteExiste: '',
     nombre: '',
     apellido: '',
     ci: '',
@@ -593,12 +639,19 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
   // sube, así que en la práctica cartaSubida ya queda en true de una.
   const [cartaSubiendo, setCartaSubiendo] = useState(false)
   const [cartaSubida, setCartaSubida] = useState(false)
-  // Cliente elegido en ClienteExistenteSearch (caso clienteExiste === "Si") — se guarda
-  // aparte del form para poder mostrar "Cliente seleccionado: X" y el botón de cambiar,
-  // sin tener que reconstruirlo desde nombre/apellido/ci por separado.
-  const [clienteSeleccionado, setClienteSeleccionado] = useState(null)
-  // Caso clienteExiste === "No": si ya existe un Cliente y/o ya hay Oportunidades con
-  // esta Cédula, se avisa acá (ver el useEffect debounced más abajo).
+  // Resultado elegido en ExistingRecordSearch (Cliente u Oportunidad) — se guarda aparte
+  // del form para poder mostrar "X seleccionado: Y" sin tener que reconstruirlo desde
+  // nombre/apellido/ci por separado, y para saber si hay que correr el chequeo de
+  // duplicado (ver más abajo: no tiene sentido avisar "ya existe" de algo que el usuario
+  // acaba de elegir a propósito).
+  const [resultadoSeleccionado, setResultadoSeleccionado] = useState(null)
+  // Primera decisión del paso 1: se "resuelve" cuando el usuario elige un resultado de la
+  // búsqueda O aprieta "Saltear" — recién ahí se muestran Nombre/Apellido/CI en adelante
+  // (antes no es una columna real de monday, solo gatea qué se muestra acá).
+  const [busquedaResuelta, setBusquedaResuelta] = useState(false)
+  // Sin resultado seleccionado (search salteada o vacía): si ya existe un Cliente y/o ya
+  // hay Oportunidades con la Cédula que se está tipeando a mano, se avisa acá (ver el
+  // useEffect debounced más abajo).
   const [duplicadoCheck, setDuplicadoCheck] = useState(null)
   // A pedido: el aviso de arriba se muestra como popup (no como cartelito inline) y hay
   // que cerrarlo a mano con "Entendido" — se prende solo cuando llega un resultado nuevo
@@ -607,27 +660,48 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
 
   const handleChange = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
 
-  // Cambiar la respuesta reinicia Nombre/Apellido/CI (y lo que se haya buscado/avisado)
-  // para no arrastrar datos de un modo al otro si el usuario va y viene.
-  const handleClienteExisteChange = (value) => {
-    setForm((prev) => ({ ...prev, clienteExiste: value, nombre: '', apellido: '', ci: '' }))
-    setClienteSeleccionado(null)
-    setDuplicadoCheck(null)
-    setShowDuplicadoModal(false)
+  // Al elegir un resultado (Cliente u Oportunidad), se completan Nombre/Apellido/CI y se
+  // abre el resto del formulario. El tablero Clientes no tiene columnas separadas de
+  // Nombre/Apellido (solo el nombre completo, ver splitNombreApellido); Oportunidades sí
+  // las tiene, así que ahí se usan directo, sin adivinar dónde corta el nombre.
+  const handleResultadoSeleccionado = (resultado) => {
+    setResultadoSeleccionado(resultado)
+    if (!resultado) return
+    setBusquedaResuelta(true)
+    if (resultado.source === 'oportunidad') {
+      // A pedido: Fecha Nacimiento y Teléfono también se autocompletan acá — Cliente no
+      // tiene esas columnas (ver mapClienteItem/mondayApi.js), así que es exclusivo del
+      // caso Oportunidad.
+      const { codigoPais, telefono } = splitTelefono(resultado.telefono, resultado.telefonoCountryShortName)
+      setForm((prev) => ({
+        ...prev,
+        nombre: resultado.nombre || prev.nombre,
+        apellido: resultado.apellido || prev.apellido,
+        ci: resultado.ci || prev.ci,
+        fechaNacimiento: resultado.fechaNacimiento || prev.fechaNacimiento,
+        codigoPais: codigoPais || prev.codigoPais,
+        telefono: telefono || prev.telefono,
+      }))
+    } else {
+      const { nombre, apellido } = splitNombreApellido(resultado.name)
+      setForm((prev) => ({ ...prev, nombre, apellido, ci: resultado.ci || prev.ci }))
+    }
   }
 
-  const handleClienteSeleccionado = (cliente) => {
-    setClienteSeleccionado(cliente)
-    if (!cliente) return
-    const { nombre, apellido } = splitNombreApellido(cliente.name)
-    setForm((prev) => ({ ...prev, nombre, apellido, ci: cliente.ci || prev.ci }))
+  // "No lo encuentro" — abre el resto del formulario para completarlo a mano, sin ningún
+  // resultado elegido (limpia Nombre/Apellido/CI por si venían de una búsqueda anterior).
+  const handleSaltearBusqueda = () => {
+    setResultadoSeleccionado(null)
+    setBusquedaResuelta(true)
+    setForm((prev) => ({ ...prev, nombre: '', apellido: '', ci: '' }))
   }
 
-  // Caso "no existe": avisa (sin bloquear) si la Cédula que se está tipeando ya está
-  // cargada como Cliente y/o ya tiene Oportunidades — debounced, recién dispara con una
+  // Solo corre cuando NO hay un resultado elegido a propósito (search salteada, o el
+  // usuario sigue tipeando la Cédula a mano) — avisa (sin bloquear) si esa Cédula ya está
+  // cargada como Cliente y/o ya tiene Oportunidades. Debounced, recién dispara con una
   // Cédula con formato válido para no pegarle a la API en cada tecla.
   useEffect(() => {
-    if (form.clienteExiste !== 'No') {
+    if (!busquedaResuelta || resultadoSeleccionado) {
       setDuplicadoCheck(null)
       return undefined
     }
@@ -652,7 +726,7 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
       cancelled = true
       clearTimeout(timer)
     }
-  }, [form.ci, form.clienteExiste])
+  }, [form.ci, busquedaResuelta, resultadoSeleccionado])
 
   // A pedido: apenas carga el schema, el formulario arranca con Tipo de Riesgo =
   // Automóvil (el único con "Datos del riesgo" definidos hasta ahora), Departamento/
@@ -743,7 +817,7 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
   const isStepValid = (index) => {
     if (index === 0) {
       return Boolean(
-        form.clienteExiste &&
+        busquedaResuelta &&
           form.nombre &&
           form.apellido &&
           form.ci &&
@@ -1086,33 +1160,37 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
 
         {stepIndex === 0 && (
           <div className="crear-op__fields crear-op__fields--grid">
+            {/* A pedido: sin la pregunta previa "¿El cliente ya existe?" — un único
+                buscador (CI o nombre) que trae resultados de los 2 tableros a la vez
+                (Cliente y Oportunidad, diferenciados con una etiqueta en cada opción,
+                ver ExistingRecordSearch) y completa Nombre/Apellido/CI al elegir uno. Si
+                no aparece nada, "Saltear" abre el resto del formulario para cargarlo a
+                mano. */}
             <label className="crear-op__field crear-op__field--full">
-              <span>¿El cliente ya existe? *</span>
-              <RequiredDropdown
-                options={CLIENTE_EXISTE_OPTIONS}
-                value={CLIENTE_EXISTE_OPTIONS.find((o) => o.value === form.clienteExiste) ?? null}
-                placeholder="Selecciona una opción"
-                onChange={(option) => handleClienteExisteChange(option?.value ?? '')}
-              />
+              <span>Buscar cliente u oportunidad existente</span>
+              <ExistingRecordSearch value={resultadoSeleccionado} onChange={handleResultadoSeleccionado} />
+              {resultadoSeleccionado && (
+                <span className="crear-op__autofill">
+                  {resultadoSeleccionado.source === 'cliente' ? 'Cliente' : 'Oportunidad'} seleccionado:{' '}
+                  {resultadoSeleccionado.name} — se completaron{' '}
+                  {resultadoSeleccionado.source === 'oportunidad'
+                    ? 'Nombre/Apellido/CI/Fecha Nacimiento/Teléfono'
+                    : 'Nombre/Apellido/CI'}{' '}
+                  abajo, revisalos antes de continuar.
+                </span>
+              )}
+              {!busquedaResuelta && (
+                <Button kind="tertiary" className="crear-op__skip-btn" onClick={handleSaltearBusqueda}>
+                  No lo encuentro, completar los datos manualmente <MdArrowForward />
+                </Button>
+              )}
             </label>
-
-            {form.clienteExiste === 'Si' && (
-              <label className="crear-op__field crear-op__field--full">
-                <span>Buscar cliente *</span>
-                <ClienteExistenteSearch value={clienteSeleccionado} onChange={handleClienteSeleccionado} />
-                {clienteSeleccionado && (
-                  <span className="crear-op__autofill">
-                    Cliente seleccionado: {clienteSeleccionado.name} — se completaron Nombre/Apellido/CI
-                    abajo, revisalos antes de continuar.
-                  </span>
-                )}
-              </label>
-            )}
 
             {/* A pedido: el aviso de Cédula duplicada es un popup grande con botón
                 "Entendido" para cerrarlo, en vez de un cartelito chico inline — así no
-                pasa desapercibido. */}
-            {form.clienteExiste === 'No' && showDuplicadoModal && duplicadoCheck && (
+                pasa desapercibido. Solo corre si no hay un resultado ya elegido a
+                propósito (ver el useEffect debounced). */}
+            {busquedaResuelta && !resultadoSeleccionado && showDuplicadoModal && duplicadoCheck && (
               <Modal id="duplicado-cedula-modal" show onClose={() => setShowDuplicadoModal(false)} size="medium">
                 <ModalHeader title="Esta cédula ya tiene actividad cargada" className="crear-op__duplicado-modal-header" />
                 <ModalContent className="crear-op__duplicado-modal-content">
@@ -1134,7 +1212,7 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
               </Modal>
             )}
 
-            {form.clienteExiste && (
+            {busquedaResuelta && (
               <>
             <label className={`crear-op__field${fieldStateClass(form.nombre, false)}`}>
               <span>Nombre *</span>

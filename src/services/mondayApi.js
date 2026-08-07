@@ -669,3 +669,85 @@ export async function countOportunidadesByCedula(ci) {
   })
   return data.boards[0]?.items_page.items.length ?? 0
 }
+
+// Búsqueda en vivo del tablero Oportunidades, mismo criterio que searchClientes (nombre
+// vs. Cédula según lo tipeado) — a pedido, el buscador de "cliente existente" del
+// formulario de creación busca en LOS DOS tableros a la vez, no solo en Clientes, para
+// poder reusar los datos de una Oportunidad ya cargada si el cliente todavía no tiene un
+// ítem formal en Clientes. A diferencia de Clientes (que no tiene columnas separadas de
+// Nombre/Apellido), acá sí existen (text_mm51b055/text_mm51ez7e) — se usan directo en vez
+// de la heurística de partir el nombre completo. También trae Fecha Nacimiento y
+// Teléfono (a pedido, se autocompletan también al elegir una Oportunidad) — Cliente no
+// tiene esas columnas, así que esto es exclusivo de acá.
+const SEARCH_OPORTUNIDADES_QUERY = `
+  query SearchOportunidades($boardId: ID!, $rules: [ItemsQueryRule!], $limit: Int!) {
+    boards(ids: [$boardId]) {
+      items_page(limit: $limit, query_params: { rules: $rules, operator: and }) {
+        items {
+          id
+          column_values(ids: ["text_mm51b055", "text_mm51ez7e", "numeric_mm51mb0s", "date_mm516agw", "phone_mm519m27"]) {
+            id
+            text
+            value
+          }
+        }
+      }
+    }
+  }
+`
+
+function mapOportunidadItem(item) {
+  const byId = Object.fromEntries(item.column_values.map((cv) => [cv.id, cv]))
+  const nombre = byId.text_mm51b055?.text?.trim() || ''
+  const apellido = byId.text_mm51ez7e?.text?.trim() || ''
+  // phone_mm519m27.text ya viene sin "+" ni espacios (solo dígitos, código de país
+  // pegado adelante) — el código de país en sí (para saber dónde corta) solo está en
+  // el JSON de "value" (countryShortName), no en "text".
+  let telefono = ''
+  let telefonoCountryShortName = ''
+  try {
+    const parsedPhone = byId.phone_mm519m27?.value ? JSON.parse(byId.phone_mm519m27.value) : null
+    telefono = parsedPhone?.phone || ''
+    telefonoCountryShortName = parsedPhone?.countryShortName || ''
+  } catch {
+    // sin teléfono usable — se deja vacío en vez de romper el resto del resultado
+  }
+  return {
+    id: item.id,
+    nombre,
+    apellido,
+    name: `${nombre} ${apellido}`.trim(),
+    ci: byId.numeric_mm51mb0s?.text?.trim() || '',
+    fechaNacimiento: byId.date_mm516agw?.text?.trim() || '',
+    telefono,
+    telefonoCountryShortName,
+  }
+}
+
+// El campo "name" del ítem de Oportunidad no es solo Nombre+Apellido (el tablero lo arma
+// combinando Nombre-Bien-Marca-Año, ej. "Santiago Gonzalez-ACURA-(2015)-TSX") — igual
+// sirve para buscar por nombre con contains_text porque el nombre de la persona siempre
+// va al principio, pero el resultado que se muestra usa nombre/apellido de las columnas
+// (mapOportunidadItem), no este campo bruto.
+export async function searchOportunidades(term) {
+  const query = (term ?? '').trim()
+  if (query.length < 2) return []
+  const isNumeric = /\d/.test(query)
+  const rules = isNumeric
+    ? [{ column_id: 'numeric_mm51mb0s', compare_value: [query.replace(/\D/g, '')], operator: 'contains_text' }]
+    : [{ column_id: 'name', compare_value: [query], operator: 'contains_text' }]
+  const data = await callMondayApi(SEARCH_OPORTUNIDADES_QUERY, { boardId: OPPORTUNITIES_BOARD_ID, rules, limit: 20 })
+  const items = data.boards[0]?.items_page.items ?? []
+  // Un mismo cliente puede tener varias Oportunidades ya cargadas (una por vehículo) —
+  // acá solo importa la persona para precargar el formulario, así que se deduplica por
+  // nombre+apellido+CI en vez de mostrar N filas idénticas.
+  const seen = new Set()
+  const result = []
+  for (const mapped of items.map(mapOportunidadItem)) {
+    const key = `${mapped.nombre.toLowerCase()}|${mapped.apellido.toLowerCase()}|${mapped.ci}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    result.push(mapped)
+  }
+  return result
+}

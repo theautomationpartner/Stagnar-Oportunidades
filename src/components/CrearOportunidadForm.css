@@ -155,9 +155,9 @@
   font-weight: 400;
 }
 
-/* Fila de cada resultado en ClienteExistenteSearch (optionRenderer) — nombre a la
-   izquierda, Cédula resaltada en azul a la derecha, para distinguir rápido resultados
-   con nombres parecidos. */
+/* Fila de cada resultado en ExistingRecordSearch (optionRenderer) — etiqueta de tablero +
+   nombre a la izquierda, Cédula resaltada en azul a la derecha, para distinguir rápido
+   resultados parecidos y de qué fuente viene cada uno. */
 .crear-op__cliente-option {
   display: flex;
   align-items: center;
@@ -166,11 +166,61 @@
   width: 100%;
 }
 
+.crear-op__cliente-option-main {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.crear-op__source-tag {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.crear-op__source-tag--cliente {
+  color: #0073ea;
+  background: #eef6ff;
+}
+
+.crear-op__source-tag--oportunidad {
+  color: #9d50dd;
+  background: #f5ebfd;
+}
+
 .crear-op__cliente-option-ci {
   color: #0073ea;
   font-weight: 600;
   font-size: 13px;
   flex-shrink: 0;
+}
+
+/* "Saltear" el buscador — Button kind="tertiary" (@vibe/core) de fábrica queda
+   demasiado parecido a texto plano acá adentro; se le da forma de chip suave (fondo
+   celeste tenue, bordes redondeados) para que se note que es una acción, sin competir
+   en peso visual con el campo de búsqueda de arriba. */
+.crear-op__skip-btn {
+  align-self: flex-start;
+  margin-top: 2px;
+  background: #eef6ff !important;
+  color: #0073ea !important;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 8px 16px;
+}
+
+.crear-op__skip-btn:hover {
+  background: #dcedfd !important;
+}
+
+.crear-op__skip-btn svg {
+  font-size: 16px;
 }
 
 .crear-op__field {

@@ -137,12 +137,22 @@
 .opp-detail__client-card-note {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
   gap: 12px;
   flex: 1 1 320px;
   min-width: 0;
   font-size: 13px;
   color: #323338;
+}
+
+/* Paso "Cotizar" (sin cotizaciones todavía): si "Cotizar" falla, el error queda en su
+   propio renglón (flex-basis:100%, ver flex-wrap de arriba) en vez de apretado al lado
+   del botón. */
+.opp-detail__client-card-note-error {
+  flex-basis: 100%;
+  color: #e2445c;
+  font-size: 12px;
 }
 
 /* Paso "Confirmar": solo el botón "Recotizar" acá, sin lista de datos al lado — no
@@ -152,6 +162,16 @@
 .opp-detail__client-card-note--btn-only {
   flex: 0 0 auto;
   justify-content: flex-end;
+}
+
+/* Paso "Cotizar" (sin cotizaciones todavía): a pedido, el texto va pegado al botón en
+   vez de separado por todo el ancho de sobra (space-between de .opp-detail__client-card-
+   note) — mismo criterio de no crecer que --btn-only, para que el par quede agrupado
+   contra el borde derecho de la tarjeta. */
+.opp-detail__client-card-note--tight {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  gap: 14px;
 }
 
 @media (max-width: 640px) {

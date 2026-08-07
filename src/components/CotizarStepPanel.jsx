@@ -1,7 +1,6 @@
 import { useState, useEffect } from 'react'
 import {
   MdCheckCircle,
-  MdSend,
   MdEdit,
   MdSave,
   MdClose,
@@ -332,17 +331,8 @@ export default function CotizarStepPanel({
         </AttentionBox>
       )}
 
-      {!editing && !polling && !hasQuotes && (
-        <AttentionBox type="warning">
-          <div className="cotizar-step__banner-row">
-            <p>Todavía no se generó ninguna cotización para esta oportunidad.</p>
-            <Button kind="primary" onClick={onMarcarParaCotizar} disabled={marking || !canCotizar}>
-              <MdSend /> {marking ? 'Marcando...' : 'Cotizar'}
-            </Button>
-          </div>
-          {markError && <p className="cotizar-step__error">Error: {markError}</p>}
-        </AttentionBox>
-      )}
+      {/* A pedido: el botón "Cotizar" (caso sin cotizaciones todavía) se sacó de acá —
+          ahora vive al lado de los datos del cliente, ver OpportunityDetail.jsx. */}
 
       {!editing && !polling && errorDetail && (
         <div className="cotizar-step__error-detail">

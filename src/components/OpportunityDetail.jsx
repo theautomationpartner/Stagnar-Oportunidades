@@ -30,7 +30,7 @@ import { mapOpportunityItem } from '../services/opportunityMapper'
 import { mapSubitemToRawQuote, groupQuotesByCompania } from '../services/quoteMapper'
 import { computeQuote } from '../services/pricingEngine'
 import { applyRecargoLookup } from '../services/recargoPanel'
-import { COTIZAR_FIELDS } from '../services/cotizarFields'
+import { COTIZAR_FIELDS, getMissingCotizarFields } from '../services/cotizarFields'
 import { renderQuoteImageDataUrl } from '../services/whatsappImage'
 import { COBERTURA_TABS, coberturaGroupOf } from '../services/coberturaGroups'
 import './OpportunityDetail.css'
@@ -472,6 +472,10 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   }, [rawQuotes, overridesByQuoteId, opportunity, schema])
 
   const hasQuotes = rawQuotes.length > 0
+  // A pedido: el botón "Cotizar" (paso 1, cuando todavía no hay ninguna cotización) vive
+  // en la tarjeta de cliente, no en CotizarStepPanel — mismo criterio de "faltan campos"
+  // que ese panel usa para su propio banner de advertencia.
+  const canCotizar = opportunity ? getMissingCotizarFields(opportunity).length === 0 : false
 
   // Solapa activa del paso "Comparar y enviar": "general" no filtra nada (como antes);
   // "GLOBAL"/"TRIPLE" solo dejan pasar las cotizaciones de esa familia de cobertura,
@@ -939,6 +943,19 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
                   <Button kind="secondary" className="opp-detail__recotizar-btn" onClick={() => setActiveStep('cotizar')}>
                     <MdAutorenew /> Recotizar
                   </Button>
+                </div>
+              )}
+
+              {/* A pedido: el botón "Cotizar" (y su aclaración) vive acá, al lado de los
+                  datos del cliente, en vez de en un banner aparte más abajo (ver
+                  CotizarStepPanel — ese banner se sacó de ahí). */}
+              {activeStep === 'cotizar' && !hasQuotes && !polling && (
+                <div className="opp-detail__client-card-note opp-detail__client-card-note--tight">
+                  <span>Todavía no se generó ninguna cotización para esta oportunidad.</span>
+                  <Button kind="primary" onClick={handleMarcarParaCotizar} disabled={marking || !canCotizar}>
+                    <MdSend /> {marking ? 'Marcando...' : 'Cotizar'}
+                  </Button>
+                  {markError && <span className="opp-detail__client-card-note-error">Error: {markError}</span>}
                 </div>
               )}
             </div>
