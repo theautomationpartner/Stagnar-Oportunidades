@@ -1,14 +1,28 @@
-import { useEffect, useState } from 'react'
-import { MdSend, MdCheckCircle } from 'react-icons/md'
+import { useState } from 'react'
+import { MdSend, MdCheckCircle, MdWarningAmber } from 'react-icons/md'
 import { Modal, ModalHeader, ModalContent, ModalFooter, AttentionBox } from '@vibe/core'
 import { sendQuotesToWhatsApp, getMakeWebhookUrl } from '../services/makeWebhook'
 import './WhatsAppSendModal.css'
 
-export default function WhatsAppSendModal({ opportunity, images, onClose, onSent }) {
+// A pedido: en vez de un mensaje de éxito genérico que se cierra solo a los 2
+// segundos (sin saber si Make.com terminó de verdad), el modal se queda abierto
+// después de mandar el POST y muestra el estado en vivo de Estado Envío
+// (color_mm4wr1t4, ver OpportunityDetail.jsx: sendPolling/envioErrorDetail) —
+// "Enviando" mientras Make procesa, "Enviado"/"Error" apenas llega a un estado
+// terminal. El usuario puede cerrar en cualquier momento (el polling de fondo
+// sigue funcionando aunque se cierre).
+export default function WhatsAppSendModal({
+  opportunity,
+  images,
+  onClose,
+  onSent,
+  sendPolling,
+  envioErrorDetail,
+}) {
   const [phone, setPhone] = useState(opportunity.telefono || '')
   const [sending, setSending] = useState(false)
   const [error, setError] = useState(null)
-  const [sent, setSent] = useState(false)
+  const [submitted, setSubmitted] = useState(false)
   const webhookConfigured = Boolean(getMakeWebhookUrl())
 
   const handleSend = async () => {
@@ -16,22 +30,14 @@ export default function WhatsAppSendModal({ opportunity, images, onClose, onSent
     setError(null)
     try {
       await sendQuotesToWhatsApp({ phone, opportunity, images })
-      setSent(true)
       await onSent?.(images)
+      setSubmitted(true)
     } catch (err) {
       setError(err.message)
     } finally {
       setSending(false)
     }
   }
-
-  // Confirmación breve en vez de dejar el modal esperando a que lo cierren a mano — se
-  // cierra sola a los 2 segundos de mostrar el éxito.
-  useEffect(() => {
-    if (!sent) return undefined
-    const timer = setTimeout(() => onClose?.(), 2000)
-    return () => clearTimeout(timer)
-  }, [sent, onClose])
 
   return (
     <Modal id="whatsapp-send-modal" show onClose={onClose} size="medium">
@@ -45,11 +51,32 @@ export default function WhatsAppSendModal({ opportunity, images, onClose, onSent
           </AttentionBox>
         )}
 
-        {sent ? (
-          <AttentionBox type="positive">
-            <MdCheckCircle /> Cotización enviada correctamente. En breve le llega por
-            WhatsApp.
-          </AttentionBox>
+        {submitted ? (
+          <div className="wa-modal__status">
+            {sendPolling ? (
+              <AttentionBox type="warning" icon={false}>
+                <span className="wa-modal__status-spinner" aria-hidden="true" />
+                Enviando por WhatsApp... esperando la confirmación de Make.
+              </AttentionBox>
+            ) : opportunity.estadoEnvio === 'Error' ? (
+              <>
+                <AttentionBox type="negative">
+                  <MdWarningAmber /> Hubo un error al enviar por WhatsApp.
+                </AttentionBox>
+                {envioErrorDetail && (
+                  <div className="wa-modal__error-detail">
+                    <strong>Detalle del error (último update en la oportunidad):</strong>
+                    <pre>{envioErrorDetail}</pre>
+                  </div>
+                )}
+              </>
+            ) : (
+              <AttentionBox type="positive">
+                <MdCheckCircle /> Cotización enviada correctamente. En breve le llega por
+                WhatsApp.
+              </AttentionBox>
+            )}
+          </div>
         ) : (
           <>
             <label className="wa-modal__field">
@@ -81,7 +108,9 @@ export default function WhatsAppSendModal({ opportunity, images, onClose, onSent
         )}
       </ModalContent>
 
-      {!sent && (
+      {submitted ? (
+        <ModalFooter primaryButton={{ text: 'Cerrar', onClick: onClose }} />
+      ) : (
         <ModalFooter
           primaryButton={{
             text: sending ? 'Enviando...' : 'Enviar',

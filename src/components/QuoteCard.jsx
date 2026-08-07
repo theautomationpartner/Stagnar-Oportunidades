@@ -392,21 +392,22 @@ export default function QuoteCard({
 
       {showDetail && (
         <div className="quote-card__detail">
-          <div>
-            <strong>Compañía:</strong> {raw.compania || '—'}
-          </div>
-          <div>
-            <strong>Cobertura:</strong> {raw.cobertura || '—'}
-          </div>
-          <div>
-            <strong>Año vehículo:</strong> {raw.anioVehiculo || '—'}
-          </div>
-          <div>
-            <strong>Contado base (sin ajustes):</strong> {formatMoney(Number(raw.contado))}
+          {/* Compañía/Cobertura ya se muestran arriba (título de la tarjeta) — a pedido,
+              acá no se repiten. */}
+          <div className="quote-card__detail-facts">
+            <div>
+              <strong>Año vehículo:</strong> {raw.anioVehiculo || '—'}
+            </div>
+            <div>
+              <strong>Contado base (sin ajustes):</strong> {formatMoney(Number(raw.contado))}
+            </div>
           </div>
           {quote.incluye.length > 0 && (
             <div className="quote-card__incluye">
               <strong>Incluye:</strong>
+              {/* A pedido: en columnas (aprovecha el ancho de la tarjeta) en vez de una
+                  viñeta por renglón — con compañías que traen 10+ ítems, eso solo hacía
+                  la tarjeta entera innecesariamente alta. */}
               <ul>
                 {quote.incluye.map((item, i) => (
                   <li key={i}>{item}</li>

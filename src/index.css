@@ -8,6 +8,20 @@
    tener que pisarlo archivo por archivo. 640px como corte "celular promedio" (portrait,
    ~375-430px de ancho real + boclas del navegador) es el mismo breakpoint que ya se
    venía usando en LandingScreen.css/EmitirStepPanel.css antes de esta pasada. */
+/* Paleta del manual de marca de Stagnari — mismos hex que BRAND_COLORS en
+   services/companyColors.js (usado del lado JS, para el canvas de la imagen de
+   WhatsApp); acá el equivalente en variables CSS para ir vistiendo el resto de la app
+   con estos colores. No hace falta usar los 6 en todos lados — --color-verde es el más
+   característico de la marca, pensado como acento principal. */
+:root {
+  --color-verde: #008581;
+  --color-crema: #fff5de;
+  --color-gris: #818685;
+  --color-verde-complementario: #7bbb8f;
+  --color-blanco: #ffffff;
+  --color-negro: #000000;
+}
+
 :root {
   --page-gutter: 32px;
 }

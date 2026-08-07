@@ -218,6 +218,46 @@
   margin: 20px var(--page-gutter) 32px;
 }
 
+/* Control segmentado: 3 botones de exactamente 1/3 del ancho cada uno (flex:1 1 0 en
+   los 3), con la solapa activa resaltada en blanco + acento azul, sobre un fondo gris
+   claro a modo de "riel" — mismo lenguaje visual que otros toggles de la app. */
+.opp-detail__cobertura-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  margin-bottom: 18px;
+  background: #f6f7fb;
+  border: 1px solid #e6e9ef;
+  border-radius: 10px;
+}
+
+.opp-detail__cobertura-tab {
+  flex: 1 1 0;
+  padding: 10px 12px;
+  border: none;
+  border-radius: 8px;
+  background: transparent;
+  font-size: 14px;
+  font-weight: 700;
+  color: #676879;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.opp-detail__cobertura-tab:hover {
+  color: #323338;
+}
+
+.opp-detail__cobertura-tab--active {
+  background: #ffffff;
+  color: #0073ea;
+  box-shadow: 0 1px 3px rgba(15, 27, 60, 0.14);
+}
+
+.opp-detail__cobertura-tab--active:hover {
+  color: #0073ea;
+}
+
 /* A pedido: de a 2 cotizaciones por renglón en vez de una lista apilada — 2 columnas
    solo cuando hay ancho de sobra para que cada tarjeta (grilla interna de 3 columnas,
    ver QuoteCard.css) no quede apretada; si no, 1 columna a ancho completo. */

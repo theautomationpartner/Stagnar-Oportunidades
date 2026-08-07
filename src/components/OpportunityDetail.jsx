@@ -32,6 +32,7 @@ import { computeQuote } from '../services/pricingEngine'
 import { applyRecargoLookup } from '../services/recargoPanel'
 import { COTIZAR_FIELDS } from '../services/cotizarFields'
 import { renderQuoteImageDataUrl } from '../services/whatsappImage'
+import { COBERTURA_TABS, coberturaGroupOf } from '../services/coberturaGroups'
 import './OpportunityDetail.css'
 
 const ESTADO_OPORTUNIDAD_COLUMN_ID = 'deal_stage'
@@ -69,6 +70,9 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   const [overridesByQuoteId, setOverridesByQuoteId] = useState({})
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [activeStep, setActiveStep] = useState('cotizar')
+  // Solapas "General / GLOBAL / TRIPLE" del paso "Comparar y enviar" — índice de
+  // COBERTURA_TABS, no el texto (así matchea directo con TabList/Tab de @vibe/core).
+  const [coberturaTabIndex, setCoberturaTabIndex] = useState(0)
   const [marking, setMarking] = useState(false)
   const [markError, setMarkError] = useState(null)
   const [waModalImages, setWaModalImages] = useState(null)
@@ -468,6 +472,17 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   }, [rawQuotes, overridesByQuoteId, opportunity, schema])
 
   const hasQuotes = rawQuotes.length > 0
+
+  // Solapa activa del paso "Comparar y enviar": "general" no filtra nada (como antes);
+  // "GLOBAL"/"TRIPLE" solo dejan pasar las cotizaciones de esa familia de cobertura,
+  // sin importar la compañía (ver coberturaGroups.js — las 2 familias ya cubren todas
+  // las coberturas reales, no dependen de qué compañía sea).
+  const activeCoberturaTab = COBERTURA_TABS[coberturaTabIndex]?.key ?? 'general'
+  const visibleQuoteEntries = useMemo(() => {
+    const flat = groups.flatMap((g) => g.entries.map((e) => ({ ...e, compania: g.compania })))
+    if (activeCoberturaTab === 'general') return flat
+    return flat.filter((e) => coberturaGroupOf(e.raw.cobertura) === activeCoberturaTab)
+  }, [groups, activeCoberturaTab])
 
   const toggleSelected = (id) => {
     setSelectedIds((prev) => {
@@ -995,12 +1010,42 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
           {activeStep === 'comparar' && hasQuotes && (
             <>
               <div className="opp-detail__body">
-                {/* A pedido: sin solapas/acordeón por compañía — todas las cotizaciones
-                    en una sola grilla de a 2 por renglón, con la compañía de cada una
-                    mostrada adentro de su propia tarjeta (ver QuoteCard). */}
-                <div className="opp-detail__quotes">
-                  {groups.flatMap((g) =>
-                    g.entries.map(({ raw, quote }) => (
+                {/* Solapas por familia de cobertura (a pedido) — "General" muestra todo,
+                    como antes; "GLOBAL"/"TRIPLE" filtran sin importar la compañía. Sin
+                    solapas/acordeón POR COMPAÑÍA: todas las cotizaciones de la solapa
+                    activa van en una sola grilla de a 2 por renglón, con la compañía de
+                    cada una mostrada adentro de su propia tarjeta (ver QuoteCard).
+                    Control segmentado a mano (en vez de Tab/TabList de @vibe/core, cuyos
+                    estilos internos vienen de clases hasheadas inyectadas en runtime, no
+                    hay hook confiable para "1/3 del ancho cada una" + look propio) —
+                    mismo criterio que los botones-pill de Stepper.jsx. */}
+                <div className="opp-detail__cobertura-tabs" role="tablist">
+                  {COBERTURA_TABS.map((tab, index) => (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={coberturaTabIndex === index}
+                      className={
+                        coberturaTabIndex === index
+                          ? 'opp-detail__cobertura-tab opp-detail__cobertura-tab--active'
+                          : 'opp-detail__cobertura-tab'
+                      }
+                      onClick={() => setCoberturaTabIndex(index)}
+                    >
+                      {tab.label}
+                    </button>
+                  ))}
+                </div>
+
+                {visibleQuoteEntries.length === 0 ? (
+                  <EmptyState
+                    title="Sin cotizaciones en esta familia"
+                    description="No hay cotizaciones con cobertura GLOBAL o TRIPLE (según corresponda) para esta oportunidad."
+                  />
+                ) : (
+                  <div className="opp-detail__quotes">
+                    {visibleQuoteEntries.map(({ raw, quote, compania }) => (
                       <QuoteCard
                         key={raw.id}
                         raw={raw}
@@ -1010,14 +1055,14 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
                         overrides={overridesByQuoteId[raw.id] ?? {}}
                         onApplyOverrides={(values) => handleApplyQuoteOverrides(raw.id, values)}
                         onResetOverrides={() => handleResetQuoteOverrides(raw.id)}
-                        onApplyToCompany={(values) => handleApplyCompanyOverrides(g.compania, values)}
-                        onClearCompany={() => handleClearCompanyOverrides(g.compania)}
+                        onApplyToCompany={(values) => handleApplyCompanyOverrides(compania, values)}
+                        onClearCompany={() => handleClearCompanyOverrides(compania)}
                         onToggleOpcional={(field, checked) => handleToggleOpcional(raw.id, field, checked)}
                         rcOptions={rcOptions}
                       />
-                    ))
-                  )}
-                </div>
+                    ))}
+                  </div>
+                )}
               </div>
 
               {envioErrorDetail && (
@@ -1139,6 +1184,8 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
           images={waModalImages}
           onClose={() => setWaModalImages(null)}
           onSent={handleWhatsAppSent}
+          sendPolling={sendPolling}
+          envioErrorDetail={envioErrorDetail}
         />
       )}
     </div>
