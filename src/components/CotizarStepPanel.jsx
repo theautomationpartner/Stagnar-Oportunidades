@@ -1,12 +1,5 @@
 import { useState, useEffect } from 'react'
-import {
-  MdCheckCircle,
-  MdEdit,
-  MdSave,
-  MdClose,
-  MdAutorenew,
-  MdWarningAmber,
-} from 'react-icons/md'
+import { MdEdit, MdSave, MdClose, MdAutorenew } from 'react-icons/md'
 import { Button, Dropdown, AttentionBox, Loader, TextField, NumberField } from '@vibe/core'
 import { COTIZAR_FIELDS, getMissingCotizarFields } from '../services/cotizarFields'
 import { searchAutodataModelos } from '../services/mondayApi'
@@ -286,9 +279,11 @@ export default function CotizarStepPanel({
         </div>
       )}
 
+      {/* Sin ícono manual — AttentionBox ya pone el suyo propio según "type" (acá
+          duplicaba el de advertencia). */}
       {!editing && !polling && !canCotizar && (
         <AttentionBox type="negative">
-          <MdWarningAmber /> Completá estos campos antes de {hasQuotes ? 'recotizar' : 'cotizar'}:{' '}
+          Completá estos campos antes de {hasQuotes ? 'recotizar' : 'cotizar'}:{' '}
           <strong>{missingFields.map((f) => f.label).join(', ')}</strong>.
         </AttentionBox>
       )}
@@ -305,8 +300,8 @@ export default function CotizarStepPanel({
         <AttentionBox type="positive">
           <div className="cotizar-step__banner-row">
             <span>
-              <MdCheckCircle /> Esta oportunidad ya tiene cotizaciones cargadas. Pasá al paso
-              "Comparar y enviar" para verlas.
+              Esta oportunidad ya tiene cotizaciones cargadas. Pasá al paso "Comparar y
+              enviar" para verlas.
             </span>
             <Button
               kind="secondary"
@@ -323,8 +318,8 @@ export default function CotizarStepPanel({
       {!editing && !polling && hasQuotes && confirmingRecotizar && (
         <AttentionBox type="negative">
           <p>
-            <MdWarningAmber /> Al recotizar se van a <strong>eliminar todos los datos de la
-            cotización actual</strong> (todas las tarjetas por compañía y cobertura) y se van a
+            Al recotizar se van a <strong>eliminar todos los datos de la cotización
+            actual</strong> (todas las tarjetas por compañía y cobertura) y se van a
             generar unos nuevos desde cero. ¿Confirmás?
           </p>
           <div className="cotizar-step__warning-actions">

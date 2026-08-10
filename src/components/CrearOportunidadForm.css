@@ -204,6 +204,33 @@
   flex-shrink: 0;
 }
 
+/* Cruz propia para limpiar ExistingRecordSearch (ver el comentario en el JSX sobre por
+   qué no se usa el "clearable" nativo del Dropdown) — mismo criterio visual que
+   .crear-op__date-clear, posicionada para no superponerse con la flechita del Dropdown. */
+.crear-op__search-wrap {
+  position: relative;
+}
+
+.crear-op__search-clear {
+  position: absolute;
+  right: 34px;
+  top: 50%;
+  transform: translateY(-50%);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: none;
+  background: none;
+  color: #9699a6;
+  cursor: pointer;
+  padding: 4px;
+  z-index: 1;
+}
+
+.crear-op__search-clear:hover {
+  color: #e2445c;
+}
+
 /* "Saltear" el buscador — Button kind="tertiary" (@vibe/core) de fábrica queda
    demasiado parecido a texto plano acá adentro; se le da forma de chip suave (fondo
    celeste tenue, bordes redondeados) para que se note que es una acción, sin competir

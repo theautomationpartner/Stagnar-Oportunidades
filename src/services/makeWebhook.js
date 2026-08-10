@@ -72,7 +72,14 @@ export async function sendQuotesToWhatsApp({ phone, opportunity, images }) {
   // Ojo: no seteamos Content-Type a mano — el navegador arma el boundary de
   // multipart/form-data solo. Si se fuerza el header manualmente, el body queda mal
   // formado y Make no puede parsear los archivos.
-  const response = await fetch(url, {
+  //
+  // El POST va a nuestro propio proxy (/api/make-webhook, ver vite.config.js /
+  // api/make-webhook.js), NO directo a `url` — un Custom Webhook de Make normalmente no
+  // responde con headers CORS, así que un fetch directo desde el navegador terminaba
+  // recibiendo el WhatsApp igual (Make sí procesaba el POST) pero tirando "Failed to
+  // fetch" del lado del cliente antes de poder confirmar el envío, y por eso nunca se
+  // marcaba "Incluir Propuesta" en monday.
+  const response = await fetch('/api/make-webhook', {
     method: 'POST',
     body: formData,
   })

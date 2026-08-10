@@ -82,13 +82,62 @@ function mondayFileProxy(env) {
   }
 }
 
+// makeWebhook.js posteaba directo del navegador a la URL de Make.com — a diferencia
+// de monday, un Custom Webhook de Make normalmente NO responde con headers CORS
+// (Access-Control-Allow-Origin) salvo que se arme un módulo de respuesta a mano. Make
+// igual recibe el POST y manda el WhatsApp, pero el navegador bloquea la LECTURA de la
+// respuesta y el fetch() del cliente termina tirando "Failed to fetch" — eso hacía que
+// sendQuotesToWhatsApp tirara antes de llegar a onSent, y por eso nunca se marcaba
+// "Incluir Propuesta" en monday aunque el WhatsApp sí hubiera salido. Mismo patrón que
+// mondayFileProxy: reenviamos el multipart tal cual del lado del servidor (mismo
+// origen para el navegador, sin problema de CORS) hacia la URL real de Make.
+function makeWebhookProxy(env) {
+  return {
+    name: 'make-webhook-proxy',
+    configureServer(server) {
+      server.middlewares.use('/api/make-webhook', async (req, res) => {
+        if (req.method !== 'POST') {
+          res.statusCode = 405
+          res.end('Method not allowed')
+          return
+        }
+
+        const targetUrl = env.VITE_MAKE_WEBHOOK_URL
+        if (!targetUrl) {
+          res.statusCode = 500
+          res.end(JSON.stringify({ error: 'VITE_MAKE_WEBHOOK_URL no está configurada' }))
+          return
+        }
+
+        const chunks = []
+        req.on('data', (chunk) => chunks.push(chunk))
+        req.on('end', async () => {
+          try {
+            const makeRes = await fetch(targetUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': req.headers['content-type'] },
+              body: Buffer.concat(chunks),
+            })
+            const data = await makeRes.text()
+            res.statusCode = makeRes.status
+            res.end(data)
+          } catch (err) {
+            res.statusCode = 502
+            res.end(JSON.stringify({ error: String(err) }))
+          }
+        })
+      })
+    },
+  }
+}
+
 // Puerto fijo (5173) para que el localhost del proyecto sea siempre el mismo
 // entre sesiones — ver /app/README.md. strictPort corta en vez de saltar de puerto
 // si 5173 ya está ocupado, así nunca queda una URL distinta "por las dudas".
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   return {
-    plugins: [react(), mondayApiProxy(env), mondayFileProxy(env)],
+    plugins: [react(), mondayApiProxy(env), mondayFileProxy(env), makeWebhookProxy(env)],
     server: {
       port: 5173,
       strictPort: true,

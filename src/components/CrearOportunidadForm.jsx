@@ -266,10 +266,27 @@ function splitNombreApellido(fullName) {
 // parecidos y de qué fuente viene cada uno. Al elegir una, onChange recibe la opción
 // entera (source/id/name/ci, +nombre/apellido si es de Oportunidad) — se arma en
 // handleResultadoSeleccionado.
-function ExistingRecordSearch({ value, onChange }) {
-  const [inputValue, setInputValue] = useState('')
+// A pedido: cuando se tipea a mano una Cédula (búsqueda salteada) que YA existe como
+// Cliente u Oportunidad (ver el aviso de duplicado en el padre), ese mismo valor se
+// manda como seedTerm para que el buscador de abajo lo muestre de una — el padre le
+// pone un `key` distinto a ExistingRecordSearch cada vez que llega un seedTerm nuevo
+// (ver su uso más abajo), así que ESTE componente se remonta de cero por completo, y
+// puede leer seedTerm directo como valor inicial de sus propios useState. Se probó
+// primero con un useEffect que "sembraba" el valor en un Dropdown ya montado (con su
+// propio remount interno) y nunca se reflejó — el Dropdown de @vibe/core (downshift
+// por debajo) solo lee su prop `inputValue` como valor INICIAL al montarse, así que
+// cualquier intento de actualizarlo después de ese primer render, por más remount
+// interno que se le agregue, corre el riesgo de un desfasaje de timing entre efectos.
+// Remontando el COMPONENTE ENTERO desde el padre en vez de un pedazo interno, el
+// Dropdown nuevo nace directo con el valor correcto, sin depender de ningún efecto.
+function ExistingRecordSearch({ value, onChange, seedTerm }) {
+  const [inputValue, setInputValue] = useState(seedTerm || '')
   const [options, setOptions] = useState([])
   const [loading, setLoading] = useState(false)
+  // Arranca abierto cuando este montaje vino de un seedTerm — onMenuOpen/onMenuClose
+  // lo devuelven al comportamiento normal (foco, click afuera, elegir una opción) apenas
+  // el usuario vuelve a interactuar.
+  const [menuOpen, setMenuOpen] = useState(Boolean(seedTerm))
 
   useEffect(() => {
     const term = inputValue.trim()
@@ -322,44 +339,77 @@ function ExistingRecordSearch({ value, onChange }) {
 
   const selected = value ? { value: `${value.source}:${value.id}`, label: value.name, ci: value.ci, source: value.source } : null
 
+  // Cruz propia (no el "clearable" nativo del Dropdown, ver el comentario grande de
+  // más abajo sobre por qué se dejó en false) — a pedido, borra tanto lo tipeado en
+  // este campo como el resultado ya elegido, y el onChange(null) de abajo es lo que le
+  // avisa al padre que también limpie los datos del form que se habían autocompletado.
+  // No hace falta remontar nada acá: al pasar `value` de un resultado elegido a null,
+  // el propio Dropdown (downshift por debajo) ya limpia su inputValue interno solo,
+  // como parte de su manejo normal de un selectedItem controlado que cambia.
+  const handleClear = () => {
+    setInputValue('')
+    setOptions([])
+    setMenuOpen(false)
+    onChange(null)
+  }
+
   return (
-    <Dropdown
-      clearable={false}
-      searchable
-      // Sin esto, el Dropdown vuelve a filtrar por su cuenta las opciones ya devueltas
-      // por la búsqueda del servidor contra el texto tipeado — que matchea desde el
-      // principio del `label` (mismo default que documenta RequiredDropdown más arriba).
-      // Con una Cédula (el label es el nombre, no el número) eso descartaba TODOS los
-      // resultados aunque la búsqueda real sí los hubiera encontrado. `options` acá ya
-      // viene filtrado por searchClientes/searchOportunidades, así que no hace falta (ni
-      // conviene) que el Dropdown filtre una segunda vez.
-      filterOption={() => true}
-      options={options}
-      value={selected}
-      loading={loading}
-      onInputChange={(input) => setInputValue(input ?? '')}
-      placeholder="Escribí un nombre o una cédula..."
-      noOptionsMessage={
-        inputValue.trim().length < 2 ? 'Escribí para buscar (letras: nombre, números: cédula)' : 'Sin resultados'
-      }
-      optionRenderer={(option) => (
-        <div className="crear-op__cliente-option">
-          <div className="crear-op__cliente-option-row">
-            <span className="crear-op__cliente-option-main">
-              <span className={`crear-op__source-tag crear-op__source-tag--${option.source}`}>
-                {option.source === 'cliente' ? 'Cliente' : 'Oportunidad'}
+    <div className="crear-op__search-wrap">
+      <Dropdown
+        clearable={false}
+        searchable
+        // Refuerzo del seedTerm (ver el comentario grande más arriba): con foco real de
+        // verdad en el input, la librería no lo puede llegar a marcar como "blur" nunca.
+        autoFocus={Boolean(seedTerm)}
+        // Sin esto, el Dropdown vuelve a filtrar por su cuenta las opciones ya devueltas
+        // por la búsqueda del servidor contra el texto tipeado — que matchea desde el
+        // principio del `label` (mismo default que documenta RequiredDropdown más arriba).
+        // Con una Cédula (el label es el nombre, no el número) eso descartaba TODOS los
+        // resultados aunque la búsqueda real sí los hubiera encontrado. `options` acá ya
+        // viene filtrado por searchClientes/searchOportunidades, así que no hace falta (ni
+        // conviene) que el Dropdown filtre una segunda vez.
+        filterOption={() => true}
+        options={options}
+        value={selected}
+        loading={loading}
+        inputValue={inputValue}
+        onInputChange={(input) => setInputValue(input ?? '')}
+        isMenuOpen={menuOpen}
+        onMenuOpen={() => setMenuOpen(true)}
+        onMenuClose={() => setMenuOpen(false)}
+        placeholder="Escribí un nombre o una cédula..."
+        noOptionsMessage={
+          inputValue.trim().length < 2 ? 'Escribí para buscar (letras: nombre, números: cédula)' : 'Sin resultados'
+        }
+        optionRenderer={(option) => (
+          <div className="crear-op__cliente-option">
+            <div className="crear-op__cliente-option-row">
+              <span className="crear-op__cliente-option-main">
+                <span className={`crear-op__source-tag crear-op__source-tag--${option.source}`}>
+                  {option.source === 'cliente' ? 'Cliente' : 'Oportunidad'}
+                </span>
+                {option.label}
               </span>
-              {option.label}
-            </span>
-            {option.ci && <span className="crear-op__cliente-option-ci">{option.ci}</span>}
+              {option.ci && <span className="crear-op__cliente-option-ci">{option.ci}</span>}
+            </div>
+            {/* A pedido: el modelo del vehículo de esa Oportunidad, para distinguir de un
+                vistazo si esta persona tiene varias — Cliente no tiene esta info. */}
+            {option.modelo && <span className="crear-op__cliente-option-modelo">{option.modelo}</span>}
           </div>
-          {/* A pedido: el modelo del vehículo de esa Oportunidad, para distinguir de un
-              vistazo si esta persona tiene varias — Cliente no tiene esta info. */}
-          {option.modelo && <span className="crear-op__cliente-option-modelo">{option.modelo}</span>}
-        </div>
+        )}
+        onChange={(option) => onChange(option ?? null)}
+      />
+      {(inputValue || selected) && (
+        <button
+          type="button"
+          className="crear-op__search-clear"
+          onClick={handleClear}
+          aria-label="Borrar búsqueda"
+        >
+          <MdClear />
+        </button>
       )}
-      onChange={(option) => onChange(option ?? null)}
-    />
+    </div>
   )
 }
 
@@ -652,6 +702,23 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
   // que cerrarlo a mano con "Entendido" — se prende solo cuando llega un resultado nuevo
   // con algo para avisar (ver el useEffect debounced más abajo), no en cada render.
   const [showDuplicadoModal, setShowDuplicadoModal] = useState(false)
+  // A pedido: cuando la Cédula tipeada a mano resulta duplicada, se manda ese mismo
+  // valor al buscador de arriba (ver ExistingRecordSearch/seedTerm) para que aparezcan
+  // ahí los resultados reales, en vez de dejar el aviso como único indicio.
+  const [duplicadoSeedCi, setDuplicadoSeedCi] = useState('')
+  // Contador aparte SOLO para forzar el remount de ExistingRecordSearch (ver su `key`
+  // más abajo) — si se usara duplicadoSeedCi solo, repetir la MISMA Cédula dos veces
+  // seguidas (ej. limpiar y volver a tipear la misma) no cambia su valor, así que React
+  // no vuelve a disparar el remount la segunda vez. El nonce sí cambia siempre.
+  const [duplicadoSeedNonce, setDuplicadoSeedNonce] = useState(0)
+  // TextField (@vibe/core) mantiene un estado interno propio para el debounce que no se
+  // sincroniza al toque cuando su `value` cambia desde AFUERA (no por su propio
+  // onChange) — al limpiar Nombre/Apellido/CI/Teléfono de golpe con setForm (ver la
+  // cruz de "Buscar Persona" más abajo) quedan un instante desincronizados con el
+  // ícono ya recalculado, y esa combinación hace que el componente tire una excepción
+  // (pantalla en blanco). Igual que con el Dropdown de ExistingRecordSearch, forzarlos
+  // a remontar de cero (key) evita el problema.
+  const [textFieldsResetKey, setTextFieldsResetKey] = useState(0)
 
   const handleChange = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
 
@@ -661,7 +728,24 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
   // las tiene, así que ahí se usan directo, sin adivinar dónde corta el nombre.
   const handleResultadoSeleccionado = (resultado) => {
     setResultadoSeleccionado(resultado)
-    if (!resultado) return
+    if (!resultado) {
+      // A pedido: la cruz de "Buscar Persona" no solo limpia el buscador, también
+      // deshace el autocompletado que había disparado la selección anterior — si no,
+      // quedaban datos de un resultado que ya no está elegido.
+      setForm((prev) => ({
+        ...prev,
+        nombre: '',
+        apellido: '',
+        ci: '',
+        fechaNacimiento: '',
+        codigoPais: '+598',
+        telefono: '',
+        departamentoId: '',
+        localidadId: '',
+      }))
+      setTextFieldsResetKey((k) => k + 1)
+      return
+    }
     setBusquedaResuelta(true)
     if (resultado.source === 'oportunidad') {
       // A pedido: Fecha Nacimiento, Teléfono, Departamento y Localidad también se
@@ -722,6 +806,10 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
         .then(([cliente, count]) => {
           if (cancelled) return
           setDuplicadoCheck({ cliente, count })
+          // El seed del buscador (ver seedTerm/handleCloseDuplicadoModal más abajo) se
+          // dispara recién al CERRAR este modal, no acá — mientras el modal está abierto
+          // atrapa el foco, y el buscador (que nunca llega a tener el foco real) queda
+          // marcado como "perdió el foco" por la librería y se resetea solo.
           if (cliente || count > 0) setShowDuplicadoModal(true)
         })
         .catch(() => {
@@ -733,6 +821,23 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
       clearTimeout(timer)
     }
   }, [form.ci, busquedaResuelta, resultadoSeleccionado])
+
+  // Cierra el popup de Cédula duplicada Y recién ahí siembra el buscador de arriba con
+  // esa misma Cédula (ver seedTerm en ExistingRecordSearch) — con el modal todavía
+  // abierto el buscador no llega a abrirse de verdad (ver el comentario en el useEffect
+  // de arriba). El setTimeout es necesario: Modal usa react-focus-lock con
+  // returnFocus=true, que al cerrarse devuelve el foco al campo de CI (donde estaba
+  // escribiendo el usuario) en un timeout propio de esa librería — si sembramos ANTES
+  // de que eso termine, el buscador alcanza a tener el foco un instante y despues se lo
+  // vuelven a sacar, y downshift (la librería del Dropdown) lo toma como que perdió el
+  // foco y resetea todo solo. 100ms le da tiempo de sobra a que termine primero.
+  const handleCloseDuplicadoModal = () => {
+    setShowDuplicadoModal(false)
+    setTimeout(() => {
+      setDuplicadoSeedCi(form.ci)
+      setDuplicadoSeedNonce((n) => n + 1)
+    }, 100)
+  }
 
   // A pedido: apenas carga el schema, el formulario arranca con Tipo de Riesgo =
   // Automóvil (el único con "Datos del riesgo" definidos hasta ahora), Departamento/
@@ -1177,8 +1282,13 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                 no aparece nada, "Saltear" abre el resto del formulario para cargarlo a
                 mano. */}
             <label className="crear-op__field crear-op__field--full">
-              <span>Buscar cliente u oportunidad existente</span>
-              <ExistingRecordSearch value={resultadoSeleccionado} onChange={handleResultadoSeleccionado} />
+              <span>Buscar Persona</span>
+              <ExistingRecordSearch
+                key={duplicadoSeedNonce}
+                value={resultadoSeleccionado}
+                onChange={handleResultadoSeleccionado}
+                seedTerm={duplicadoSeedCi}
+              />
               {resultadoSeleccionado && (
                 <span className="crear-op__autofill">
                   {resultadoSeleccionado.source === 'cliente' ? 'Cliente' : 'Oportunidad'} seleccionado:{' '}
@@ -1191,7 +1301,7 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
               )}
               {!busquedaResuelta && (
                 <Button kind="tertiary" className="crear-op__skip-btn" onClick={handleSaltearBusqueda}>
-                  No lo encuentro, completar los datos manualmente <MdArrowForward />
+                  Buscar manualmente <MdArrowForward />
                 </Button>
               )}
             </label>
@@ -1201,7 +1311,7 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                 pasa desapercibido. Solo corre si no hay un resultado ya elegido a
                 propósito (ver el useEffect debounced). */}
             {busquedaResuelta && !resultadoSeleccionado && showDuplicadoModal && duplicadoCheck && (
-              <Modal id="duplicado-cedula-modal" show onClose={() => setShowDuplicadoModal(false)} size="medium">
+              <Modal id="duplicado-cedula-modal" show onClose={handleCloseDuplicadoModal} size="medium">
                 <ModalHeader title="Esta cédula ya tiene actividad cargada" className="crear-op__duplicado-modal-header" />
                 <ModalContent className="crear-op__duplicado-modal-content">
                   <AttentionBox type="warning">
@@ -1217,7 +1327,7 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                   </AttentionBox>
                 </ModalContent>
                 <ModalFooter
-                  primaryButton={{ text: 'Entendido', onClick: () => setShowDuplicadoModal(false) }}
+                  primaryButton={{ text: 'Entendido', onClick: handleCloseDuplicadoModal }}
                 />
               </Modal>
             )}
@@ -1226,37 +1336,51 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
               <>
             {/* TextField nativo de @vibe/core en vez de <label> + ClearableInput a mano —
                 ya trae label (title/required), botón de limpiar (icon/onIconClick/
-                clearOnIconClick) y el borde verde/rojo (validation) de fábrica. */}
+                clearOnIconClick) y el borde verde/rojo (validation) de fábrica.
+                `icon` SIEMPRE en MdClear, nunca condicionado a si hay valor (`form.x ?
+                MdClear : undefined`) — internamente el componente ya oculta el ícono
+                solo cuando el campo está vacío, así que ese condicional era redundante
+                Y además el causante de una excepción real: si el valor se limpia desde
+                AFUERA (no tipeando, ver la cruz de "Buscar Persona" más abajo), hay un
+                instante en que su estado interno de debounce todavía no bajó a vacío
+                mientras `icon` ya pasó a `undefined` — esa combinación (valor todavía
+                verdadero + ícono ya indefinido) hace que el componente intente leer
+                `icon.length` y tira "Cannot read properties of undefined" (pantalla en
+                blanco). Pasando siempre un ícono definido, esa combinación imposible de
+                lograr no existe más. */}
             <TextField
+              key={`nombre-${textFieldsResetKey}`}
               wrapperClassName="crear-op__field"
               title="Nombre"
               required
               placeholder="Ingresa el nombre"
               value={form.nombre}
               onChange={(value) => handleChange('nombre', value)}
-              icon={form.nombre ? MdClear : undefined}
+              icon={MdClear}
               onIconClick={() => handleChange('nombre', '')}
               validation={form.nombre ? { status: 'success' } : undefined}
             />
             <TextField
+              key={`apellido-${textFieldsResetKey}`}
               wrapperClassName="crear-op__field"
               title="Apellido"
               required
               placeholder="Ingresa el apellido"
               value={form.apellido}
               onChange={(value) => handleChange('apellido', value)}
-              icon={form.apellido ? MdClear : undefined}
+              icon={MdClear}
               onIconClick={() => handleChange('apellido', '')}
               validation={form.apellido ? { status: 'success' } : undefined}
             />
             <TextField
+              key={`ci-${textFieldsResetKey}`}
               wrapperClassName="crear-op__field"
               title="CI"
               required
               placeholder="Ej: 4.123.456-7"
               value={form.ci}
               onChange={(value) => handleChange('ci', value)}
-              icon={form.ci ? MdClear : undefined}
+              icon={MdClear}
               onIconClick={() => handleChange('ci', '')}
               validation={
                 ciError(form.ci)
@@ -1303,11 +1427,12 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                 {/* Sin title acá — el label de arriba ("Teléfono *") ya cubre a los 2
                     campos (código de país + número) juntos. */}
                 <TextField
+                  key={`telefono-${textFieldsResetKey}`}
                   wrapperClassName="crear-op__phone-number"
                   placeholder="Ej: 099 123 456"
                   value={form.telefono}
                   onChange={(value) => handleChange('telefono', value)}
-                  icon={form.telefono ? MdClear : undefined}
+                  icon={MdClear}
                   onIconClick={() => handleChange('telefono', '')}
                   validation={
                     telefonoError(form.telefono, form.codigoPais)

@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { MdSend, MdCheckCircle, MdWarningAmber } from 'react-icons/md'
+import { MdSend } from 'react-icons/md'
 import { Modal, ModalHeader, ModalContent, ModalFooter, AttentionBox, Loader, TextField } from '@vibe/core'
 import { sendQuotesToWhatsApp, getMakeWebhookUrl } from '../services/makeWebhook'
 import './WhatsAppSendModal.css'
@@ -60,9 +60,7 @@ export default function WhatsAppSendModal({
               </AttentionBox>
             ) : opportunity.estadoEnvio === 'Error' ? (
               <>
-                <AttentionBox type="negative">
-                  <MdWarningAmber /> Hubo un error al enviar por WhatsApp.
-                </AttentionBox>
+                <AttentionBox type="negative">Hubo un error al enviar por WhatsApp.</AttentionBox>
                 {envioErrorDetail && (
                   <div className="wa-modal__error-detail">
                     <strong>Detalle del error (último update en la oportunidad):</strong>
@@ -72,8 +70,7 @@ export default function WhatsAppSendModal({
               </>
             ) : (
               <AttentionBox type="positive">
-                <MdCheckCircle /> Cotización enviada correctamente. En breve le llega por
-                WhatsApp.
+                Cotización enviada correctamente. En breve le llega por WhatsApp.
               </AttentionBox>
             )}
           </div>

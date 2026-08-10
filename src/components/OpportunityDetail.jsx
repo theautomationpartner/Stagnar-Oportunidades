@@ -1,10 +1,5 @@
 import { useEffect, useMemo, useState } from 'react'
-import {
-  MdSend,
-  MdArrowBack,
-  MdAutorenew,
-  MdWarningAmber,
-} from 'react-icons/md'
+import { MdSend, MdArrowBack, MdAutorenew } from 'react-icons/md'
 import { Button, EmptyState, AttentionBox, Loader } from '@vibe/core'
 import TopBar from './TopBar'
 import QuoteCard from './QuoteCard'
@@ -949,9 +944,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
               {opportunity.estadoLectura === 'Error' && (
                 <AttentionBox type="negative">
                   <div className="opp-detail__lectura-gate-row">
-                    <span>
-                      <MdWarningAmber /> No se pudieron leer los documentos automáticamente.
-                    </span>
+                    <span>No se pudieron leer los documentos automáticamente.</span>
                     <Button kind="secondary" onClick={() => setLecturaDismissed(true)}>
                       Continuar de todas formas
                     </Button>
