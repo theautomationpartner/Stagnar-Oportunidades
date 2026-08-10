@@ -427,6 +427,21 @@ const LATEST_UPDATE_QUERY = `
   }
 `
 
+// `value` (a diferencia de `text`) es el único campo que trae el assetId real de una
+// columna "file" — `text` da una URL de "protected_static" que exige sesión de monday
+// logueada (devuelve 302 a /users/sign_in si se pide directo, confirmado a mano), así
+// que no sirve para descargar el archivo del lado del cliente. Con el assetId sí se
+// puede pedir una URL firmada de S3 vía `assets` (ver /api/monday-asset).
+const FILE_COLUMN_VALUE_QUERY = `
+  query GetFileColumnValue($itemId: ID!, $columnId: [String!]) {
+    items(ids: [$itemId]) {
+      column_values(ids: $columnId) {
+        value
+      }
+    }
+  }
+`
+
 async function callMondayApi(query, variables) {
   const response = await fetch('/api/monday', {
     method: 'POST',
@@ -553,6 +568,37 @@ export async function clearFileColumn(itemId, columnId) {
     columnId,
   })
   return data.update_assets_on_item
+}
+
+// A pedido: al elegir en el buscador una Oportunidad que ya tiene Cédula Identidad
+// subida, se reusa ese mismo archivo para el campo de acá en vez de tener que volver a
+// subirlo a mano (ver handleResultadoSeleccionado en CrearOportunidadForm.jsx). Devuelve
+// null si la columna está vacía — no hay nada raro que avisar, simplemente no hay
+// archivo para reusar.
+export async function fetchFileColumnAsset(itemId, columnId) {
+  const data = await callMondayApi(FILE_COLUMN_VALUE_QUERY, { itemId, columnId: [columnId] })
+  const raw = data.items?.[0]?.column_values?.[0]?.value
+  if (!raw) return null
+  const parsed = JSON.parse(raw)
+  const file = parsed.files?.[0]
+  if (!file?.assetId) return null
+  return { assetId: file.assetId, name: file.name }
+}
+
+// Descarga el archivo real y lo devuelve como File (mismo tipo que entrega
+// <input type="file">) — así encaja tal cual en el resto del flujo de FileField/
+// handleCedulaIdentidadChange, sin tocar esa lógica. El assetId se resuelve del lado del
+// servidor (ver /api/monday-asset, vite.config.js y api/monday-asset.js) para conseguir
+// una URL firmada de S3 y bajarla ahí mismo — misma razón que el resto de los proxies de
+// esta app: mantener el API key del lado del servidor, y evitar cualquier sorpresa de
+// CORS pegándole directo a un dominio ajeno desde el navegador.
+export async function fetchFileColumnAsFile(itemId, columnId) {
+  const asset = await fetchFileColumnAsset(itemId, columnId)
+  if (!asset) return null
+  const response = await fetch(`/api/monday-asset?assetId=${asset.assetId}`)
+  if (!response.ok) return null
+  const blob = await response.blob()
+  return new File([blob], asset.name, { type: blob.type })
 }
 
 // `tag` (p. ej. "[COTIZAR]" o "[ENVIO]") filtra a los Updates que arrancan con ese

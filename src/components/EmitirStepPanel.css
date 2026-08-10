@@ -138,9 +138,10 @@
   font-size: 13px;
 }
 
-/* Loader nativo de @vibe/core (ver JSX) — solo el color acá. */
+/* Loader nativo de @vibe/core (ver JSX) — a pedido, todo loading usa el verde de marca
+   (--color-verde, ver index.css). */
 .emitir-step__spinner {
-  color: #a15c00;
+  color: var(--color-verde);
   flex-shrink: 0;
 }
 

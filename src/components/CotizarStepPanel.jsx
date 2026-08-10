@@ -1,9 +1,10 @@
-import { useState, useEffect } from 'react'
-import { MdEdit, MdSave, MdClose, MdAutorenew } from 'react-icons/md'
+import { useState } from 'react'
+import { MdEdit, MdSave, MdClose, MdAutorenew, MdSend } from 'react-icons/md'
 import { Button, Dropdown, AttentionBox, Loader, TextField, NumberField } from '@vibe/core'
 import { COTIZAR_FIELDS, getMissingCotizarFields } from '../services/cotizarFields'
-import { searchAutodataModelos } from '../services/mondayApi'
+import { matchesSearchQuery } from '../services/format'
 import StatusBadge from './StatusBadge'
+import AutodataModeloPorAnioMarca from './AutodataModeloPorAnioMarca'
 import './CotizarStepPanel.css'
 
 function buildInitialForm(opportunity, dropdownOptions) {
@@ -39,62 +40,10 @@ function buildInitialForm(opportunity, dropdownOptions) {
 // Dropdown maneja objetos {value, label} como opción seleccionada, no un
 // string/id suelto como nuestro estado de formulario — la conversión de ida
 // y vuelta pasa toda acá adentro, el resto del componente sigue viendo
-// strings/ids comunes (mismo patrón ya usado en FilterPanel.jsx).
-// Modelo (Autodata): a diferencia de Departamento, el tablero vinculado (AUTODATA V1 +
-// V2) tiene más de 15.000 ítems combinados — no se puede precargar como el resto de
-// los "connected". Se busca en vivo por texto (mínimo 2 caracteres, debounce 300ms)
-// contra la API real (ver mondayApi.js#searchAutodataModelos) y se muestra hasta ~24
-// coincidencias. `value` es la selección NUEVA hecha en esta edición ({id, name} o
-// null si no se tocó) — el texto real actual (`currentLabel`) se muestra como
-// placeholder para que se vea qué modelo tiene cargado hoy la oportunidad.
-function AutodataModeloSelect({ currentLabel, value, onChange }) {
-  const [inputValue, setInputValue] = useState('')
-  const [options, setOptions] = useState([])
-  const [loading, setLoading] = useState(false)
-
-  useEffect(() => {
-    const term = inputValue.trim()
-    if (term.length < 2) {
-      setOptions([])
-      setLoading(false)
-      return undefined
-    }
-    let cancelled = false
-    setLoading(true)
-    const timer = setTimeout(() => {
-      searchAutodataModelos(term)
-        .then((results) => {
-          if (!cancelled) setOptions(results.map((r) => ({ value: r.id, label: r.name })))
-        })
-        .finally(() => {
-          if (!cancelled) setLoading(false)
-        })
-    }, 300)
-    return () => {
-      cancelled = true
-      clearTimeout(timer)
-    }
-  }, [inputValue])
-
-  const selected = value ? { value: value.id, label: value.name } : null
-
-  return (
-    <Dropdown
-      searchable
-      options={options}
-      value={selected}
-      loading={loading}
-      onInputChange={(input) => setInputValue(input ?? '')}
-      placeholder={currentLabel ? `Actual: ${currentLabel}` : 'Buscar modelo...'}
-      noOptionsMessage={inputValue.trim().length < 2 ? 'Escribí para buscar' : 'Sin resultados'}
-      clearable
-      onClear={() => onChange(null)}
-      onChange={(option) => onChange(option ? { id: option.value, name: option.label } : null)}
-    />
-  )
-}
-
-function FieldControl({ field, value, onChange, options, currentModelo }) {
+// strings/ids comunes (mismo patrón ya usado en FilterPanel.jsx). `searchable` +
+// filterOption (matchesSearchQuery, ver services/format.js) en los 3 primeros — a
+// pedido, antes no se podía filtrar tipeando en ninguno de estos.
+function FieldControl({ field, value, onChange, options, anio, marca, tipo, combustible }) {
   if (field.kind === 'text') {
     return <TextField size="small" value={value} onChange={(newValue) => onChange(newValue)} />
   }
@@ -120,6 +69,8 @@ function FieldControl({ field, value, onChange, options, currentModelo }) {
         options={dropdownOptions}
         value={selected}
         placeholder="Sin definir"
+        searchable
+        filterOption={(option, inputValue) => matchesSearchQuery(option.label, inputValue)}
         clearable
         onClear={() => onChange('')}
         onChange={(option) => onChange(option?.value ?? '')}
@@ -137,6 +88,8 @@ function FieldControl({ field, value, onChange, options, currentModelo }) {
         options={connectedOptions}
         value={selected}
         placeholder="Sin definir"
+        searchable
+        filterOption={(option, inputValue) => matchesSearchQuery(option.label, inputValue)}
         clearable
         onClear={() => onChange('')}
         onChange={(option) => onChange(option?.value ?? '')}
@@ -144,7 +97,12 @@ function FieldControl({ field, value, onChange, options, currentModelo }) {
     )
   }
   if (field.kind === 'autodata') {
-    return <AutodataModeloSelect currentLabel={currentModelo} value={value} onChange={onChange} />
+    // A pedido: filtrado por Año + Marca ya elegidos en esta misma edición (antes era
+    // una búsqueda libre por texto sin acotar, mismo componente que ya usa
+    // CrearOportunidadForm.jsx para lo mismo).
+    return (
+      <AutodataModeloPorAnioMarca anio={anio} marca={marca} tipo={tipo} combustible={combustible} value={value} onChange={onChange} />
+    )
   }
   return null
 }
@@ -161,6 +119,7 @@ export default function CotizarStepPanel({
   estadoCotizacionColor,
   polling,
   errorDetail,
+  onBack,
 }) {
   const [editing, setEditing] = useState(false)
   const [form, setForm] = useState(() => buildInitialForm(opportunity, dropdownOptions))
@@ -206,15 +165,27 @@ export default function CotizarStepPanel({
     }
   }
 
+  // A pedido, estética tipo mockup: la grilla de solo lectura se muestra agrupada en 3
+  // columnas (Cédula/Fecha Nacimiento/Ubicación, Marca/Modelo/Año, Combustible/Tipo/
+  // Uso) en vez de la lista plana de COTIZAR_FIELDS — Ubicación combina Departamento +
+  // Localidad en una sola celda (son 2 campos reales, ver cotizarFields.js). El modo
+  // "Editar información" no cambia: sigue en una grilla plana con un control por campo
+  // (COTIZAR_FIELDS ya en el orden real de columnas de monday, no hace falta agruparlo
+  // igual que la vista).
+  const ubicacion = [opportunity.departamento, opportunity.zonaCirculacion].filter(Boolean).join(' — ')
+
+  // A pedido: Localidad filtrada por el Departamento elegido EN ESTA EDICIÓN (form,
+  // no opportunity) — se busca el nombre real por id contra la lista completa, ya que
+  // dropdownOptions.localidades filtra por nombre de texto, no por id.
+  const selectedDepartamentoName = (dropdownOptions.departamentos ?? []).find(
+    (d) => d.id === form.departamentoId
+  )?.name
+
   return (
     <div className="cotizar-step">
       <div className="cotizar-step__head">
         <div>
-          <h2 className="cotizar-step__title">Datos con los que se generó la cotización</h2>
-          <p className="cotizar-step__subtitle">
-            Esta es la información de la oportunidad que se usa como base para cotizar en las
-            compañías.
-          </p>
+          <h2 className="cotizar-step__title">Datos base de la oportunidad</h2>
           {estadoCotizacion && (
             <div className="cotizar-step__estado">
               <span>Estado de cotización:</span>
@@ -223,20 +194,50 @@ export default function CotizarStepPanel({
           )}
         </div>
         {!editing && (
-          <Button kind="secondary" onClick={startEditing}>
-            <MdEdit /> Editar
+          <Button kind="tertiary" className="cotizar-step__edit-link" onClick={startEditing}>
+            <MdEdit /> Editar información
           </Button>
         )}
       </div>
 
       {!editing && (
         <div className="cotizar-step__grid">
-          {COTIZAR_FIELDS.map((f) => (
-            <div className="cotizar-step__field" key={f.key}>
-              <span className="cotizar-step__field-label">{f.label}</span>
-              <span className="cotizar-step__field-value">{opportunity[f.key] || '—'}</span>
-            </div>
-          ))}
+          <div className="cotizar-step__field">
+            <span className="cotizar-step__field-label">Cédula de identidad</span>
+            <span className="cotizar-step__field-value">{opportunity.ci || '—'}</span>
+          </div>
+          <div className="cotizar-step__field">
+            <span className="cotizar-step__field-label">Fecha de nacimiento</span>
+            <span className="cotizar-step__field-value">{opportunity.fechaNacimiento || '—'}</span>
+          </div>
+          <div className="cotizar-step__field">
+            <span className="cotizar-step__field-label">Ubicación</span>
+            <span className="cotizar-step__field-value">{ubicacion || '—'}</span>
+          </div>
+          <div className="cotizar-step__field">
+            <span className="cotizar-step__field-label">Marca</span>
+            <span className="cotizar-step__field-value">{opportunity.marca || '—'}</span>
+          </div>
+          <div className="cotizar-step__field">
+            <span className="cotizar-step__field-label">Modelo</span>
+            <span className="cotizar-step__field-value">{opportunity.modelo || '—'}</span>
+          </div>
+          <div className="cotizar-step__field">
+            <span className="cotizar-step__field-label">Año</span>
+            <span className="cotizar-step__field-value">{opportunity.anio || '—'}</span>
+          </div>
+          <div className="cotizar-step__field">
+            <span className="cotizar-step__field-label">Combustible</span>
+            <span className="cotizar-step__field-value">{opportunity.combustible || '—'}</span>
+          </div>
+          <div className="cotizar-step__field">
+            <span className="cotizar-step__field-label">Tipo</span>
+            <span className="cotizar-step__field-value">{opportunity.tipo || '—'}</span>
+          </div>
+          <div className="cotizar-step__field">
+            <span className="cotizar-step__field-label">Uso</span>
+            <span className="cotizar-step__field-value">{opportunity.uso || '—'}</span>
+          </div>
         </div>
       )}
 
@@ -255,12 +256,29 @@ export default function CotizarStepPanel({
                       : form[f.key]
                 }
                 onChange={(v) => {
+                  // A pedido: al cambiar el Departamento se limpia la Localidad elegida —
+                  // puede ya no pertenecer al departamento nuevo (ver el filtro de
+                  // "options" más abajo, mismo criterio que CrearOportunidadForm.jsx).
+                  if (f.key === 'departamento') {
+                    setForm((prev) => ({ ...prev, departamentoId: v, localidadId: '' }))
+                    return
+                  }
                   if (f.kind === 'connected') return handleFieldChange(f.idKey, v)
                   if (f.key === 'modelo') return handleFieldChange('modeloSeleccion', v)
                   return handleFieldChange(f.key, v)
                 }}
-                options={dropdownOptions[f.optionsKey] ?? []}
-                currentModelo={opportunity.modelo}
+                options={
+                  // A pedido: sin Departamento elegido se ven todas las Localidades; una
+                  // vez elegido, solo las de ese departamento (texto plano de la propia
+                  // Localidad, igual que CrearOportunidadForm.jsx).
+                  f.key === 'zonaCirculacion' && selectedDepartamentoName
+                    ? (dropdownOptions.localidades ?? []).filter((l) => l.departamento === selectedDepartamentoName)
+                    : dropdownOptions[f.optionsKey] ?? []
+                }
+                anio={form.anio}
+                marca={form.marca}
+                tipo={form.tipo}
+                combustible={form.combustible}
               />
             </label>
           ))}
@@ -285,6 +303,17 @@ export default function CotizarStepPanel({
         <AttentionBox type="negative">
           Completá estos campos antes de {hasQuotes ? 'recotizar' : 'cotizar'}:{' '}
           <strong>{missingFields.map((f) => f.label).join(', ')}</strong>.
+        </AttentionBox>
+      )}
+
+      {/* A pedido, estética tipo mockup: banner celeste avisando que ya se puede
+          cotizar, en vez de dejar la ausencia de cotizaciones sin ningún mensaje
+          positivo — reemplaza la aclaración que antes vivía al lado de los datos del
+          cliente (ver OpportunityDetail.jsx). */}
+      {!editing && !polling && canCotizar && !hasQuotes && (
+        <AttentionBox type="primary">
+          Todos los datos necesarios están completos. Al hacer clic en{' '}
+          <strong>Cotizar en aseguradoras</strong> se consultarán las primas en tiempo real.
         </AttentionBox>
       )}
 
@@ -334,13 +363,32 @@ export default function CotizarStepPanel({
         </AttentionBox>
       )}
 
-      {/* A pedido: el botón "Cotizar" (caso sin cotizaciones todavía) se sacó de acá —
-          ahora vive al lado de los datos del cliente, ver OpportunityDetail.jsx. */}
-
       {!editing && !polling && errorDetail && (
         <div className="cotizar-step__error-detail">
           <strong>Detalle del error (último update en la oportunidad):</strong>
           <pre>{errorDetail}</pre>
+        </div>
+      )}
+
+      {/* A pedido, estética tipo mockup: el botón "Cotizar en aseguradoras" (caso sin
+          cotizaciones todavía) vuelve a vivir acá, junto a "Volver a detalles" — antes
+          vivía al lado de los datos del cliente (ver OpportunityDetail.jsx). Con
+          cotizaciones ya cargadas, "Recotizar" sigue en el banner de arriba — acá solo
+          queda "Volver". */}
+      {!editing && !polling && !hasQuotes && markError && (
+        <p className="cotizar-step__error">Error: {markError}</p>
+      )}
+
+      {!editing && (
+        <div className="cotizar-step__footer">
+          <Button kind="secondary" onClick={onBack}>
+            Volver a detalles
+          </Button>
+          {!hasQuotes && (
+            <Button kind="primary" onClick={onMarcarParaCotizar} disabled={marking || !canCotizar || polling}>
+              <MdSend /> {marking ? 'Marcando...' : 'Cotizar en aseguradoras'}
+            </Button>
+          )}
         </div>
       )}
     </div>

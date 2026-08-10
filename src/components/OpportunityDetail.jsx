@@ -1,11 +1,11 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { MdSend, MdArrowBack, MdAutorenew } from 'react-icons/md'
 import { Button, EmptyState, AttentionBox, Loader } from '@vibe/core'
-import TopBar from './TopBar'
 import QuoteCard from './QuoteCard'
 import StatusBadge from './StatusBadge'
 import Stepper from './Stepper'
 import CotizarStepPanel from './CotizarStepPanel'
+import CotizandoModal from './CotizandoModal'
 import ConfirmarStepPanel from './ConfirmarStepPanel'
 import EmitirStepPanel from './EmitirStepPanel'
 import WhatsAppSendModal from './WhatsAppSendModal'
@@ -86,6 +86,25 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   const [lecturaPolling, setLecturaPolling] = useState(false)
   const [lecturaDismissed, setLecturaDismissed] = useState(false)
   const [cotizarErrorDetail, setCotizarErrorDetail] = useState(null)
+  // A pedido: progreso en vivo por compañía mientras se cotiza/recotiza (ver
+  // CotizandoModal) — {compania: cantidad de subitems ya creados}, se actualiza en cada
+  // tick del polling de abajo (antes se calculaba mid-poll y se descartaba, solo se
+  // usaba una vez llegado al estado terminal).
+  const [cotizarProgress, setCotizarProgress] = useState({})
+  // A pedido: en un RECOTIZAR, el primer paso de la automatización es BORRAR todas las
+  // cotizaciones anteriores y recién después crear las nuevas desde cero — sin esto, los
+  // subitems viejos (todavía sin borrar en el momento de un tick) se contarían como si
+  // ya fueran progreso de la tanda nueva, mostrando compañías "completas" un instante
+  // antes de que esos mismos subitems desaparezcan. Se guarda el set de ids YA
+  // existentes justo antes de arrancar (ver handleMarcarParaCotizar) — useRef porque
+  // el tick del polling (más abajo) lo necesita estable entre renders, no como estado
+  // que dispare un re-render propio.
+  const oldSubitemIdsRef = useRef(new Set())
+  // Cerrar CotizandoModal es solo visual (mismo criterio que WhatsAppSendModal) — no
+  // corta el polling de fondo. Se reinicia a false cada vez que arranca una cotización
+  // nueva (ver handleMarcarParaCotizar), así vuelve a aparecer aunque se haya cerrado
+  // en un intento anterior.
+  const [cotizandoModalDismissed, setCotizandoModalDismissed] = useState(false)
   const [envioErrorDetail, setEnvioErrorDetail] = useState(null)
   const [polizaErrorDetail, setPolizaErrorDetail] = useState(null)
   const [lecturaErrorDetail, setLecturaErrorDetail] = useState(null)
@@ -233,6 +252,21 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
         )?.text?.trim()
         const mapped = (data.subitems ?? []).map(mapSubitemToRawQuote)
         const raws = applyRecargoLookup(mapped, schema?.recargoLookup ?? {})
+
+        // A pedido: progreso en vivo por compañía (ver CotizandoModal) — a diferencia
+        // de raws/estadoCotizacion (que solo se usan una vez llegado al estado
+        // terminal), esto se actualiza en CADA tick para reflejar los subitems que ya
+        // se fueron creando mientras la automatización sigue corriendo. Se excluyen los
+        // subitems que YA existían antes de arrancar (oldSubitemIdsRef) — en un
+        // recotizar la automatización primero borra todo lo viejo y recién después crea
+        // lo nuevo; sin este filtro, mientras lo viejo todavía no se borró se contaría
+        // como si ya fuera progreso de la tanda nueva.
+        const newRaws = raws.filter((r) => !oldSubitemIdsRef.current.has(r.id))
+        const progressByCompania = {}
+        for (const { compania, quotes } of groupQuotesByCompania(newRaws)) {
+          progressByCompania[compania] = quotes.length
+        }
+        setCotizarProgress(progressByCompania)
 
         if (estadoCotizacion === 'Cotizado (Subitems)' && estadoOportunidad === 'Cotizacion Emitida') {
           setRawQuotes(raws)
@@ -525,6 +559,9 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
           cv.id === ESTADO_COTIZACION_COLUMN_ID ? { ...cv, text: 'Cotizar' } : cv
         ),
       }))
+      oldSubitemIdsRef.current = new Set(rawQuotes.map((r) => r.id))
+      setCotizarProgress({})
+      setCotizandoModalDismissed(false)
       setPolling(true)
     } catch (err) {
       setMarkError(err.message)
@@ -744,14 +781,19 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
     }
 
     // Modelo (Autodata): solo se escribe si en esta edición se eligió uno nuevo del
-    // buscador — se guarda como conexión (igual que Departamento), no como texto. El
-    // texto real de `text_mm54fb7m` lo termina asentando la automatización de
-    // "Cotizar" (que además vacía esta conexión) — acá solo dejamos la elección hecha.
+    // buscador — se guarda como conexión (igual que Departamento) Y como texto, los dos
+    // juntos acá mismo. Antes solo se dejaba armada la conexión, a la espera de que la
+    // automatización de "Cotizar" terminara de asentar el texto real de
+    // `text_mm54fb7m` (y vaciar la conexión) — pero si se edita el Modelo sin volver a
+    // cotizar/recotizar enseguida, ese texto quedaba desactualizado en monday
+    // indefinidamente (bug reportado). Como acá ya se sabe el nombre elegido, no hace
+    // falta esperar a ninguna automatización para escribirlo.
     if (formValues.modeloSeleccion) {
       const modeloField = COTIZAR_FIELDS.find((f) => f.key === 'modelo')
       await setConnectedColumnValue(opportunityId, modeloField.connectedColumnId, [
         Number(formValues.modeloSeleccion.id),
       ])
+      await setSimpleColumnValue(opportunityId, modeloField.columnId, formValues.modeloSeleccion.name)
     }
 
     const textByColumnId = {
@@ -843,8 +885,6 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
 
   return (
     <div className="app">
-      <TopBar />
-
       <div className="opp-detail__breadcrumb">
         <Button kind="tertiary" className="opp-detail__back-btn" onClick={onBack}>
           <MdArrowBack /> Volver
@@ -856,7 +896,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
 
       {loading && (
         <div className="opp-detail__status">
-          <Loader size={36} className="opp-detail__loading-spinner" />
+          <Loader size={64} className="opp-detail__loading-spinner" />
           Cargando cotizaciones...
         </div>
       )}
@@ -867,7 +907,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
           <div className="opp-detail__header">
             <h1 className="opp-detail__title">Cotizaciones</h1>
             <p className="opp-detail__subtitle">
-              Cotizá, comparalá y enviá las mejores opciones a tu cliente.
+              Cotizá, compará y enviá las mejores opciones a tu cliente.
             </p>
           </div>
 
@@ -876,11 +916,29 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
               <div className="opp-detail__client-avatar">{opportunity.clienteNombre.slice(0, 2).toUpperCase()}</div>
               <div className="opp-detail__client-info">
                 <span className="opp-detail__client-name">{opportunity.clienteNombre}</span>
-                <span className="opp-detail__client-meta">
-                  {opportunity.bienLinea1} {opportunity.bienLinea2 && `· ${opportunity.bienLinea2}`}
-                </span>
-                {opportunity.ci && <span className="opp-detail__client-meta">CI {opportunity.ci}</span>}
+                {/* A pedido, estética tipo mockup: en el paso "Cotizar" el renglón de
+                    abajo es CI/Teléfono (para tener a mano cómo contactar al cliente) en
+                    vez del bien asegurado — en el resto de los pasos se deja el bien
+                    asegurado tal cual estaba, más relevante ahí que el teléfono. */}
+                {activeStep === 'cotizar' ? (
+                  <span className="opp-detail__client-meta">
+                    {[opportunity.ci && `CI: ${opportunity.ci}`, opportunity.telefono && `Tel: ${opportunity.telefono}`]
+                      .filter(Boolean)
+                      .join(' · ')}
+                  </span>
+                ) : (
+                  <>
+                    <span className="opp-detail__client-meta">
+                      {opportunity.bienLinea1} {opportunity.bienLinea2 && `· ${opportunity.bienLinea2}`}
+                    </span>
+                    {opportunity.ci && <span className="opp-detail__client-meta">CI {opportunity.ci}</span>}
+                  </>
+                )}
               </div>
+
+              {/* A pedido, estética tipo mockup: número corto de la oportunidad como tag,
+                  visible en cualquier paso. */}
+              <span className="opp-detail__client-opp-badge">{opportunity.oppNumber}</span>
 
               {/* A pedido: en vez de la aclaración de "Parámetros", acá va la lista de
                   datos de la oportunidad (Edad, Combustible, Teléfono — antes en el
@@ -907,19 +965,6 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
                   <Button kind="secondary" className="opp-detail__recotizar-btn" onClick={() => setActiveStep('cotizar')}>
                     <MdAutorenew /> Recotizar
                   </Button>
-                </div>
-              )}
-
-              {/* A pedido: el botón "Cotizar" (y su aclaración) vive acá, al lado de los
-                  datos del cliente, en vez de en un banner aparte más abajo (ver
-                  CotizarStepPanel — ese banner se sacó de ahí). */}
-              {activeStep === 'cotizar' && !hasQuotes && !polling && (
-                <div className="opp-detail__client-card-note opp-detail__client-card-note--tight">
-                  <span>Todavía no se generó ninguna cotización para esta oportunidad.</span>
-                  <Button kind="primary" onClick={handleMarcarParaCotizar} disabled={marking || !canCotizar}>
-                    <MdSend /> {marking ? 'Marcando...' : 'Cotizar'}
-                  </Button>
-                  {markError && <span className="opp-detail__client-card-note-error">Error: {markError}</span>}
                 </div>
               )}
             </div>
@@ -973,6 +1018,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
               estadoCotizacionColor={opportunity.estadoCotizacionColor}
               polling={polling}
               errorDetail={cotizarErrorDetail}
+              onBack={onBack}
             />
           )}
 
@@ -1162,6 +1208,13 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
           envioErrorDetail={envioErrorDetail}
         />
       )}
+
+      <CotizandoModal
+        show={polling && !cotizandoModalDismissed}
+        recotizando={hasQuotes}
+        progress={cotizarProgress}
+        onClose={() => setCotizandoModalDismissed(true)}
+      />
     </div>
   )
 }

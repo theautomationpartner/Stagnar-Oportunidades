@@ -26,12 +26,6 @@
   margin: 0 0 4px;
 }
 
-.cotizar-step__subtitle {
-  font-size: 13px;
-  color: #676879;
-  margin: 0 0 12px;
-}
-
 .cotizar-step__estado {
   display: flex;
   align-items: center;
@@ -149,9 +143,10 @@
   margin-top: 10px;
 }
 
-/* Loader nativo de @vibe/core (ver JSX) — solo el color acá. */
+/* Loader nativo de @vibe/core (ver JSX) — a pedido, todo loading usa el verde de marca
+   (--color-verde, ver index.css). */
 .cotizar-step__spinner {
-  color: #a15c00;
+  color: var(--color-verde);
   flex-shrink: 0;
 }
 
@@ -183,4 +178,27 @@
   font-family: inherit;
   font-size: 13px;
   line-height: 2;
+}
+
+/* A pedido, estética tipo mockup: link celeste chico en vez del Button "Editar" de
+   siempre — pega mejor al lado del título de sección en vez de competir en peso visual
+   con él. */
+.cotizar-step__edit-link {
+  color: #0073ea !important;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 !important;
+}
+
+/* A pedido, estética tipo mockup: "Volver a detalles" / "Cotizar en aseguradoras" al
+   pie de la tarjeta, separados del resto por una línea — mismo criterio que el footer
+   de CrearOportunidadForm.css. */
+.cotizar-step__footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e6e9ef;
 }

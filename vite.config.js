@@ -131,13 +131,77 @@ function makeWebhookProxy(env) {
   }
 }
 
+// Descarga el archivo real de una columna "file" ya subida (a pedido: reusar la Cédula
+// Identidad de una Oportunidad anterior al elegirla en el buscador, ver
+// mondayApi.js#fetchFileColumnAsFile). El asset guarda el binario en S3, no en
+// monday.com — la URL "protected_static" que trae `text` exige sesión de monday
+// logueada (confirmado a mano, redirige a /users/sign_in), así que hace falta pedir una
+// URL firmada vía `assets{public_url}` primero. Todo del lado del servidor: el API key
+// nunca llega al navegador, y el navegador nunca le pega directo a un bucket S3 ajeno
+// (mismo criterio que mondayFileProxy/makeWebhookProxy). assetId se valida numérico
+// antes de interpolarlo en la query — llega como query param, no como variable GraphQL.
+function mondayAssetProxy(env) {
+  return {
+    name: 'monday-asset-proxy',
+    configureServer(server) {
+      server.middlewares.use('/api/monday-asset', async (req, res) => {
+        if (req.method !== 'GET') {
+          res.statusCode = 405
+          res.end('Method not allowed')
+          return
+        }
+
+        const assetId = new URL(req.url, 'http://localhost').searchParams.get('assetId')
+        if (!assetId || !/^\d+$/.test(assetId)) {
+          res.statusCode = 400
+          res.end(JSON.stringify({ error: 'assetId inválido' }))
+          return
+        }
+
+        try {
+          const gqlRes = await fetch('https://api.monday.com/v2', {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              Authorization: env.MONDAY_API_KEY,
+            },
+            body: JSON.stringify({ query: `query { assets(ids: [${assetId}]) { public_url name } }` }),
+          })
+          const gqlData = await gqlRes.json()
+          const asset = gqlData.data?.assets?.[0]
+          if (!asset?.public_url) {
+            res.statusCode = 404
+            res.end(JSON.stringify({ error: 'Asset no encontrado' }))
+            return
+          }
+
+          const fileRes = await fetch(asset.public_url)
+          const buffer = Buffer.from(await fileRes.arrayBuffer())
+          res.statusCode = fileRes.status
+          res.setHeader('Content-Type', fileRes.headers.get('content-type') || 'application/octet-stream')
+          res.end(buffer)
+        } catch (err) {
+          res.statusCode = 502
+          res.end(JSON.stringify({ error: String(err) }))
+        }
+      })
+    },
+  }
+}
+
 // Puerto fijo (5173) para que el localhost del proyecto sea siempre el mismo
 // entre sesiones — ver /app/README.md. strictPort corta en vez de saltar de puerto
 // si 5173 ya está ocupado, así nunca queda una URL distinta "por las dudas".
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), '')
   return {
-    plugins: [react(), mondayApiProxy(env), mondayFileProxy(env), makeWebhookProxy(env)],
+    plugins: [
+      react(),
+      mondayApiProxy(env),
+      mondayFileProxy(env),
+      makeWebhookProxy(env),
+      mondayAssetProxy(env),
+    ],
     server: {
       port: 5173,
       strictPort: true,

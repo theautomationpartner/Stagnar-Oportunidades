@@ -81,10 +81,96 @@
   gap: 12px;
 }
 
-/* Loader nativo de @vibe/core (ver JSX) — solo el color acá. */
-.wa-modal__status-spinner {
-  color: #a15c00;
-  flex-shrink: 0;
+/* A pedido, estética tipo mockup: tarjeta con GradientSpinner + barra de progreso
+   mientras Make procesa el envío — mismo lenguaje visual que CotizandoModal.css. */
+.wa-modal__sending {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 20px 8px;
+}
+
+.wa-modal__sending-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #323338;
+  margin: 0;
+}
+
+.wa-modal__sending-subtitle {
+  font-size: 13px;
+  color: #676879;
+  margin: 4px 0 20px;
+}
+
+.wa-modal__sending-progress-track {
+  width: 100%;
+  height: 6px;
+  background: #e6e9ef;
+  border-radius: 4px;
+  overflow: hidden;
+}
+
+/* Ancho fijo (no hay forma de medir el progreso real del lado de Make) — transmite "ya
+   casi" sin inventar una precisión que no existe. */
+.wa-modal__sending-progress-fill {
+  width: 90%;
+  height: 100%;
+  background: linear-gradient(90deg, #0073ea, var(--color-verde));
+  border-radius: 4px;
+}
+
+/* A pedido, estética tipo mockup: check verde + "Redirigiendo a Confirmación..." tras
+   un envío exitoso — el modal se cierra solo (ver AUTO_CLOSE_DELAY_MS en el JSX). */
+.wa-modal__success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 20px 8px;
+}
+
+.wa-modal__success-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #e9f9f3;
+  color: var(--color-verde);
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.wa-modal__success-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #323338;
+  margin: 0;
+}
+
+.wa-modal__success-subtitle {
+  font-size: 13px;
+  color: #676879;
+  margin: 4px 0 16px;
+}
+
+.wa-modal__success-redirect {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0073ea;
+  background: #eef6ff;
+  border-radius: 14px;
+  padding: 6px 14px;
+}
+
+.wa-modal__success-redirect svg {
+  font-size: 14px;
 }
 
 .wa-modal__error-detail {

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import TopBar from './components/TopBar'
+import Sidebar from './components/Sidebar'
 import PageHeader from './components/PageHeader'
 import FilterPanel from './components/FilterPanel'
 import OpportunitiesTable from './components/OpportunitiesTable'
@@ -123,37 +124,48 @@ export default function App() {
 
   if (openOpportunityId) {
     return (
-      <OpportunityDetail
-        opportunityId={openOpportunityId}
-        onBack={() => setOpenOpportunityId(null)}
-        schema={schema}
-      />
+      <div className="app-shell">
+        <Sidebar />
+        <div className="app-shell__main">
+          <OpportunityDetail
+            opportunityId={openOpportunityId}
+            onBack={() => setOpenOpportunityId(null)}
+            schema={schema}
+          />
+        </div>
+      </div>
     )
   }
 
   if (view === 'landing') {
     return (
-      <div className="app">
-        <TopBar />
-        <LandingScreen onCreateNew={() => setView('create')} onSearchExisting={() => setView('table')} />
+      <div className="app-shell">
+        <Sidebar />
+        <div className="app-shell__main">
+          <LandingScreen onCreateNew={() => setView('create')} onSearchExisting={() => setView('table')} />
+        </div>
       </div>
     )
   }
 
   if (view === 'create') {
     return (
-      <div className="app">
-        <TopBar />
-        <CrearOportunidadForm
-          schema={schema}
-          onCancel={() => setView('landing')}
-          onVerOportunidades={() => setView('table')}
-          onHome={() => setView('landing')}
-          onCreated={(newItemId) => {
-            setView('table')
-            setOpenOpportunityId(newItemId)
-          }}
-        />
+      <div className="app-shell">
+        <Sidebar />
+        <div className="app-shell__main">
+          <CrearOportunidadForm
+            schema={schema}
+            opportunities={opportunities}
+            onCancel={() => setView('landing')}
+            onVerOportunidades={() => setView('table')}
+            onHome={() => setView('landing')}
+            onOpenOportunidad={setOpenOpportunityId}
+            onCreated={(newItemId) => {
+              setView('table')
+              setOpenOpportunityId(newItemId)
+            }}
+          />
+        </div>
       </div>
     )
   }

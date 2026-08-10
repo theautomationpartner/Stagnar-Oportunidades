@@ -11,12 +11,43 @@
 
 /* ModalHeader/ModalContent (@vibe/core) son <div> sin padding propio — sin esto el
    título y el texto quedan pegados contra el borde redondeado del Modal. */
-.crear-op__duplicado-modal-header {
-  padding: 24px 32px 12px;
+/* A pedido: estética tipo mockup para popups de confirmación simples — ícono en
+   círculo celeste centrado, título y descripción abajo, todo dentro de ModalContent
+   (sin ModalHeader propio, que traía su propia línea divisoria). Reusable tal cual si
+   aparece otro popup con esta misma forma más adelante. */
+.confirm-modal__content {
+  padding: 32px 32px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
 }
 
-.crear-op__duplicado-modal-content {
-  padding: 0 32px 28px;
+.confirm-modal__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #eef6ff;
+  color: #0073ea;
+  font-size: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 8px;
+}
+
+.confirm-modal__title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #323338;
+  margin: 0;
+}
+
+.confirm-modal__desc {
+  font-size: 13px;
+  color: #676879;
+  margin: 0;
 }
 
 .crear-op__card {
@@ -47,64 +78,52 @@
   }
 }
 
+/* A pedido: estética tipo mockup — Stepper.jsx (mismos círculos numerados + línea que
+   usa OpportunityDetail) centrado de verdad (grid de 3 columnas, la de la izquierda
+   vacía solo para balancear el ancho de los botones de la derecha — mismo criterio que
+   .opp-detail__breadcrumb), al lado de un par de botones solo-ícono (Buscar
+   Oportunidad/Inicio), sin título de página propio. */
 .crear-op__header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
+  align-items: center;
   gap: 16px;
-}
-
-.crear-op__title {
-  font-size: 22px;
-  font-weight: 700;
-  color: #323338;
-  margin: 0;
+  margin-bottom: 24px;
 }
 
 .crear-op__header-actions {
   display: flex;
   align-items: center;
+  justify-self: end;
   gap: 8px;
   flex-shrink: 0;
 }
-
-.crear-op__progress {
-  margin: 16px 0 24px;
-}
-
-.crear-op__steps {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-  margin-bottom: 8px;
-  justify-content: space-between;
-}
-
-.crear-op__step {
-  border: none;
-  background: none;
-  padding: 0;
-  font-size: 13px;
-  font-weight: 600;
-  color: #676879;
-  cursor: pointer;
-}
-
-.crear-op__step:hover {
-  color: #323338;
-}
-
-.crear-op__step--active {
-  color: #0073ea;
-}
-
-/* ProgressBar nativo de @vibe/core (ver JSX) — ya trae su propio alto/color/transición,
-   no queda nada que pisar acá. */
 
 .crear-op__fields {
   display: flex;
   flex-direction: column;
   gap: 16px;
+}
+
+/* A pedido: estética tipo mockup — campos agrupados en secciones con encabezado propio
+   (Datos personales/Contacto/Ubicación/Documentación/Datos de la oportunidad), separadas
+   por una línea fina arriba de cada una (menos la primera, que ya viene después del
+   buscador de arriba). */
+.crear-op__section {
+  padding-top: 20px;
+  border-top: 1px solid #e6e9ef;
+}
+
+.crear-op__section:first-of-type {
+  padding-top: 0;
+  border-top: none;
+}
+
+.crear-op__section-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #323338;
+  margin: 0 0 14px;
 }
 
 /* A pedido, solo en el paso 1: Nombre/Apellido, CI/Fecha Nacimiento y Departamento/
@@ -143,6 +162,212 @@
   color: #a15c00;
   font-size: 12px;
   font-weight: 400;
+}
+
+/* Tarjeta de confirmación tras elegir un resultado en ExistingRecordSearch (a pedido,
+   estética tipo mockup) — avatar con iniciales + nombre/CI/Tel/Departamento + botón para
+   recién ahí aplicar el autocompletado (ver handleConfirmPreview). */
+.crear-op__preview-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #f5f8ff;
+  border: 1px solid #c2d9fb;
+  border-radius: 8px;
+}
+
+.crear-op__preview-avatar {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--color-verde);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.crear-op__preview-info {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.crear-op__preview-name {
+  font-size: 14px;
+  font-weight: 700;
+  color: #323338;
+}
+
+.crear-op__preview-meta {
+  font-size: 12px;
+  color: #676879;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crear-op__preview-btn {
+  flex-shrink: 0;
+  background: #eef6ff !important;
+  color: #0073ea !important;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.crear-op__preview-btn:hover {
+  background: #dcedfd !important;
+}
+
+/* A pedido: oportunidades anteriores de la persona elegida (debajo de la tarjeta de
+   confirmación) — lista compacta, una fila por oportunidad, expandible a un detalle
+   con el bien asegurado y las compañías cotizadas. */
+.crear-op__historial {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  border: 1px solid #e6e9ef;
+  border-radius: 8px;
+  overflow: hidden;
+}
+
+.crear-op__historial-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 10px 12px;
+  font-size: 12px;
+  font-weight: 700;
+  color: #676879;
+  background: #f6f7fb;
+}
+
+.crear-op__historial-title svg {
+  font-size: 14px;
+}
+
+.crear-op__historial-item {
+  border-top: 1px solid #e6e9ef;
+}
+
+.crear-op__historial-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  font-size: 12px;
+}
+
+.crear-op__historial-date {
+  color: #676879;
+  flex-shrink: 0;
+}
+
+.crear-op__historial-desc {
+  flex: 1;
+  min-width: 0;
+  color: #323338;
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.crear-op__historial-toggle {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  color: #0073ea;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.crear-op__historial-toggle svg {
+  font-size: 16px;
+}
+
+.crear-op__historial-detail {
+  padding: 4px 12px 14px;
+  background: #fafbfd;
+}
+
+.crear-op__historial-detail-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.crear-op__historial-detail-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #0073ea;
+}
+
+.crear-op__historial-detail-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+@media (max-width: 640px) {
+  .crear-op__historial-detail-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.crear-op__historial-detail-box {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid #e6e9ef;
+  border-radius: 6px;
+  font-size: 12px;
+  color: #676879;
+}
+
+.crear-op__historial-detail-label {
+  font-size: 10px;
+  font-weight: 700;
+  color: #9699a6;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.crear-op__historial-detail-box strong {
+  font-size: 13px;
+  color: #323338;
+}
+
+.crear-op__historial-companias {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin: 2px 0;
+}
+
+.crear-op__historial-compania-tag {
+  font-size: 10px;
+  font-weight: 700;
+  color: #676879;
+  background: #f0f1f5;
+  border-radius: 10px;
+  padding: 2px 8px;
 }
 
 /* Cada resultado en ExistingRecordSearch (optionRenderer): renglón principal (etiqueta
@@ -263,6 +488,162 @@
   color: #323338;
 }
 
+/* A pedido, estética tipo mockup: campos que la lectura automática no pudo completar,
+   resaltados en amarillo — los que SÍ se leyeron quedan con el estilo normal de arriba
+   (ver VehiculoManualFields#highlightEmpty). */
+.crear-op__field--missing {
+  padding: 8px;
+  margin: -8px;
+  background: #fffbea;
+  border: 1px solid #fdd776;
+  border-radius: 8px;
+}
+
+/* A pedido, estética tipo mockup: título + subtítulo propios del paso "Detalles del
+   riesgo" (antes no tenía). */
+.crear-op__risk-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #323338;
+  margin: 0 0 4px;
+}
+
+.crear-op__risk-subtitle {
+  font-size: 13px;
+  color: #676879;
+  margin: 0;
+}
+
+/* A pedido, estética tipo mockup: toggle de 2 botones (Sí/No) en vez del dropdown de
+   siempre — mismos valores reales ("Si"/"No", ver color_mm51n4j), solo cambia el
+   control visual. */
+.crear-op__toggle {
+  display: flex;
+  gap: 12px;
+}
+
+.crear-op__toggle-btn {
+  flex: 1;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid #d0d4e4;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #323338;
+  cursor: pointer;
+  text-align: center;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.crear-op__toggle-btn:hover {
+  border-color: #9cc2f2;
+}
+
+.crear-op__toggle-btn--active {
+  background: #eef6ff;
+  border-color: #0073ea;
+  color: #0073ea;
+}
+
+/* A pedido, estética tipo mockup: tarjeta verde con spinner mientras se analiza la
+   Carta Automóvil — reemplaza el AttentionBox amarillo genérico de antes. */
+.crear-op__lectura-analyzing {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 16px;
+  background: #e9f9f3;
+  border: 1px solid #b3ecd4;
+  border-radius: 8px;
+}
+
+.crear-op__lectura-analyzing-spinner {
+  color: var(--color-verde);
+  flex-shrink: 0;
+}
+
+.crear-op__lectura-analyzing strong {
+  display: block;
+  font-size: 14px;
+  color: #00854d;
+}
+
+.crear-op__lectura-analyzing span {
+  font-size: 12px;
+  color: #676879;
+}
+
+/* A pedido: tarjeta propia (mismo lenguaje visual que crear-op__lectura-analyzing/
+   summary de acá) en vez del AttentionBox genérico de antes, para "confirmá para
+   iniciar la lectura". */
+.crear-op__lectura-subido {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 16px;
+  background: #eef6ff;
+  border: 1px solid #9cc2f2;
+  border-radius: 8px;
+}
+
+.crear-op__lectura-subido p {
+  margin: 0;
+  font-size: 13px;
+  color: #323338;
+}
+
+/* A pedido, estética tipo mockup: resumen compacto tras leer todo (incluido el Modelo)
+   en vez de mostrar los campos sueltos — "Editar datos" los vuelve a mostrar (ver JSX,
+   editingLeidos). */
+.crear-op__lectura-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid #e6e9ef;
+  border-left: 3px solid #00c875;
+  border-radius: 8px;
+}
+
+.crear-op__lectura-summary-info {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.crear-op__lectura-summary-info strong {
+  font-size: 14px;
+  color: #323338;
+}
+
+.crear-op__lectura-summary-info span {
+  font-size: 12px;
+  color: #676879;
+}
+
+.crear-op__lectura-summary-edit {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  color: #00854d;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 0;
+}
+
+.crear-op__lectura-summary-edit svg {
+  font-size: 14px;
+}
+
 .crear-op__field input {
   padding: 11px 14px;
   border: 1px solid #d0d4e4;
@@ -377,6 +758,38 @@
   border-color: #0073ea;
 }
 
+/* A pedido: recubrimiento verde de todo el campo — avisa que este archivo vino solo
+   (autocompletado de una Oportunidad anterior), no que el usuario lo subió a mano. */
+.crear-op__file--highlighted {
+  background: #e9f9f3;
+  border: 1px solid #00c875;
+}
+
+.crear-op__file-preview {
+  width: 40px;
+  height: 40px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid #d0d4e4;
+  flex-shrink: 0;
+}
+
+/* A pedido, estética tipo mockup: caja grande centrada (Carta Automóvil, paso 2) en vez
+   de la fila compacta de siempre (Cédula Identidad, paso 1) — mismo componente
+   (FileField), ver el prop `prominent`. */
+.crear-op__file--prominent {
+  flex-direction: column;
+  justify-content: center;
+  padding: 28px 20px;
+  text-align: center;
+}
+
+.crear-op__file-helper {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: #676879;
+}
+
 .crear-op__file-input {
   display: none;
 }
@@ -431,8 +844,10 @@
 }
 
 /* Loader nativo de @vibe/core (ver JSX) — solo color/margen acá. */
+/* A pedido: todo loading de esta pantalla usa el verde de marca (--color-verde, ver
+   index.css) en vez de colores sueltos. */
 .crear-op__lectura-spinner {
-  color: #0073ea;
+  color: var(--color-verde);
   flex-shrink: 0;
   margin-right: 6px;
 }

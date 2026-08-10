@@ -47,10 +47,11 @@
 
 /* Pantalla de carga al abrir una oportunidad desde la tabla — Loader nativo de
    @vibe/core (ver JSX) en vez de un spinner armado a mano; el SVG usa
-   stroke:currentColor, así que alcanza con "color" acá para el color de marca pedido
-   (#3F1A6A) en vez del azul de acento habitual. */
+   stroke:currentColor, así que alcanza con "color" acá. A pedido, todo loading usa el
+   verde de marca (--color-verde, ver index.css) — antes un morado (#3F1A6A) pedido en
+   otro momento de este proyecto, y más chico (36px, ver JSX). */
 .opp-detail__loading-spinner {
-  color: #3f1a6a;
+  color: var(--color-verde);
 }
 
 .opp-detail__header {
@@ -128,6 +129,20 @@
 .opp-detail__client-meta {
   font-size: 12px;
   color: #676879;
+}
+
+/* A pedido, estética tipo mockup: número corto de la oportunidad (OPP-XXXX) como tag —
+   flex-shrink:0 para que no se lo coma .opp-detail__client-info (flex:1) si el nombre
+   es largo. */
+.opp-detail__client-opp-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: #0073ea;
+  background: #eef6ff;
+  border: 1px solid #9cc2f2;
+  border-radius: 12px;
+  padding: 3px 10px;
 }
 
 /* Renglón de la aclaración de "Parámetros" + botón "Recotizar", al lado de
@@ -345,10 +360,10 @@
   gap: 8px;
 }
 
-/* Loader nativo de @vibe/core (ver JSX) — el tamaño lo pone el prop size, acá solo el
-   color (stroke:currentColor en el SVG del componente). */
+/* Loader nativo de @vibe/core (ver JSX) — a pedido, todo loading usa el verde de marca
+   (--color-verde, ver index.css) en vez del azul de acento habitual. */
 .opp-detail__envio-spinner {
-  color: #0073ea;
+  color: var(--color-verde);
   flex-shrink: 0;
 }
 

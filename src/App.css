@@ -3,3 +3,16 @@
   background: #f6f7fb;
   padding-bottom: 40px;
 }
+
+/* Pantalla de inicio: Sidebar.jsx a la izquierda + contenido a la derecha, en vez del
+   TopBar horizontal que usan el resto de las vistas. */
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+  background: #f6f7fb;
+}
+
+.app-shell__main {
+  flex: 1;
+  min-width: 0;
+}
