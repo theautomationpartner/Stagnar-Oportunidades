@@ -1,15 +1,11 @@
 import { useState } from 'react'
 import {
   MdWarningAmber,
-  MdVisibility,
   MdRadioButtonChecked,
   MdRadioButtonUnchecked,
-  MdTune,
-  MdRefresh,
-  MdBusiness,
-  MdClearAll,
+  MdListAlt,
 } from 'react-icons/md'
-import { Button, IconButton, Dropdown, Checkbox } from '@vibe/core'
+import { Button, IconButton, Dropdown, Checkbox, NumberField } from '@vibe/core'
 import { formatMoney } from '../services/format'
 import { accentForCompania } from '../services/companyColors'
 import './QuoteCard.css'
@@ -30,17 +26,14 @@ const PORTO_OPCIONALES = [
   { field: 'cristales', label: 'Cristales' },
 ]
 
-// Datos "de tarifa" — vienen fijos de monday y no se editan por cotización: el
-// Contado base, la Edad del subitem, el Deducible general y los recargos por cuota
-// son parte de la tarifa cargada, no un parámetro que el vendedor deba tocar.
+// Datos "de tarifa" — vienen fijos de monday y no se editan por cotización: el Contado
+// base y el Deducible general son parte de la tarifa cargada, no un parámetro que el
+// vendedor deba tocar. Los recargos por cuota se sacaron de acá (a pedido) y se muestran
+// arriba, en la propia tabla de cuotas (ver quote-card__cuotas-table) — y Edad se sacó
+// directamente, ya no se muestra.
 const FIXED_FIELDS = [
   { key: 'contado', label: 'Contado/Costo', kind: 'money' },
-  { key: 'edad', label: 'Edad', kind: 'text' },
   { key: 'deducibleBase', label: 'Deducible', kind: 'text' },
-  { key: 'recargo3', label: 'Recargo 3 Cuotas', kind: 'percent' },
-  { key: 'recargo6', label: 'Recargo 6 Cuotas', kind: 'percent' },
-  { key: 'recargo8', label: 'Recargo 8 Cuotas', kind: 'percent' },
-  { key: 'recargo10', label: 'Recargo 10 Cuotas', kind: 'percent' },
 ]
 
 // Únicos campos editables por cotización: Bonificación/Descuento son palancas
@@ -106,6 +99,23 @@ function buildInitialForm(raw, overrides, fields) {
   return form
 }
 
+// A pedido: tags que muestran qué parámetros ajustables se le agregaron a ESTA
+// cotización puntual (no a toda la compañía) — uno por campo con override activo, con
+// el valor ya aplicado. El "(%)" del label completo (ej. "Bonificación (%)") se saca acá
+// porque el "%" ya va pegado al valor del tag. RC queda afuera a propósito — ese override
+// se marca coloreando el RC que ya se mostraba en quote-card__meta, no como un tag más.
+function overrideTags(fields, overrides) {
+  return fields
+    .filter((field) => field.key !== 'rc' && overrides[field.key] != null)
+    .map((field) => {
+      const value =
+        field.kind === 'percent' || field.kind === 'percent-only'
+          ? `${toPercentString(overrides[field.key])}%`
+          : String(overrides[field.key])
+      return { key: field.key, label: field.label.replace(/\s*\(%\)$/, ''), value }
+    })
+}
+
 // Adaptador Dropdown <-> string plano, mismo patrón que en FilterPanel.jsx/
 // CotizarStepPanel.jsx: Dropdown maneja {value,label} y el objeto entero
 // como seleccionado, acá se convierte a/desde el string plano que ya usa
@@ -134,13 +144,13 @@ export default function QuoteCard({
   overrides,
   onApplyOverrides,
   onResetOverrides,
-  onApplyToCompany,
-  onClearCompany,
   onToggleOpcional,
   rcOptions,
 }) {
-  const [showDetail, setShowDetail] = useState(false)
-  const [showParams, setShowParams] = useState(false)
+  // A pedido: un solo botón que despliega TODO (parámetros ajustables + datos fijos +
+  // detalle del vehículo/incluye) — antes eran 2 botones separados ("Parámetros"/"Ver
+  // detalle") que abrían cada sección por su lado.
+  const [showMore, setShowMore] = useState(false)
   const fields = fieldsForRaw(raw, rcOptions)
   const [form, setForm] = useState(() => buildInitialForm(raw, overrides, fields))
   const [savingOpcional, setSavingOpcional] = useState(null)
@@ -148,6 +158,11 @@ export default function QuoteCard({
 
   const hasCustomOverrides = Object.keys(overrides).length > 0
   const accent = accentForCompania(raw.compania)
+  // A pedido: los opcionales PORTO tildados (Granizo/Cristales/Coche Cortesía) se
+  // marcan a vista general, sin tener que abrir "Ver más" — mismo lugar que los tags de
+  // parámetros ajustados, pero en verde (son un dato real incluido en la cotización, no
+  // un ajuste de prueba).
+  const activeOpcionales = raw.compania === 'PORTO' ? PORTO_OPCIONALES.filter((opt) => raw[opt.field]) : []
 
   const handleToggleOpcional = async (field, checked) => {
     setSavingOpcional(field)
@@ -161,17 +176,13 @@ export default function QuoteCard({
     }
   }
 
-  const handleFieldChange = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
-
-  const handleToggleParams = () => {
-    if (!showParams) setForm(buildInitialForm(raw, overrides, fields))
-    setShowParams((v) => !v)
-  }
-
-  const handleApply = () => {
+  // A pedido: sin botón "Aplicar" — cada cambio en un parámetro ajustable se aplica solo,
+  // recalculando nextOverrides con el form ya actualizado (no el de la closure, que
+  // todavía tiene el valor viejo del campo que se acaba de tocar).
+  const applyFromForm = (formValues) => {
     const nextOverrides = {}
     for (const field of fields) {
-      const formValue = form[field.key]
+      const formValue = formValues[field.key]
       if (field.key === 'descuento') {
         if (formValue !== '0' && formValue !== '') nextOverrides.descuento = fromPercentString(formValue)
         continue
@@ -185,41 +196,22 @@ export default function QuoteCard({
     onApplyOverrides(nextOverrides)
   }
 
+  const handleFieldChange = (key, value) => {
+    setForm((prev) => {
+      const next = { ...prev, [key]: value }
+      applyFromForm(next)
+      return next
+    })
+  }
+
+  const handleToggleMore = () => {
+    if (!showMore) setForm(buildInitialForm(raw, overrides, fields))
+    setShowMore((v) => !v)
+  }
+
   const handleReset = () => {
     setForm(buildInitialForm(raw, {}, fields))
     onResetOverrides()
-  }
-
-  // Contraparte de "Aplicar a toda {compania}": saca los parámetros de prueba de todas
-  // las cotizaciones de la compañía de una, no solo la de esta tarjeta — también resetea
-  // el form local de esta tarjeta (si no, quedaría mostrando valores viejos hasta volver
-  // a abrir/cerrar Parámetros).
-  const handleClearCompany = () => {
-    setForm(buildInitialForm(raw, {}, fields))
-    onClearCompany()
-  }
-
-  // A diferencia de "Aplicar a esta cotización" (que solo guarda lo que cambió respecto
-  // al dato real de ESTA tarjeta), acá el objetivo es dejar la MISMA configuración en
-  // todas las coberturas de la compañía — así que se manda el valor tal cual está en el
-  // formulario (salvo que esté vacío, que sigue significando "usar el dato real de cada
-  // cotización"). Los campos son los mismos para todas las cotizaciones de una compañía
-  // (fieldsForRaw depende solo de raw.compania, no de la cobertura), así que aplican 1 a 1.
-  const handleApplyToCompany = () => {
-    const companyOverrides = {}
-    for (const field of fields) {
-      const formValue = form[field.key]
-      if (field.key === 'descuento') {
-        if (formValue !== '0' && formValue !== '') companyOverrides.descuento = fromPercentString(formValue)
-        continue
-      }
-      if (field.kind === 'percent') {
-        if (formValue !== '') companyOverrides[field.key] = fromPercentString(formValue)
-        continue
-      }
-      if (formValue !== '') companyOverrides[field.key] = formValue
-    }
-    onApplyToCompany(companyOverrides)
   }
 
   if (quote.blocked) {
@@ -269,58 +261,106 @@ export default function QuoteCard({
           </div>
           <div>
             <span className="quote-card__meta-label">RC</span>
-            <span className="quote-card__meta-value">{quote.rc || '—'}</span>
+            {/* A pedido: el override de RC no va como tag aparte (ver overrideTags) —
+                se marca coloreando este mismo valor que ya se mostraba acá. */}
+            <span
+              className={
+                overrides.rc != null ? 'quote-card__meta-value quote-card__meta-value--override' : 'quote-card__meta-value'
+              }
+            >
+              {quote.rc || '—'}
+            </span>
+          </div>
+          {/* A pedido: la versión corta de la advertencia va acá, al mismo nivel que
+              Deducible/Uso/RC, en vez de en un banner aparte más abajo. Este renglón se
+              reserva SIEMPRE (con o sin advertencia, ver min-height en CSS) para que
+              todas las tarjetas midan lo mismo y los datos queden en el mismo lugar —
+              con advertencia, aparece el texto; sin ella, el espacio queda vacío pero
+              ocupado igual. La versión completa (quote.warning.full) sigue solo
+              adentro de "Ver más". */}
+          <div className="quote-card__meta-warning">
+            {quote.warning && (
+              <>
+                <MdWarningAmber /> {quote.warning.short}
+              </>
+            )}
           </div>
         </div>
       </div>
 
+      {/* A pedido: el Recargo de cada cuota (antes en "Datos fijos", adentro de
+          Parámetros) se muestra acá arriba, en la misma tabla que cuotas/valor — con un
+          encabezado que aclara qué es cada columna. La promo "N cuotas SIN RECARGO" pasa
+          al final de la sección, no arriba de todo. */}
       <div className="quote-card__cuotas">
-        {quote.promo && (
-          <span className="quote-card__cuotas-label">
-            ➜ {quote.promo.count} cuotas SIN RECARGO de {formatMoney(quote.promo.valor)}
-          </span>
-        )}
         <table className="quote-card__cuotas-table">
+          <thead>
+            <tr>
+              <th>Cuotas</th>
+              <th>Valor cuota</th>
+              <th>Recargo</th>
+            </tr>
+          </thead>
           <tbody>
             {CUOTA_COUNTS.map((n) => (
               <tr key={n}>
                 <td>{n}x</td>
                 <td>{formatMoney(quote.cuotas[n].valor)}</td>
+                <td>{toPercentString(raw[`recargo${n}`])}%</td>
               </tr>
             ))}
           </tbody>
         </table>
+        {quote.promo && (
+          <span className="quote-card__cuotas-label">
+            ➜ {quote.promo.count} cuotas SIN RECARGO de {formatMoney(quote.promo.valor)}
+          </span>
+        )}
       </div>
 
       <div className="quote-card__total">
         <span className="quote-card__total-label">COSTO TOTAL</span>
         <span className="quote-card__total-value">{formatMoney(quote.total)}</span>
-        <div className="quote-card__total-actions">
-          <Button
-            kind="secondary"
-            className={showParams ? 'quote-card__params-btn--active' : undefined}
-            onClick={handleToggleParams}
-          >
-            <MdTune /> Parámetros
-          </Button>
-          <Button kind="secondary" onClick={() => setShowDetail((v) => !v)}>
-            <MdVisibility /> Ver detalle
-          </Button>
-        </div>
+        {/* A pedido: qué parámetros ajustables se le agregaron a esta cotización puntual
+            (uno por campo con override activo) y qué opcionales PORTO están tildados,
+            al lado del costo total, sin tener que abrir "Ver más". */}
+        {(hasCustomOverrides || activeOpcionales.length > 0) && (
+          <div className="quote-card__override-tags">
+            {activeOpcionales.map((opt) => (
+              <span key={opt.field} className="quote-card__opcional-tag">
+                {opt.label}
+              </span>
+            ))}
+            {overrideTags(fields, overrides).map((tag) => (
+              <span key={tag.key} className="quote-card__override-tag">
+                {tag.label}: {tag.value}
+              </span>
+            ))}
+          </div>
+        )}
       </div>
 
-      {quote.warning && (
-        <p className="quote-card__warning">
-          <MdWarningAmber /> {quote.warning}
-        </p>
-      )}
+      {/* A pedido: más abajo, como una barra de ancho completo, en vez de arriba al lado
+          del costo total. */}
+      <Button
+        kind="secondary"
+        className={
+          showMore ? 'quote-card__more-btn quote-card__params-btn--active' : 'quote-card__more-btn'
+        }
+        onClick={handleToggleMore}
+      >
+        <MdListAlt /> {showMore ? 'Ver menos' : 'Ver más'}
+      </Button>
 
-      {showParams && (
+      {showMore && (
         <div className="quote-card__params">
-          <p className="quote-card__params-note">
-            Datos fijos de tarifa ({raw.compania} · {raw.cobertura || raw.name}) y los parámetros que
-            sí podés ajustar para esta cotización puntual.
-          </p>
+          {/* Versión completa de la advertencia (ver quote.warning.short más arriba, que
+              es la que siempre se ve) — acá el detalle: compañía y requisito puntual. */}
+          {quote.warning && (
+            <p className="quote-card__warning quote-card__warning--full">
+              <MdWarningAmber /> {quote.warning.full}
+            </p>
+          )}
 
           <div className="quote-card__params-subtitle">Datos fijos (no editables)</div>
           <div className="quote-card__params-fixed">
@@ -333,25 +373,41 @@ export default function QuoteCard({
           </div>
 
           <div className="quote-card__params-subtitle">Parámetros ajustables</div>
-          <div className="quote-card__params-grid">
-            {fields.map((field) => (
-              <label className="quote-card__params-field" key={field.key}>
-                <span>{field.label}</span>
-                {field.kind === 'select' ? (
-                  <FieldSelect
-                    value={form[field.key]}
-                    options={field.options}
-                    onChange={(value) => handleFieldChange(field.key, value)}
-                  />
-                ) : (
-                  <input
-                    type="number"
-                    value={form[field.key]}
-                    onChange={(e) => handleFieldChange(field.key, e.target.value)}
-                  />
-                )}
-              </label>
-            ))}
+          {/* A pedido: "Restablecer" (más chico, azul) va al lado de la grilla de campos
+              — alineado con los inputs, no con el subtítulo de arriba. */}
+          <div className="quote-card__params-adjustable-row">
+            <div className="quote-card__params-grid">
+              {fields.map((field) => (
+                <label className="quote-card__params-field" key={field.key}>
+                  <span>{field.label}</span>
+                  {field.kind === 'select' ? (
+                    <FieldSelect
+                      value={form[field.key]}
+                      options={field.options}
+                      onChange={(value) => handleFieldChange(field.key, value)}
+                    />
+                  ) : (
+                    // NumberField nativo de @vibe/core — maneja number|null, el form
+                    // sigue en string (mismo criterio que el resto de los campos), así
+                    // que el ida y vuelta se adapta acá mismo.
+                    <NumberField
+                      size="small"
+                      value={form[field.key] === '' ? null : Number(form[field.key])}
+                      onChange={(value) => handleFieldChange(field.key, value == null ? '' : String(value))}
+                    />
+                  )}
+                </label>
+              ))}
+            </div>
+            <Button
+              kind="primary"
+              size="small"
+              className="quote-card__reset-btn"
+              onClick={handleReset}
+              disabled={!hasCustomOverrides}
+            >
+              Restablecer
+            </Button>
           </div>
 
           {raw.compania === 'PORTO' && (
@@ -372,25 +428,10 @@ export default function QuoteCard({
               {opcionalError && <p className="quote-card__warning">{opcionalError}</p>}
             </>
           )}
-
-          <div className="quote-card__params-actions">
-            <Button kind="primary" onClick={handleApply}>
-              <MdRefresh /> Aplicar a esta cotización
-            </Button>
-            <Button kind="secondary" onClick={handleApplyToCompany}>
-              <MdBusiness /> Aplicar a toda {raw.compania}
-            </Button>
-            <Button kind="secondary" onClick={handleClearCompany}>
-              <MdClearAll /> Limpiar toda {raw.compania}
-            </Button>
-            <Button kind="secondary" onClick={handleReset} disabled={!hasCustomOverrides}>
-              Restablecer
-            </Button>
-          </div>
         </div>
       )}
 
-      {showDetail && (
+      {showMore && (
         <div className="quote-card__detail">
           {/* Compañía/Cobertura ya se muestran arriba (título de la tarjeta) — a pedido,
               acá no se repiten. */}

@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react'
 import { MdCheckCircle, MdWarningAmber, MdUploadFile, MdDeleteOutline, MdClose } from 'react-icons/md'
-import { Button, IconButton } from '@vibe/core'
+import { Button, IconButton, Loader } from '@vibe/core'
 import './DocumentUploadRow.css'
 
 // El `text` de una columna "file" de monday no es el nombre del archivo — es la URL
@@ -76,7 +76,7 @@ export default function DocumentUploadRow({
     >
       <div className="doc-upload-row__info">
         {busy ? (
-          <span className="doc-upload-row__spinner" aria-hidden="true" />
+          <Loader size={16} className="doc-upload-row__spinner" />
         ) : uploaded ? (
           <MdCheckCircle />
         ) : (

@@ -82,9 +82,13 @@
   gap: 14px;
 }
 
+/* Más anchas que antes (200/260 → 240/320) — a pedido. Siguen agrupadas por compañía
+   (una fila por compañía, sin título de grupo) y con flex-wrap: con 6 cotizaciones
+   (SANCOR, el caso con más) simplemente pasan a 2 o 3 renglones según el ancho de
+   pantalla, en vez de forzarlas a entrar todas apretadas en una sola línea. */
 .confirmar-step__company-row .confirmar-step__card {
-  flex: 1 1 200px;
-  max-width: 260px;
+  flex: 1 1 240px;
+  max-width: 320px;
 }
 
 @media (max-width: 480px) {
@@ -93,11 +97,15 @@
   }
 }
 
+/* height fijo (a pedido) — todas las tarjetas miden exactamente lo mismo sin importar
+   el largo de compañía/cobertura (esos 2 truncan a 1 línea, ver más abajo); el botón
+   queda siempre pegado abajo con margin-top:auto (ver .confirmar-step__card-btn). */
 .confirmar-step__card {
   position: relative;
   display: flex;
   flex-direction: column;
   gap: 6px;
+  height: 150px;
   padding: 16px;
   border: 1px solid #d0d4e4;
   border-left-width: 4px;
@@ -125,28 +133,45 @@
   font-size: 13px;
 }
 
+/* Compañía + precio ahora van en el mismo renglón (a pedido) — padding-right acá (no
+   solo en compañía) para que ninguno de los 2 quede tapado por el ícono de WhatsApp. */
+.confirmar-step__card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding-right: 26px;
+}
+
 .confirmar-step__card-compania {
   font-weight: 700;
   color: #323338;
-  padding-right: 26px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .confirmar-step__card-cobertura {
   font-size: 13px;
   color: #676879;
-  min-height: 32px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
+/* Mismo verde que el costo total del paso 2 (ver .quote-card__total-value en
+   QuoteCard.css) — a pedido, para que se lea igual en los 2 pasos. */
 .confirmar-step__card-total {
   font-size: 18px;
   font-weight: 700;
-  color: #323338;
-  margin: 4px 0 8px;
+  color: var(--color-verde);
+  flex-shrink: 0;
 }
 
 .confirmar-step__card-btn {
   justify-content: center;
   width: 100%;
+  margin-top: auto;
 }
 
 .confirmar-step__error {

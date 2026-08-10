@@ -37,13 +37,18 @@ function QuoteChoiceCard({ entry, selected, onSelect, selecting }) {
           <FaWhatsapp />
         </span>
       )}
-      <span className="confirmar-step__card-compania" style={{ color: accent }}>
-        {raw.compania}
-      </span>
+      {/* A pedido: el precio se sube junto a la compañía (antes quedaba solo, en el
+          medio de la tarjeta) — y con height fijo en .confirmar-step__card (ver CSS),
+          todas las tarjetas miden lo mismo sin importar el largo de compañía/cobertura. */}
+      <div className="confirmar-step__card-head">
+        <span className="confirmar-step__card-compania" style={{ color: accent }}>
+          {raw.compania}
+        </span>
+        <span className="confirmar-step__card-total">
+          {quote.blocked ? 'Sin fórmula' : formatMoney(quote.total)}
+        </span>
+      </div>
       <span className="confirmar-step__card-cobertura">{raw.cobertura || raw.name}</span>
-      <span className="confirmar-step__card-total">
-        {quote.blocked ? 'Sin fórmula' : formatMoney(quote.total)}
-      </span>
       <Button
         kind={selected ? 'primary' : 'secondary'}
         className="confirmar-step__card-btn"

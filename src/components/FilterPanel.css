@@ -51,13 +51,9 @@
   color: #323338;
 }
 
+/* Search (@vibe/core) ya trae su propio padding/borde/radio — acá solo el layout. */
 .filter-panel__search {
   width: 100%;
-  box-sizing: border-box;
-  padding: 9px 12px;
-  border: 1px solid #d0d4e4;
-  border-radius: 8px;
-  font-size: 13px;
   margin-bottom: 10px;
 }
 
@@ -95,15 +91,6 @@
   font-size: 11px;
   color: #676879;
   font-weight: 600;
-}
-
-.filter-field input {
-  padding: 7px 9px;
-  border: 1px solid #d0d4e4;
-  border-radius: 6px;
-  font-size: 13px;
-  color: #323338;
-  background: #fff;
 }
 
 .filter-panel__footer {

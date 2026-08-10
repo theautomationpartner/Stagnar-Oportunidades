@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
 import {
-  MdOpenInNew,
-  MdFileDownload,
   MdSend,
   MdArrowBack,
   MdAutorenew,
   MdWarningAmber,
 } from 'react-icons/md'
-import { Button, EmptyState, AttentionBox } from '@vibe/core'
+import { Button, EmptyState, AttentionBox, Loader } from '@vibe/core'
 import TopBar from './TopBar'
 import QuoteCard from './QuoteCard'
 import StatusBadge from './StatusBadge'
@@ -70,8 +68,10 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   const [overridesByQuoteId, setOverridesByQuoteId] = useState({})
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [activeStep, setActiveStep] = useState('cotizar')
-  // Solapas "General / GLOBAL / TRIPLE" del paso "Comparar y enviar" — índice de
-  // COBERTURA_TABS, no el texto (así matchea directo con TabList/Tab de @vibe/core).
+  // Solapas "GLOBAL / TRIPLE / General" del paso "Comparar y enviar" — índice de
+  // COBERTURA_TABS, no el texto (así matchea directo con TabList/Tab de @vibe/core). En
+  // 0 arranca en GLOBAL (a pedido, la solapa que se ve primero al entrar), no en
+  // "General" — ver el orden del array en coberturaGroups.js.
   const [coberturaTabIndex, setCoberturaTabIndex] = useState(0)
   const [marking, setMarking] = useState(false)
   const [markError, setMarkError] = useState(null)
@@ -518,32 +518,6 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
     setRawQuotes((prev) => prev.map((r) => (r.id === rawId ? { ...r, [field]: checked } : r)))
   }
 
-  // "Aplicar a toda [Compañía]": la misma configuración de parámetros (Bonificación,
-  // Descuento, deducible/edad específico) se replica en todas las cotizaciones de esa
-  // compañía, no solo en la tarjeta desde la que se apretó el botón.
-  const handleApplyCompanyOverrides = (compania, values) => {
-    setOverridesByQuoteId((prev) => {
-      const next = { ...prev }
-      for (const raw of rawQuotes) {
-        if (raw.compania === compania) next[raw.id] = values
-      }
-      return next
-    })
-  }
-
-  // Contraparte de "Aplicar a toda [Compañía]": saca los parámetros de prueba de TODAS
-  // las cotizaciones de esa compañía de una, en vez de tener que abrir tarjeta por
-  // tarjeta y apretar "Restablecer" en cada una.
-  const handleClearCompanyOverrides = (compania) => {
-    setOverridesByQuoteId((prev) => {
-      const next = { ...prev }
-      for (const raw of rawQuotes) {
-        if (raw.compania === compania) delete next[raw.id]
-      }
-      return next
-    })
-  }
-
   const handleMarcarParaCotizar = async () => {
     setMarking(true)
     setMarkError(null)
@@ -878,21 +852,16 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
 
       <div className="opp-detail__breadcrumb">
         <Button kind="tertiary" className="opp-detail__back-btn" onClick={onBack}>
-          <MdArrowBack /> Volver a Oportunidades
+          <MdArrowBack /> Volver
         </Button>
         {!loading && !error && opportunity && !lecturaGateActive && (
           <Stepper steps={steps} activeKey={activeStep} onSelect={setActiveStep} />
-        )}
-        {!loading && !error && opportunity && (
-          <Button kind="secondary" className="opp-detail__ver-monday-btn">
-            <MdOpenInNew /> Ver en Monday
-          </Button>
         )}
       </div>
 
       {loading && (
         <div className="opp-detail__status">
-          <span className="opp-detail__loading-spinner" aria-hidden="true" />
+          <Loader size={36} className="opp-detail__loading-spinner" />
           Cargando cotizaciones...
         </div>
       )}
@@ -969,7 +938,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
               </div>
               {(opportunity.estadoLectura === 'Leer' || opportunity.estadoLectura === 'Leyendo') && (
                 <AttentionBox type="warning" icon={false}>
-                  <span className="opp-detail__envio-spinner" aria-hidden="true" />
+                  <Loader size={13} className="opp-detail__envio-spinner" />
                   {opportunity.estadoLectura === 'Leer'
                     ? 'En cola para leer Cédula y Carta Automóvil...'
                     : 'Leyendo Cédula y Carta Automóvil...'}{' '}
@@ -1062,7 +1031,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
                   />
                 ) : (
                   <div className="opp-detail__quotes">
-                    {visibleQuoteEntries.map(({ raw, quote, compania }) => (
+                    {visibleQuoteEntries.map(({ raw, quote }) => (
                       <QuoteCard
                         key={raw.id}
                         raw={raw}
@@ -1072,8 +1041,6 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
                         overrides={overridesByQuoteId[raw.id] ?? {}}
                         onApplyOverrides={(values) => handleApplyQuoteOverrides(raw.id, values)}
                         onResetOverrides={() => handleResetQuoteOverrides(raw.id)}
-                        onApplyToCompany={(values) => handleApplyCompanyOverrides(compania, values)}
-                        onClearCompany={() => handleClearCompanyOverrides(compania)}
                         onToggleOpcional={(field, checked) => handleToggleOpcional(raw.id, field, checked)}
                         rcOptions={rcOptions}
                       />
@@ -1095,16 +1062,13 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
                   {opportunity.estadoEnvio && (
                     <span className="opp-detail__envio-status">
                       {sendPolling && (
-                        <span className="opp-detail__envio-spinner" aria-hidden="true" />
+                        <Loader size={13} className="opp-detail__envio-spinner" />
                       )}
                       <StatusBadge label={opportunity.estadoEnvio} color={opportunity.estadoEnvioColor} />
                     </span>
                   )}
                 </div>
                 <div className="opp-detail__footer-actions">
-                  <Button kind="secondary">
-                    <MdFileDownload /> Descargar comparativo
-                  </Button>
                   <Button
                     kind="primary"
                     color="positive"

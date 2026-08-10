@@ -1,5 +1,5 @@
 import { MdCheckCircle } from 'react-icons/md'
-import { AttentionBox, Button } from '@vibe/core'
+import { AttentionBox, Button, Loader } from '@vibe/core'
 import { formatMoney } from '../services/format'
 import { accentForCompania } from '../services/companyColors'
 import DocumentUploadRow from './DocumentUploadRow'
@@ -171,7 +171,7 @@ export default function EmitirStepPanel({
         )}
         {polling && (
           <AttentionBox type="warning" icon={false}>
-            <span className="emitir-step__spinner" aria-hidden="true" />
+            <Loader size={13} className="emitir-step__spinner" />
             Creando la póliza... esto puede tardar unos segundos. La pantalla se va a
             actualizar sola apenas esté lista.
           </AttentionBox>

@@ -31,22 +31,9 @@
   }
 }
 
+/* TextField (@vibe/core) ya trae su propio label/padding/borde — acá solo el margen. */
 .wa-modal__field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #676879;
   margin-bottom: 18px;
-}
-
-.wa-modal__field input {
-  padding: 10px 12px;
-  border: 1px solid #d0d4e4;
-  border-radius: 8px;
-  font-size: 14px;
-  color: #323338;
 }
 
 .wa-modal__preview-label {
@@ -94,20 +81,10 @@
   gap: 12px;
 }
 
+/* Loader nativo de @vibe/core (ver JSX) — solo el color acá. */
 .wa-modal__status-spinner {
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid #fde3c4;
-  border-top-color: #a15c00;
+  color: #a15c00;
   flex-shrink: 0;
-  animation: wa-modal-status-spin 0.8s linear infinite;
-}
-
-@keyframes wa-modal-status-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .wa-modal__error-detail {

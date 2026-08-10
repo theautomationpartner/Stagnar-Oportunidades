@@ -98,18 +98,8 @@
   color: #0073ea;
 }
 
-.crear-op__progress-bar {
-  height: 4px;
-  border-radius: 2px;
-  background: #e6e9ef;
-  overflow: hidden;
-}
-
-.crear-op__progress-fill {
-  height: 100%;
-  background: #0073ea;
-  transition: width 0.2s ease;
-}
+/* ProgressBar nativo de @vibe/core (ver JSX) — ya trae su propio alto/color/transición,
+   no queda nada que pisar acá. */
 
 .crear-op__fields {
   display: flex;
@@ -155,15 +145,29 @@
   font-weight: 400;
 }
 
-/* Fila de cada resultado en ExistingRecordSearch (optionRenderer) — etiqueta de tablero +
-   nombre a la izquierda, Cédula resaltada en azul a la derecha, para distinguir rápido
-   resultados parecidos y de qué fuente viene cada uno. */
+/* Cada resultado en ExistingRecordSearch (optionRenderer): renglón principal (etiqueta
+   de tablero + nombre a la izquierda, Cédula resaltada en azul a la derecha) y, si es
+   una Oportunidad, el modelo del vehículo debajo — para distinguir rápido resultados
+   parecidos, de qué fuente viene cada uno y de qué vehículo es. */
 .crear-op__cliente-option {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+}
+
+.crear-op__cliente-option-row {
   display: flex;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
   width: 100%;
+}
+
+.crear-op__cliente-option-modelo {
+  font-size: 11px;
+  color: #9699a6;
+  padding-left: 2px;
 }
 
 .crear-op__cliente-option-main {
@@ -262,34 +266,8 @@
   box-shadow: 0 0 0 3px rgba(0, 115, 234, 0.15);
 }
 
-/* Wrapper de ClearableInput — relative para poder posicionar la "x" de borrar adentro
-   del input en vez de al lado (así no rompe el layout de flex/grid del campo). */
-.crear-op__input-wrap {
-  position: relative;
-  display: flex;
-}
-
-.crear-op__input-wrap input {
-  padding-right: 32px;
-}
-
-.crear-op__input-clear {
-  position: absolute;
-  right: 6px;
-  top: 50%;
-  transform: translateY(-50%);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: none;
-  color: #9699a6;
-  cursor: pointer;
-  padding: 4px;
-  font-size: 15px;
-}
-
-/* Igual que .crear-op__input-wrap/__input-clear, pero para <input type="date"> — no se
+/* Igual que antes con ClearableInput (ya migrado a TextField de @vibe/core, que trae su
+   propio botón de limpiar), pero para <input type="date"> — no se
    puede reusar tal cual: el navegador ya reserva su propio espacio a la derecha para el
    ícono nativo del calendario, así que la "x" propia va más a la izquierda (right: 34px)
    con más padding-right en el input para no superponerse ni comerse el ícono nativo. */
@@ -322,10 +300,6 @@
   color: #e2445c;
 }
 
-.crear-op__input-clear:hover {
-  color: #e2445c;
-}
-
 .crear-op__phone {
   display: flex;
   gap: 8px;
@@ -340,7 +314,7 @@
   flex-shrink: 0;
 }
 
-.crear-op__phone .crear-op__input-wrap {
+.crear-op__phone-number {
   flex: 0 1 220px;
   min-width: 160px;
 }
@@ -354,7 +328,7 @@
     width: 100%;
   }
 
-  .crear-op__phone .crear-op__input-wrap {
+  .crear-op__phone-number {
     flex-basis: 100%;
   }
 }
@@ -429,22 +403,11 @@
   font-size: 13px;
 }
 
+/* Loader nativo de @vibe/core (ver JSX) — solo color/margen acá. */
 .crear-op__lectura-spinner {
-  display: inline-block;
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  border: 2px solid #cfe3fb;
-  border-top-color: #0073ea;
+  color: #0073ea;
   flex-shrink: 0;
   margin-right: 6px;
-  animation: crear-op-lectura-spin 0.8s linear infinite;
-}
-
-@keyframes crear-op-lectura-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .crear-op__error-detail {

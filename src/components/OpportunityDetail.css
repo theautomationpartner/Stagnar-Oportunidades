@@ -1,11 +1,15 @@
-/* A pedido: "Volver a Oportunidades", el Stepper y "Ver en Monday" van todos en este
-   mismo renglón de arriba (antes el Stepper tenía su propio renglón entero para él solo,
-   y acá solo iba el breadcrumb "> OPP-XXXX · Cliente", que se sacó). */
+/* "Volver" y el Stepper van en este mismo renglón de arriba (antes el Stepper tenía su
+   propio renglón entero para él solo, y acá solo iba el breadcrumb "> OPP-XXXX ·
+   Cliente", que se sacó). Grid de 3 columnas (1fr / auto / 1fr) en vez de flex — a
+   pedido, así el Stepper (2do hijo, cae en la columna del medio) queda centrado en el
+   medio de la página sin importar el ancho de "Volver": solo hay 2 hijos, así que la
+   3ra columna (1fr) queda sin ítem pero igual reserva su espacio — hace de contrapeso
+   simétrico con la 1ra, sin necesidad de agregar un div vacío en el JSX. */
 .opp-detail__breadcrumb {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  justify-content: space-between;
-  gap: 16px;
+  gap: 24px;
   padding: 16px var(--page-gutter) 0;
   font-size: 13px;
   color: #676879;
@@ -13,18 +17,18 @@
 
 @media (max-width: 900px) {
   .opp-detail__breadcrumb {
-    flex-wrap: wrap;
+    grid-template-columns: 1fr;
   }
 }
 
 /* Button (@vibe/core, kind="tertiary") ya pone su propio color/padding/hover
-   — acá solo el ajuste de alineación con el borde de la pantalla. */
+   — acá solo el ajuste de alineación con el borde de la pantalla. justify-self:start
+   porque .opp-detail__breadcrumb es grid (1fr auto 1fr, ver más arriba) — sin esto, el
+   botón se estira para ocupar toda su columna (1fr) en vez de quedar pegado a la
+   izquierda con su ancho natural. */
 .opp-detail__back-btn {
+  justify-self: start;
   margin-left: -6px;
-}
-
-.opp-detail__ver-monday-btn {
-  flex-shrink: 0;
 }
 
 .opp-detail__status {
@@ -41,16 +45,12 @@
   color: #e2445c;
 }
 
-/* Pantalla de carga al abrir una oportunidad desde la tabla — mismo patrón de spinner
-   que .opp-detail__envio-spinner (border-top girando), más grande y con el color de
-   marca pedido (#3F1A6A) en vez del azul de acento habitual. */
+/* Pantalla de carga al abrir una oportunidad desde la tabla — Loader nativo de
+   @vibe/core (ver JSX) en vez de un spinner armado a mano; el SVG usa
+   stroke:currentColor, así que alcanza con "color" acá para el color de marca pedido
+   (#3F1A6A) en vez del azul de acento habitual. */
 .opp-detail__loading-spinner {
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  border: 3px solid #e6e0f0;
-  border-top-color: #3f1a6a;
-  animation: opp-detail-envio-spin 0.8s linear infinite;
+  color: #3f1a6a;
 }
 
 .opp-detail__header {
@@ -278,20 +278,24 @@
   color: #0073ea;
 }
 
-/* A pedido: de a 2 cotizaciones por renglón en vez de una lista apilada — 2 columnas
-   solo cuando hay ancho de sobra para que cada tarjeta (grilla interna de 3 columnas,
-   ver QuoteCard.css) no quede apretada; si no, 1 columna a ancho completo. */
+/* De a 2 cotizaciones por columna — vuelta a "columns" (a pedido, de nuevo): con "grid"
+   las 2 tarjetas de un mismo renglón comparten el alto del renglón entero, así que al
+   desplegar "Ver más" en una, la otra (más corta) deja un hueco gris vacío debajo hasta
+   igualar esa altura — es lo que se estaba viendo. Con columns cada tarjeta ocupa solo
+   lo que necesita, sin ese hueco; la contra (ya charlada) es que al fluir cada columna
+   de forma independiente, las tarjetas de la izquierda y la derecha no siempre quedan a
+   la misma altura leyendo en horizontal. 2 columnas solo cuando hay ancho de sobra para
+   que cada tarjeta (grilla interna de 3 columnas, ver QuoteCard.css) no quede apretada;
+   si no, 1 columna a ancho completo. */
 .opp-detail__quotes {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 16px;
-  align-items: start;
+  columns: 2;
+  column-gap: 16px;
   min-width: 0;
 }
 
 @media (max-width: 1100px) {
   .opp-detail__quotes {
-    grid-template-columns: 1fr;
+    columns: 1;
   }
 }
 
@@ -341,20 +345,11 @@
   gap: 8px;
 }
 
+/* Loader nativo de @vibe/core (ver JSX) — el tamaño lo pone el prop size, acá solo el
+   color (stroke:currentColor en el SVG del componente). */
 .opp-detail__envio-spinner {
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  border: 2px solid #cfe3fb;
-  border-top-color: #0073ea;
+  color: #0073ea;
   flex-shrink: 0;
-  animation: opp-detail-envio-spin 0.8s linear infinite;
-}
-
-@keyframes opp-detail-envio-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .opp-detail__error-detail {

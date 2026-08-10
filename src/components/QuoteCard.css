@@ -11,6 +11,12 @@
   border-left-width: 2px;
   border-radius: 8px;
   background: #fff;
+  /* .opp-detail__quotes usa "columns" (2 flujos independientes) — eso apila las
+     tarjetas de una misma columna una debajo de la otra, así que hace falta este
+     margen (antes lo daba el gap del grid) para separarlas; break-inside evita que el
+     navegador corte una tarjeta a la mitad entre una columna y la otra. */
+  margin-bottom: 16px;
+  break-inside: avoid;
 }
 
 @media (max-width: 640px) {
@@ -50,12 +56,16 @@
   font-size: 13px;
 }
 
+/* Sin "row-gap" (a pedido) — con flex-wrap, "gap" se aplicaba también como espacio
+   VERTICAL entre líneas cuando el renglón envolvía (ej. tarjetas con el tag "Parámetros
+   propios", más largo), y eso hacía esa tarjeta más alta que sus vecinas, rompiendo la
+   alineación pareja de alturas entre tarjetas. column-gap mantiene el espaciado
+   horizontal entre radio/compañía/título en la misma línea. */
 .quote-card__title-row {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 10px;
-  margin-bottom: 10px;
+  column-gap: 10px;
 }
 
 /* Sin acordeón por compañía (ver .opp-detail__quotes), la compañía de cada
@@ -115,11 +125,39 @@
   font-weight: 600;
 }
 
+/* RC con override — mismo violeta que los tags de overrideTags/quote-card__custom-tag,
+   para marcarlo sin agregarle un tag aparte (a pedido). */
+.quote-card__meta-value--override {
+  color: #9d50dd;
+}
+
+/* Versión corta de la advertencia (ver quote.warning.short), al mismo nivel que
+   Deducible/Uso/RC — a pedido, compacta (una línea, sin caja/padding grande) para que
+   la tarjeta no quede más alta que una sin advertencia. La versión completa sigue
+   siendo la caja grande (.quote-card__warning), pero recién adentro de "Ver más". */
+/* min-height (no el contenido) es lo que reserva el lugar — el div se renderiza
+   siempre, con o sin advertencia (ver JSX), así todas las tarjetas miden lo mismo. */
+.quote-card__meta-warning {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 17px;
+  color: #a15c00;
+  font-weight: 600;
+}
+
+.quote-card__meta-warning svg {
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+/* La promo "N cuotas SIN RECARGO" ahora va DEBAJO de la tabla (a pedido) — margin-top en
+   vez de margin-bottom. */
 .quote-card__cuotas-label {
   display: block;
   font-size: 12px;
   color: #676879;
-  margin-bottom: 6px;
+  margin-top: 8px;
 }
 
 .quote-card__cuotas-table {
@@ -127,8 +165,20 @@
   font-size: 12px;
 }
 
+/* Encabezado que aclara qué es cada columna (Cuotas/Valor cuota/Recargo, ver JSX) —
+   mismo lenguaje visual que .quote-card__params-subtitle (gris, chico, mayúsculas). */
+.quote-card__cuotas-table th {
+  padding: 0 12px 4px 0;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  color: #9699a6;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
 .quote-card__cuotas-table td {
-  padding: 2px 8px 2px 0;
+  padding: 2px 12px 2px 0;
   color: #323338;
 }
 
@@ -151,6 +201,40 @@
   color: var(--color-verde);
 }
 
+/* Tags de qué parámetros ajustables tiene esta cotización puntual (ver overrideTags en
+   QuoteCard.jsx) — mismo look que .quote-card__custom-tag (violeta), pero uno por campo
+   en vez de un solo "Parámetros propios" genérico. */
+.quote-card__override-tags {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 4px;
+  margin-top: 2px;
+}
+
+/* Opcionales PORTO tildados (Granizo/Cristales/Coche Cortesía) — en verde, no violeta,
+   para distinguirlos de un vistazo: son un dato real incluido en la cotización, no un
+   parámetro de prueba ajustado (ver .quote-card__override-tag). */
+.quote-card__opcional-tag {
+  font-size: 10px;
+  font-weight: 700;
+  color: var(--color-verde);
+  background: #e3f4f3;
+  border-radius: 10px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.quote-card__override-tag {
+  font-size: 10px;
+  font-weight: 700;
+  color: #9d50dd;
+  background: #f5ebfd;
+  border-radius: 10px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
 .quote-card__warning {
   grid-column: 1 / -1;
   display: flex;
@@ -170,9 +254,19 @@
   flex-shrink: 0;
 }
 
-.quote-card__total-actions {
-  display: flex;
-  gap: 8px;
+/* La versión completa (adentro de "Ver más") necesita separación de lo que viene
+   después ("DATOS FIJOS"), a diferencia de la corta (pegada al botón "Ver más"). */
+.quote-card__warning--full {
+  margin-bottom: 12px;
+}
+
+/* A pedido: barra de ancho completo más abajo (antes al lado de COSTO TOTAL, arriba) —
+   único botón que despliega detalles + parámetros. */
+.quote-card__more-btn {
+  grid-column: 1 / -1;
+  width: 100%;
+  justify-content: center;
+  margin-top: 4px;
 }
 
 .quote-card__params-btn--active {
@@ -227,12 +321,6 @@
   padding-top: 12px;
 }
 
-.quote-card__params-note {
-  margin: 0 0 10px;
-  font-size: 12px;
-  color: #676879;
-}
-
 .quote-card__params-subtitle {
   font-size: 11px;
   font-weight: 700;
@@ -240,6 +328,26 @@
   text-transform: uppercase;
   letter-spacing: 0.02em;
   margin-bottom: 8px;
+}
+
+/* "Restablecer" al lado de la grilla de campos ajustables (a pedido) — align-items:
+   flex-end para que quede a la altura de los inputs, no de los labels de arriba. La
+   grilla ya no necesita su propio margin-bottom (ver .quote-card__params-grid), lo da
+   esta fila. */
+.quote-card__params-adjustable-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.quote-card__params-adjustable-row .quote-card__params-grid {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.quote-card__reset-btn {
+  flex-shrink: 0;
 }
 
 .quote-card__params-fixed {
@@ -283,16 +391,6 @@
   color: #676879;
 }
 
-.quote-card__params-field input {
-  padding: 6px 8px;
-  border: 1px solid #d0d4e4;
-  border-radius: 6px;
-  font-size: 13px;
-  color: #323338;
-}
+/* NumberField (@vibe/core) ya trae su propio padding/borde/radio — no queda nada que
+   pisar acá (antes esto apuntaba al <input type="number"> a mano). */
 
-.quote-card__params-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}

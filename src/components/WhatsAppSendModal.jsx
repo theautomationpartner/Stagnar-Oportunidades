@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { MdSend, MdCheckCircle, MdWarningAmber } from 'react-icons/md'
-import { Modal, ModalHeader, ModalContent, ModalFooter, AttentionBox } from '@vibe/core'
+import { Modal, ModalHeader, ModalContent, ModalFooter, AttentionBox, Loader, TextField } from '@vibe/core'
 import { sendQuotesToWhatsApp, getMakeWebhookUrl } from '../services/makeWebhook'
 import './WhatsAppSendModal.css'
 
@@ -55,7 +55,7 @@ export default function WhatsAppSendModal({
           <div className="wa-modal__status">
             {sendPolling ? (
               <AttentionBox type="warning" icon={false}>
-                <span className="wa-modal__status-spinner" aria-hidden="true" />
+                <Loader size={14} className="wa-modal__status-spinner" />
                 Enviando por WhatsApp... esperando la confirmación de Make.
               </AttentionBox>
             ) : opportunity.estadoEnvio === 'Error' ? (
@@ -79,15 +79,14 @@ export default function WhatsAppSendModal({
           </div>
         ) : (
           <>
-            <label className="wa-modal__field">
-              <span>Número de teléfono</span>
-              <input
-                type="text"
-                placeholder="Ej: 099 123 456"
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-              />
-            </label>
+            {/* TextField nativo de @vibe/core en vez de <label>+<input> a mano. */}
+            <TextField
+              wrapperClassName="wa-modal__field"
+              title="Número de teléfono"
+              placeholder="Ej: 099 123 456"
+              value={phone}
+              onChange={(value) => setPhone(value)}
+            />
 
             <div className="wa-modal__preview-label">
               Previsualización ({images.length} {images.length === 1 ? 'imagen' : 'imágenes'})

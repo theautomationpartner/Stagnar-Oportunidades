@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { MdExpandLess, MdExpandMore, MdSearch } from 'react-icons/md'
-import { Button, Dropdown } from '@vibe/core'
+import { Button, Dropdown, TextField, Search } from '@vibe/core'
 import './FilterPanel.css'
 
 // Dropdown (@vibe/core) maneja {value, label} y el objeto entero como valor
@@ -26,17 +26,17 @@ function FilterSelect({ label, field, value, options, onChange, placeholder }) {
   )
 }
 
+// TextField nativo de @vibe/core en vez de <label>+<input> a mano.
 function FilterInput({ label, field, value, onChange, placeholder }) {
   return (
-    <label className="filter-field">
-      <span>{label}</span>
-      <input
-        type="text"
-        placeholder={placeholder}
-        value={value}
-        onChange={(e) => onChange(field, e.target.value)}
-      />
-    </label>
+    <TextField
+      wrapperClassName="filter-field"
+      title={label}
+      size="small"
+      placeholder={placeholder}
+      value={value}
+      onChange={(newValue) => onChange(field, newValue)}
+    />
   )
 }
 
@@ -68,12 +68,14 @@ export default function FilterPanel({
 
       {!collapsed && (
         <>
-          <input
+          {/* Search nativo de @vibe/core — ya trae ícono de lupa, botón de limpiar y
+              debounce, en vez de un <input> a mano. */}
+          <Search
             className="filter-panel__search"
-            type="text"
             placeholder="Buscar por nombre, apellido, CI, teléfono, bien o compañía..."
             value={searchTerm}
-            onChange={(e) => onSearchTermChange(e.target.value)}
+            onChange={onSearchTermChange}
+            showClearIcon
           />
 
           <div className="filter-panel__fields">

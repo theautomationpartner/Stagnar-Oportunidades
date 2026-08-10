@@ -676,19 +676,26 @@ export async function countOportunidadesByCedula(ci) {
 // poder reusar los datos de una Oportunidad ya cargada si el cliente todavía no tiene un
 // ítem formal en Clientes. A diferencia de Clientes (que no tiene columnas separadas de
 // Nombre/Apellido), acá sí existen (text_mm51b055/text_mm51ez7e) — se usan directo en vez
-// de la heurística de partir el nombre completo. También trae Fecha Nacimiento y
-// Teléfono (a pedido, se autocompletan también al elegir una Oportunidad) — Cliente no
-// tiene esas columnas, así que esto es exclusivo de acá.
+// de la heurística de partir el nombre completo. También trae Fecha Nacimiento,
+// Teléfono, Departamento y Localidad (a pedido, se autocompletan también al elegir una
+// Oportunidad) — Cliente no tiene esas columnas, así que esto es exclusivo de acá.
+// Modelo (text_mm54fb7m) se trae solo para MOSTRAR en el resultado de la búsqueda (a
+// pedido, ayuda a distinguir de qué vehículo es esta Oportunidad) — no se autocompleta
+// nada del formulario con él, el paso 2 sigue pidiendo el vehículo de la Oportunidad
+// NUEVA que se está creando.
 const SEARCH_OPORTUNIDADES_QUERY = `
   query SearchOportunidades($boardId: ID!, $rules: [ItemsQueryRule!], $limit: Int!) {
     boards(ids: [$boardId]) {
       items_page(limit: $limit, query_params: { rules: $rules, operator: and }) {
         items {
           id
-          column_values(ids: ["text_mm51b055", "text_mm51ez7e", "numeric_mm51mb0s", "date_mm516agw", "phone_mm519m27"]) {
+          column_values(ids: ["text_mm51b055", "text_mm51ez7e", "numeric_mm51mb0s", "date_mm516agw", "phone_mm519m27", "board_relation_mm54tq30", "board_relation_mm5sqf8t", "text_mm54fb7m"]) {
             id
             text
             value
+            ... on BoardRelationValue {
+              display_value
+            }
           }
         }
       }
@@ -720,7 +727,14 @@ function mapOportunidadItem(item) {
     ci: byId.numeric_mm51mb0s?.text?.trim() || '',
     fechaNacimiento: byId.date_mm516agw?.text?.trim() || '',
     telefono,
+    // board_relation: el "text" plano siempre viene null, el nombre real está en
+    // display_value (ver ... on BoardRelationValue arriba) — el formulario matchea este
+    // nombre contra schema.departamentos/localidades para sacar el id que necesita el
+    // Dropdown (mismo criterio que ya usa cotizarFields.js para "connected").
+    departamentoNombre: byId.board_relation_mm54tq30?.display_value?.trim() || '',
+    localidadNombre: byId.board_relation_mm5sqf8t?.display_value?.trim() || '',
     telefonoCountryShortName,
+    modelo: byId.text_mm54fb7m?.text?.trim() || '',
   }
 }
 
@@ -740,14 +754,21 @@ export async function searchOportunidades(term) {
   const items = data.boards[0]?.items_page.items ?? []
   // Un mismo cliente puede tener varias Oportunidades ya cargadas (una por vehículo) —
   // acá solo importa la persona para precargar el formulario, así que se deduplica por
-  // nombre+apellido+CI en vez de mostrar N filas idénticas.
-  const seen = new Set()
-  const result = []
+  // nombre+apellido+CI en vez de mostrar N filas idénticas. Entre duplicados, se queda
+  // con el más "completo" (más de fechaNacimiento/teléfono/departamento/localidad
+  // cargados), no con el primero que aparezca — antes se quedaba con cualquiera al
+  // azar (según el orden en que responde la API) y podía tocarle justo el que tenía
+  // esos campos vacíos, aunque OTRA oportunidad de la misma persona sí los tuviera.
+  const completeness = (o) => [o.fechaNacimiento, o.telefono, o.departamentoNombre, o.localidadNombre].filter(
+    Boolean
+  ).length
+  const bestByKey = new Map()
   for (const mapped of items.map(mapOportunidadItem)) {
     const key = `${mapped.nombre.toLowerCase()}|${mapped.apellido.toLowerCase()}|${mapped.ci}`
-    if (seen.has(key)) continue
-    seen.add(key)
-    result.push(mapped)
+    const existing = bestByKey.get(key)
+    if (!existing || completeness(mapped) > completeness(existing)) {
+      bestByKey.set(key, mapped)
+    }
   }
-  return result
+  return Array.from(bestByKey.values())
 }

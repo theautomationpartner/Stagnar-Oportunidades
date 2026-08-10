@@ -1,6 +1,17 @@
 import { useEffect, useRef, useState } from 'react'
 import { MdUploadFile, MdClear, MdSearch, MdHome, MdArrowForward } from 'react-icons/md'
-import { Button, Dropdown, AttentionBox, Modal, ModalHeader, ModalContent, ModalFooter } from '@vibe/core'
+import {
+  Button,
+  Dropdown,
+  AttentionBox,
+  Modal,
+  ModalHeader,
+  ModalContent,
+  ModalFooter,
+  Loader,
+  ProgressBar,
+  TextField,
+} from '@vibe/core'
 import {
   createOpportunityItem,
   setMultipleColumnValues,
@@ -293,6 +304,9 @@ function ExistingRecordSearch({ value, onChange }) {
             fechaNacimiento: o.fechaNacimiento,
             telefono: o.telefono,
             telefonoCountryShortName: o.telefonoCountryShortName,
+            departamentoNombre: o.departamentoNombre,
+            localidadNombre: o.localidadNombre,
+            modelo: o.modelo,
           }))
           setOptions([...clienteOptions, ...oportunidadOptions])
         })
@@ -330,13 +344,18 @@ function ExistingRecordSearch({ value, onChange }) {
       }
       optionRenderer={(option) => (
         <div className="crear-op__cliente-option">
-          <span className="crear-op__cliente-option-main">
-            <span className={`crear-op__source-tag crear-op__source-tag--${option.source}`}>
-              {option.source === 'cliente' ? 'Cliente' : 'Oportunidad'}
+          <div className="crear-op__cliente-option-row">
+            <span className="crear-op__cliente-option-main">
+              <span className={`crear-op__source-tag crear-op__source-tag--${option.source}`}>
+                {option.source === 'cliente' ? 'Cliente' : 'Oportunidad'}
+              </span>
+              {option.label}
             </span>
-            {option.label}
-          </span>
-          {option.ci && <span className="crear-op__cliente-option-ci">{option.ci}</span>}
+            {option.ci && <span className="crear-op__cliente-option-ci">{option.ci}</span>}
+          </div>
+          {/* A pedido: el modelo del vehículo de esa Oportunidad, para distinguir de un
+              vistazo si esta persona tiene varias — Cliente no tiene esta info. */}
+          {option.modelo && <span className="crear-op__cliente-option-modelo">{option.modelo}</span>}
         </div>
       )}
       onChange={(option) => onChange(option ?? null)}
@@ -418,35 +437,11 @@ function RequiredDropdown({ onChange, onClear, searchable, options, ...props }) 
   )
 }
 
-// Input de texto con una "x" para borrar el contenido de una — sin esto había que
-// seleccionar todo el texto a mano o borrar letra por letra para corregir un campo. Solo
-// se usa en los inputs de texto plano (Nombre/Apellido/CI/Fecha/Teléfono); los Dropdown
-// del formulario a propósito NO tienen "clearable" (ver RequiredDropdown más arriba —
-// ahí la "x" superpuesta con el click de reabrir el menú terminaba borrando el valor por
-// error), así que no se les agrega esto.
-function ClearableInput({ value, onChange, onClear, ...inputProps }) {
-  return (
-    <div className="crear-op__input-wrap">
-      <input value={value} onChange={onChange} {...inputProps} />
-      {value && (
-        <button
-          type="button"
-          className="crear-op__input-clear"
-          onClick={onClear}
-          aria-label="Borrar campo"
-        >
-          <MdClear />
-        </button>
-      )}
-    </div>
-  )
-}
-
 // Sin ítem de monday creado todavía (recién se está completando el formulario), así que
 // esto solo guarda el File en memoria — la subida real a la columna correspondiente
 // (file_mm51jy06 / file_mm5pc008) se hace más adelante, cuando se sepa en qué paso se
 // crea efectivamente el ítem.
-function FileField({ label, file, onChange, required = true }) {
+function FileField({ label, file, onChange, required = true, fullWidth = false }) {
   const inputRef = useRef(null)
   const [dragOver, setDragOver] = useState(false)
 
@@ -465,7 +460,7 @@ function FileField({ label, file, onChange, required = true }) {
   }
 
   return (
-    <label className="crear-op__field">
+    <label className={fullWidth ? 'crear-op__field crear-op__field--full' : 'crear-op__field'}>
       <span>{label}{required ? ' *' : ''}</span>
       <div
         className={dragOver ? 'crear-op__file crear-op__file--drag-over' : 'crear-op__file'}
@@ -669,10 +664,19 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
     if (!resultado) return
     setBusquedaResuelta(true)
     if (resultado.source === 'oportunidad') {
-      // A pedido: Fecha Nacimiento y Teléfono también se autocompletan acá — Cliente no
-      // tiene esas columnas (ver mapClienteItem/mondayApi.js), así que es exclusivo del
-      // caso Oportunidad.
+      // A pedido: Fecha Nacimiento, Teléfono, Departamento y Localidad también se
+      // autocompletan acá — Cliente no tiene esas columnas (ver mapClienteItem/
+      // mondayApi.js), así que es exclusivo del caso Oportunidad. Departamento/Localidad
+      // vienen como nombre (display_value de un board_relation, ver mondayApi.js), hay
+      // que matchearlos contra la lista real para sacar el id que necesita el Dropdown
+      // — mismo criterio que ya usa cotizarFields.js para los campos "connected".
       const { codigoPais, telefono } = splitTelefono(resultado.telefono, resultado.telefonoCountryShortName)
+      const departamentoMatch = (schema?.departamentos ?? []).find(
+        (d) => d.name.toLowerCase() === (resultado.departamentoNombre || '').toLowerCase()
+      )
+      const localidadMatch = (schema?.localidades ?? []).find(
+        (l) => l.name.toLowerCase() === (resultado.localidadNombre || '').toLowerCase()
+      )
       setForm((prev) => ({
         ...prev,
         nombre: resultado.nombre || prev.nombre,
@@ -681,6 +685,8 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
         fechaNacimiento: resultado.fechaNacimiento || prev.fechaNacimiento,
         codigoPais: codigoPais || prev.codigoPais,
         telefono: telefono || prev.telefono,
+        departamentoId: departamentoMatch?.id ?? prev.departamentoId,
+        localidadId: localidadMatch?.id ?? prev.localidadId,
       }))
     } else {
       const { nombre, apellido } = splitNombreApellido(resultado.name)
@@ -1135,9 +1141,9 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
               // gap de siempre entre pills (crear-op__steps), no un hueco vacío al lado.
               if (index === 1 && !isStepValid(0)) return null
               return (
-                <button
+                <Button
                   key={s.key}
-                  type="button"
+                  kind="tertiary"
                   className={
                     index === stepIndex
                       ? 'crear-op__step crear-op__step--active'
@@ -1146,16 +1152,20 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                   onClick={() => handleStepClick(index)}
                 >
                   Paso {index + 1} — {stepLabels[index]}
-                </button>
+                </Button>
               )
             })}
           </div>
-          <div className="crear-op__progress-bar">
-            <div
-              className="crear-op__progress-fill"
-              style={{ width: `${((stepIndex + 1) / STEPS.length) * 100}%` }}
-            />
-          </div>
+          {/* ProgressBar nativo de @vibe/core en vez de un div con width a mano. */}
+          <ProgressBar
+            className="crear-op__progress-bar"
+            size="small"
+            barStyle="primary"
+            min={1}
+            max={STEPS.length}
+            value={stepIndex + 1}
+            aria-label={`Paso ${stepIndex + 1} de ${STEPS.length}`}
+          />
         </div>
 
         {stepIndex === 0 && (
@@ -1174,7 +1184,7 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                   {resultadoSeleccionado.source === 'cliente' ? 'Cliente' : 'Oportunidad'} seleccionado:{' '}
                   {resultadoSeleccionado.name} — se completaron{' '}
                   {resultadoSeleccionado.source === 'oportunidad'
-                    ? 'Nombre/Apellido/CI/Fecha Nacimiento/Teléfono'
+                    ? 'Nombre/Apellido/CI/Fecha Nacimiento/Teléfono/Departamento/Localidad'
                     : 'Nombre/Apellido/CI'}{' '}
                   abajo, revisalos antes de continuar.
                 </span>
@@ -1214,37 +1224,48 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
 
             {busquedaResuelta && (
               <>
-            <label className={`crear-op__field${fieldStateClass(form.nombre, false)}`}>
-              <span>Nombre *</span>
-              <ClearableInput
-                type="text"
-                placeholder="Ingresa el nombre"
-                value={form.nombre}
-                onChange={(e) => handleChange('nombre', e.target.value)}
-                onClear={() => handleChange('nombre', '')}
-              />
-            </label>
-            <label className={`crear-op__field${fieldStateClass(form.apellido, false)}`}>
-              <span>Apellido *</span>
-              <ClearableInput
-                type="text"
-                placeholder="Ingresa el apellido"
-                value={form.apellido}
-                onChange={(e) => handleChange('apellido', e.target.value)}
-                onClear={() => handleChange('apellido', '')}
-              />
-            </label>
-            <label className={`crear-op__field${fieldStateClass(form.ci, ciError(form.ci))}`}>
-              <span>CI *</span>
-              <ClearableInput
-                type="text"
-                placeholder="Ej: 4.123.456-7"
-                value={form.ci}
-                onChange={(e) => handleChange('ci', e.target.value)}
-                onClear={() => handleChange('ci', '')}
-              />
-              {ciError(form.ci) && <span className="crear-op__field-error">{ciError(form.ci)}</span>}
-            </label>
+            {/* TextField nativo de @vibe/core en vez de <label> + ClearableInput a mano —
+                ya trae label (title/required), botón de limpiar (icon/onIconClick/
+                clearOnIconClick) y el borde verde/rojo (validation) de fábrica. */}
+            <TextField
+              wrapperClassName="crear-op__field"
+              title="Nombre"
+              required
+              placeholder="Ingresa el nombre"
+              value={form.nombre}
+              onChange={(value) => handleChange('nombre', value)}
+              icon={form.nombre ? MdClear : undefined}
+              onIconClick={() => handleChange('nombre', '')}
+              validation={form.nombre ? { status: 'success' } : undefined}
+            />
+            <TextField
+              wrapperClassName="crear-op__field"
+              title="Apellido"
+              required
+              placeholder="Ingresa el apellido"
+              value={form.apellido}
+              onChange={(value) => handleChange('apellido', value)}
+              icon={form.apellido ? MdClear : undefined}
+              onIconClick={() => handleChange('apellido', '')}
+              validation={form.apellido ? { status: 'success' } : undefined}
+            />
+            <TextField
+              wrapperClassName="crear-op__field"
+              title="CI"
+              required
+              placeholder="Ej: 4.123.456-7"
+              value={form.ci}
+              onChange={(value) => handleChange('ci', value)}
+              icon={form.ci ? MdClear : undefined}
+              onIconClick={() => handleChange('ci', '')}
+              validation={
+                ciError(form.ci)
+                  ? { status: 'error', text: ciError(form.ci) }
+                  : form.ci
+                    ? { status: 'success' }
+                    : undefined
+              }
+            />
             <label className={`crear-op__field${fieldStateClass(form.fechaNacimiento, fechaError(form.fechaNacimiento))}`}>
               <span>Fecha Nacimiento *</span>
               <div className="crear-op__date-wrap">
@@ -1269,9 +1290,7 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                 <span className="crear-op__field-error">{fechaError(form.fechaNacimiento)}</span>
               )}
             </label>
-            <label
-              className={`crear-op__field crear-op__field--full${fieldStateClass(form.telefono, telefonoError(form.telefono, form.codigoPais))}`}
-            >
+            <label className="crear-op__field crear-op__field--full">
               <span>Teléfono *</span>
               <div className="crear-op__phone">
                 <div className="crear-op__phone-code">
@@ -1281,12 +1300,22 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                     onChange={(option) => handleChange('codigoPais', option?.value ?? '')}
                   />
                 </div>
-                <ClearableInput
-                  type="text"
+                {/* Sin title acá — el label de arriba ("Teléfono *") ya cubre a los 2
+                    campos (código de país + número) juntos. */}
+                <TextField
+                  wrapperClassName="crear-op__phone-number"
                   placeholder="Ej: 099 123 456"
                   value={form.telefono}
-                  onChange={(e) => handleChange('telefono', e.target.value)}
-                  onClear={() => handleChange('telefono', '')}
+                  onChange={(value) => handleChange('telefono', value)}
+                  icon={form.telefono ? MdClear : undefined}
+                  onIconClick={() => handleChange('telefono', '')}
+                  validation={
+                    telefonoError(form.telefono, form.codigoPais)
+                      ? { status: 'error' }
+                      : form.telefono
+                        ? { status: 'success' }
+                        : undefined
+                  }
                 />
               </div>
               {telefonoError(form.telefono, form.codigoPais) && (
@@ -1333,6 +1362,19 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                 onChange={(option) => handleChange('tipoRiesgo', option?.value ?? '')}
               />
             </label>
+            {/* A pedido: Cédula Identidad se pide acá, en el paso 1, en vez de repetida en
+                las 2 ramas del paso 2 (Posee Vehículo Sí/No) — opcional, no bloquea
+                avanzar. El archivo queda en memoria hasta que exista el ítem (se crea
+                recién en el paso 2 o al guardar); handleGuardar tiene el fallback que lo
+                sube si todavía no se subió para entonces. */}
+            <FileField
+              label="Cédula Identidad"
+              required={false}
+              file={form.cedulaIdentidad}
+              onChange={handleCedulaIdentidadChange}
+              fullWidth
+            />
+            {cedulaSubiendo && <p className="crear-op__autofill">Subiendo Cédula Identidad...</p>}
               </>
             )}
           </div>
@@ -1360,30 +1402,20 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
 
             {esAutomovil && form.poseeVehiculo === 'Si' && (
               <>
-                {/* A pedido: los 2 archivos se piden juntos de entrada (Cédula Identidad
-                    opcional, no bloquea nada) — antes recién aparecía después de que la
-                    lectura terminaba, muy tarde en el flujo. */}
-                <div className="crear-op__fields--grid">
-                  <FileField
-                    label="Carta Automóvil / Cédula Automovil"
-                    file={form.cartaAutomovil}
-                    onChange={handleCartaAutomovilChange}
-                  />
-                  <FileField
-                    label="Cédula Identidad"
-                    required={false}
-                    file={form.cedulaIdentidad}
-                    onChange={handleCedulaIdentidadChange}
-                  />
-                </div>
-                {cedulaSubiendo && <p className="crear-op__autofill">Subiendo Cédula Identidad...</p>}
+                {/* Cédula Identidad se movió al paso 1 (a pedido) — acá solo queda Carta
+                    Automóvil, la que dispara la lectura automática. */}
+                <FileField
+                  label="Carta Automóvil / Cédula Automovil"
+                  file={form.cartaAutomovil}
+                  onChange={handleCartaAutomovilChange}
+                />
 
                 {(lecturaEstado === 'subiendo' ||
                   lecturaEstado === 'confirmando' ||
                   lecturaEstado === 'Leer' ||
                   lecturaEstado === 'Leyendo') && (
                   <AttentionBox type="warning" icon={false}>
-                    <span className="crear-op__lectura-spinner" aria-hidden="true" />
+                    <Loader size={13} className="crear-op__lectura-spinner" />
                     {lecturaEstado === 'subiendo' && 'Subiendo Carta Automóvil...'}
                     {lecturaEstado === 'confirmando' && 'Confirmando...'}
                     {lecturaEstado === 'Leer' && 'En cola para leer Cédula y Carta Automóvil...'}
@@ -1486,25 +1518,16 @@ export default function CrearOportunidadForm({ schema, onCancel, onVerOportunida
                   usoOptions={usoOptions}
                   onModeloChange={handleModeloChange}
                 />
-                {/* A pedido: se piden los 2 archivos a la vez acá (antes solo se pedía
-                    Cédula Identidad en este caso) — los dos opcionales, no bloquean el
-                    guardado. */}
-                <div className="crear-op__fields--grid">
-                  <FileField
-                    label="Carta Automóvil / Cédula Automovil"
-                    required={false}
-                    file={form.cartaAutomovil}
-                    onChange={handleCartaAutomovilManualChange}
-                  />
-                  <FileField
-                    label="Cédula Identidad"
-                    required={false}
-                    file={form.cedulaIdentidad}
-                    onChange={handleCedulaIdentidadChange}
-                  />
-                </div>
+                {/* Cédula Identidad se movió al paso 1 (a pedido) — acá solo queda Carta
+                    Automóvil, opcional en este caso (no hay lectura automática que
+                    dispare). */}
+                <FileField
+                  label="Carta Automóvil / Cédula Automovil"
+                  required={false}
+                  file={form.cartaAutomovil}
+                  onChange={handleCartaAutomovilManualChange}
+                />
                 {cartaSubiendo && <p className="crear-op__autofill">Subiendo Carta Automóvil...</p>}
-                {cedulaSubiendo && <p className="crear-op__autofill">Subiendo Cédula Identidad...</p>}
               </>
             )}
           </div>

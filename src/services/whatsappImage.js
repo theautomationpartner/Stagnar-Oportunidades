@@ -219,7 +219,9 @@ function drawContent(ctx, opportunity, raw, quote, canvasHeight) {
   if (quote.warning) {
     y += 20
     ctx.font = 'bold 16px Arial'
-    const warnLines = wrapLines(ctx, `⚠ ${quote.warning}`, WIDTH - 140)
+    // La versión completa (con compañía + requisito puntual) — la corta es solo para la
+    // tarjeta de la app antes de desplegar "Ver más", acá conviene el detalle entero.
+    const warnLines = wrapLines(ctx, `⚠ ${quote.warning.full}`, WIDTH - 140)
     const warnHeight = 20 + warnLines.length * 22 + 16
     ctx.fillStyle = BRAND_COLORS.crema
     ctx.fillRect(50, y, WIDTH - 100, warnHeight)

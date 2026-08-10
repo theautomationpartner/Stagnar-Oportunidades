@@ -18,10 +18,12 @@ const GLOBAL_COBERTURAS = new Set([
 
 const TRIPLE_COBERTURAS = new Set(['TRIPLE - ANUAL', 'TRIPLE - 3X2', 'TRIPLE', 'PARCIAL', 'PARCIAL PLUS', '4 EN 1'])
 
+// A pedido: GLOBAL primero (también la solapa que arranca activa por defecto, ver
+// coberturaTabIndex en OpportunityDetail.jsx), después TRIPLE, General al final.
 export const COBERTURA_TABS = [
-  { key: 'general', label: 'General' },
   { key: 'GLOBAL', label: 'GLOBAL' },
   { key: 'TRIPLE', label: 'TRIPLE' },
+  { key: 'general', label: 'General' },
 ]
 
 // null si la cobertura no matchea ninguna de las 2 familias (dato viejo/inesperado) —

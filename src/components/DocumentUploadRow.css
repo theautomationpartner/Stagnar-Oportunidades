@@ -99,20 +99,10 @@
   background: #fdf1f2 !important;
 }
 
+/* Loader nativo de @vibe/core (ver JSX) — solo el color acá. */
 .doc-upload-row__spinner {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 2px solid #fde3c4;
-  border-top-color: #a15c00;
+  color: #a15c00;
   flex-shrink: 0;
-  animation: doc-upload-row-spin 0.8s linear infinite;
-}
-
-@keyframes doc-upload-row-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .doc-upload-row__error {

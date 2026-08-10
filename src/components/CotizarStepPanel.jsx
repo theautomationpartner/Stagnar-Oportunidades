@@ -7,7 +7,7 @@ import {
   MdAutorenew,
   MdWarningAmber,
 } from 'react-icons/md'
-import { Button, Dropdown, AttentionBox } from '@vibe/core'
+import { Button, Dropdown, AttentionBox, Loader, TextField, NumberField } from '@vibe/core'
 import { COTIZAR_FIELDS, getMissingCotizarFields } from '../services/cotizarFields'
 import { searchAutodataModelos } from '../services/mondayApi'
 import StatusBadge from './StatusBadge'
@@ -103,10 +103,18 @@ function AutodataModeloSelect({ currentLabel, value, onChange }) {
 
 function FieldControl({ field, value, onChange, options, currentModelo }) {
   if (field.kind === 'text') {
-    return <input type="text" value={value} onChange={(e) => onChange(e.target.value)} />
+    return <TextField size="small" value={value} onChange={(newValue) => onChange(newValue)} />
   }
   if (field.kind === 'number') {
-    return <input type="number" value={value} onChange={(e) => onChange(e.target.value)} />
+    // NumberField (@vibe/core) maneja number|null, el form de este panel sigue en
+    // string (mismo criterio que el resto de los campos) — se adapta acá mismo.
+    return (
+      <NumberField
+        size="small"
+        value={value === '' ? null : Number(value)}
+        onChange={(newValue) => onChange(newValue == null ? '' : String(newValue))}
+      />
+    )
   }
   if (field.kind === 'date') {
     return <input type="date" value={value} onChange={(e) => onChange(e.target.value)} />
@@ -287,7 +295,7 @@ export default function CotizarStepPanel({
 
       {!editing && polling && (
         <AttentionBox type="warning" icon={false}>
-          <span className="cotizar-step__spinner" aria-hidden="true" />
+          <Loader size={13} className="cotizar-step__spinner" />
           {hasQuotes ? 'Recotizando' : 'Cotizando'} con las compañías... esto puede tardar unos
           segundos. La pantalla se va a actualizar sola apenas esté lista.
         </AttentionBox>

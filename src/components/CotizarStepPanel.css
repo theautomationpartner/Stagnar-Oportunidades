@@ -149,20 +149,10 @@
   margin-top: 10px;
 }
 
+/* Loader nativo de @vibe/core (ver JSX) — solo el color acá. */
 .cotizar-step__spinner {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 2px solid #fde3c4;
-  border-top-color: #a15c00;
+  color: #a15c00;
   flex-shrink: 0;
-  animation: cotizar-step-spin 0.8s linear infinite;
-}
-
-@keyframes cotizar-step-spin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 .cotizar-step__error {
