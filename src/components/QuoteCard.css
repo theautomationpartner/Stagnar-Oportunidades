@@ -1,28 +1,45 @@
 /* border-left-color se pisa inline por tarjeta (accentForCompania) — mismo criterio de
    color por compañía que el paso 3 "Confirmar" (ver companyColors.js), pero más fina
-   (2px vs. 4px) y con el borde redondeado en vez de a filo recto. */
+   (2px vs. 4px) y con el borde redondeado en vez de a filo recto.
+   A pedido, estética tipo mockup: layout VERTICAL (columna) en vez de las 3 columnas
+   lado a lado de antes — con 3 tarjetas por renglón (ver .opp-detail__quotes, ahora CSS
+   Grid en vez de "columns") no entraba ancho para eso; ver .quote-card__header más
+   abajo para cómo quedan título/deducible y COSTO TOTAL en la misma fila de arriba. */
 .quote-card {
-  display: grid;
-  grid-template-columns: 1.6fr 1.2fr 0.9fr;
-  gap: 16px;
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   padding: 16px 20px;
   border: 1px solid #e6e9ef;
   border-left-width: 2px;
   border-radius: 8px;
   background: #fff;
-  /* .opp-detail__quotes usa "columns" (2 flujos independientes) — eso apila las
-     tarjetas de una misma columna una debajo de la otra, así que hace falta este
-     margen (antes lo daba el gap del grid) para separarlas; break-inside evita que el
-     navegador corte una tarjeta a la mitad entre una columna y la otra. */
-  margin-bottom: 16px;
-  break-inside: avoid;
 }
 
-@media (max-width: 640px) {
-  .quote-card {
-    grid-template-columns: 1fr;
-    padding: 14px 16px;
+.quote-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.quote-card__header-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.quote-card__deducible-line {
+  font-size: 12px;
+  color: #676879;
+}
+
+@media (max-width: 480px) {
+  .quote-card__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
   }
 
   .quote-card__total {
@@ -97,46 +114,12 @@
   font-size: 14px;
 }
 
-.quote-card__custom-tag {
-  font-size: 10px;
-  font-weight: 700;
-  color: #9d50dd;
-  background: #f5ebfd;
-  border-radius: 10px;
-  padding: 2px 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
-
-.quote-card__meta {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
-}
-
-.quote-card__meta-label {
-  color: #676879;
-  margin-right: 6px;
-}
-
-.quote-card__meta-value {
-  color: #323338;
-  font-weight: 600;
-}
-
-/* RC con override — mismo violeta que los tags de overrideTags/quote-card__custom-tag,
-   para marcarlo sin agregarle un tag aparte (a pedido). */
-.quote-card__meta-value--override {
-  color: #9d50dd;
-}
-
-/* Versión corta de la advertencia (ver quote.warning.short), al mismo nivel que
-   Deducible/Uso/RC — a pedido, compacta (una línea, sin caja/padding grande) para que
-   la tarjeta no quede más alta que una sin advertencia. La versión completa sigue
-   siendo la caja grande (.quote-card__warning), pero recién adentro de "Ver más". */
-/* min-height (no el contenido) es lo que reserva el lugar — el div se renderiza
-   siempre, con o sin advertencia (ver JSX), así todas las tarjetas miden lo mismo. */
+/* Versión corta de la advertencia (ver quote.warning.short) — a pedido, compacta (una
+   línea, sin caja/padding grande) para que la tarjeta no quede más alta que una sin
+   advertencia. La versión completa sigue siendo la caja grande (.quote-card__warning),
+   pero recién adentro de "Parámetros". min-height (no el contenido) es lo que reserva
+   el lugar — el div se renderiza siempre, con o sin advertencia (ver JSX), así todas
+   las tarjetas de un mismo renglón miden lo mismo. */
 .quote-card__meta-warning {
   display: flex;
   align-items: center;
@@ -188,6 +171,7 @@
   align-items: flex-end;
   gap: 6px;
   text-align: right;
+  flex-shrink: 0;
 }
 
 .quote-card__total-label {
@@ -202,14 +186,26 @@
 }
 
 /* Tags de qué parámetros ajustables tiene esta cotización puntual (ver overrideTags en
-   QuoteCard.jsx) — mismo look que .quote-card__custom-tag (violeta), pero uno por campo
-   en vez de un solo "Parámetros propios" genérico. */
+   QuoteCard.jsx) — renglón propio a lo ancho de la tarjeta (a pedido: antes apretados a
+   la derecha, debajo de COSTO TOTAL, inflaban esa columna angosta y terminaban
+   invadiendo visualmente el título). Sin margin-top: el gap de .quote-card (flex column)
+   ya separa este renglón del header de arriba. */
+/* A pedido: el max-width: 50% de antes agrupaba los tags en un bloque angosto a la
+   izquierda y dejaba todo el resto del renglón (a la derecha, bajo COSTO TOTAL) vacío —
+   sin ese límite, los tags aprovechan todo el ancho disponible y bajan de renglón recién
+   cuando de verdad no entran más.
+   min-height: reserva SIEMPRE el alto de una fila de tags (el div ahora se renderiza
+   siempre, con o sin tags — ver JSX) para que una tarjeta con 1 tag (ej. "Granizo") no
+   quede más alta que sus vecinas sin ninguno, así los botones de abajo no se desalinean
+   entre tarjetas de un mismo renglón (mismo criterio que .quote-card__meta-warning más
+   abajo). Cubre el caso común (0 o 1 línea); con 3-4 tags de golpe (varios parámetros
+   ajustados a la vez) la fila crece igual a una 2da línea — ahí sí puede quedar más alta
+   que sus vecinas, pero es la excepción, no lo típico. */
 .quote-card__override-tags {
   display: flex;
   flex-wrap: wrap;
-  justify-content: flex-end;
-  gap: 4px;
-  margin-top: 2px;
+  gap: 6px;
+  min-height: 20px;
 }
 
 /* Opcionales PORTO tildados (Granizo/Cristales/Coche Cortesía) — en verde, no violeta,
@@ -236,7 +232,6 @@
 }
 
 .quote-card__warning {
-  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -254,31 +249,32 @@
   flex-shrink: 0;
 }
 
-/* La versión completa (adentro de "Ver más") necesita separación de lo que viene
-   después ("DATOS FIJOS"), a diferencia de la corta (pegada al botón "Ver más"). */
+/* La versión completa (adentro de "Parámetros") necesita separación de lo que viene
+   después ("DATOS FIJOS"), a diferencia de la corta (pegada a la tabla de cuotas). */
 .quote-card__warning--full {
   margin-bottom: 12px;
 }
 
-/* A pedido: barra de ancho completo más abajo (antes al lado de COSTO TOTAL, arriba) —
-   único botón que despliega detalles + parámetros. */
-.quote-card__more-btn {
-  grid-column: 1 / -1;
-  width: 100%;
-  justify-content: center;
-  margin-top: 4px;
+/* A pedido, estética tipo mockup: 2 botones de ancho parejo en vez del único "Ver más"
+   de antes — Parámetros/Coberturas, mutuamente excluyentes (ver openPanel en el JSX). */
+.quote-card__actions {
+  display: flex;
+  gap: 8px;
 }
 
-.quote-card__params-btn--active {
+.quote-card__action-btn {
+  flex: 1;
+  justify-content: center;
+}
+
+.quote-card__action-btn--active {
   background: #eef6ff;
   border-color: #0073ea;
   color: #0073ea;
 }
 
 .quote-card__detail {
-  grid-column: 1 / -1;
   border-top: 1px dashed #e6e9ef;
-  margin-top: 8px;
   padding-top: 10px;
   font-size: 12px;
   color: #676879;
@@ -315,9 +311,7 @@
 }
 
 .quote-card__params {
-  grid-column: 1 / -1;
   border-top: 1px solid #e6e9ef;
-  margin-top: 8px;
   padding-top: 12px;
 }
 

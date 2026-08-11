@@ -4,13 +4,12 @@ import {
   MdRadioButtonChecked,
   MdRadioButtonUnchecked,
   MdListAlt,
+  MdTune,
 } from 'react-icons/md'
 import { Button, IconButton, Dropdown, Checkbox, NumberField } from '@vibe/core'
-import { formatMoney } from '../services/format'
+import { formatMoney, CUOTA_COUNTS, toPercentString } from '../services/format'
 import { accentForCompania } from '../services/companyColors'
 import './QuoteCard.css'
-
-const CUOTA_COUNTS = [3, 6, 8, 10]
 
 const BSE_DEDUCIBLE_OPTIONS = ['0.5', '1', '1.5', '2', '2.5', '3']
 const BSE_EDAD_OPTIONS = ['No', '35 a 75', '56 a 75']
@@ -34,6 +33,7 @@ const PORTO_OPCIONALES = [
 const FIXED_FIELDS = [
   { key: 'contado', label: 'Contado/Costo', kind: 'money' },
   { key: 'deducibleBase', label: 'Deducible', kind: 'text' },
+  { key: 'uso', label: 'Uso', kind: 'text' },
 ]
 
 // Únicos campos editables por cotización: Bonificación/Descuento son palancas
@@ -63,12 +63,6 @@ function fieldsForRaw(raw, rcOptions) {
   }
 
   return common
-}
-
-function toPercentString(rawValue) {
-  const n = parseFloat(rawValue)
-  if (!Number.isFinite(n)) return '0'
-  return String(Math.round(n * 100 * 10000) / 10000)
 }
 
 function fromPercentString(value) {
@@ -147,10 +141,11 @@ export default function QuoteCard({
   onToggleOpcional,
   rcOptions,
 }) {
-  // A pedido: un solo botón que despliega TODO (parámetros ajustables + datos fijos +
-  // detalle del vehículo/incluye) — antes eran 2 botones separados ("Parámetros"/"Ver
-  // detalle") que abrían cada sección por su lado.
-  const [showMore, setShowMore] = useState(false)
+  // A pedido, estética tipo mockup: 2 botones separados ("Parámetros"/"Coberturas") que
+  // NO se pueden desplegar a la vez — un solo estado con el panel abierto (o ninguno) en
+  // vez de 2 booleans independientes, así abrir uno cierra el otro solo por construcción
+  // (nunca hay que acordarse de apagar el otro a mano).
+  const [openPanel, setOpenPanel] = useState(null)
   const fields = fieldsForRaw(raw, rcOptions)
   const [form, setForm] = useState(() => buildInitialForm(raw, overrides, fields))
   const [savingOpcional, setSavingOpcional] = useState(null)
@@ -204,9 +199,16 @@ export default function QuoteCard({
     })
   }
 
-  const handleToggleMore = () => {
-    if (!showMore) setForm(buildInitialForm(raw, overrides, fields))
-    setShowMore((v) => !v)
+  // Al abrir "Parámetros" se refresca el form con los valores reales vigentes (mismo
+  // motivo que antes: si se cerró con "Restablecer" pendiente o cambió algo por fuera,
+  // no queremos mostrar un valor viejo de una apertura anterior).
+  const handleToggleParams = () => {
+    if (openPanel !== 'params') setForm(buildInitialForm(raw, overrides, fields))
+    setOpenPanel((prev) => (prev === 'params' ? null : 'params'))
+  }
+
+  const handleToggleCoberturas = () => {
+    setOpenPanel((prev) => (prev === 'coberturas' ? null : 'coberturas'))
   }
 
   const handleReset = () => {
@@ -235,57 +237,71 @@ export default function QuoteCard({
       className={selected ? 'quote-card quote-card--selected' : 'quote-card'}
       style={{ borderLeftColor: accent }}
     >
-      <div className="quote-card__main">
-        <div className="quote-card__title-row">
-          <IconButton
-            className="quote-card__radio"
-            icon={selected ? MdRadioButtonChecked : MdRadioButtonUnchecked}
-            onClick={onToggleSelected}
-            aria-label="Seleccionar opción"
-          />
-          <span className="quote-card__company" style={{ color: accent }}>
-            {raw.compania}
-          </span>
-          <span className="quote-card__title">{raw.cobertura || raw.name}</span>
-          {hasCustomOverrides && <span className="quote-card__custom-tag">Parámetros propios</span>}
+      {/* A pedido, estética tipo mockup: layout vertical (título+deducible a la
+          izquierda, COSTO TOTAL a la derecha, arriba de todo) en vez de las 3 columnas
+          lado a lado de antes — con 3 tarjetas por renglón (ver .opp-detail__quotes) no
+          entraba ancho para eso. Uso/RC ya no van sueltos acá arriba: Uso pasó a "Datos
+          fijos" (adentro de Parámetros) y RC ya se editaba solo adentro de "Parámetros
+          ajustables" (ver overrides.rc), así que mostrarlo acá arriba era redundante. */}
+      <div className="quote-card__header">
+        <div className="quote-card__header-main">
+          <div className="quote-card__title-row">
+            <IconButton
+              className="quote-card__radio"
+              icon={selected ? MdRadioButtonChecked : MdRadioButtonUnchecked}
+              onClick={onToggleSelected}
+              aria-label="Seleccionar opción"
+            />
+            <span className="quote-card__company" style={{ color: accent }}>
+              {raw.compania}
+            </span>
+            <span className="quote-card__title">{raw.cobertura || raw.name}</span>
+          </div>
+          <span className="quote-card__deducible-line">Deduc.: {quote.deducibleDisplay}</span>
         </div>
 
-        <div className="quote-card__meta">
-          <div>
-            <span className="quote-card__meta-label">Deducible</span>
-            <span className="quote-card__meta-value">{quote.deducibleDisplay}</span>
-          </div>
-          <div>
-            <span className="quote-card__meta-label">Uso</span>
-            <span className="quote-card__meta-value">{raw.uso || '—'}</span>
-          </div>
-          <div>
-            <span className="quote-card__meta-label">RC</span>
-            {/* A pedido: el override de RC no va como tag aparte (ver overrideTags) —
-                se marca coloreando este mismo valor que ya se mostraba acá. */}
-            <span
-              className={
-                overrides.rc != null ? 'quote-card__meta-value quote-card__meta-value--override' : 'quote-card__meta-value'
-              }
-            >
-              {quote.rc || '—'}
-            </span>
-          </div>
-          {/* A pedido: la versión corta de la advertencia va acá, al mismo nivel que
-              Deducible/Uso/RC, en vez de en un banner aparte más abajo. Este renglón se
-              reserva SIEMPRE (con o sin advertencia, ver min-height en CSS) para que
-              todas las tarjetas midan lo mismo y los datos queden en el mismo lugar —
-              con advertencia, aparece el texto; sin ella, el espacio queda vacío pero
-              ocupado igual. La versión completa (quote.warning.full) sigue solo
-              adentro de "Ver más". */}
-          <div className="quote-card__meta-warning">
-            {quote.warning && (
-              <>
-                <MdWarningAmber /> {quote.warning.short}
-              </>
-            )}
-          </div>
+        <div className="quote-card__total">
+          <span className="quote-card__total-label">COSTO TOTAL</span>
+          <span className="quote-card__total-value">{formatMoney(quote.total)}</span>
         </div>
+      </div>
+
+      {/* A pedido: qué parámetros ajustables se le agregaron a esta cotización puntual
+          (uno por campo con override activo) y qué opcionales PORTO están tildados, sin
+          tener que abrir "Parámetros" — a diferencia de antes (apretados a la derecha,
+          debajo de COSTO TOTAL) ahora van en su propio renglón a lo ancho: con 3
+          tarjetas por fila (ver .opp-detail__quotes) no entra ancho como para meter 4
+          tags de golpe apretados contra una columna angosta. Reemplaza al tag genérico
+          "Parámetros propios" que tenía el title-row antes — quedaba redundante con
+          esto (ya dice explícitamente QUÉ se ajustó, no solo que "algo" se ajustó).
+          El div se renderiza SIEMPRE (con o sin tags, ver min-height en CSS) — mismo
+          criterio que quote-card__meta-warning más abajo: sin esto, una tarjeta con un
+          tag (ej. "Granizo") queda más alta que sus vecinas sin ninguno y los botones de
+          abajo terminan a distinta altura entre tarjetas de un mismo renglón. */}
+      <div className="quote-card__override-tags">
+        {activeOpcionales.map((opt) => (
+          <span key={opt.field} className="quote-card__opcional-tag">
+            {opt.label}
+          </span>
+        ))}
+        {overrideTags(fields, overrides).map((tag) => (
+          <span key={tag.key} className="quote-card__override-tag">
+            {tag.label}: {tag.value}
+          </span>
+        ))}
+      </div>
+
+      {/* Versión corta de la advertencia (ver quote.warning.full más abajo, adentro de
+          "Parámetros") — este renglón se reserva SIEMPRE (con o sin advertencia, ver
+          min-height en CSS) para que todas las tarjetas de un mismo renglón midan lo
+          mismo: con advertencia, aparece el texto; sin ella, el espacio queda vacío pero
+          ocupado igual. */}
+      <div className="quote-card__meta-warning">
+        {quote.warning && (
+          <>
+            <MdWarningAmber /> {quote.warning.short}
+          </>
+        )}
       </div>
 
       {/* A pedido: el Recargo de cada cuota (antes en "Datos fijos", adentro de
@@ -318,41 +334,35 @@ export default function QuoteCard({
         )}
       </div>
 
-      <div className="quote-card__total">
-        <span className="quote-card__total-label">COSTO TOTAL</span>
-        <span className="quote-card__total-value">{formatMoney(quote.total)}</span>
-        {/* A pedido: qué parámetros ajustables se le agregaron a esta cotización puntual
-            (uno por campo con override activo) y qué opcionales PORTO están tildados,
-            al lado del costo total, sin tener que abrir "Ver más". */}
-        {(hasCustomOverrides || activeOpcionales.length > 0) && (
-          <div className="quote-card__override-tags">
-            {activeOpcionales.map((opt) => (
-              <span key={opt.field} className="quote-card__opcional-tag">
-                {opt.label}
-              </span>
-            ))}
-            {overrideTags(fields, overrides).map((tag) => (
-              <span key={tag.key} className="quote-card__override-tag">
-                {tag.label}: {tag.value}
-              </span>
-            ))}
-          </div>
-        )}
+      {/* A pedido, estética tipo mockup: 2 botones separados en vez de un solo "Ver
+          más" — Parámetros abre datos fijos + ajustables (+ opcionales PORTO si es
+          PORTO), Coberturas abre el detalle del vehículo + "Incluye". Mutuamente
+          excluyentes por construcción (ver openPanel/handleToggleParams/
+          handleToggleCoberturas más arriba: un solo estado, no 2 booleans). */}
+      <div className="quote-card__actions">
+        <Button
+          kind="secondary"
+          className={
+            openPanel === 'params' ? 'quote-card__action-btn quote-card__action-btn--active' : 'quote-card__action-btn'
+          }
+          onClick={handleToggleParams}
+        >
+          <MdTune /> Parámetros
+        </Button>
+        <Button
+          kind="secondary"
+          className={
+            openPanel === 'coberturas'
+              ? 'quote-card__action-btn quote-card__action-btn--active'
+              : 'quote-card__action-btn'
+          }
+          onClick={handleToggleCoberturas}
+        >
+          <MdListAlt /> Coberturas
+        </Button>
       </div>
 
-      {/* A pedido: más abajo, como una barra de ancho completo, en vez de arriba al lado
-          del costo total. */}
-      <Button
-        kind="secondary"
-        className={
-          showMore ? 'quote-card__more-btn quote-card__params-btn--active' : 'quote-card__more-btn'
-        }
-        onClick={handleToggleMore}
-      >
-        <MdListAlt /> {showMore ? 'Ver menos' : 'Ver más'}
-      </Button>
-
-      {showMore && (
+      {openPanel === 'params' && (
         <div className="quote-card__params">
           {/* Versión completa de la advertencia (ver quote.warning.short más arriba, que
               es la que siempre se ve) — acá el detalle: compañía y requisito puntual. */}
@@ -431,7 +441,7 @@ export default function QuoteCard({
         </div>
       )}
 
-      {showMore && (
+      {openPanel === 'coberturas' && (
         <div className="quote-card__detail">
           {/* Compañía/Cobertura ya se muestran arriba (título de la tarjeta) — a pedido,
               acá no se repiten. */}

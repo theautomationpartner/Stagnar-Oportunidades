@@ -1,6 +1,13 @@
+/* A pedido, estética tipo mockup: número arriba + nombre del paso abajo (columna),
+   en vez de la pill horizontal (círculo + label lado a lado) de antes — ver
+   .stepper__step más abajo. align-items:flex-start (no center) porque los labels no
+   miden todos lo mismo de ancho/alto ("Comparar y enviar" vs. "Confirmar"); con center
+   el círculo de cada paso quedaría a distinta altura según el label de al lado, y la
+   línea (que se alinea contra el círculo con un margin-top fijo, ver .stepper__line)
+   dejaría de coincidir. */
 .stepper {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   /* Sin margen de página propio — ahora vive adentro de .opp-detail__breadcrumb, que ya
      tiene su propio padding/gap (ver OpportunityDetail.css). */
   min-width: 0;
@@ -11,8 +18,8 @@
    tablet/celular ese ancho no entra ni cerca, así que se va achicando en 2 escalones. */
 @media (max-width: 900px) {
   .stepper__line {
-    width: 40px;
-    margin: 0 8px;
+    width: 32px;
+    margin: 11px 4px 0;
   }
 }
 
@@ -25,20 +32,28 @@
     display: none;
   }
 
+  .stepper__step {
+    width: auto;
+  }
+
   button.stepper__step {
     padding: 6px;
     margin: -6px;
   }
 
   .stepper__line {
-    width: 16px;
-    margin: 0 4px;
+    width: 14px;
+    margin: 11px 2px 0;
   }
 }
 
 .stepper__item {
   display: flex;
-  align-items: center;
+  /* flex-start (no center): el círculo tiene que arrancar siempre a la misma altura
+     (y=0) en todos los pasos para que .stepper__line (alineada con un margin-top fijo,
+     ver más abajo) le pegue justo en el medio sin importar cuánto mida el label de al
+     lado. */
+  align-items: flex-start;
   /* Antes flex:1 — con el Stepper ahora compartiendo renglón con "Volver" y "Ver en
      Monday" (en vez de ocupar la página entera para él solo), estirar cada tramo a lo
      que sobre de espacio quedaba viéndose innecesariamente separado. Ancho fijo, más
@@ -46,31 +61,58 @@
   flex: 0 0 auto;
 }
 
+/* A pedido, estética tipo mockup: círculo arriba, nombre del paso abajo (columna) — sin
+   la pill/borde de botón que tenía antes (ver el comentario grande sobre .stepper de
+   más arriba). Sigue siendo clickeable (Button kind="tertiary" por debajo cuando
+   step.clickable) — solo queda transparente, sin chrome propio, el cursor y el color
+   del label/círculo ya avisan que se puede tocar.  */
 .stepper__step {
   display: flex;
+  flex-direction: column;
   align-items: center;
-  gap: 8px;
+  gap: 6px;
   flex-shrink: 0;
+  width: 96px;
 }
 
-/* Se pisa el look por defecto de Button (kind="tertiary") con la forma de
-   "pill" que ya usábamos — para que se note a simple vista que cada paso es
-   clickeable, no solo texto con un hover sutil. */
+/* A pedido: mejorar el hover — antes (sin chrome propio, ver el comentario grande de
+   arriba) el único indicio era el subrayado del label, poco visible. Ahora, al pasar el
+   mouse, todo el paso (círculo + label) gana un fondo redondeado + el círculo "pending"
+   se pinta de azul de una (sin esperar a que sea el activo/viewing) — mismo lenguaje de
+   hover que .sidebar__toggle/.sidebar__nav-item (fondo celeste clarito #f0f4fa).
+   Sin padding vertical (a propósito): el paso ACTIVO se renderiza como <div> en vez de
+   <button> cuando no es clickeable (ver Stepper.jsx — ej. CrearOportunidadForm nunca
+   deja clickear el paso que ya estás mirando), y ese <div> no tiene este padding — si acá
+   metiéramos padding-top, el círculo del botón quedaría más abajo que el de ese <div> y
+   dejaría de coincidir con .stepper__line (calibrada para que el círculo arranque en
+   y=0, ver su comentario). Padding solo horizontal: no mueve nada verticalmente. */
 button.stepper__step {
-  border: 1px solid #d0d4e4;
-  background: #fff;
-  padding: 6px 14px 6px 8px;
-  margin: -6px -8px;
-  border-radius: 20px;
+  /* Reset de <button> nativo (ver el comentario grande en Stepper.jsx sobre por qué ya
+     no es el Button de @vibe/core) — font/appearance no vienen gratis como con el
+     componente de la librería. */
+  font: inherit;
+  appearance: none;
+  border: none;
+  background: transparent;
+  padding: 0 8px;
+  margin: 0 -8px;
+  border-radius: 10px;
   cursor: pointer;
-  box-shadow: 0 1px 2px rgba(15, 27, 60, 0.04);
-  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  transition: background-color 0.15s ease;
 }
 
 button.stepper__step:hover {
   background: #f0f4fa;
+}
+
+button.stepper__step:hover .stepper__label {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+button.stepper__step:hover .stepper__circle--pending {
   border-color: #0073ea;
-  box-shadow: 0 1px 4px rgba(0, 115, 234, 0.2);
+  color: #0073ea;
 }
 
 button.stepper__step:active {
@@ -80,16 +122,6 @@ button.stepper__step:active {
 button.stepper__step:focus-visible {
   outline: 2px solid #0073ea;
   outline-offset: 2px;
-}
-
-/* El paso que se está viendo en este momento (activeKey) es un eje aparte
-   del estado de progreso (status) — puede ser cualquiera de los 4, incluso
-   uno ya "done". Se resalta la pill entera, no solo el círculo, para que sea
-   inconfundible cuál estás mirando. */
-button.stepper__step--viewing {
-  border-color: #0073ea;
-  background: #eef6ff;
-  box-shadow: 0 0 0 3px #cfe3fb;
 }
 
 .stepper__circle {
@@ -124,7 +156,8 @@ button.stepper__step--viewing {
   font-size: 13px;
   font-weight: 600;
   color: #9699a6;
-  white-space: nowrap;
+  text-align: center;
+  line-height: 1.25;
 }
 
 .stepper__label--done {
@@ -143,12 +176,19 @@ button.stepper__step--viewing {
 .stepper__line {
   /* Antes flex:1 + min-width:24px (se estiraba a lo que sobrara de ancho) — ancho fijo
      para que el Stepper quede compacto al lado de "Volver"/"Ver en Monday" en vez de
-     todo separado, pero no tan corto como para que los pasos queden pegados entre sí. */
+     todo separado, pero no tan corto como para que los pasos queden pegados entre sí.
+     margin-top: alinea la línea con el CENTRO del círculo (24px de alto / 2 = 12px,
+     menos la mitad del propio grosor de la línea) — .stepper__item ahora arranca sus
+     hijos en flex-start (ver más arriba), así que sin este offset la línea quedaría
+     pegada arriba, a la altura del círculo en vez de cruzarlo por el medio. Con el
+     label ahora abajo del círculo (columna, no al lado), no hace falta tanto ancho como
+     antes para separar un paso del siguiente — el propio ancho de .stepper__step (96px)
+     ya da aire de sobra. */
   flex: 0 0 auto;
-  width: 150px;
+  width: 56px;
   height: 2px;
   background: #e6e9ef;
-  margin: 0 10px;
+  margin: 11px 4px 0;
 }
 
 .stepper__line--done {

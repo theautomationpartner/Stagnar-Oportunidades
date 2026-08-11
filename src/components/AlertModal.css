@@ -1,0 +1,99 @@
+/* Mismo layout que el popup de "Cédula duplicada" (CrearOportunidadForm.css,
+   .confirm-modal__*) — ícono en círculo, título, descripción, todo centrado. */
+.alert-modal__content {
+  padding: 32px 32px 24px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 8px;
+}
+
+.alert-modal__icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 22px;
+  margin-bottom: 4px;
+}
+
+.alert-modal__content--info .alert-modal__icon {
+  background: #eef6ff;
+  color: #0073ea;
+}
+
+.alert-modal__content--error .alert-modal__icon {
+  background: #fdf1f2;
+  color: #e2445c;
+}
+
+.alert-modal__content--warning .alert-modal__icon {
+  background: #fff7e6;
+  color: #fdab3d;
+}
+
+.alert-modal__title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #323338;
+  margin: 0;
+}
+
+.alert-modal__desc {
+  font-size: 13px;
+  color: #676879;
+  margin: 0;
+}
+
+/* Lista de detalles opcional (ej. "Campos pendientes") — caja gris clara, texto en
+   rojo (son ítems que faltan/fallan, mismo criterio de color que .alert-modal__content
+   --error) para que salten a la vista dentro de la caja neutra. */
+.alert-modal__details {
+  width: 100%;
+  margin-top: 6px;
+  padding: 12px 16px;
+  background: #f6f7fb;
+  border-radius: 8px;
+  text-align: left;
+}
+
+.alert-modal__details-title {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: #676879;
+  margin-bottom: 6px;
+}
+
+.alert-modal__details ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.alert-modal__details li {
+  font-size: 13px;
+  font-weight: 600;
+  color: #e2445c;
+  margin-bottom: 2px;
+}
+
+/* Sin secondaryButton (ver AlertModal.jsx) — el primario ocupa todo el ancho en vez de
+   quedar chico y centrado como con 2 botones. */
+.alert-modal__btn--full {
+  width: 100%;
+  justify-content: center;
+}
+
+/* Para acciones tipo "Reintentar" sobre un error real (no una simple confirmación) —
+   rojo en vez del azul/verde de "primary" por defecto. */
+.alert-modal__btn--danger {
+  background-color: #e2445c !important;
+  border-color: #e2445c !important;
+}
+
+.alert-modal__btn--danger:hover {
+  filter: brightness(0.92);
+}

@@ -302,15 +302,33 @@
    la misma altura leyendo en horizontal. 2 columnas solo cuando hay ancho de sobra para
    que cada tarjeta (grilla interna de 3 columnas, ver QuoteCard.css) no quede apretada;
    si no, 1 columna a ancho completo. */
+/* A pedido, estética tipo mockup: grilla de 3 por renglón (antes 2, con "columns" — un
+   flujo tipo masonry que apilaba tarjetas de alto distinto sin alinearlas por fila). CSS
+   Grid en vez de "columns": con QuoteCard ahora en layout vertical (ver QuoteCard.css)
+   las tarjetas de un mismo renglón quedan prolijamente alineadas entre sí, cosa que
+   "columns" no garantiza (reparte por columna completa, no por fila). */
+/* align-items:start (no el "stretch" de fábrica de Grid) — a pedido: con stretch, al
+   abrir "Parámetros"/"Coberturas" en UNA tarjeta, todo el RENGLÓN de la grilla crecía a
+   esa altura y las tarjetas vecinas (cerradas) se estiraban igual, dejando un hueco
+   vacío enorme entre sus botones y el resto de su contenido. Con start, cada tarjeta
+   mide solo lo que necesita — abrir una no infla a las de al lado. */
 .opp-detail__quotes {
-  columns: 2;
-  column-gap: 16px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-items: start;
+  gap: 16px;
   min-width: 0;
 }
 
-@media (max-width: 1100px) {
+@media (max-width: 1300px) {
   .opp-detail__quotes {
-    columns: 1;
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .opp-detail__quotes {
+    grid-template-columns: 1fr;
   }
 }
 

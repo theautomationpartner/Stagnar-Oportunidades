@@ -1,10 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { MdEdit, MdSave, MdClose, MdAutorenew, MdSend } from 'react-icons/md'
 import { Button, Dropdown, AttentionBox, Loader, TextField, NumberField } from '@vibe/core'
 import { COTIZAR_FIELDS, getMissingCotizarFields } from '../services/cotizarFields'
 import { matchesSearchQuery } from '../services/format'
 import StatusBadge from './StatusBadge'
 import AutodataModeloPorAnioMarca from './AutodataModeloPorAnioMarca'
+import AlertModal from './AlertModal'
 import './CotizarStepPanel.css'
 
 function buildInitialForm(opportunity, dropdownOptions) {
@@ -126,6 +127,16 @@ export default function CotizarStepPanel({
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
   const [confirmingRecotizar, setConfirmingRecotizar] = useState(false)
+
+  // A pedido, estética tipo mockup: popup compartido (AlertModal) para "Error al
+  // cotizar" en vez de texto suelto — cerrarlo es solo visual, `marking` se resetea a
+  // true en cada intento nuevo (ver handleMarcarParaCotizar en OpportunityDetail.jsx,
+  // que también limpia markError/errorDetail ahí mismo), así que vuelve a aparecer si
+  // el reintento vuelve a fallar en vez de quedar escondido para siempre.
+  const [errorModalDismissed, setErrorModalDismissed] = useState(false)
+  useEffect(() => {
+    if (marking) setErrorModalDismissed(false)
+  }, [marking])
 
   // Ningún campo base puede quedar vacío: si falta alguno, no dejamos cotizar/recotizar
   // (la automatización de monday que genera los subitems necesita todos estos datos).
@@ -359,7 +370,6 @@ export default function CotizarStepPanel({
               Cancelar
             </Button>
           </div>
-          {markError && <p className="cotizar-step__error">Error: {markError}</p>}
         </AttentionBox>
       )}
 
@@ -375,10 +385,6 @@ export default function CotizarStepPanel({
           vivía al lado de los datos del cliente (ver OpportunityDetail.jsx). Con
           cotizaciones ya cargadas, "Recotizar" sigue en el banner de arriba — acá solo
           queda "Volver". */}
-      {!editing && !polling && !hasQuotes && markError && (
-        <p className="cotizar-step__error">Error: {markError}</p>
-      )}
-
       {!editing && (
         <div className="cotizar-step__footer">
           <Button kind="secondary" onClick={onBack}>
@@ -390,6 +396,18 @@ export default function CotizarStepPanel({
             </Button>
           )}
         </div>
+      )}
+
+      {(markError || errorDetail) && !errorModalDismissed && (
+        <AlertModal
+          id="cotizar-error-modal"
+          type="error"
+          title={hasQuotes ? 'Error al recotizar' : 'Error al cotizar'}
+          description="Ocurrió un problema al comunicarse con el servidor de la aseguradora. Verificá la conexión e intentalo nuevamente."
+          onClose={() => setErrorModalDismissed(true)}
+          secondaryButton={{ text: 'Cancelar', onClick: () => setErrorModalDismissed(true) }}
+          primaryButton={{ text: 'Reintentar', danger: true, onClick: onMarcarParaCotizar, disabled: marking }}
+        />
       )}
     </div>
   )

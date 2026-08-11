@@ -12,75 +12,43 @@
   }
 }
 
-.filter-panel__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-
-.filter-panel__head:last-child {
-  margin-bottom: 0;
-}
-
-.filter-panel__title-row {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-
-.filter-panel__step {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  background: #0073ea;
-  color: #fff;
-  font-size: 12px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.filter-panel__title {
-  font-size: 15px;
-  font-weight: 700;
-  margin: 0;
-  color: #323338;
-}
-
 /* Search (@vibe/core) ya trae su propio padding/borde/radio — acá solo el layout. */
 .filter-panel__search {
   width: 100%;
-  margin-bottom: 10px;
+}
+
+/* A pedido, estética tipo mockup: link chico en vez del Button "Ocultar/Mostrar
+   filtros" de siempre — los filtros básicos (Estado cotización/Tipo sujeto/Estado
+   envío) son secundarios ahora que la búsqueda hace la mayor parte del trabajo. */
+.filter-panel__advanced-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  margin-top: 10px;
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: #0073ea;
+  cursor: pointer;
+}
+
+.filter-panel__advanced-toggle:hover {
+  text-decoration: underline;
 }
 
 .filter-panel__fields {
   display: grid;
-  grid-template-columns: repeat(4, 1fr);
+  grid-template-columns: repeat(3, 1fr);
   gap: 10px 16px;
-  margin-bottom: 12px;
-}
-
-@media (max-width: 900px) {
-  .filter-panel__fields {
-    grid-template-columns: repeat(2, 1fr);
-  }
+  margin-top: 14px;
 }
 
 @media (max-width: 640px) {
   .filter-panel__fields {
     grid-template-columns: 1fr;
-  }
-
-  .filter-panel__footer {
-    flex-wrap: wrap;
-  }
-
-  .filter-panel__footer > * {
-    flex: 1 1 auto;
   }
 }
 
@@ -97,5 +65,5 @@
   display: flex;
   align-items: center;
   justify-content: flex-end;
-  gap: 16px;
+  margin-top: 12px;
 }

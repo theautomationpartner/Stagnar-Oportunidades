@@ -320,7 +320,7 @@ function ExistingRecordSearch({ value, onChange, seedTerm }) {
         isMenuOpen={menuOpen}
         onMenuOpen={() => setMenuOpen(true)}
         onMenuClose={() => setMenuOpen(false)}
-        placeholder="Escribí un nombre o una cédula..."
+        placeholder="Buscá a la persona por nombre o cédula..."
         noOptionsMessage={
           inputValue.trim().length < 2 ? 'Escribí para buscar (letras: nombre, números: cédula)' : 'Sin resultados'
         }
@@ -384,6 +384,46 @@ function buildInitialForm() {
     combustible: '',
     uso: '',
     tipo: '',
+  }
+}
+
+// A pedido: si eligen una persona en "Buscar Persona" y se van del formulario (Inicio,
+// Ver Oportunidades) antes de terminar de cargar la Oportunidad, no hay que hacerlos
+// buscar de nuevo al volver — se guarda ese resultado (y los datos personales que
+// autocompletó) en localStorage por un rato corto nada más: pensado para "me fui un
+// momento y vuelvo", no para autocompletar algo de hace rato con datos capaz ya viejos.
+const PERSISTED_SEARCH_KEY = 'stagnari:crear-op:buscar-persona'
+const PERSISTED_SEARCH_TTL_MS = 10 * 60 * 1000
+
+function loadPersistedSearch() {
+  try {
+    const raw = window.localStorage.getItem(PERSISTED_SEARCH_KEY)
+    if (!raw) return null
+    const parsed = JSON.parse(raw)
+    if (!parsed?.savedAt || Date.now() - parsed.savedAt > PERSISTED_SEARCH_TTL_MS) {
+      window.localStorage.removeItem(PERSISTED_SEARCH_KEY)
+      return null
+    }
+    return parsed
+  } catch {
+    return null
+  }
+}
+
+function savePersistedSearch(data) {
+  try {
+    window.localStorage.setItem(PERSISTED_SEARCH_KEY, JSON.stringify({ ...data, savedAt: Date.now() }))
+  } catch {
+    // localStorage lleno o deshabilitado (modo privado, etc.): no es crítico, el
+    // formulario sigue funcionando igual, solo no se recuerda para la próxima.
+  }
+}
+
+function clearPersistedSearch() {
+  try {
+    window.localStorage.removeItem(PERSISTED_SEARCH_KEY)
+  } catch {
+    // sin efecto si ya no existía o localStorage no está disponible.
   }
 }
 
@@ -661,7 +701,15 @@ export default function CrearOportunidadForm({
   onCreated,
 }) {
   const [stepIndex, setStepIndex] = useState(0)
-  const [form, setForm] = useState(buildInitialForm)
+  // Calculado una sola vez, al montar (ver loadPersistedSearch) — de acá salen los
+  // valores iniciales de form/resultadoSeleccionado/searchPreview/busquedaResuelta más
+  // abajo, para que la Oportunidad anterior a medio cargar (si hay una vigente, dentro
+  // de PERSISTED_SEARCH_TTL_MS) aparezca ya autocompleta desde el primer render.
+  const [initialPersistedSearch] = useState(loadPersistedSearch)
+  const [form, setForm] = useState(() => ({
+    ...buildInitialForm(),
+    ...(initialPersistedSearch?.personales ?? {}),
+  }))
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
 
@@ -702,14 +750,16 @@ export default function CrearOportunidadForm({
   // nombre/apellido/ci por separado, y para saber si hay que correr el chequeo de
   // duplicado (ver más abajo: no tiene sentido avisar "ya existe" de algo que el usuario
   // acaba de elegir a propósito).
-  const [resultadoSeleccionado, setResultadoSeleccionado] = useState(null)
+  const [resultadoSeleccionado, setResultadoSeleccionado] = useState(
+    () => initialPersistedSearch?.resultadoSeleccionado ?? null
+  )
   // A pedido: elegir un resultado en el buscador ya NO autocompleta directo — primero
   // se muestra una tarjeta de confirmación con los datos que se van a usar (ver más
   // abajo), y recién al apretar "Usar datos de este..." se aplican de verdad (ver
   // handleConfirmPreview). searchPreview es lo que el usuario tiene elegido en el
   // buscador en este momento, haya confirmado o no todavía — resultadoSeleccionado
   // sigue siendo solo lo YA confirmado (autofill real).
-  const [searchPreview, setSearchPreview] = useState(null)
+  const [searchPreview, setSearchPreview] = useState(() => initialPersistedSearch?.searchPreview ?? null)
   // A pedido: qué oportunidad anterior (de la lista debajo de la tarjeta de
   // confirmación) está expandida mostrando su detalle — una a la vez, igual que el
   // mockup ("Ocultar detalle" en la que está abierta, "Ver detalle" en el resto).
@@ -722,7 +772,9 @@ export default function CrearOportunidadForm({
   // Primera decisión del paso 1: se "resuelve" cuando el usuario elige un resultado de la
   // búsqueda O aprieta "Saltear" — recién ahí se muestran Nombre/Apellido/CI en adelante
   // (antes no es una columna real de monday, solo gatea qué se muestra acá).
-  const [busquedaResuelta, setBusquedaResuelta] = useState(false)
+  const [busquedaResuelta, setBusquedaResuelta] = useState(
+    () => Boolean(initialPersistedSearch?.resultadoSeleccionado)
+  )
   // Sin resultado seleccionado (search salteada o vacía): si ya existe un Cliente y/o ya
   // hay Oportunidades con la Cédula que se está tipeando a mano, se avisa acá (ver el
   // useEffect debounced más abajo).
@@ -845,6 +897,42 @@ export default function CrearOportunidadForm({
   const handleConfirmPreview = () => {
     if (searchPreview) handleResultadoSeleccionado(searchPreview)
   }
+
+  // A pedido: recuerda por PERSISTED_SEARCH_TTL_MS lo elegido en "Buscar Persona" —
+  // incluso SIN confirmar todavía ("Usar datos de...") — para poder recuperarlo si el
+  // usuario se va del formulario (ej. "Ir a esta oportunidad" desde el historial de abajo)
+  // y vuelve antes de que expire (ver initialPersistedSearch más arriba). Si se deshace la
+  // selección (cruz de "Buscar Persona"), se borra lo guardado — no tiene sentido
+  // autocompletar algo que el usuario acaba de descartar a propósito.
+  useEffect(() => {
+    if (!searchPreview) {
+      clearPersistedSearch()
+      return
+    }
+    savePersistedSearch({
+      searchPreview,
+      // Los datos personales autocompletados solo existen una vez confirmado (ver
+      // handleConfirmPreview) — sin confirmar, solo hace falta recordar la selección en
+      // sí (searchPreview) para que reaparezcan la tarjeta de preview y el historial.
+      resultadoSeleccionado,
+      personales: resultadoSeleccionado
+        ? {
+            nombre: form.nombre,
+            apellido: form.apellido,
+            ci: form.ci,
+            fechaNacimiento: form.fechaNacimiento,
+            codigoPais: form.codigoPais,
+            telefono: form.telefono,
+            departamentoId: form.departamentoId,
+            localidadId: form.localidadId,
+          }
+        : null,
+    })
+    // Solo cuando cambia la selección/confirmación — no en cada tecla de Nombre/Apellido/
+    // CI/Teléfono editados a mano después (guardamos la foto de ese momento, no cada
+    // cambio posterior; igual sigue vigente por el resto del TTL).
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchPreview, resultadoSeleccionado])
 
   // "No lo encuentro" — abre el resto del formulario para completarlo a mano, sin ningún
   // resultado elegido (limpia Nombre/Apellido/CI por si venían de una búsqueda anterior).
@@ -1292,6 +1380,7 @@ export default function CrearOportunidadForm({
         await uploadFileToColumn(itemId, 'file_mm51jy06', form.cartaAutomovil)
       }
 
+      clearPersistedSearch()
       onCreated?.(itemId)
     } catch (err) {
       setSaveError(err.message)
@@ -1453,7 +1542,11 @@ export default function CrearOportunidadForm({
                                 <span>Última cotización: {o.ultimaCotizacion}</span>
                               </div>
                             </div>
-                            <Button kind="primary" onClick={() => onOpenOportunidad?.(o.id)}>
+                            <Button
+                              kind="primary"
+                              className="crear-op__historial-detail-btn"
+                              onClick={() => onOpenOportunidad?.(o.id)}
+                            >
                               Ir a esta oportunidad <MdArrowForward />
                             </Button>
                           </div>

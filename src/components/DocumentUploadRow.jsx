@@ -31,6 +31,7 @@ export default function DocumentUploadRow({
   onUpload,
   onDelete,
   compactDelete,
+  missingMessage,
 }) {
   const uploaded = Boolean(fileName)
   const busy = uploading || deleting
@@ -83,9 +84,18 @@ export default function DocumentUploadRow({
           <MdWarningAmber />
         )}
         <span className="doc-upload-row__label">{label}</span>
-        {(uploading || deleting || uploaded) && (
+        {/* missingMessage es opcional (a pedido, "Póliza pendiente de adjuntar" en el
+            paso 4) — sin él, el estado "falta" se queda solo con el label + ícono, como
+            antes (Libreta/Cédula en el paso 3 no pasan este prop). */}
+        {(uploading || deleting || uploaded || missingMessage) && (
           <span className="doc-upload-row__value">
-            {uploading ? 'Subiendo...' : deleting ? 'Eliminando...' : displayFileName(fileName)}
+            {uploading
+              ? 'Subiendo...'
+              : deleting
+                ? 'Eliminando...'
+                : uploaded
+                  ? displayFileName(fileName)
+                  : missingMessage}
           </span>
         )}
       </div>

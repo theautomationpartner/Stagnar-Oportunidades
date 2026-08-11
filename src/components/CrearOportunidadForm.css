@@ -370,6 +370,21 @@
   padding: 2px 8px;
 }
 
+/* A pedido, estética tipo mockup: "Ir a esta oportunidad" a lo ancho completo, en verde
+   de marca (antes azul, ancho automático — Button kind="primary" de fábrica). !important
+   porque el color base de "primary" viene de una variable interna de @vibe/core con más
+   especificidad que una clase propia sin ella. */
+.crear-op__historial-detail-btn {
+  width: 100%;
+  justify-content: center;
+  background-color: var(--color-verde) !important;
+  border-color: var(--color-verde) !important;
+}
+
+.crear-op__historial-detail-btn:hover {
+  filter: brightness(0.92);
+}
+
 /* Cada resultado en ExistingRecordSearch (optionRenderer): renglón principal (etiqueta
    de tablero + nombre a la izquierda, Cédula resaltada en azul a la derecha) y, si es
    una Oportunidad, el modelo del vehículo debajo — para distinguir rápido resultados

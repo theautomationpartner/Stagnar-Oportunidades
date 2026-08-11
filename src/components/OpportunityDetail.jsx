@@ -684,23 +684,27 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
     }
   }
 
-  // Paso 4: subir la póliza (file_mm5bzdd4) cierra el flujo — a pedido, una vez que la
-  // mutation de subida confirma, la oportunidad pasa directo a "Concretada" (mismo
-  // helper setSimpleColumnValue que ya usa "Cotizar", apuntando a Estado Oportunidad en
-  // vez de Estado Cotización).
+  // Paso 4: subir la póliza (file_mm5bzdd4) — a pedido, YA NO pasa la oportunidad a
+  // "Concretada" sola (antes lo hacía apenas confirmaba la subida); eso se movió al
+  // botón "Concretar Oportunidad" (ver handleConfirmarEmision más abajo), que es la
+  // acción explícita que de verdad cierra la oportunidad.
   const handleUploadPoliza = async (file) => {
     setUploadingDoc((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: true }))
     setDocUploadError((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: null }))
     try {
+      // A pedido: que nunca quede más de 1 archivo cargado en Póliza — add_file_to_column
+      // (uploadFileToColumn) SUMA el archivo a la columna en vez de reemplazar el que ya
+      // hubiera, así que si ya había uno se limpia primero (mismo helper que usa
+      // "Eliminar", clearFileColumn) antes de subir el nuevo.
+      if (opportunity.poliza) {
+        await clearFileColumn(opportunityId, POLIZA_COLUMN_ID)
+      }
       await uploadFileToColumn(opportunityId, POLIZA_COLUMN_ID, file)
-      await setSimpleColumnValue(opportunityId, ESTADO_OPORTUNIDAD_COLUMN_ID, 'Concretada')
       setItem((prev) => ({
         ...prev,
-        column_values: prev.column_values.map((cv) => {
-          if (cv.id === POLIZA_COLUMN_ID) return { ...cv, text: file.name }
-          if (cv.id === ESTADO_OPORTUNIDAD_COLUMN_ID) return { ...cv, text: 'Concretada' }
-          return cv
-        }),
+        column_values: prev.column_values.map((cv) =>
+          cv.id === POLIZA_COLUMN_ID ? { ...cv, text: file.name } : cv
+        ),
       }))
     } catch (err) {
       setDocUploadError((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: err.message }))
@@ -709,20 +713,25 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
     }
   }
 
-  // Botón "Confirmar emisión de póliza": dispara la automatización que crea/emite la
-  // póliza (color_mm5ejysv, "Crear Poliza") poniéndola en "Crear" — mismo mecanismo que
-  // "Cotizar" sobre Estado Cotización — y prende el polling en vivo de esa columna.
+  // Botón "Concretar Oportunidad": dispara la automatización que crea/emite la póliza
+  // (color_mm5ejysv, "Crear Poliza") poniéndola en "Crear" — mismo mecanismo que
+  // "Cotizar" sobre Estado Cotización, prende el polling en vivo de esa columna — Y,
+  // a pedido, es acá (no al subir el archivo) donde la oportunidad pasa de verdad a
+  // "Concretada", ya que es el botón que dice eso mismo.
   const handleConfirmarEmision = async () => {
     setConfirmandoEmision(true)
     setConfirmarEmisionError(null)
     setPolizaErrorDetail(null)
     try {
       await setSimpleColumnValue(opportunityId, ESTADO_CREACION_COLUMN_ID, 'Crear')
+      await setSimpleColumnValue(opportunityId, ESTADO_OPORTUNIDAD_COLUMN_ID, 'Concretada')
       setItem((prev) => ({
         ...prev,
-        column_values: prev.column_values.map((cv) =>
-          cv.id === ESTADO_CREACION_COLUMN_ID ? { ...cv, text: 'Crear' } : cv
-        ),
+        column_values: prev.column_values.map((cv) => {
+          if (cv.id === ESTADO_CREACION_COLUMN_ID) return { ...cv, text: 'Crear' }
+          if (cv.id === ESTADO_OPORTUNIDAD_COLUMN_ID) return { ...cv, text: 'Concretada' }
+          return cv
+        }),
       }))
       setPolizaPolling(true)
     } catch (err) {
