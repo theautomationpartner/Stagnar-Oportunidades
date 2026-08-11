@@ -31,8 +31,16 @@ export default function WhatsAppSendModal({
   const [error, setError] = useState(null)
   const [submitted, setSubmitted] = useState(false)
   const webhookConfigured = Boolean(getMakeWebhookUrl())
-  const sendFailed = submitted && !sendPolling && opportunity.estadoEnvio === 'Error'
-  const sendSucceeded = submitted && !sendPolling && !sendFailed
+  // A pedido: la animación de "Enviando" tiene que reflejar el estado REAL de la
+  // columna Estado Envío (sendPolling, ver el polling en OpportunityDetail.jsx), no
+  // solo si este envío puntual se hizo desde ESTA instancia del modal — si se cierra el
+  // modal mientras un envío sigue en curso y se vuelve a abrir (o a apretar "Enviar
+  // seleccionadas"), `submitted` arranca en false de nuevo pero sendPolling sigue en
+  // true, y sin esto se volvía a mostrar el formulario de teléfono en vez del estado
+  // real en curso.
+  const showStatus = submitted || sendPolling
+  const sendFailed = showStatus && !sendPolling && opportunity.estadoEnvio === 'Error'
+  const sendSucceeded = showStatus && !sendPolling && !sendFailed
 
   const handleSend = async () => {
     setSending(true)
@@ -66,7 +74,7 @@ export default function WhatsAppSendModal({
           </AttentionBox>
         )}
 
-        {submitted ? (
+        {showStatus ? (
           <div className="wa-modal__status">
             {/* A pedido, estética tipo mockup: tarjeta con spinner degradé + barra de
                 progreso mientras Make procesa el envío — reemplaza el AttentionBox
@@ -151,7 +159,7 @@ export default function WhatsAppSendModal({
           (se cierra sola) — "Cerrar" solo hace falta si hay que abortar a mano, en el
           caso de error. */}
       {sendFailed && <ModalFooter primaryButton={{ text: 'Cerrar', onClick: onClose }} />}
-      {!submitted && (
+      {!showStatus && (
         <ModalFooter
           primaryButton={{
             text: sending ? 'Enviando...' : 'Enviar',

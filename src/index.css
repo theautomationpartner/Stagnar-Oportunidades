@@ -49,3 +49,15 @@ body {
 .monday-style-dialog-content-wrapper {
   z-index: 9999;
 }
+
+/* AttentionBox (@vibe/core) alinea su ícono ARRIBA (align-self:start) cuando no tiene
+   `title` — en toda la app lo usamos sin título, con textos cortos de 1-2 líneas, así
+   que el ícono queda visiblemente descentrado respecto al texto (a pedido: centrarlo).
+   Selector con el nombre de clase compilado de la librería, no una clase propia — si
+   una actualización de @vibe/core cambia ese hash, esta regla deja de aplicar sin
+   avisar (mismo riesgo ya asumido arriba con monday-style-dialog-content-wrapper, que
+   sí es una clase estable; ver el comentario de esa clase). Mismo selector/especificidad
+   que la regla original (container:not(hasTitle) icon) para ganarle limpio, sin !important. */
+.container_887afa963b:not(.hasTitle_ef9b0b5fb0) .icon_0013d16c97 {
+  align-self: center;
+}

@@ -307,7 +307,10 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
 
   // Refleja en vivo los cambios de color_mm4wr1t4 (Estado Envio) mientras Make.com
   // procesa el envío por WhatsApp: reconsulta cada POLL_INTERVAL_MS y corta el polling
-  // apenas llega a un estado terminal ("Enviado" o "Error").
+  // apenas llega a un estado terminal ("Enviado" o "Error"). El paso activo pasa a
+  // "Confirmar" recién acá, cuando "Enviado" se confirma de verdad — no al aceptar el
+  // envío (que solo deja "Enviando") — para que no dependa de la sincronización con el
+  // auto-cierre del modal de WhatsApp.
   useEffect(() => {
     if (!sendPolling) return undefined
     let cancelled = false
@@ -324,7 +327,11 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
 
         if (estadoEnvio === 'Enviado' || estadoEnvio === 'Error') {
           setSendPolling(false)
-          if (estadoEnvio === 'Error') setEnvioErrorDetail(await loadErrorUpdate(ERROR_UPDATE_TAG_ENVIO))
+          if (estadoEnvio === 'Error') {
+            setEnvioErrorDetail(await loadErrorUpdate(ERROR_UPDATE_TAG_ENVIO))
+          } else {
+            setActiveStep('confirmar')
+          }
         }
       } catch {
         // hiccup de red puntual: seguimos intentando en el próximo tick
@@ -627,10 +634,12 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
       ),
     }))
     setSendPolling(true)
-    // A pedido: al cerrarse el mensaje de éxito del modal de WhatsApp (a mano o solo a
-    // los 2 segundos), se pasa directo al paso 3 (Confirmar) en vez de dejar a quien lo
-    // manda en el paso 2 (Comparar y enviar).
-    setActiveStep('confirmar')
+    // A pedido: el paso pasa a "Confirmar" recién cuando el polling de abajo confirma
+    // que Estado Envío llegó de verdad a "Enviado" — no acá (apenas se acepta el envío,
+    // "Enviando" todavía). Antes se cambiaba de una en este punto y el modal de
+    // WhatsApp (que se queda abierto tapando la pantalla hasta el estado terminal) lo
+    // disimulaba, pero si se cerraba a mano antes de tiempo se veía "Confirmar" con el
+    // envío todavía en curso.
   }
 
   // Sube Libreta de Conducir/Carta Automóvil y Cédula (paso 3, columnas "file" de la
