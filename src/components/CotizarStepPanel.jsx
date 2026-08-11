@@ -403,7 +403,7 @@ export default function CotizarStepPanel({
           id="cotizar-error-modal"
           type="error"
           title={hasQuotes ? 'Error al recotizar' : 'Error al cotizar'}
-          description="Ocurrió un problema al comunicarse con el servidor de la aseguradora. Verificá la conexión e intentalo nuevamente."
+          description="No se pudo completar la cotización con las aseguradoras. Podés revisar el detalle del error más abajo, en esta misma pantalla, antes de reintentar."
           onClose={() => setErrorModalDismissed(true)}
           secondaryButton={{ text: 'Cancelar', onClick: () => setErrorModalDismissed(true) }}
           primaryButton={{ text: 'Reintentar', danger: true, onClick: onMarcarParaCotizar, disabled: marking }}

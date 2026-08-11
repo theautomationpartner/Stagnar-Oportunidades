@@ -157,6 +157,7 @@
 }
 
 .cotizar-step__error-detail {
+  margin-top: 16px;
   background: #fdf1f2;
   border: 1px solid #f7c6cc;
   border-radius: 8px;

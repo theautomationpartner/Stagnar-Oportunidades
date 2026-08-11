@@ -34,15 +34,24 @@ export default function CotizandoModal({ show, recotizando, progress, onClose })
   )
   const percent = totalExpected > 0 ? Math.round((totalDone / totalExpected) * 100) : 0
   const allDone = totalDone >= totalExpected
-  // A pedido: en un recotizar, el primer paso de la automatización es borrar TODAS las
-  // cotizaciones anteriores — mientras `progress` (ya filtrado del lado de
-  // OpportunityDetail para no contar lo viejo, ver oldSubitemIdsRef) sigue en cero, se
-  // avisa de esa fase en vez de dar a entender que ya se está cotizando de nuevo.
+  // A pedido: 3 fases en vez de 2 — la automatización de monday no expone un estado
+  // propio para cada una (Estado Cotización solo tiene "Cotizar"/"Cotizando"/"Cotizado
+  // (Subitems)"/"Error", ver color_mm51n7aa), así que se infieren del progreso real de
+  // subitems (`progress`, ya filtrado del lado de OpportunityDetail para no contar lo
+  // viejo en un recotizar, ver oldSubitemIdsRef):
+  // 1. "Eliminando..." — solo en un recotizar, mientras sigue en cero (borra TODAS las
+  //    cotizaciones anteriores antes de arrancar de nuevo).
+  // 2. "Cotizando..." — sigue en cero pero no es un recotizar (o ya terminó de borrar):
+  //    todavía está consultando precios, ningún subitem devuelto todavía.
+  // 3. "Creando los subitems..." — ya empezaron a aparecer subitems (>0): está
+  //    escribiendo los resultados de vuelta en el tablero.
   const subtitle = allDone
     ? '¡Cotizaciones obtenidas con éxito!'
     : recotizando && totalDone === 0
       ? 'Eliminando cotizaciones anteriores...'
-      : 'Esto puede tardar unos segundos...'
+      : totalDone === 0
+        ? 'Cotizando con las aseguradoras...'
+        : 'Creando los subitems...'
 
   return (
     <Modal id="cotizando-modal" show={show} onClose={onClose} size="small">
