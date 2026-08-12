@@ -1,0 +1,127 @@
+.emitir-step {
+  margin: 20px 32px 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+
+.emitir-step__banner {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 14px 18px;
+  border-radius: 8px;
+  background: #e6f9f1;
+  color: #037f4c;
+  font-weight: 600;
+  font-size: 13px;
+}
+
+.emitir-step__banner svg {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.emitir-step__section {
+  padding: 20px 24px;
+  background: #fff;
+  border: 1px solid #e6e9ef;
+  border-radius: 10px;
+}
+
+.emitir-step__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #323338;
+  margin: 0 0 4px;
+}
+
+.emitir-step__subtitle {
+  font-size: 13px;
+  color: #676879;
+  margin: 0 0 16px;
+}
+
+.emitir-step__subtitle-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #676879;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin: 16px 0 10px;
+}
+
+.emitir-step__subtitle-label:first-of-type {
+  margin-top: 0;
+}
+
+.emitir-step__columns {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 24px;
+}
+
+@media (max-width: 640px) {
+  .emitir-step__columns {
+    grid-template-columns: 1fr;
+  }
+}
+
+.emitir-step__grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 12px;
+}
+
+.emitir-step__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: #f6f7fb;
+  border-radius: 8px;
+}
+
+.emitir-step__field span {
+  font-size: 11px;
+  font-weight: 600;
+  color: #676879;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.emitir-step__field strong {
+  font-size: 14px;
+  color: #323338;
+}
+
+.emitir-step__chosen {
+  border-left: 4px solid #0073ea;
+  border-radius: 8px;
+  background: #f6f7fb;
+  padding: 14px 16px;
+}
+
+.emitir-step__chosen-head {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 12px;
+  font-weight: 700;
+}
+
+.emitir-step__chosen-head span:first-child {
+  font-size: 15px;
+}
+
+.emitir-step__chosen-head span:last-child {
+  font-size: 14px;
+  color: #676879;
+  font-weight: 400;
+}
+
+.emitir-step__empty {
+  font-size: 13px;
+  color: #a15c00;
+  margin: 4px 0 0;
+}

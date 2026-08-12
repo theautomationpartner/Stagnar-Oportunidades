@@ -1,0 +1,51 @@
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: #f6f7fb;
+}
+
+/* Estilo único para todos los <select> de la app (filtros, edición del paso 1, params
+   por cotización, etc.) — antes cada uno heredaba solo el look nativo del navegador
+   (sin flecha propia, esquinas rectas). Centralizado acá para no duplicarlo por
+   componente; los estilos por componente solo definen su propio input de texto/número. */
+select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  background-color: #fff;
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23676879' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 10px center;
+  background-size: 10px 6px;
+  border: 1px solid #d0d4e4;
+  border-radius: 8px;
+  padding: 8px 30px 8px 10px;
+  font-size: 13px;
+  font-family: inherit;
+  color: #323338;
+  cursor: pointer;
+  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+select:hover {
+  border-color: #a7b0c4;
+}
+
+select:focus-visible {
+  outline: none;
+  border-color: #0073ea;
+  box-shadow: 0 0 0 3px rgba(0, 115, 234, 0.15);
+}
+
+select:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+
+select::-ms-expand {
+  display: none;
+}

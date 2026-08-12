@@ -1,0 +1,276 @@
+.quote-card {
+  display: grid;
+  grid-template-columns: 1.6fr 1.2fr 0.9fr;
+  gap: 16px;
+  align-items: start;
+  padding: 16px 20px;
+  border: 1px solid #e6e9ef;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  background: #fff;
+}
+
+.quote-card--selected {
+  border-color: #0073ea;
+  box-shadow: 0 0 0 1px #0073ea inset;
+}
+
+.quote-card--blocked {
+  display: block;
+  background: #fff7f0;
+  border-color: #fdab3d;
+}
+
+.quote-card__blocked-msg {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 6px 0 0;
+  color: #a15c00;
+  font-size: 13px;
+}
+
+.quote-card__title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.quote-card__radio {
+  display: inline-flex;
+  border: none;
+  background: none;
+  cursor: pointer;
+  padding: 0;
+  flex-shrink: 0;
+  font-size: 20px;
+  color: #c3c6d4;
+}
+
+.quote-card--selected .quote-card__radio {
+  color: #0073ea;
+}
+
+.quote-card__title {
+  font-weight: 700;
+  color: #0073ea;
+  font-size: 14px;
+}
+
+.quote-card__custom-tag {
+  font-size: 10px;
+  font-weight: 700;
+  color: #9d50dd;
+  background: #f5ebfd;
+  border-radius: 10px;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.quote-card__meta {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 12px;
+}
+
+.quote-card__meta-label {
+  color: #676879;
+  margin-right: 6px;
+}
+
+.quote-card__meta-value {
+  color: #323338;
+  font-weight: 600;
+}
+
+.quote-card__cuotas-label {
+  display: block;
+  font-size: 12px;
+  color: #676879;
+  margin-bottom: 6px;
+}
+
+.quote-card__cuotas-table {
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.quote-card__cuotas-table td {
+  padding: 2px 8px 2px 0;
+  color: #323338;
+}
+
+.quote-card__total {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  text-align: right;
+}
+
+.quote-card__total-label {
+  font-size: 11px;
+  color: #676879;
+}
+
+.quote-card__total-value {
+  font-size: 20px;
+  font-weight: 700;
+  color: #323338;
+}
+
+.quote-card__warning {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 4px 0 0;
+  padding: 8px 12px;
+  background: #fff7f0;
+  border: 1px solid #fde3c4;
+  border-radius: 6px;
+  color: #a15c00;
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.quote-card__warning svg {
+  flex-shrink: 0;
+}
+
+.quote-card__total-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.quote-card__detail-btn {
+  padding: 6px 10px;
+  font-size: 12px;
+}
+
+.quote-card__params-btn--active {
+  background: #eef6ff;
+  border-color: #0073ea;
+  color: #0073ea;
+}
+
+.quote-card__detail {
+  grid-column: 1 / -1;
+  border-top: 1px dashed #e6e9ef;
+  margin-top: 8px;
+  padding-top: 10px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  font-size: 12px;
+  color: #676879;
+}
+
+.quote-card__incluye {
+  flex-basis: 100%;
+}
+
+.quote-card__incluye ul {
+  margin: 6px 0 0;
+  padding-left: 18px;
+}
+
+.quote-card__incluye li {
+  margin-bottom: 4px;
+}
+
+.quote-card__params {
+  grid-column: 1 / -1;
+  border-top: 1px solid #e6e9ef;
+  margin-top: 8px;
+  padding-top: 12px;
+}
+
+.quote-card__params-note {
+  margin: 0 0 10px;
+  font-size: 12px;
+  color: #676879;
+}
+
+.quote-card__params-subtitle {
+  font-size: 11px;
+  font-weight: 700;
+  color: #9699a6;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin-bottom: 8px;
+}
+
+.quote-card__params-fixed {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
+}
+
+.quote-card__params-fixed-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 6px 8px;
+  background: #f6f7fb;
+  border-radius: 6px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #676879;
+}
+
+.quote-card__params-fixed-field strong {
+  font-size: 13px;
+  color: #323338;
+  font-weight: 700;
+}
+
+.quote-card__params-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(130px, 1fr));
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.quote-card__params-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: #676879;
+}
+
+.quote-card__params-field input {
+  padding: 6px 8px;
+  border: 1px solid #d0d4e4;
+  border-radius: 6px;
+  font-size: 13px;
+  color: #323338;
+}
+
+.quote-card__params-field select {
+  padding: 6px 26px 6px 8px;
+  background-position: right 8px center;
+}
+
+.quote-card__params-field--checkbox {
+  flex-direction: row;
+  align-items: center;
+  gap: 6px;
+}
+
+.quote-card__params-field--checkbox input {
+  width: auto;
+  padding: 0;
+}
+
+.quote-card__params-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}

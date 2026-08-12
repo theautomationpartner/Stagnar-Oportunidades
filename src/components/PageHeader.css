@@ -1,0 +1,63 @@
+.page-header {
+  padding: 24px 32px 0;
+}
+
+.page-header__title {
+  font-size: 28px;
+  font-weight: 700;
+  color: #323338;
+  margin: 0 0 4px;
+}
+
+.page-header__subtitle {
+  color: #676879;
+  font-size: 14px;
+  margin: 0;
+}
+
+.btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  border-radius: 6px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  padding: 9px 16px;
+  border: 1px solid transparent;
+}
+
+.btn svg {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.btn--outline {
+  background: #fff;
+  border-color: #d0d4e4;
+  color: #323338;
+}
+
+.btn--icon {
+  background: #fff;
+  border-color: #d0d4e4;
+  color: #676879;
+  padding: 9px 12px;
+}
+
+.btn--primary {
+  background: #0073ea;
+  color: #fff;
+}
+
+.btn--link {
+  background: transparent;
+  color: #0073ea;
+  border: none;
+  padding: 0;
+}
