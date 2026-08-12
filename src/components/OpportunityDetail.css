@@ -102,6 +102,12 @@
   }
 }
 
+@media (max-width: 640px) {
+  .opp-detail__title {
+    font-size: 20px;
+  }
+}
+
 .opp-detail__subtitle {
   color: #676879;
   font-size: 14px;

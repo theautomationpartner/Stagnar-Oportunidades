@@ -34,13 +34,13 @@ Dejarlo corriendo y abrir http://localhost:5173 en el navegador.
     `VITE_` a propósito — a diferencia de `VITE_MAKE_WEBHOOK_URL`, esta URL nunca debe
     llegar al navegador, solo la usa el servidor (`api/leer-carta-automovil.js` en
     Vercel, o el proxy de `vite.config.js` en local).
-- En local (`npm run dev`), los proxies de `/api/monday`, `/api/monday-file`,
-  `/api/make-webhook` y `/api/leer-carta-automovil` los pone `vite.config.js` (solo
-  corren en el dev server de Vite). En Vercel (build de producción/preview), esos
-  proxies no existen — los reemplazan las Serverless Functions bajo `api/` (mismo
-  nombre de archivo que la ruta), que leen las mismas variables de entorno del lado del
-  servidor. Configurar las 5 variables en el proyecto de Vercel (Production + Preview +
-  Development) para que el deploy funcione igual que en local.
+- En local (`npm run dev`), el proxy de `/api/monday`, `/api/monday-file` y
+  `/api/leer-carta-automovil` los pone `vite.config.js` (solo corre en el dev server de
+  Vite). En Vercel (build de producción/preview), esos proxies no existen — los
+  reemplazan las Serverless Functions bajo `api/` (mismo nombre de archivo que la
+  ruta), que leen las mismas variables de entorno del lado del servidor. Configurar las
+  5 variables en el proyecto de Vercel (Production + Preview + Development) para que el
+  deploy funcione igual que en local.
 - La lógica de negocio (qué se muestra, cómo se calculan las cotizaciones, qué falta)
   está documentada en `/logica-monday-vibe.md`, en la raíz del repo (un nivel arriba
   de esta carpeta `app/`).
