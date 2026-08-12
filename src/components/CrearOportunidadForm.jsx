@@ -2044,10 +2044,7 @@ export default function CrearOportunidadForm({
                     control. A pedido: se sacó la selección de "¿es alguno de estos
                     vehículos?" (ver git history) — este paso deja solo la pregunta de
                     abajo, ahora más destacada (ver .crear-op__risk-subtitle). */}
-                <div>
-                  <h2 className="crear-op__risk-title">Detalles del riesgo — {form.tipoRiesgo}</h2>
-                  <p className="crear-op__risk-subtitle">¿Tenés la Cédula o Carta del vehículo a cotizar?</p>
-                </div>
+                <p className="crear-op__risk-subtitle">¿Tenés la Cédula o Carta del vehículo a cotizar?</p>
                 <div className="crear-op__toggle">
                   <button
                     type="button"

@@ -635,15 +635,6 @@
   border-radius: 8px;
 }
 
-/* A pedido, estética tipo mockup: título + subtítulo propios del paso "Detalles del
-   riesgo" (antes no tenía). */
-.crear-op__risk-title {
-  font-size: 20px;
-  font-weight: 700;
-  color: #323338;
-  margin: 0 0 4px;
-}
-
 /* A pedido: única pregunta que queda en este paso (se sacó "¿es alguno de estos
    vehículos?") — más grande y destacada que un subtítulo genérico para que se note que
    es LA pregunta a responder con el toggle de abajo. */
