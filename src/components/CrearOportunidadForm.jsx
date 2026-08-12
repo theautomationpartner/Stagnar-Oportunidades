@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from 'react'
 import {
-  MdUploadFile,
   MdClear,
   MdSearch,
   MdHome,
   MdArrowForward,
+  MdArrowBack,
   MdEventNote,
   MdKeyboardArrowDown,
   MdKeyboardArrowUp,
@@ -15,29 +15,42 @@ import {
   IconButton,
   Dropdown,
   AttentionBox,
+  Loader,
+  TextField,
   Modal,
   ModalContent,
   ModalFooter,
-  Loader,
-  TextField,
 } from '@vibe/core'
 import Stepper from './Stepper'
 import StatusBadge from './StatusBadge'
+import AlertModal from './AlertModal'
+import ErrorDetailBox from './ErrorDetailBox'
+import FileUploadField from './FileUploadField'
 import AutodataModeloPorAnioMarca from './AutodataModeloPorAnioMarca'
 import {
   createOpportunityItem,
   setMultipleColumnValues,
+  setConnectedColumnValue,
   uploadFileToColumn,
   setSimpleColumnValue,
   dropdownColumnValue,
   fetchOpportunityDetail,
   fetchLatestUpdate,
-  searchClientes,
+  searchContactos,
   searchOportunidades,
-  findClienteByCedula,
-  countOportunidadesByCedula,
+  findContactoByCedula,
+  fetchContactoOportunidades,
+  createContactoItem,
   fetchFileColumnAsFile,
+  fetchAutodataModelosByAnioMarca,
+  setContactoColumnValues,
+  OPORTUNIDAD_CONTACTO_COLUMN_ID,
+  CONTACTO_CI_COLUMN_ID,
+  CONTACTO_TELEFONO_COLUMN_ID,
+  CONTACTO_FECHA_NACIMIENTO_COLUMN_ID,
+  CONTACTO_LOCALIDAD_COLUMN_ID,
 } from '../services/mondayApi'
+import { mapOpportunities } from '../services/opportunityMapper'
 import { matchesSearchQuery } from '../services/format'
 import './CrearOportunidadForm.css'
 
@@ -49,7 +62,7 @@ const POLL_INTERVAL_MS = 4000
 
 const STEPS = [
   { key: 'personales', label: 'Datos personales' },
-  { key: 'oportunidad', label: 'Datos Oportunidad' },
+  { key: 'oportunidad', label: 'Datos de oportunidad' },
 ]
 
 // Único label real (con emoji, tal cual está configurado en monday) que muestra el resto
@@ -193,43 +206,23 @@ function splitNombreApellido(fullName) {
   return { nombre: parts[0], apellido: parts.slice(1).join(' ') }
 }
 
-// Iniciales para el avatar de la tarjeta de confirmación (ver JSX) — primera letra de
-// las 2 primeras palabras del nombre completo, igual que el "MC"/"SG" del mockup.
-function initialsOf(fullName) {
-  const parts = fullName.trim().split(/\s+/).filter(Boolean)
-  return parts.slice(0, 2).map((p) => p[0].toUpperCase()).join('')
-}
-
-// Búsqueda en vivo contra los 2 tableros a la vez (Clientes 18420863014 y Oportunidades)
-// para precargar Nombre/Apellido/CI de un registro que ya existe, en vez de tipear todo
-// de nuevo — el modo de búsqueda (nombre vs. Cédula) lo decide cada función según lo que
-// se tipeó (ver searchClientes/searchOportunidades). Cada opción se muestra con una
-// etiqueta de a qué tablero pertenece + el nombre a la izquierda, y la Cédula resaltada
-// en azul a la derecha (optionRenderer), para distinguir rápido entre resultados
-// parecidos y de qué fuente viene cada uno. Al elegir una, onChange recibe la opción
-// entera (source/id/name/ci, +nombre/apellido si es de Oportunidad) — se arma en
+// Búsqueda en vivo contra los 2 tableros a la vez (Contactos 18420863016 y Oportunidades
+// 18420863013) para precargar los datos personales de un registro que ya existe, en vez
+// de tipear todo de nuevo — el modo de búsqueda (nombre vs. Cédula) lo decide cada
+// función según lo que se tipeó (ver searchContactos/searchOportunidades). Resultado de
+// Oportunidades se etiqueta "Lead" (persona sin Contacto formal todavía, ver el dedup por
+// CI más abajo) en vez de "Cliente"/"Oportunidad" — nombra mejor lo que es cada uno.
+// Cada opción se muestra con su etiqueta + el nombre a la izquierda, y la Cédula
+// resaltada en azul a la derecha (optionRenderer), para distinguir rápido entre
+// resultados parecidos y de qué fuente viene cada uno. Al elegir una, onChange recibe la
+// opción entera (source/id/name/ci + datos personales — ambas fuentes ya traen
+// Fecha Nacimiento/Teléfono/Departamento/Localidad) — se arma en
 // handleResultadoSeleccionado.
-// A pedido: cuando se tipea a mano una Cédula (búsqueda salteada) que YA existe como
-// Cliente u Oportunidad (ver el aviso de duplicado en el padre), ese mismo valor se
-// manda como seedTerm para que el buscador de abajo lo muestre de una — el padre le
-// pone un `key` distinto a ExistingRecordSearch cada vez que llega un seedTerm nuevo
-// (ver su uso más abajo), así que ESTE componente se remonta de cero por completo, y
-// puede leer seedTerm directo como valor inicial de sus propios useState. Se probó
-// primero con un useEffect que "sembraba" el valor en un Dropdown ya montado (con su
-// propio remount interno) y nunca se reflejó — el Dropdown de @vibe/core (downshift
-// por debajo) solo lee su prop `inputValue` como valor INICIAL al montarse, así que
-// cualquier intento de actualizarlo después de ese primer render, por más remount
-// interno que se le agregue, corre el riesgo de un desfasaje de timing entre efectos.
-// Remontando el COMPONENTE ENTERO desde el padre en vez de un pedazo interno, el
-// Dropdown nuevo nace directo con el valor correcto, sin depender de ningún efecto.
-function ExistingRecordSearch({ value, onChange, seedTerm }) {
-  const [inputValue, setInputValue] = useState(seedTerm || '')
+function ExistingRecordSearch({ value, onChange }) {
+  const [inputValue, setInputValue] = useState('')
   const [options, setOptions] = useState([])
   const [loading, setLoading] = useState(false)
-  // Arranca abierto cuando este montaje vino de un seedTerm — onMenuOpen/onMenuClose
-  // lo devuelven al comportamiento normal (foco, click afuera, elegir una opción) apenas
-  // el usuario vuelve a interactuar.
-  const [menuOpen, setMenuOpen] = useState(Boolean(seedTerm))
+  const [menuOpen, setMenuOpen] = useState(false)
 
   useEffect(() => {
     const term = inputValue.trim()
@@ -241,34 +234,45 @@ function ExistingRecordSearch({ value, onChange, seedTerm }) {
     let cancelled = false
     setLoading(true)
     const timer = setTimeout(() => {
-      Promise.all([searchClientes(term), searchOportunidades(term)])
-        .then(([clientes, oportunidades]) => {
+      Promise.all([searchContactos(term), searchOportunidades(term)])
+        .then(([contactos, oportunidades]) => {
           if (cancelled) return
-          const clienteOptions = clientes.map((c) => ({
-            value: `cliente:${c.id}`,
+          const contactoOptions = contactos.map((c) => ({
+            value: `contacto:${c.id}`,
             label: c.name,
             ci: c.ci,
-            source: 'cliente',
+            source: 'contacto',
             id: c.id,
             name: c.name,
+            fechaNacimiento: c.fechaNacimiento,
+            telefono: c.telefono,
+            telefonoCountryShortName: c.telefonoCountryShortName,
+            departamentoNombre: c.departamentoNombre,
+            localidadNombre: c.localidadNombre,
           }))
-          const oportunidadOptions = oportunidades.map((o) => ({
-            value: `oportunidad:${o.id}`,
-            label: o.name,
-            ci: o.ci,
-            source: 'oportunidad',
-            id: o.id,
-            name: o.name,
-            nombre: o.nombre,
-            apellido: o.apellido,
-            fechaNacimiento: o.fechaNacimiento,
-            telefono: o.telefono,
-            telefonoCountryShortName: o.telefonoCountryShortName,
-            departamentoNombre: o.departamentoNombre,
-            localidadNombre: o.localidadNombre,
-            modelo: o.modelo,
-          }))
-          setOptions([...clienteOptions, ...oportunidadOptions])
+          // A pedido: si esta persona YA es Contacto, no se muestra de nuevo como
+          // "Lead" a partir de una Oportunidad vieja suya (mismo CI) — un solo
+          // resultado, el de Contacto (fuente completa).
+          const contactoCis = new Set(contactoOptions.map((c) => stripCi(c.ci)).filter(Boolean))
+          const leadOptions = oportunidades
+            .filter((o) => !stripCi(o.ci) || !contactoCis.has(stripCi(o.ci)))
+            .map((o) => ({
+              value: `lead:${o.id}`,
+              label: o.name,
+              ci: o.ci,
+              source: 'lead',
+              id: o.id,
+              name: o.name,
+              nombre: o.nombre,
+              apellido: o.apellido,
+              fechaNacimiento: o.fechaNacimiento,
+              telefono: o.telefono,
+              telefonoCountryShortName: o.telefonoCountryShortName,
+              departamentoNombre: o.departamentoNombre,
+              localidadNombre: o.localidadNombre,
+              modelo: o.modelo,
+            }))
+          setOptions([...contactoOptions, ...leadOptions])
         })
         .finally(() => {
           if (!cancelled) setLoading(false)
@@ -301,15 +305,12 @@ function ExistingRecordSearch({ value, onChange, seedTerm }) {
       <Dropdown
         clearable={false}
         searchable
-        // Refuerzo del seedTerm (ver el comentario grande más arriba): con foco real de
-        // verdad en el input, la librería no lo puede llegar a marcar como "blur" nunca.
-        autoFocus={Boolean(seedTerm)}
         // Sin esto, el Dropdown vuelve a filtrar por su cuenta las opciones ya devueltas
         // por la búsqueda del servidor contra el texto tipeado — que matchea desde el
         // principio del `label` (mismo default que documenta RequiredDropdown más arriba).
         // Con una Cédula (el label es el nombre, no el número) eso descartaba TODOS los
         // resultados aunque la búsqueda real sí los hubiera encontrado. `options` acá ya
-        // viene filtrado por searchClientes/searchOportunidades, así que no hace falta (ni
+        // viene filtrado por searchContactos/searchOportunidades, así que no hace falta (ni
         // conviene) que el Dropdown filtre una segunda vez.
         filterOption={() => true}
         options={options}
@@ -329,14 +330,15 @@ function ExistingRecordSearch({ value, onChange, seedTerm }) {
             <div className="crear-op__cliente-option-row">
               <span className="crear-op__cliente-option-main">
                 <span className={`crear-op__source-tag crear-op__source-tag--${option.source}`}>
-                  {option.source === 'cliente' ? 'Cliente' : 'Oportunidad'}
+                  {option.source === 'contacto' ? 'Contacto' : 'Lead'}
                 </span>
                 {option.label}
               </span>
               {option.ci && <span className="crear-op__cliente-option-ci">{option.ci}</span>}
             </div>
             {/* A pedido: el modelo del vehículo de esa Oportunidad, para distinguir de un
-                vistazo si esta persona tiene varias — Cliente no tiene esta info. */}
+                vistazo si esta persona tiene varias — solo los resultados "Lead" (vienen
+                de una Oportunidad) tienen esta info, Contacto no. */}
             {option.modelo && <span className="crear-op__cliente-option-modelo">{option.modelo}</span>}
           </div>
         )}
@@ -470,105 +472,6 @@ function RequiredDropdown({ onChange, onClear, searchable, options, ...props }) 
   )
 }
 
-// Sin ítem de monday creado todavía (recién se está completando el formulario), así que
-// esto solo guarda el File en memoria — la subida real a la columna correspondiente
-// (file_mm51jy06 / file_mm5pc008) se hace más adelante, cuando se sepa en qué paso se
-// crea efectivamente el ítem.
-function FileField({
-  label,
-  file,
-  onChange,
-  required = true,
-  fullWidth = false,
-  highlighted = false,
-  // A pedido, estética tipo mockup: caja grande centrada con borde punteado, texto de
-  // ayuda y botón con texto propio (Carta Automóvil en el paso 2) — en vez de la caja
-  // compacta de siempre (Cédula Identidad en el paso 1). Mismo componente para no
-  // duplicar la lógica de drag&drop/preview/limpiar, solo cambia el layout.
-  prominent = false,
-  helperText,
-  buttonLabel,
-}) {
-  const inputRef = useRef(null)
-  const [dragOver, setDragOver] = useState(false)
-  const [previewUrl, setPreviewUrl] = useState(null)
-
-  // A pedido: previsualización cuando el archivo es una imagen (lo más común para la
-  // Cédula escaneada/fotografiada) — un PDF no se puede mostrar como thumbnail sin una
-  // librería aparte, ahí se sigue mostrando solo el nombre. revokeObjectURL en el
-  // cleanup para no dejar URLs colgadas cada vez que cambia el archivo.
-  useEffect(() => {
-    if (!file || !file.type?.startsWith('image/')) {
-      setPreviewUrl(null)
-      return undefined
-    }
-    const url = URL.createObjectURL(file)
-    setPreviewUrl(url)
-    return () => URL.revokeObjectURL(url)
-  }, [file])
-
-  const handleDragOver = (e) => {
-    e.preventDefault()
-    setDragOver(true)
-  }
-
-  const handleDragLeave = () => setDragOver(false)
-
-  const handleDrop = (e) => {
-    e.preventDefault()
-    setDragOver(false)
-    const dropped = e.dataTransfer.files?.[0]
-    if (dropped) onChange(dropped)
-  }
-
-  return (
-    <label className={fullWidth ? 'crear-op__field crear-op__field--full' : 'crear-op__field'}>
-      {label && <span>{label}{required ? ' *' : ''}</span>}
-      <div
-        className={[
-          'crear-op__file',
-          dragOver && 'crear-op__file--drag-over',
-          // A pedido: recubrimiento verde de todo el campo — forma visual de avisar que
-          // este archivo vino solo (autocompletado de una Oportunidad anterior, ver
-          // handleAutofillCedula), no que el usuario lo subió a mano.
-          highlighted && 'crear-op__file--highlighted',
-          prominent && 'crear-op__file--prominent',
-        ]
-          .filter(Boolean)
-          .join(' ')}
-        onDragOver={handleDragOver}
-        onDragLeave={handleDragLeave}
-        onDrop={handleDrop}
-      >
-        <input
-          ref={inputRef}
-          type="file"
-          className="crear-op__file-input"
-          onChange={(e) => onChange(e.target.files?.[0] ?? null)}
-        />
-        {prominent && !file && helperText && <p className="crear-op__file-helper">{helperText}</p>}
-        {previewUrl && <img className="crear-op__file-preview" src={previewUrl} alt="" />}
-        <Button kind={prominent ? 'primary' : 'secondary'} onClick={() => inputRef.current?.click()}>
-          <MdUploadFile /> {buttonLabel || (file ? 'Cambiar archivo' : 'Subir archivo')}
-        </Button>
-        {file && (
-          <span className="crear-op__file-name">
-            {file.name}
-            <button
-              type="button"
-              className="crear-op__file-clear"
-              onClick={() => onChange(null)}
-              aria-label={`Quitar ${label || 'archivo'}`}
-            >
-              <MdClear />
-            </button>
-          </span>
-        )}
-      </div>
-    </label>
-  )
-}
-
 // Año/Marca/Modelo/Combustible/Tipo/Uso a mano — se usa en dos casos: Posee Vehículo =
 // "No" (nunca hubo archivo que leer) y Posee Vehículo = "Sí" con lectura en "Error" (el
 // robot no pudo terminar; se completa/corrige lo que haga falta a mano en vez de trabar
@@ -591,6 +494,7 @@ function VehiculoManualFields({
   usoOptions,
   onModeloChange,
   highlightEmpty = false,
+  modeloDisabled = false,
 }) {
   const missingClass = (value) => (highlightEmpty && !value ? ' crear-op__field--missing' : '')
 
@@ -644,6 +548,7 @@ function VehiculoManualFields({
           value={form.modeloSeleccion}
           onChange={onModeloChange}
           placeholder={highlightEmpty && !form.modeloSeleccion ? 'Seleccioná el modelo faltante...' : undefined}
+          disabled={modeloDisabled}
         />
       </label>
       <label className={`crear-op__field crear-op__field--full${missingClass(form.combustible)}`}>
@@ -688,6 +593,106 @@ function VehiculoManualFields({
         />
       </label>
     </div>
+  )
+}
+
+// A pedido: popup para editar los datos del Contacto ya elegido directo desde acá — a
+// diferencia del resto del form (que solo vive en esta Oportunidad hasta guardar), lo
+// que se cambia acá escribe DE UNA en el Contacto real (ver handleSaveContacto en el
+// componente principal). CI/Nombre/Apellido quedan afuera a propósito — son datos de
+// identidad, no se tocan desde una Oportunidad puntual.
+function EditarContactoModal({ form, departamentoOptions, localidades, onSave, onClose, saving, error }) {
+  const [fechaNacimiento, setFechaNacimiento] = useState(form.fechaNacimiento)
+  const [codigoPais, setCodigoPais] = useState(form.codigoPais)
+  const [telefono, setTelefono] = useState(form.telefono)
+  const [departamentoId, setDepartamentoId] = useState(form.departamentoId)
+  const [localidadId, setLocalidadId] = useState(form.localidadId)
+
+  const selectedDepartamento = departamentoOptions.find((o) => o.value === departamentoId) ?? null
+  const localidadOptions = localidades
+    .filter((l) => !selectedDepartamento || l.departamento === selectedDepartamento.label)
+    .map((l) => ({ value: l.id, label: l.name }))
+  const selectedLocalidad = localidadOptions.find((o) => o.value === localidadId) ?? null
+
+  const telefonoErr = telefonoError(telefono, codigoPais)
+  const fechaErr = fechaError(fechaNacimiento)
+  const canSave = !telefonoErr && !fechaErr && departamentoId && localidadId
+
+  return (
+    <Modal id="editar-contacto-modal" show onClose={onClose} size="medium">
+      <ModalContent className="crear-op__editar-contacto-content">
+        <h2 className="crear-op__editar-contacto-title">Editar contacto</h2>
+        {error && <p className="crear-op__error">Error: {error}</p>}
+        <div className="crear-op__fields--grid">
+          <label className={`crear-op__field${fieldStateClass(fechaNacimiento, fechaErr)}`}>
+            <span>Fecha Nacimiento *</span>
+            <div className="crear-op__date-wrap">
+              <input
+                type="date"
+                value={fechaNacimiento}
+                max={maxFechaNacimiento()}
+                onChange={(e) => setFechaNacimiento(e.target.value)}
+              />
+            </div>
+            {fechaErr && <span className="crear-op__field-error">{fechaErr}</span>}
+          </label>
+          <label className="crear-op__field crear-op__field--full">
+            <span>Teléfono *</span>
+            <div className="crear-op__phone">
+              <div className="crear-op__phone-code">
+                <RequiredDropdown
+                  options={CODIGO_PAIS_OPTIONS}
+                  value={CODIGO_PAIS_OPTIONS.find((o) => o.value === codigoPais) ?? null}
+                  onChange={(option) => setCodigoPais(option?.value ?? '')}
+                />
+              </div>
+              <TextField
+                wrapperClassName="crear-op__phone-number"
+                placeholder="Ej: 099 123 456"
+                value={telefono}
+                onChange={setTelefono}
+                icon={MdClear}
+                onIconClick={() => setTelefono('')}
+                validation={telefonoErr ? { status: 'error' } : telefono ? { status: 'success' } : undefined}
+              />
+            </div>
+            {telefonoErr && <span className="crear-op__field-error">{telefonoErr}</span>}
+          </label>
+          <label className="crear-op__field">
+            <span>Departamento *</span>
+            <RequiredDropdown
+              options={departamentoOptions}
+              value={selectedDepartamento}
+              placeholder="Escribe para buscar resultados"
+              searchable
+              onChange={(option) => {
+                setDepartamentoId(option?.value ?? '')
+                setLocalidadId('')
+              }}
+            />
+          </label>
+          <label className="crear-op__field">
+            <span>Localidad *</span>
+            <RequiredDropdown
+              options={localidadOptions}
+              value={selectedLocalidad}
+              placeholder={selectedDepartamento ? 'Escribe para buscar resultados' : 'Elegí primero un departamento'}
+              disabled={!selectedDepartamento}
+              searchable
+              onChange={(option) => setLocalidadId(option?.value ?? '')}
+            />
+          </label>
+        </div>
+      </ModalContent>
+      <ModalFooter
+        secondaryButton={{ text: 'Cancelar', onClick: onClose, disabled: saving }}
+        primaryButton={{
+          text: saving ? 'Guardando...' : 'Guardar',
+          disabled: !canSave || saving,
+          onClick: () => onSave({ fechaNacimiento, codigoPais, telefono, departamentoId, localidadId }),
+        }}
+      />
+    </Modal>
   )
 }
 
@@ -753,17 +758,29 @@ export default function CrearOportunidadForm({
   const [resultadoSeleccionado, setResultadoSeleccionado] = useState(
     () => initialPersistedSearch?.resultadoSeleccionado ?? null
   )
-  // A pedido: elegir un resultado en el buscador ya NO autocompleta directo — primero
-  // se muestra una tarjeta de confirmación con los datos que se van a usar (ver más
-  // abajo), y recién al apretar "Usar datos de este..." se aplican de verdad (ver
-  // handleConfirmPreview). searchPreview es lo que el usuario tiene elegido en el
-  // buscador en este momento, haya confirmado o no todavía — resultadoSeleccionado
-  // sigue siendo solo lo YA confirmado (autofill real).
+  // A pedido: elegir un resultado en el buscador autocompleta directo (ver
+  // handleSearchPreview, que setea los 2 juntos) — searchPreview controla el value del
+  // Dropdown y de qué persona se trae el historial; resultadoSeleccionado es lo mismo
+  // ya aplicado al form. Quedan siempre en sincro entre sí, pero se mantienen como 2
+  // variables separadas porque cada una alimenta una parte distinta del componente.
   const [searchPreview, setSearchPreview] = useState(() => initialPersistedSearch?.searchPreview ?? null)
   // A pedido: qué oportunidad anterior (de la lista debajo de la tarjeta de
   // confirmación) está expandida mostrando su detalle — una a la vez, igual que el
   // mockup ("Ocultar detalle" en la que está abierta, "Ver detalle" en el resto).
   const [expandedOppId, setExpandedOppId] = useState(null)
+  // A pedido: popup "Editar" para modificar los datos del Contacto ya elegido (ver
+  // EditarContactoModal y handleSaveContacto más abajo) — solo aplica cuando la persona
+  // vino de "Contacto" en el buscador (Lead/"crear de 0" siguen con el form editable de
+  // siempre, ver el JSX del paso 1).
+  const [editingContacto, setEditingContacto] = useState(false)
+  const [savingContacto, setSavingContacto] = useState(false)
+  const [savingContactoError, setSavingContactoError] = useState(null)
+  // A pedido: el historial (panel derecho, ver JSX) se puede filtrar por estado tocando
+  // el contador correspondiente — null es "Total" (sin filtrar). Tocar el mismo contador
+  // ya activo lo desactiva (mismo botón sirve de filtro Y de contador, "funciona de las
+  // dos formas"). Se resetea solo si cambia la persona elegida (ver el useEffect debajo
+  // de previousOportunidades más abajo).
+  const [historialFilter, setHistorialFilter] = useState(null)
   // A pedido: si la Oportunidad elegida en el buscador ya tenía Cédula Identidad
   // subida, se reusa ese mismo archivo acá (ver handleResultadoSeleccionado/
   // fetchFileColumnAsFile) — este estado solo prende un cartelito mientras se descarga,
@@ -779,19 +796,10 @@ export default function CrearOportunidadForm({
   // hay Oportunidades con la Cédula que se está tipeando a mano, se avisa acá (ver el
   // useEffect debounced más abajo).
   const [duplicadoCheck, setDuplicadoCheck] = useState(null)
-  // A pedido: el aviso de arriba se muestra como popup (no como cartelito inline) y hay
-  // que cerrarlo a mano con "Entendido" — se prende solo cuando llega un resultado nuevo
-  // con algo para avisar (ver el useEffect debounced más abajo), no en cada render.
+  // A pedido: el aviso se muestra como popup (no como cartelito inline) y hay que
+  // cerrarlo a mano — se prende solo cuando llega un Cliente nuevo para avisar (ver el
+  // useEffect debounced más abajo), no en cada render.
   const [showDuplicadoModal, setShowDuplicadoModal] = useState(false)
-  // A pedido: cuando la Cédula tipeada a mano resulta duplicada, se manda ese mismo
-  // valor al buscador de arriba (ver ExistingRecordSearch/seedTerm) para que aparezcan
-  // ahí los resultados reales, en vez de dejar el aviso como único indicio.
-  const [duplicadoSeedCi, setDuplicadoSeedCi] = useState('')
-  // Contador aparte SOLO para forzar el remount de ExistingRecordSearch (ver su `key`
-  // más abajo) — si se usara duplicadoSeedCi solo, repetir la MISMA Cédula dos veces
-  // seguidas (ej. limpiar y volver a tipear la misma) no cambia su valor, así que React
-  // no vuelve a disparar el remount la segunda vez. El nonce sí cambia siempre.
-  const [duplicadoSeedNonce, setDuplicadoSeedNonce] = useState(0)
   // TextField (@vibe/core) mantiene un estado interno propio para el debounce que no se
   // sincroniza al toque cuando su `value` cambia desde AFUERA (no por su propio
   // onChange) — al limpiar Nombre/Apellido/CI/Teléfono de golpe con setForm (ver la
@@ -803,10 +811,12 @@ export default function CrearOportunidadForm({
 
   const handleChange = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
 
-  // Al elegir un resultado (Cliente u Oportunidad), se completan Nombre/Apellido/CI y se
-  // abre el resto del formulario. El tablero Clientes no tiene columnas separadas de
-  // Nombre/Apellido (solo el nombre completo, ver splitNombreApellido); Oportunidades sí
-  // las tiene, así que ahí se usan directo, sin adivinar dónde corta el nombre.
+  // Al elegir un resultado (Contacto o Lead), se completan los datos personales y se abre
+  // el resto del formulario. Las 2 fuentes ya traen Fecha Nacimiento/Teléfono/
+  // Departamento/Localidad (ver searchContactos/searchOportunidades en mondayApi.js) —
+  // Contacto solo tiene el nombre completo en un campo (sin columnas separadas de
+  // Nombre/Apellido, ver splitNombreApellido); Lead (Oportunidad) sí las tiene, se usan
+  // directo sin adivinar dónde corta el nombre.
   const handleResultadoSeleccionado = (resultado) => {
     setResultadoSeleccionado(resultado)
     if (!resultado) {
@@ -828,52 +838,49 @@ export default function CrearOportunidadForm({
       return
     }
     setBusquedaResuelta(true)
-    if (resultado.source === 'oportunidad') {
-      // A pedido: Fecha Nacimiento, Teléfono, Departamento y Localidad también se
-      // autocompletan acá — Cliente no tiene esas columnas (ver mapClienteItem/
-      // mondayApi.js), así que es exclusivo del caso Oportunidad. Departamento/Localidad
-      // vienen como nombre (display_value de un board_relation, ver mondayApi.js), hay
-      // que matchearlos contra la lista real para sacar el id que necesita el Dropdown
-      // — mismo criterio que ya usa cotizarFields.js para los campos "connected".
-      const { codigoPais, telefono } = splitTelefono(resultado.telefono, resultado.telefonoCountryShortName)
-      const departamentoMatch = (schema?.departamentos ?? []).find(
-        (d) => d.name.toLowerCase() === (resultado.departamentoNombre || '').toLowerCase()
-      )
-      const localidadMatch = (schema?.localidades ?? []).find(
-        (l) => l.name.toLowerCase() === (resultado.localidadNombre || '').toLowerCase()
-      )
-      setForm((prev) => ({
-        ...prev,
-        nombre: resultado.nombre || prev.nombre,
-        apellido: resultado.apellido || prev.apellido,
-        ci: resultado.ci || prev.ci,
-        fechaNacimiento: resultado.fechaNacimiento || prev.fechaNacimiento,
-        codigoPais: codigoPais || prev.codigoPais,
-        telefono: telefono || prev.telefono,
-        departamentoId: departamentoMatch?.id ?? prev.departamentoId,
-        localidadId: localidadMatch?.id ?? prev.localidadId,
-      }))
-      // A pedido: si esa Oportunidad ya tenía Cédula Identidad subida, se reusa acá
-      // también — Clientes no tiene esta columna, así que es exclusivo del caso
-      // Oportunidad (mismo criterio que Fecha Nacimiento/Teléfono/Departamento más
-      // arriba). Fire-and-forget: no bloquea el resto del autocompletado ni la
-      // confirmación si tarda o si esa Oportunidad no tenía archivo.
-      handleAutofillCedula(resultado.id)
-    } else {
-      const { nombre, apellido } = splitNombreApellido(resultado.name)
-      setForm((prev) => ({ ...prev, nombre, apellido, ci: resultado.ci || prev.ci }))
-    }
+    // Departamento/Localidad vienen como nombre (display_value de un board_relation, ver
+    // mondayApi.js), hay que matchearlos contra la lista real para sacar el id que
+    // necesita el Dropdown — mismo criterio que ya usa cotizarFields.js para los campos
+    // "connected".
+    const { codigoPais, telefono } = splitTelefono(resultado.telefono, resultado.telefonoCountryShortName)
+    const departamentoMatch = (schema?.departamentos ?? []).find(
+      (d) => d.name.toLowerCase() === (resultado.departamentoNombre || '').toLowerCase()
+    )
+    const localidadMatch = (schema?.localidades ?? []).find(
+      (l) => l.name.toLowerCase() === (resultado.localidadNombre || '').toLowerCase()
+    )
+    const { nombre, apellido } =
+      resultado.source === 'lead'
+        ? { nombre: resultado.nombre, apellido: resultado.apellido }
+        : splitNombreApellido(resultado.name)
+    setForm((prev) => ({
+      ...prev,
+      nombre: nombre || prev.nombre,
+      apellido: apellido || prev.apellido,
+      ci: resultado.ci || prev.ci,
+      fechaNacimiento: resultado.fechaNacimiento || prev.fechaNacimiento,
+      codigoPais: codigoPais || prev.codigoPais,
+      telefono: telefono || prev.telefono,
+      departamentoId: departamentoMatch?.id ?? prev.departamentoId,
+      localidadId: localidadMatch?.id ?? prev.localidadId,
+    }))
+    // A pedido: si esa persona ya tenía Cédula Identidad subida, se reusa acá — Lead
+    // (Oportunidad) la guarda en file_mm5pc008, Contacto en file_mm4whbdc ("🪪 CI Frente",
+    // tablero Contactos 18420863016). Fire-and-forget: no bloquea el resto del
+    // autocompletado ni la confirmación si tarda o si no tenía archivo.
+    const cedulaColumnId = resultado.source === 'lead' ? 'file_mm5pc008' : 'file_mm4whbdc'
+    handleAutofillCedula(resultado.id, cedulaColumnId)
   }
 
-  // Descarga la Cédula Identidad ya subida en una Oportunidad anterior y la deja como si
-  // el usuario la hubiera elegido a mano (ver handleCedulaIdentidadChange, sin cambios —
-  // mismo File, misma lógica de subida diferida). Si esa Oportunidad no tenía archivo,
+  // Descarga la Cédula Identidad ya subida en una Oportunidad o Contacto anterior y la
+  // deja como si el usuario la hubiera elegido a mano (ver handleCedulaIdentidadChange,
+  // sin cambios — mismo File, misma lógica de subida diferida). Si no tenía archivo,
   // fetchFileColumnAsFile devuelve null y acá no se hace nada — no hay nada raro que
   // avisar, simplemente no había Cédula para reusar.
-  const handleAutofillCedula = async (itemId) => {
+  const handleAutofillCedula = async (itemId, columnId) => {
     setCedulaAutofillLoading(true)
     try {
-      const file = await fetchFileColumnAsFile(itemId, 'file_mm5pc008')
+      const file = await fetchFileColumnAsFile(itemId, columnId)
       if (file) await handleCedulaIdentidadChange(file, true)
     } catch {
       // Silencioso — la descarga falló, el usuario sigue pudiendo subirla a mano como
@@ -883,19 +890,13 @@ export default function CrearOportunidadForm({
     }
   }
 
-  // onChange de ExistingRecordSearch — a diferencia de antes, elegir un resultado acá
-  // NO autocompleta directo, solo lo deja "en preview" (ver la tarjeta de confirmación
-  // más abajo en el JSX). La cruz (resultado null) sí deshace de una un autocompletado
-  // ya confirmado — no tiene sentido esperar una segunda confirmación para limpiar.
+  // onChange de ExistingRecordSearch — a pedido, elegir un resultado autocompleta
+  // directo (antes había un paso intermedio de "preview" con un botón "Usar datos de
+  // este..." aparte, de punta a punta). La cruz (resultado null) deshace el
+  // autocompletado igual, mismo circuito.
   const handleSearchPreview = (resultado) => {
     setSearchPreview(resultado)
-    if (!resultado) handleResultadoSeleccionado(null)
-  }
-
-  // "Usar datos de este cliente/oportunidad" en la tarjeta de confirmación — recién acá
-  // se aplica el autocompletado real (handleResultadoSeleccionado, sin cambios).
-  const handleConfirmPreview = () => {
-    if (searchPreview) handleResultadoSeleccionado(searchPreview)
+    handleResultadoSeleccionado(resultado)
   }
 
   // A pedido: recuerda por PERSISTED_SEARCH_TTL_MS lo elegido en "Buscar Persona" —
@@ -911,9 +912,6 @@ export default function CrearOportunidadForm({
     }
     savePersistedSearch({
       searchPreview,
-      // Los datos personales autocompletados solo existen una vez confirmado (ver
-      // handleConfirmPreview) — sin confirmar, solo hace falta recordar la selección en
-      // sí (searchPreview) para que reaparezcan la tarjeta de preview y el historial.
       resultadoSeleccionado,
       personales: resultadoSeleccionado
         ? {
@@ -943,31 +941,46 @@ export default function CrearOportunidadForm({
     setForm((prev) => ({ ...prev, nombre: '', apellido: '', ci: '' }))
   }
 
-  // Solo corre cuando NO hay un resultado elegido a propósito (search salteada, o el
-  // usuario sigue tipeando la Cédula a mano) — avisa (sin bloquear) si esa Cédula ya está
-  // cargada como Cliente y/o ya tiene Oportunidades. Debounced, recién dispara con una
-  // Cédula con formato válido para no pegarle a la API en cada tecla.
+  // A pedido: desde la pantalla ya con los datos autocompletados, "Cambiar persona"
+  // vuelve a la búsqueda — mismo circuito que la cruz de "Buscar Persona" (deshace el
+  // autocompletado, ver handleResultadoSeleccionado(null)) más ocultar esta pantalla,
+  // para poder elegir otra persona sin arrastrar nada de la anterior.
+  const handleVolverABuscar = () => {
+    handleResultadoSeleccionado(null)
+    setSearchPreview(null)
+    setBusquedaResuelta(false)
+  }
+
+  // Solo corre cuando NO hay un resultado elegido a propósito por "Buscar Persona" (search
+  // salteada — "crear de 0" — y el usuario sigue completando Nombre/Apellido/CI a mano) —
+  // avisa (sin bloquear) si esa persona ya está cargada como Contacto, por Cédula o por
+  // Nombre + Apellido (lo que haya completo primero). CI exacto tiene prioridad porque es
+  // inequívoco; Nombre+Apellido es una búsqueda más laxa (contains_text), así que solo se
+  // dispara con los 2 campos completos y se queda con el primer resultado. Debounced para
+  // no pegarle a la API en cada tecla. Por ahora solo avisa por Contacto (no por
+  // Oportunidades/Lead ya cargadas con esa Cédula) — variante aparte, pendiente.
   useEffect(() => {
     if (!busquedaResuelta || resultadoSeleccionado) {
       setDuplicadoCheck(null)
       return undefined
     }
     const digits = stripCi(form.ci)
-    if (!digits || ciError(form.ci)) {
+    const ciValida = digits && !ciError(form.ci)
+    const nombreCompleto = form.nombre.trim() && form.apellido.trim() ? `${form.nombre} ${form.apellido}`.trim() : ''
+    if (!ciValida && !nombreCompleto) {
       setDuplicadoCheck(null)
       return undefined
     }
     let cancelled = false
     const timer = setTimeout(() => {
-      Promise.all([findClienteByCedula(digits), countOportunidadesByCedula(digits)])
-        .then(([cliente, count]) => {
+      const lookup = ciValida
+        ? findContactoByCedula(digits)
+        : searchContactos(nombreCompleto).then((r) => r[0] ?? null)
+      lookup
+        .then((contacto) => {
           if (cancelled) return
-          setDuplicadoCheck({ cliente, count })
-          // El seed del buscador (ver seedTerm/handleCloseDuplicadoModal más abajo) se
-          // dispara recién al CERRAR este modal, no acá — mientras el modal está abierto
-          // atrapa el foco, y el buscador (que nunca llega a tener el foco real) queda
-          // marcado como "perdió el foco" por la librería y se resetea solo.
-          if (cliente || count > 0) setShowDuplicadoModal(true)
+          setDuplicadoCheck({ contacto })
+          if (contacto) setShowDuplicadoModal(true)
         })
         .catch(() => {
           if (!cancelled) setDuplicadoCheck(null)
@@ -977,29 +990,52 @@ export default function CrearOportunidadForm({
       cancelled = true
       clearTimeout(timer)
     }
-  }, [form.ci, busquedaResuelta, resultadoSeleccionado])
+  }, [form.ci, form.nombre, form.apellido, busquedaResuelta, resultadoSeleccionado])
 
-  // "Cancelar" — cierra el popup de Cédula duplicada sin tocar el buscador de arriba,
-  // el usuario sigue completando el form a mano como si el aviso no hubiera aparecido.
+  // "Cancelar" — cierra el popup sin tocar nada, el usuario sigue completando el form a
+  // mano como si el aviso no hubiera aparecido.
   const handleCancelDuplicadoModal = () => {
     setShowDuplicadoModal(false)
   }
 
-  // "Continuar" — cierra el popup Y recién ahí siembra el buscador de arriba con esa
-  // misma Cédula (ver seedTerm en ExistingRecordSearch) — con el modal todavía abierto
-  // el buscador no llega a abrirse de verdad (ver el comentario en el useEffect de
-  // arriba). El setTimeout es necesario: Modal usa react-focus-lock con
-  // returnFocus=true, que al cerrarse devuelve el foco al campo de CI (donde estaba
-  // escribiendo el usuario) en un timeout propio de esa librería — si sembramos ANTES
-  // de que eso termine, el buscador alcanza a tener el foco un instante y despues se lo
-  // vuelven a sacar, y downshift (la librería del Dropdown) lo toma como que perdió el
-  // foco y resetea todo solo. 100ms le da tiempo de sobra a que termine primero.
-  const handleContinueDuplicadoModal = () => {
+  // "Confirmar" — aplica directo los datos de ese Contacto (mismo circuito que elegir un
+  // resultado en "Buscar Persona", ver handleSearchPreview/handleResultadoSeleccionado)
+  // en vez de solo avisar: pisa los datos personales con los reales del Contacto
+  // encontrado (ya viene completo — CI/Fecha Nacimiento/Teléfono/Departamento/
+  // Localidad, ver mapContactoItem). También se guarda en searchPreview para que el
+  // buscador de arriba y el cartelito "Contacto seleccionado" de abajo lo reflejen.
+  const handleConfirmDuplicadoContacto = () => {
+    if (!duplicadoCheck?.contacto) return
+    const resultado = { ...duplicadoCheck.contacto, source: 'contacto' }
     setShowDuplicadoModal(false)
-    setTimeout(() => {
-      setDuplicadoSeedCi(form.ci)
-      setDuplicadoSeedNonce((n) => n + 1)
-    }, 100)
+    setSearchPreview(resultado)
+    handleResultadoSeleccionado(resultado)
+  }
+
+  // "Guardar" del popup "Editar contacto" (ver EditarContactoModal) — a diferencia del
+  // resto del form, esto escribe DIRECTO en el Contacto real (no espera al guardado
+  // final de la Oportunidad), y recién si eso sale bien actualiza el form local para que
+  // la descripción de solo lectura y el resto de la Oportunidad reflejen lo nuevo.
+  const handleSaveContacto = async (values) => {
+    if (!resultadoSeleccionado?.id) return
+    setSavingContacto(true)
+    setSavingContactoError(null)
+    try {
+      await setContactoColumnValues(resultadoSeleccionado.id, {
+        [CONTACTO_FECHA_NACIMIENTO_COLUMN_ID]: values.fechaNacimiento,
+        [CONTACTO_TELEFONO_COLUMN_ID]: {
+          phone: `${values.codigoPais.replace('+', '')}${values.telefono.replace(/\D/g, '')}`,
+          countryShortName: COUNTRY_SHORT_NAMES[values.codigoPais] ?? 'UY',
+        },
+        [CONTACTO_LOCALIDAD_COLUMN_ID]: { item_ids: [Number(values.localidadId)] },
+      })
+      setForm((prev) => ({ ...prev, ...values }))
+      setEditingContacto(false)
+    } catch (err) {
+      setSavingContactoError(err.message)
+    } finally {
+      setSavingContacto(false)
+    }
   }
 
   // A pedido: apenas carga el schema, el formulario arranca con Tipo de Riesgo =
@@ -1094,6 +1130,53 @@ export default function CrearOportunidadForm({
     }))
   }
 
+  // A pedido: "¿Es alguno de estos vehículos?" (ver vehiculosAnteriores/JSX) — pisa
+  // Marca/Año/Combustible/Tipo/Uso con los de esa oportunidad anterior y deja el campo
+  // en "No, ingresar manualmente" (mismos campos que ese camino, ahora precompletados,
+  // el usuario los puede seguir editando antes de continuar). El Modelo en sí es texto
+  // suelto en la oportunidad vieja (text_mm54fb7m), no necesariamente conectado a un
+  // ítem real de Autodata — se busca ese ítem real por Año+Marca+nombre para dejarlo
+  // bien conectado en la oportunidad nueva; si no se encuentra (nombre no matchea
+  // exacto), se deja sin elegir y el usuario lo termina de elegir a mano abajo (con
+  // Año/Marca ya filtrados, así que igual queda rápido).
+  // A pedido: mientras busca, el campo Modelo queda no editable (ver
+  // buscandoModeloAnterior/JSX) — evita que el usuario toque el dropdown y lo pisen de
+  // golpe cuando termine la búsqueda (o al revés, que elija algo justo antes de que la
+  // búsqueda lo pise a él).
+  const [buscandoModeloAnterior, setBuscandoModeloAnterior] = useState(false)
+
+  const handleSelectVehiculoAnterior = async (v) => {
+    setForm((prev) => ({
+      ...prev,
+      poseeVehiculo: 'No',
+      marca: v.marca,
+      anio: v.anio,
+      combustible: v.combustible,
+      tipo: v.tipo,
+      uso: v.uso || prev.uso,
+      modeloSeleccion: null,
+    }))
+    setBuscandoModeloAnterior(true)
+    try {
+      const modelos = await fetchAutodataModelosByAnioMarca(v.anio, v.marca)
+      const modeloText = (v.modelo || '').trim().toLowerCase()
+      // A pedido: match exacto primero (más preciso cuando coincide tal cual), y si no
+      // hay ninguno, contains por palabra — el nombre real en Autodata suele traer la
+      // Marca pegada adelante (ej. "FORD  - Nuevo Fiesta 1.6 First dir, a/a 5p.") que
+      // text_mm54fb7m no siempre repite tal cual, así que la igualdad estricta sola se
+      // queda corta.
+      const match =
+        modelos.find((m) => m.name.trim().toLowerCase() === modeloText) ||
+        modelos.find((m) => matchesSearchQuery(m.name, v.modelo))
+      if (match) setForm((prev) => ({ ...prev, modeloSeleccion: match }))
+    } catch {
+      // Si falla la búsqueda, el Modelo queda para elegir a mano — no bloquea el resto
+      // del autocompletado (Marca/Año/Combustible/Tipo/Uso ya se aplicaron igual).
+    } finally {
+      setBuscandoModeloAnterior(false)
+    }
+  }
+
   // Válido para avanzar de este paso al siguiente — todos los campos son obligatorios
   // (no vacíos) y, para CI/Fecha Nacimiento/Teléfono, además tienen que tener un
   // formato válido (ver ciError/fechaError/telefonoError).
@@ -1111,11 +1194,13 @@ export default function CrearOportunidadForm({
           form.telefono &&
           !telefonoError(form.telefono, form.codigoPais) &&
           form.localidadId &&
-          form.departamentoId &&
-          form.tipoRiesgo
+          form.departamentoId
       )
     }
     if (index === 1) {
+      // Tipo de Riesgo vive en este paso ahora (ver JSX) — sin elegirlo no hay nada más
+      // que validar.
+      if (!form.tipoRiesgo) return false
       if (!esAutomovil) return true
       if (!form.poseeVehiculo) return false
       if (form.poseeVehiculo === 'Si') {
@@ -1142,11 +1227,6 @@ export default function CrearOportunidadForm({
     }
     return false
   }
-
-  // El paso 2 se llama como el Tipo de Riesgo elegido en el paso 1 (ej. "🚗 Automóvil"),
-  // en vez de un nombre fijo genérico — hasta que se elija algo, se muestra el label
-  // original como placeholder.
-  const stepLabels = [STEPS[0].label, form.tipoRiesgo || STEPS[1].label]
 
   const isLastStep = stepIndex === STEPS.length - 1
   const canAdvance = isStepValid(stepIndex)
@@ -1194,12 +1274,9 @@ export default function CrearOportunidadForm({
   }
 
   // Posee Vehículo === "Sí": ya no se piden Marca/Año/Tipo a mano — se leen del archivo.
-  // A pedido, subir el archivo NO dispara la lectura automática sola/todavía: se sube y
-  // queda en "subido" (ver JSX) hasta que el usuario confirma con el botón "Confirmar
-  // lectura" (handleConfirmarLectura), recién ahí se pone color_mm5rzrhk = "Leer" y
-  // arranca el robot que completa Marca/Año/Tipo/Combustible directo en el tablero
-  // (mismo mecanismo/gate que OpportunityDetail.jsx). Antes de esto se podía subir sin
-  // querer un archivo equivocado y ya arrancaba la lectura sin poder frenarla.
+  // A pedido: subir el archivo dispara la lectura automática directo (color_mm5rzrhk =
+  // "Leer"), sin el paso intermedio de "Confirmar lectura" que había antes — el archivo
+  // elegido ya es la confirmación.
   const handleCartaAutomovilChange = async (file) => {
     handleChange('cartaAutomovil', file)
     setCartaSubida(false)
@@ -1217,7 +1294,8 @@ export default function CrearOportunidadForm({
       await setMultipleColumnValues(itemId, buildBaseColumnValues())
       await uploadFileToColumn(itemId, 'file_mm51jy06', file)
       setCartaSubida(true)
-      setLecturaEstado('subido')
+      await setSimpleColumnValue(itemId, 'color_mm5rzrhk', 'Leer')
+      setLecturaEstado('Leer')
     } catch (err) {
       setLecturaEstado('Error')
       setLecturaError(err.message)
@@ -1240,21 +1318,6 @@ export default function CrearOportunidadForm({
       setSaveError(err.message)
     } finally {
       setCartaSubiendo(false)
-    }
-  }
-
-  // Recién acá se dispara la lectura automática — el usuario ya vio que el archivo
-  // subió bien y confirma explícitamente antes de que el robot lo procese.
-  const handleConfirmarLectura = async () => {
-    if (!createdItemId) return
-    setLecturaEstado('confirmando')
-    setLecturaError(null)
-    try {
-      await setSimpleColumnValue(createdItemId, 'color_mm5rzrhk', 'Leer')
-      setLecturaEstado('Leer')
-    } catch (err) {
-      setLecturaEstado('Error')
-      setLecturaError(err.message)
     }
   }
 
@@ -1334,6 +1397,26 @@ export default function CrearOportunidadForm({
     }
   }, [lecturaEstado, createdItemId])
 
+  // A pedido: toda Oportunidad nueva queda con el campo Contacto completo, nunca vacío
+  // — si se eligió un Contacto existente en "Buscar Persona" se reusa ese id; si no (Lead
+  // o "Crear desde cero"), se crea un Contacto nuevo con los mismos datos personales que
+  // ya se cargaron acá, para no volver a tipearlos. Esto es además lo que hace que el
+  // historial por relación (ver contactoOportunidades más arriba) se empiece a llenar
+  // solo de acá en adelante.
+  const ensureContactoId = async () => {
+    if (resultadoSeleccionado?.source === 'contacto') return resultadoSeleccionado.id
+    const created = await createContactoItem(`${form.nombre} ${form.apellido}`.trim(), {
+      [CONTACTO_CI_COLUMN_ID]: stripCi(form.ci),
+      [CONTACTO_TELEFONO_COLUMN_ID]: {
+        phone: `${form.codigoPais.replace('+', '')}${form.telefono.replace(/\D/g, '')}`,
+        countryShortName: COUNTRY_SHORT_NAMES[form.codigoPais] ?? 'UY',
+      },
+      [CONTACTO_FECHA_NACIMIENTO_COLUMN_ID]: form.fechaNacimiento,
+      [CONTACTO_LOCALIDAD_COLUMN_ID]: { item_ids: [Number(form.localidadId)] },
+    })
+    return created.id
+  }
+
   const handleGuardar = async () => {
     if (!canAdvance || saving) return
     setSaving(true)
@@ -1341,6 +1424,9 @@ export default function CrearOportunidadForm({
     try {
       const itemId = await ensureItemId()
       await setMultipleColumnValues(itemId, buildBaseColumnValues())
+
+      const contactoId = await ensureContactoId()
+      await setConnectedColumnValue(itemId, OPORTUNIDAD_CONTACTO_COLUMN_ID, [Number(contactoId)])
 
       if (esAutomovil) {
         const extra = {
@@ -1399,18 +1485,23 @@ export default function CrearOportunidadForm({
 
   // Mismo componente Stepper.jsx que usa OpportunityDetail (círculos numerados + línea
   // de progreso), en vez de las pills propias que tenía este form antes — a pedido, para
-  // que la estética de "pasos" sea consistente en toda la app. El paso 2 se sigue
-  // ocultando hasta que el paso 1 esté completo (antes no hay a dónde ir).
+  // que la estética de "pasos" sea consistente en toda la app. A pedido: el paso 2 ahora
+  // se ve siempre (antes se ocultaba hasta completar el paso 1) — sigue sin ser
+  // clickeable hasta entonces (`clickable` de abajo no cambió), solo deja de estar
+  // escondido para que el usuario sepa de entrada que hay un paso más. A pedido: el
+  // nombre del paso 2 ya no cambia según el Tipo de Riesgo elegido (antes mostraba ej.
+  // "🚗 Automóvil") — queda fijo en "Datos de oportunidad" (STEPS[1].label), sin importar
+  // qué se elija.
   const stepperSteps = STEPS.map((s, index) => ({
     key: s.key,
-    label: stepLabels[index],
+    label: s.label,
     status: index < stepIndex ? 'done' : index === stepIndex ? 'active' : 'pending',
     clickable: index < stepIndex || (index > stepIndex && isStepValid(index - 1)),
-  })).filter((_, index) => index !== 1 || isStepValid(0))
+  }))
 
   // El resultado en preview ya está confirmado (autocompletado real aplicado) cuando
-  // coincide con resultadoSeleccionado — gatea si se muestra la tarjeta de confirmación
-  // (sin confirmar) o el cartelito de "ya se completó" (confirmado).
+  // coincide con resultadoSeleccionado — en la práctica siempre es así apenas se elige
+  // algo (ver handleSearchPreview), gatea si se muestra el cartelito "seleccionado: ...".
   const previewConfirmed = Boolean(
     resultadoSeleccionado &&
       searchPreview &&
@@ -1418,19 +1509,136 @@ export default function CrearOportunidadForm({
       resultadoSeleccionado.id === searchPreview.id
   )
 
+  // A pedido: cuando la persona elegida es un Contacto, el historial se lee de la
+  // relación real Contacto→Oportunidades (más precisa que un escaneo por CI, ver
+  // fetchContactoOportunidades en mondayApi.js) — pero esa relación recién se empieza a
+  // completar de acá en adelante (ver handleGuardar más abajo), así que las Oportunidades
+  // viejas de un Contacto que todavía no estaban vinculadas no aparecerían solas ahí.
+  const [contactoOportunidades, setContactoOportunidades] = useState([])
+  useEffect(() => {
+    if (!searchPreview || searchPreview.source !== 'contacto') {
+      setContactoOportunidades([])
+      return undefined
+    }
+    let cancelled = false
+    fetchContactoOportunidades(searchPreview.id)
+      .then((items) => {
+        if (cancelled) return
+        setContactoOportunidades(mapOpportunities(items, { estadoOportunidad: schema?.estadoOportunidad?.colorsByLabel ?? {} }))
+      })
+      .catch(() => {
+        if (!cancelled) setContactoOportunidades([])
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [searchPreview?.id, searchPreview?.source, schema])
+
+  // A pedido: cuando la persona elegida es un Lead (una Oportunidad vieja, sin Contacto
+  // formal todavía), su propio vehículo entra SIEMPRE como candidato en "¿Es alguno de
+  // estos vehículos?" (ver vehiculosAnteriores más abajo) — se trae directo por id en vez
+  // de depender de que la Cédula matchee contra `opportunities` (ver
+  // previousOportunidadesPorCi, más abajo): así aparece igual aunque esa Oportunidad no
+  // tuviera la Cédula cargada, o el buscador haya deduplicado el Lead con otra Oportunidad
+  // de la misma persona (ver el criterio de "más completa" en searchOportunidades,
+  // mondayApi.js). Mismas columnas que ya lee el polling de lectura automática más arriba.
+  const [leadVehiculo, setLeadVehiculo] = useState(null)
+  useEffect(() => {
+    if (!searchPreview || searchPreview.source !== 'lead') {
+      setLeadVehiculo(null)
+      return undefined
+    }
+    let cancelled = false
+    fetchOpportunityDetail(searchPreview.id)
+      .then((data) => {
+        if (cancelled || !data) return
+        const textOf = (id) => data.column_values.find((cv) => cv.id === id)?.text?.trim() || ''
+        const marca = textOf('dropdown_mm51ykrd')
+        const anio = textOf('dropdown_mm51mdmq')
+        const modelo = textOf('text_mm54fb7m')
+        if (!marca || !anio || !modelo) {
+          setLeadVehiculo(null)
+          return
+        }
+        setLeadVehiculo({
+          id: searchPreview.id,
+          marca,
+          anio,
+          modelo,
+          combustible: textOf('dropdown_mm52jp01'),
+          tipo: textOf('dropdown_mm5jqdk'),
+          uso: textOf('color_mm52ey1d'),
+        })
+      })
+      .catch(() => {
+        if (!cancelled) setLeadVehiculo(null)
+      })
+    return () => {
+      cancelled = true
+    }
+  }, [searchPreview?.id, searchPreview?.source])
+
   // A pedido: mostrar las oportunidades anteriores de la persona elegida en el
   // buscador — reusa `opportunities` (App.jsx ya lo trae completo y mapeado, ver
   // opportunityMapper.js, mismos datos que la tabla principal) en vez de armar una
   // consulta nueva a monday. Se matchea por CI (mismo criterio que
-  // countOportunidadesByCedula/findClienteByCedula, ver mondayApi.js).
-  const previousOportunidades =
+  // findContactoByCedula, ver mondayApi.js). Se combina con contactoOportunidades (la
+  // relación real, ver arriba) y se deduplica por id — nunca se pierde historial
+  // existente mientras la relación todavía no cubre todo, y con el tiempo la relación
+  // real termina siendo la fuente completa por sí sola.
+  const previousOportunidadesPorCi =
     searchPreview?.ci && opportunities
       ? opportunities.filter((o) => o.ci && stripCi(o.ci) === stripCi(searchPreview.ci))
       : []
+  const previousOportunidades = Array.from(
+    new Map([...contactoOportunidades, ...previousOportunidadesPorCi].map((o) => [o.id, o])).values()
+  )
+
+  // Contadores por estado para el filtro del panel de historial (ver JSX) — un chip por
+  // cada estado que realmente aparece entre las oportunidades de esta persona, en el
+  // orden en que aparece la primera vez (no fijo ni alfabético, así se adapta solo si el
+  // tablero agrega o saca estados).
+  const historialEstados = []
+  previousOportunidades.forEach((o) => {
+    if (!historialEstados.some((e) => e.label === o.estadoLabel)) {
+      historialEstados.push({ label: o.estadoLabel, color: o.estadoColor, count: 0 })
+    }
+  })
+  historialEstados.forEach((e) => {
+    e.count = previousOportunidades.filter((o) => o.estadoLabel === e.label).length
+  })
+
+  const historialFiltradas = historialFilter
+    ? previousOportunidades.filter((o) => o.estadoLabel === historialFilter)
+    : previousOportunidades
+
+  const hasHistorial = Boolean(searchPreview && previousOportunidades.length > 0)
+
+  // A pedido: en el paso 2 (Datos del riesgo), si la persona elegida ya tiene vehículos
+  // cotizados antes, se pueden elegir de ahí en vez de tipear todo de nuevo — reusa
+  // `previousOportunidades` (ya cargado para el historial, ver arriba), deduplicado por
+  // Marca+Modelo+Año (una misma persona puede tener varias oportunidades del mismo auto
+  // por recotizaciones/otra aseguradora). Solo entran los que sí tienen los 3 datos
+  // completos — no tiene sentido ofrecer un vehículo a medio cargar. `leadVehiculo` (el
+  // propio vehículo del Lead elegido, ver más arriba) va AL FINAL a propósito: si tiene
+  // la misma clave que uno ya traído por CI, gana él (viene de una lectura directa y
+  // siempre completa), y si no matcheaba por CI, se suma como candidato nuevo.
+  const vehiculosAnteriores = Array.from(
+    new Map(
+      [...previousOportunidades.filter((o) => o.marca && o.modelo && o.anio), ...(leadVehiculo ? [leadVehiculo] : [])].map(
+        (o) => [`${o.marca.toLowerCase()}|${o.modelo.toLowerCase()}|${o.anio}`, o]
+      )
+    ).values()
+  )
+
+  // Si cambia la persona elegida (o se deselecciona), el filtro de historial vuelve a
+  // "Total" — no tiene sentido arrastrar un filtro de estado de la persona anterior.
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  useEffect(() => setHistorialFilter(null), [searchPreview?.id])
 
   return (
     <div className="crear-op">
-      <div className="crear-op__card">
+      <div className={hasHistorial ? 'crear-op__card crear-op__card--wide' : 'crear-op__card'}>
         <div className="crear-op__header">
           {/* Columna vacía a la izquierda solo para que el grid de 3 columnas centre el
               Stepper de verdad (mismo criterio que .opp-detail__breadcrumb). */}
@@ -1448,64 +1656,379 @@ export default function CrearOportunidadForm({
 
         {stepIndex === 0 && (
           <div className="crear-op__fields">
-            {/* A pedido: sin la pregunta previa "¿El cliente ya existe?" — un único
-                buscador (CI o nombre) que trae resultados de los 2 tableros a la vez
-                (Cliente y Oportunidad, diferenciados con una etiqueta en cada opción,
-                ver ExistingRecordSearch) y completa Nombre/Apellido/CI al elegir uno. Si
-                no aparece nada, "Saltear" abre el resto del formulario para cargarlo a
-                mano. */}
-            <label className="crear-op__field crear-op__field--full">
-              <span>Buscar Persona</span>
-              <ExistingRecordSearch
-                key={duplicadoSeedNonce}
-                value={searchPreview}
-                onChange={handleSearchPreview}
-                seedTerm={duplicadoSeedCi}
-              />
-              {/* A pedido: elegir un resultado ya no autocompleta directo — se muestra
-                  primero esta tarjeta con los datos que se van a usar, y recién al
-                  apretar "Usar datos de este..." se aplican de verdad (estética tipo
-                  mockup: avatar con iniciales, nombre, CI/Tel/Departamento en una línea,
-                  botón de confirmación). */}
-              {searchPreview && !previewConfirmed && (
-                <div className="crear-op__preview-card">
-                  <span className="crear-op__preview-avatar">{initialsOf(searchPreview.name)}</span>
-                  <div className="crear-op__preview-info">
-                    <span className="crear-op__preview-name">{searchPreview.name}</span>
-                    <span className="crear-op__preview-meta">
-                      {[
-                        searchPreview.ci && `CI ${searchPreview.ci}`,
-                        searchPreview.telefono && `Tel ${searchPreview.telefono}`,
-                        searchPreview.departamentoNombre,
-                      ]
-                        .filter(Boolean)
-                        .join(' · ')}
-                    </span>
-                  </div>
-                  <Button kind="tertiary" className="crear-op__preview-btn" onClick={handleConfirmPreview}>
-                    Usar datos de {searchPreview.source === 'cliente' ? 'este cliente' : 'esta oportunidad'}{' '}
-                    <MdArrowForward />
+            {/* A pedido: la búsqueda y los datos ya autocompletados viven en 2
+                "pantallas" separadas (nunca las 2 juntas) — antes el campo "Buscar
+                Persona" se quedaba visible arriba con el resultado ya elegido mientras
+                abajo aparecía todo el resto del formulario, quedaba redundante (el
+                nombre ya se ve repetido en Datos personales) y competía por atención.
+                Elegir un resultado (o "Crear Persona desde Cero") anima la transición de
+                una pantalla a la otra (key distinto por pantalla, ver el CSS) — "Cambiar
+                persona" (ver handleVolverABuscar) siempre permite volver atrás y elegir
+                otra cosa, sin perder nada: solo deshace el autocompletado, mismo
+                circuito que la cruz de "Buscar Persona" de antes. */}
+            {!busquedaResuelta ? (
+              <div className="crear-op__search-screen" key="search-screen">
+                <label className="crear-op__field crear-op__field--full">
+                  <span>Buscar Persona</span>
+                  <ExistingRecordSearch value={searchPreview} onChange={handleSearchPreview} />
+                  <Button kind="tertiary" className="crear-op__skip-btn" onClick={handleSaltearBusqueda}>
+                    Crear Persona desde Cero <MdArrowForward />
                   </Button>
+                </label>
+              </div>
+            ) : (
+              <div className="crear-op__data-screen" key="data-screen">
+                <Button kind="tertiary" className="crear-op__volver-btn" onClick={handleVolverABuscar}>
+                  <MdArrowBack /> Cambiar persona
+                </Button>
+
+                {previewConfirmed && (
+                  <span className="crear-op__autofill">
+                    {/* A pedido: Contacto y Lead ya traen los mismos datos personales (ver
+                        handleResultadoSeleccionado), así que el mensaje deja de depender
+                        de la fuente. */}
+                    {resultadoSeleccionado.source === 'contacto' ? 'Contacto' : 'Lead'} seleccionado:{' '}
+                    {resultadoSeleccionado.name} — se completaron
+                    Nombre/Apellido/CI/Fecha Nacimiento/Teléfono/Departamento/Localidad abajo, revisalos antes de
+                    continuar.
+                  </span>
+                )}
+
+                {/* A pedido: estética tipo mockup para los popups de confirmación — ícono en
+                    círculo celeste, título y descripción en el cuerpo, "Cancelar" +
+                    acción primaria abajo a la derecha. Solo corre si no hay un resultado ya
+                    elegido a propósito en "Buscar Persona" (ver el useEffect debounced,
+                    solo activo en esta pantalla porque busquedaResuelta ya es true acá).
+                    "Cancelar" cierra sin tocar nada; "Confirmar" aplica directo los datos de
+                    ese Contacto (ver handleConfirmDuplicadoContacto). */}
+                {!resultadoSeleccionado && showDuplicadoModal && duplicadoCheck?.contacto && (
+                  <AlertModal
+                    id="duplicado-cedula-modal"
+                    type="info"
+                    title="Cédula de Identidad existente en Contacto"
+                    description="Usaremos los datos de este contacto para completar los datos personales."
+                    onClose={handleCancelDuplicadoModal}
+                    secondaryButton={{ text: 'Cancelar', onClick: handleCancelDuplicadoModal }}
+                    primaryButton={{ text: 'Confirmar', onClick: handleConfirmDuplicadoContacto }}
+                  />
+                )}
+
+                {editingContacto && (
+                  <EditarContactoModal
+                    form={form}
+                    departamentoOptions={departamentoOptions}
+                    localidades={localidades}
+                    saving={savingContacto}
+                    error={savingContactoError}
+                    onClose={() => {
+                      setEditingContacto(false)
+                      setSavingContactoError(null)
+                    }}
+                    onSave={handleSaveContacto}
+                  />
+                )}
+
+              <div className={hasHistorial ? 'crear-op__step1-layout' : 'crear-op__step1-layout crear-op__step1-layout--solo'}>
+              <div className="crear-op__step1-main">
+                {/* A pedido: estética tipo mockup — campos agrupados en secciones con
+                    encabezado propio (Datos personales/Contacto/Ubicación/Documentación/
+                    Datos de la oportunidad) en vez de una sola grilla plana. */}
+                {resultadoSeleccionado?.source === 'contacto' ? (
+                  // A pedido: para un Contacto ya existente, sus datos personales se
+                  // muestran como descripción de solo lectura (no como formulario) — se
+                  // confirmó que es la persona correcta con la tarjeta de arriba y el
+                  // historial de al lado, no hace falta que se vea editable como si se
+                  // estuviera cargando de cero. "Editar" abre un popup aparte que
+                  // modifica el Contacto real (ver EditarContactoModal más abajo), no
+                  // solo el form de esta Oportunidad.
+                  <div className="crear-op__section">
+                    <div className="crear-op__contacto-resumen-head">
+                      <h3 className="crear-op__section-title">Datos personales</h3>
+                      <Button kind="tertiary" onClick={() => setEditingContacto(true)}>
+                        <MdEdit /> Editar
+                      </Button>
+                    </div>
+                    <div className="crear-op__contacto-resumen-grid">
+                      <div className="crear-op__contacto-resumen-field">
+                        <span className="crear-op__contacto-resumen-label">Nombre</span>
+                        <span className="crear-op__contacto-resumen-value">
+                          {`${form.nombre} ${form.apellido}`.trim() || '—'}
+                        </span>
+                      </div>
+                      <div className="crear-op__contacto-resumen-field">
+                        <span className="crear-op__contacto-resumen-label">CI</span>
+                        <span className="crear-op__contacto-resumen-value">{form.ci || '—'}</span>
+                      </div>
+                      <div className="crear-op__contacto-resumen-field">
+                        <span className="crear-op__contacto-resumen-label">Fecha de nacimiento</span>
+                        <span className="crear-op__contacto-resumen-value">{form.fechaNacimiento || '—'}</span>
+                      </div>
+                      <div className="crear-op__contacto-resumen-field">
+                        <span className="crear-op__contacto-resumen-label">Teléfono</span>
+                        <span className="crear-op__contacto-resumen-value">
+                          {form.telefono ? `${form.codigoPais} ${form.telefono}` : '—'}
+                        </span>
+                      </div>
+                      <div className="crear-op__contacto-resumen-field crear-op__contacto-resumen-field--full">
+                        <span className="crear-op__contacto-resumen-label">Ubicación</span>
+                        <span className="crear-op__contacto-resumen-value">
+                          {[selectedDepartamento?.label, selectedLocalidad?.label].filter(Boolean).join(' — ') || '—'}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="crear-op__section">
+                      <h3 className="crear-op__section-title">Datos personales</h3>
+                      <div className="crear-op__fields--grid">
+                        {/* TextField nativo de @vibe/core en vez de <label> + ClearableInput a
+                            mano — ya trae label (title/required), botón de limpiar (icon/
+                            onIconClick/clearOnIconClick) y el borde verde/rojo (validation) de
+                            fábrica. `icon` SIEMPRE en MdClear, nunca condicionado a si hay
+                            valor (`form.x ? MdClear : undefined`) — internamente el
+                            componente ya oculta el ícono solo cuando el campo está vacío, así
+                            que ese condicional era redundante Y además el causante de una
+                            excepción real: si el valor se limpia desde AFUERA (no tipeando,
+                            ver la cruz de "Buscar Persona" más arriba), hay un instante en
+                            que su estado interno de debounce todavía no bajó a vacío mientras
+                            `icon` ya pasó a `undefined` — esa combinación (valor todavía
+                            verdadero + ícono ya indefinido) hace que el componente intente
+                            leer `icon.length` y tira "Cannot read properties of undefined"
+                            (pantalla en blanco). Pasando siempre un ícono definido, esa
+                            combinación imposible de lograr no existe más. */}
+                        <TextField
+                          key={`nombre-${textFieldsResetKey}`}
+                          wrapperClassName="crear-op__field"
+                          title="Nombre"
+                          required
+                          placeholder="Ingresa el nombre"
+                          value={form.nombre}
+                          onChange={(value) => handleChange('nombre', value)}
+                          icon={MdClear}
+                          onIconClick={() => handleChange('nombre', '')}
+                          validation={form.nombre ? { status: 'success' } : undefined}
+                        />
+                        <TextField
+                          key={`apellido-${textFieldsResetKey}`}
+                          wrapperClassName="crear-op__field"
+                          title="Apellido"
+                          required
+                          placeholder="Ingresa el apellido"
+                          value={form.apellido}
+                          onChange={(value) => handleChange('apellido', value)}
+                          icon={MdClear}
+                          onIconClick={() => handleChange('apellido', '')}
+                          validation={form.apellido ? { status: 'success' } : undefined}
+                        />
+                        <TextField
+                          key={`ci-${textFieldsResetKey}`}
+                          wrapperClassName="crear-op__field"
+                          title="CI"
+                          required
+                          placeholder="Ej: 4.123.456-7"
+                          value={form.ci}
+                          onChange={(value) => handleChange('ci', value)}
+                          icon={MdClear}
+                          onIconClick={() => handleChange('ci', '')}
+                          validation={
+                            ciError(form.ci)
+                              ? { status: 'error', text: ciError(form.ci) }
+                              : form.ci
+                                ? { status: 'success' }
+                                : undefined
+                          }
+                        />
+                        <label className={`crear-op__field${fieldStateClass(form.fechaNacimiento, fechaError(form.fechaNacimiento))}`}>
+                          <span>Fecha Nacimiento *</span>
+                          <div className="crear-op__date-wrap">
+                            <input
+                              type="date"
+                              value={form.fechaNacimiento}
+                              max={maxFechaNacimiento()}
+                              onChange={(e) => handleChange('fechaNacimiento', e.target.value)}
+                            />
+                            {form.fechaNacimiento && (
+                              <button
+                                type="button"
+                                className="crear-op__date-clear"
+                                onClick={() => handleChange('fechaNacimiento', '')}
+                                aria-label="Borrar campo"
+                              >
+                                <MdClear />
+                              </button>
+                            )}
+                          </div>
+                          {fechaError(form.fechaNacimiento) && (
+                            <span className="crear-op__field-error">{fechaError(form.fechaNacimiento)}</span>
+                          )}
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="crear-op__section">
+                      <h3 className="crear-op__section-title">Contacto</h3>
+                      <div className="crear-op__fields--grid">
+                        <label className="crear-op__field crear-op__field--full">
+                          <span>Teléfono *</span>
+                          <div className="crear-op__phone">
+                            <div className="crear-op__phone-code">
+                              <RequiredDropdown
+                                options={CODIGO_PAIS_OPTIONS}
+                                value={CODIGO_PAIS_OPTIONS.find((o) => o.value === form.codigoPais) ?? null}
+                                onChange={(option) => handleChange('codigoPais', option?.value ?? '')}
+                              />
+                            </div>
+                            {/* Sin title acá — el label de arriba ("Teléfono *") ya cubre a los 2
+                                campos (código de país + número) juntos. */}
+                            <TextField
+                              key={`telefono-${textFieldsResetKey}`}
+                              wrapperClassName="crear-op__phone-number"
+                              placeholder="Ej: 099 123 456"
+                              value={form.telefono}
+                              onChange={(value) => handleChange('telefono', value)}
+                              icon={MdClear}
+                              onIconClick={() => handleChange('telefono', '')}
+                              validation={
+                                telefonoError(form.telefono, form.codigoPais)
+                                  ? { status: 'error' }
+                                  : form.telefono
+                                    ? { status: 'success' }
+                                    : undefined
+                              }
+                            />
+                          </div>
+                          {telefonoError(form.telefono, form.codigoPais) && (
+                            <span className="crear-op__field-error">
+                              {telefonoError(form.telefono, form.codigoPais)}
+                            </span>
+                          )}
+                        </label>
+                      </div>
+                    </div>
+
+                    <div className="crear-op__section">
+                      <h3 className="crear-op__section-title">Ubicación</h3>
+                      <div className="crear-op__fields--grid">
+                        <label className="crear-op__field">
+                          <span>Departamento *</span>
+                          <RequiredDropdown
+                            options={departamentoOptions}
+                            value={selectedDepartamento}
+                            placeholder="Escribe para buscar resultados"
+                            searchable
+                            onChange={(option) => {
+                              // Al cambiar el departamento, se limpia la Localidad elegida —
+                              // puede ya no pertenecer al departamento nuevo (el dropdown de
+                              // acá abajo se filtra por esto mismo).
+                              handleChange('departamentoId', option?.value ?? '')
+                              handleChange('localidadId', '')
+                            }}
+                          />
+                        </label>
+                        <label className="crear-op__field">
+                          <span>Localidad *</span>
+                          <RequiredDropdown
+                            options={localidadOptions}
+                            value={selectedLocalidad}
+                            placeholder={
+                              selectedDepartamento ? 'Escribe para buscar resultados' : 'Elegí primero un departamento'
+                            }
+                            disabled={!selectedDepartamento}
+                            searchable
+                            onChange={(option) => handleChange('localidadId', option?.value ?? '')}
+                          />
+                        </label>
+                      </div>
+                    </div>
+                  </>
+                )}
+
+                <div className="crear-op__section">
+                  <h3 className="crear-op__section-title">Documentación</h3>
+                  <div className="crear-op__fields--grid">
+                    {/* A pedido: Cédula Identidad se pide acá, en el paso 1, en vez de
+                        repetida en las 2 ramas del paso 2 (Posee Vehículo Sí/No) —
+                        opcional, no bloquea avanzar. El archivo queda en memoria hasta
+                        que exista el ítem (se crea recién en el paso 2 o al guardar);
+                        handleGuardar tiene el fallback que lo sube si todavía no se
+                        subió para entonces. */}
+                    <FileUploadField
+                      label="Cédula Identidad"
+                      required={false}
+                      file={form.cedulaIdentidad}
+                      onUpload={handleCedulaIdentidadChange}
+                      onDelete={() => handleCedulaIdentidadChange(null)}
+                      fullWidth
+                      highlighted={cedulaAutofilled}
+                    />
+                    {cedulaAutofillLoading && (
+                      <p className="crear-op__autofill">
+                        <Loader size={13} className="crear-op__lectura-spinner" /> Buscando Cédula Identidad de una
+                        oportunidad anterior...
+                      </p>
+                    )}
+                    {cedulaSubiendo && <p className="crear-op__autofill">Subiendo Cédula Identidad...</p>}
+                  </div>
                 </div>
-              )}
-              {/* A pedido: oportunidades anteriores de la persona elegida (mismo criterio
-                  de CI que el chequeo de duplicado) — reusa `opportunities`, ya cargado y
-                  mapeado por App.jsx, sin pegarle a monday de nuevo (ver
-                  previousOportunidades más arriba). Una expandida a la vez. */}
-              {searchPreview && previousOportunidades.length > 0 && (
+
+              </div>
+
+              {/* A pedido: panel de historial a la derecha del formulario (antes iba
+                  arriba, adentro de "Buscar Persona") — contador por estado que también
+                  funciona de filtro (tocar el mismo estado ya activo lo desactiva, ver
+                  handleHistorialFilterClick) y, debajo, la lista ya filtrada con el mismo
+                  "Ver detalle"/resumen breve de siempre por oportunidad. Solo se muestra
+                  si la persona elegida tiene oportunidades anteriores. */}
+              {hasHistorial && (
                 <div className="crear-op__historial">
                   <span className="crear-op__historial-title">
                     <MdEventNote /> Oportunidades anteriores de{' '}
-                    {searchPreview.source === 'cliente' ? 'este cliente' : 'esta persona'}
+                    {searchPreview.source === 'contacto' ? 'este contacto' : 'esta persona'}
                   </span>
-                  {previousOportunidades.map((o) => {
+
+                  <div className="crear-op__historial-counters">
+                    <button
+                      type="button"
+                      className={
+                        historialFilter === null
+                          ? 'crear-op__historial-counter crear-op__historial-counter--active'
+                          : 'crear-op__historial-counter'
+                      }
+                      onClick={() => setHistorialFilter(null)}
+                    >
+                      Total <strong>{previousOportunidades.length}</strong>
+                    </button>
+                    {historialEstados.map((e) => (
+                      <button
+                        type="button"
+                        key={e.label}
+                        className={
+                          historialFilter === e.label
+                            ? 'crear-op__historial-counter crear-op__historial-counter--active'
+                            : 'crear-op__historial-counter'
+                        }
+                        style={{ '--counter-color': e.color.bg, '--counter-bg': `${e.color.bg}1a` }}
+                        onClick={() => setHistorialFilter((prev) => (prev === e.label ? null : e.label))}
+                      >
+                        {e.label} <strong>{e.count}</strong>
+                      </button>
+                    ))}
+                  </div>
+
+                  {historialFiltradas.map((o) => {
                     const isExpanded = expandedOppId === o.id
-                    const companias = o.companias !== '—' ? o.companias.split(', ') : []
                     return (
                       <div className="crear-op__historial-item" key={o.id}>
                         <div className="crear-op__historial-row">
-                          <span className="crear-op__historial-date">{o.ultimaCotizacion}</span>
-                          <span className="crear-op__historial-desc">{o.bienLinea1}</span>
+                          {/* A pedido: el número de oportunidad (siempre presente, lo
+                              asigna la app — ver oppNumber en opportunityMapper.js) en
+                              vez de bienLinea1 — este último cae a item.name (el título
+                              del ítem en monday) cuando todavía no hay Marca/Modelo
+                              cargados (oportunidades "Nueva"), y ese fallback puede
+                              terminar mostrando el propio nombre del cliente acá,
+                              rompiendo la fila. */}
+                          <span className="crear-op__historial-desc">{o.oppNumber}</span>
                           <StatusBadge label={o.estadoLabel} color={o.estadoColor} />
                           <button
                             type="button"
@@ -1516,30 +2039,20 @@ export default function CrearOportunidadForm({
                             {isExpanded ? <MdKeyboardArrowUp /> : <MdKeyboardArrowDown />}
                           </button>
                         </div>
+                        {/* A pedido: solo fecha de cotización + datos del bien asegurado +
+                            "Ir a esta oportunidad" — el número/estado ya se ven en la
+                            fila de arriba, no hace falta repetirlos acá adentro. */}
                         {isExpanded && (
                           <div className="crear-op__historial-detail">
-                            <div className="crear-op__historial-detail-header">
-                              <span className="crear-op__historial-detail-title">{o.oppNumber} — Detalle del bien</span>
-                              <StatusBadge label={o.estadoLabel} color={o.estadoColor} />
-                            </div>
                             <div className="crear-op__historial-detail-grid">
+                              <div className="crear-op__historial-detail-box">
+                                <span className="crear-op__historial-detail-label">Fecha de cotización</span>
+                                <strong>{o.ultimaCotizacion}</strong>
+                              </div>
                               <div className="crear-op__historial-detail-box">
                                 <span className="crear-op__historial-detail-label">Bien asegurado</span>
                                 <strong>{o.bienLinea1}</strong>
                                 {o.bienLinea2 && <span>{o.bienLinea2}</span>}
-                              </div>
-                              <div className="crear-op__historial-detail-box">
-                                <span className="crear-op__historial-detail-label">Compañías cotizadas</span>
-                                {companias.length > 0 && (
-                                  <div className="crear-op__historial-companias">
-                                    {companias.map((c) => (
-                                      <span key={c} className="crear-op__historial-compania-tag">
-                                        {c}
-                                      </span>
-                                    ))}
-                                  </div>
-                                )}
-                                <span>Última cotización: {o.ultimaCotizacion}</span>
                               </div>
                             </div>
                             <Button
@@ -1556,269 +2069,86 @@ export default function CrearOportunidadForm({
                   })}
                 </div>
               )}
-              {previewConfirmed && (
-                <span className="crear-op__autofill">
-                  {resultadoSeleccionado.source === 'cliente' ? 'Cliente' : 'Oportunidad'} seleccionado:{' '}
-                  {resultadoSeleccionado.name} — se completaron{' '}
-                  {resultadoSeleccionado.source === 'oportunidad'
-                    ? 'Nombre/Apellido/CI/Fecha Nacimiento/Teléfono/Departamento/Localidad'
-                    : 'Nombre/Apellido/CI'}{' '}
-                  abajo, revisalos antes de continuar.
-                </span>
-              )}
-              {!busquedaResuelta && (
-                <Button kind="tertiary" className="crear-op__skip-btn" onClick={handleSaltearBusqueda}>
-                  Buscar manualmente <MdArrowForward />
-                </Button>
-              )}
-            </label>
-
-            {/* A pedido: estética tipo mockup para los popups de confirmación — ícono en
-                círculo celeste, título y descripción en el cuerpo, "Cancelar" +
-                acción primaria abajo a la derecha, en vez del AttentionBox con un solo
-                botón "Entendido" de antes. Solo corre si no hay un resultado ya elegido
-                a propósito (ver el useEffect debounced). "Cancelar" cierra sin tocar el
-                buscador; "Continuar" lo siembra con la Cédula (ver handleContinue/
-                handleCancelDuplicadoModal). */}
-            {busquedaResuelta && !resultadoSeleccionado && showDuplicadoModal && duplicadoCheck && (
-              <Modal id="duplicado-cedula-modal" show onClose={handleCancelDuplicadoModal} size="small">
-                <ModalContent className="confirm-modal__content">
-                  <span className="confirm-modal__icon">
-                    <MdSearch />
-                  </span>
-                  <h2 className="confirm-modal__title">Esta cédula ya tiene actividad cargada</h2>
-                  <p className="confirm-modal__desc">
-                    {duplicadoCheck.cliente &&
-                      `Ya existe un cliente con esta cédula: ${duplicadoCheck.cliente.name}. `}
-                    {duplicadoCheck.count > 0 &&
-                      `Esta cédula tiene ${duplicadoCheck.count} ${
-                        duplicadoCheck.count === 1 ? 'oportunidad consultada' : 'oportunidades consultadas'
-                      }.`}
-                  </p>
-                </ModalContent>
-                <ModalFooter
-                  secondaryButton={{ text: 'Cancelar', onClick: handleCancelDuplicadoModal }}
-                  primaryButton={{ text: 'Continuar', onClick: handleContinueDuplicadoModal }}
-                />
-              </Modal>
-            )}
-
-            {busquedaResuelta && (
-              <>
-                {/* A pedido: estética tipo mockup — campos agrupados en secciones con
-                    encabezado propio (Datos personales/Contacto/Ubicación/Documentación/
-                    Datos de la oportunidad) en vez de una sola grilla plana. */}
-                <div className="crear-op__section">
-                  <h3 className="crear-op__section-title">Datos personales</h3>
-                  <div className="crear-op__fields--grid">
-                    {/* TextField nativo de @vibe/core en vez de <label> + ClearableInput a
-                        mano — ya trae label (title/required), botón de limpiar (icon/
-                        onIconClick/clearOnIconClick) y el borde verde/rojo (validation) de
-                        fábrica. `icon` SIEMPRE en MdClear, nunca condicionado a si hay
-                        valor (`form.x ? MdClear : undefined`) — internamente el
-                        componente ya oculta el ícono solo cuando el campo está vacío, así
-                        que ese condicional era redundante Y además el causante de una
-                        excepción real: si el valor se limpia desde AFUERA (no tipeando,
-                        ver la cruz de "Buscar Persona" más arriba), hay un instante en
-                        que su estado interno de debounce todavía no bajó a vacío mientras
-                        `icon` ya pasó a `undefined` — esa combinación (valor todavía
-                        verdadero + ícono ya indefinido) hace que el componente intente
-                        leer `icon.length` y tira "Cannot read properties of undefined"
-                        (pantalla en blanco). Pasando siempre un ícono definido, esa
-                        combinación imposible de lograr no existe más. */}
-                    <TextField
-                      key={`nombre-${textFieldsResetKey}`}
-                      wrapperClassName="crear-op__field"
-                      title="Nombre"
-                      required
-                      placeholder="Ingresa el nombre"
-                      value={form.nombre}
-                      onChange={(value) => handleChange('nombre', value)}
-                      icon={MdClear}
-                      onIconClick={() => handleChange('nombre', '')}
-                      validation={form.nombre ? { status: 'success' } : undefined}
-                    />
-                    <TextField
-                      key={`apellido-${textFieldsResetKey}`}
-                      wrapperClassName="crear-op__field"
-                      title="Apellido"
-                      required
-                      placeholder="Ingresa el apellido"
-                      value={form.apellido}
-                      onChange={(value) => handleChange('apellido', value)}
-                      icon={MdClear}
-                      onIconClick={() => handleChange('apellido', '')}
-                      validation={form.apellido ? { status: 'success' } : undefined}
-                    />
-                    <TextField
-                      key={`ci-${textFieldsResetKey}`}
-                      wrapperClassName="crear-op__field"
-                      title="CI"
-                      required
-                      placeholder="Ej: 4.123.456-7"
-                      value={form.ci}
-                      onChange={(value) => handleChange('ci', value)}
-                      icon={MdClear}
-                      onIconClick={() => handleChange('ci', '')}
-                      validation={
-                        ciError(form.ci)
-                          ? { status: 'error', text: ciError(form.ci) }
-                          : form.ci
-                            ? { status: 'success' }
-                            : undefined
-                      }
-                    />
-                    <label className={`crear-op__field${fieldStateClass(form.fechaNacimiento, fechaError(form.fechaNacimiento))}`}>
-                      <span>Fecha Nacimiento *</span>
-                      <div className="crear-op__date-wrap">
-                        <input
-                          type="date"
-                          value={form.fechaNacimiento}
-                          max={maxFechaNacimiento()}
-                          onChange={(e) => handleChange('fechaNacimiento', e.target.value)}
-                        />
-                        {form.fechaNacimiento && (
-                          <button
-                            type="button"
-                            className="crear-op__date-clear"
-                            onClick={() => handleChange('fechaNacimiento', '')}
-                            aria-label="Borrar campo"
-                          >
-                            <MdClear />
-                          </button>
-                        )}
-                      </div>
-                      {fechaError(form.fechaNacimiento) && (
-                        <span className="crear-op__field-error">{fechaError(form.fechaNacimiento)}</span>
-                      )}
-                    </label>
-                  </div>
-                </div>
-
-                <div className="crear-op__section">
-                  <h3 className="crear-op__section-title">Contacto</h3>
-                  <div className="crear-op__fields--grid">
-                    <label className="crear-op__field crear-op__field--full">
-                      <span>Teléfono *</span>
-                      <div className="crear-op__phone">
-                        <div className="crear-op__phone-code">
-                          <RequiredDropdown
-                            options={CODIGO_PAIS_OPTIONS}
-                            value={CODIGO_PAIS_OPTIONS.find((o) => o.value === form.codigoPais) ?? null}
-                            onChange={(option) => handleChange('codigoPais', option?.value ?? '')}
-                          />
-                        </div>
-                        {/* Sin title acá — el label de arriba ("Teléfono *") ya cubre a los 2
-                            campos (código de país + número) juntos. */}
-                        <TextField
-                          key={`telefono-${textFieldsResetKey}`}
-                          wrapperClassName="crear-op__phone-number"
-                          placeholder="Ej: 099 123 456"
-                          value={form.telefono}
-                          onChange={(value) => handleChange('telefono', value)}
-                          icon={MdClear}
-                          onIconClick={() => handleChange('telefono', '')}
-                          validation={
-                            telefonoError(form.telefono, form.codigoPais)
-                              ? { status: 'error' }
-                              : form.telefono
-                                ? { status: 'success' }
-                                : undefined
-                          }
-                        />
-                      </div>
-                      {telefonoError(form.telefono, form.codigoPais) && (
-                        <span className="crear-op__field-error">
-                          {telefonoError(form.telefono, form.codigoPais)}
-                        </span>
-                      )}
-                    </label>
-                  </div>
-                </div>
-
-                <div className="crear-op__section">
-                  <h3 className="crear-op__section-title">Ubicación</h3>
-                  <div className="crear-op__fields--grid">
-                    <label className="crear-op__field">
-                      <span>Departamento *</span>
-                      <RequiredDropdown
-                        options={departamentoOptions}
-                        value={selectedDepartamento}
-                        placeholder="Escribe para buscar resultados"
-                        searchable
-                        onChange={(option) => {
-                          // Al cambiar el departamento, se limpia la Localidad elegida —
-                          // puede ya no pertenecer al departamento nuevo (el dropdown de
-                          // acá abajo se filtra por esto mismo).
-                          handleChange('departamentoId', option?.value ?? '')
-                          handleChange('localidadId', '')
-                        }}
-                      />
-                    </label>
-                    <label className="crear-op__field">
-                      <span>Localidad *</span>
-                      <RequiredDropdown
-                        options={localidadOptions}
-                        value={selectedLocalidad}
-                        placeholder={
-                          selectedDepartamento ? 'Escribe para buscar resultados' : 'Elegí primero un departamento'
-                        }
-                        disabled={!selectedDepartamento}
-                        searchable
-                        onChange={(option) => handleChange('localidadId', option?.value ?? '')}
-                      />
-                    </label>
-                  </div>
-                </div>
-
-                <div className="crear-op__section">
-                  <h3 className="crear-op__section-title">Documentación</h3>
-                  <div className="crear-op__fields--grid">
-                    {/* A pedido: Cédula Identidad se pide acá, en el paso 1, en vez de
-                        repetida en las 2 ramas del paso 2 (Posee Vehículo Sí/No) —
-                        opcional, no bloquea avanzar. El archivo queda en memoria hasta
-                        que exista el ítem (se crea recién en el paso 2 o al guardar);
-                        handleGuardar tiene el fallback que lo sube si todavía no se
-                        subió para entonces. */}
-                    <FileField
-                      label="Cédula Identidad"
-                      required={false}
-                      file={form.cedulaIdentidad}
-                      onChange={handleCedulaIdentidadChange}
-                      fullWidth
-                      highlighted={cedulaAutofilled}
-                    />
-                    {cedulaAutofillLoading && (
-                      <p className="crear-op__autofill">
-                        <Loader size={13} className="crear-op__lectura-spinner" /> Buscando Cédula Identidad de una
-                        oportunidad anterior...
-                      </p>
-                    )}
-                    {cedulaSubiendo && <p className="crear-op__autofill">Subiendo Cédula Identidad...</p>}
-                  </div>
-                </div>
-
-                <div className="crear-op__section">
-                  <h3 className="crear-op__section-title">Datos de la oportunidad</h3>
-                  <div className="crear-op__fields--grid">
-                    <label className="crear-op__field crear-op__field--full">
-                      <span>Tipo de Riesgo *</span>
-                      <RequiredDropdown
-                        options={tipoRiesgoOptions}
-                        value={selectedTipoRiesgo}
-                        placeholder="Selecciona una opción"
-                        onChange={(option) => handleChange('tipoRiesgo', option?.value ?? '')}
-                      />
-                    </label>
-                  </div>
-                </div>
-              </>
+            </div>
+              </div>
             )}
           </div>
         )}
 
         {stepIndex === 1 && (
           <div className="crear-op__fields">
+            {/* A pedido: Tipo de Riesgo se movió acá (antes vivía en el paso 1, sección
+                "Datos de la oportunidad") — tiene más sentido en el paso que literalmente
+                se llama así, y de paso el resto de este paso ya depende de este mismo
+                campo (ver esAutomovil más abajo). Llega completado con el default de
+                Vehículo (ver el useEffect que arranca con TIPO_RIESGO_AUTOMOVIL), pero
+                se puede cambiar libremente acá. */}
+            <div className="crear-op__section">
+              <h3 className="crear-op__section-title">Datos de oportunidad</h3>
+              <div className="crear-op__fields--grid">
+                <label className="crear-op__field crear-op__field--full">
+                  <span>Tipo de Riesgo *</span>
+                  <RequiredDropdown
+                    options={tipoRiesgoOptions}
+                    value={selectedTipoRiesgo}
+                    placeholder="Selecciona una opción"
+                    onChange={(option) => handleChange('tipoRiesgo', option?.value ?? '')}
+                  />
+                </label>
+              </div>
+            </div>
+
+            {/* A pedido: si la persona elegida ya tiene vehículos cotizados antes (ver
+                vehiculosAnteriores más arriba), se pueden elegir acá en vez de tipear
+                Marca/Modelo/Año/Combustible/Tipo de nuevo — "ninguno de estos" es
+                simplemente no tocar esta sección y seguir con el flujo de siempre
+                (Sí/No de abajo). */}
+            {esAutomovil && vehiculosAnteriores.length > 0 && (
+              <div className="crear-op__section">
+                {/* A pedido: con un solo candidato (ej. el vehículo propio de un Lead
+                    recién elegido) el encabezado ofrece esa opción de forma directa en
+                    vez del genérico "¿es alguno de estos?" pensado para elegir entre
+                    varios — mismas tarjetas clickeables debajo en los dos casos. */}
+                <h3 className="crear-op__section-title">
+                  {vehiculosAnteriores.length === 1
+                    ? 'Encontramos un vehículo cargado antes'
+                    : '¿Es alguno de estos vehículos?'}
+                </h3>
+                <div className="crear-op__vehiculos-anteriores">
+                  {vehiculosAnteriores.map((v) => {
+                    const isActive =
+                      form.marca === v.marca &&
+                      form.anio === v.anio &&
+                      (form.modeloSeleccion?.name || '').toLowerCase() === (v.modelo || '').toLowerCase()
+                    return (
+                      <button
+                        type="button"
+                        key={v.id}
+                        className={
+                          isActive
+                            ? 'crear-op__vehiculo-anterior crear-op__vehiculo-anterior--active'
+                            : 'crear-op__vehiculo-anterior'
+                        }
+                        onClick={() => handleSelectVehiculoAnterior(v)}
+                      >
+                        <span className="crear-op__vehiculo-anterior-title">
+                          {v.marca} {v.modelo}
+                        </span>
+                        {/* A pedido: Marca/Modelo (arriba) + Año/Combustible/Tipo, los 5
+                            datos del vehículo de un vistazo — antes faltaba Tipo acá. */}
+                        <span className="crear-op__vehiculo-anterior-meta">
+                          {[v.anio, v.combustible, v.tipo].filter(Boolean).join(' · ')}
+                        </span>
+                        {vehiculosAnteriores.length === 1 && (
+                          <span className="crear-op__vehiculo-anterior-cta">Usar este vehículo</span>
+                        )}
+                      </button>
+                    )
+                  })}
+                </div>
+              </div>
+            )}
+
             {esAutomovil && (
               <>
                 {/* A pedido, estética tipo mockup: título + subtítulo propios del paso
@@ -1866,30 +2196,43 @@ export default function CrearOportunidadForm({
               <>
                 {/* Cédula Identidad se movió al paso 1 (a pedido) — acá solo queda Carta
                     Automóvil, la que dispara la lectura automática. Caja grande
-                    centrada (prominent) mientras no hay archivo, o si la lectura
-                    anterior falló (para poder reintentar con otro). El resto del tiempo
-                    (procesando/leído) no hace falta — el estado de abajo ya lo cubre. */}
-                {(!form.cartaAutomovil || lecturaEstado === 'Error') && (
-                  <FileField
+                    centrada (prominent) SOLO mientras no hay archivo — apenas se elige
+                    uno, se reemplaza por una fila compacta (mismo lenguaje que el resto
+                    de la app: Cédula Identidad, Póliza, etc.) que se queda FIJA ahí pase
+                    lo que pase con la lectura (subiendo/analizando/leído/incompleto/
+                    error, ver más abajo). A pedido: antes "eliminar" era un link de
+                    texto suelto, distinto y en un lugar distinto en cada uno de esos 4
+                    estados — ahora es un único botón, siempre pegado al archivo al que
+                    se refiere (más fácil de encontrar, ni hay que ir a buscarlo según en
+                    qué estado esté la lectura). uploading refleja la subida real del
+                    archivo (lecturaEstado "subiendo") con el mismo spinner/leyenda que
+                    ya usa este componente en el resto de la app. */}
+                {!form.cartaAutomovil ? (
+                  <FileUploadField
+                    label="Cédula/Carta Automóvil"
                     file={form.cartaAutomovil}
-                    onChange={handleCartaAutomovilChange}
+                    onUpload={handleCartaAutomovilChange}
                     prominent
-                    helperText="Subí una foto o PDF de la cédula para autocompletar el vehículo."
-                    buttonLabel="Adjuntar Cédula / Carta"
+                    helperText="Subí una foto o PDF de la Cédula o Carta Automóvil del vehículo para autocompletar sus datos."
+                    buttonLabel="Adjuntar Cédula/Carta Automóvil"
+                  />
+                ) : (
+                  <FileUploadField
+                    label="Cédula/Carta Automóvil"
+                    file={form.cartaAutomovil}
+                    uploading={lecturaEstado === 'subiendo'}
+                    onDelete={() => handleCartaAutomovilChange(null)}
+                    deleteLabel="Eliminar archivo y reintentar"
+                    showReplaceButton={false}
                   />
                 )}
 
-                {(lecturaEstado === 'subiendo' ||
-                  lecturaEstado === 'confirmando' ||
-                  lecturaEstado === 'Leer' ||
-                  lecturaEstado === 'Leyendo') && (
+                {(lecturaEstado === 'Leer' || lecturaEstado === 'Leyendo') && (
                   <div className="crear-op__lectura-analyzing">
                     <Loader size={20} className="crear-op__lectura-analyzing-spinner" />
                     <div>
                       <strong>Analizando cédula del vehículo...</strong>
                       <span>
-                        {lecturaEstado === 'subiendo' && 'Subiendo el archivo...'}
-                        {lecturaEstado === 'confirmando' && 'Confirmando...'}
                         {lecturaEstado === 'Leer' && 'En cola para leer el documento...'}
                         {lecturaEstado === 'Leyendo' &&
                           'Extrayendo Marca, Modelo y Año con Inteligencia Artificial.'}
@@ -1898,40 +2241,18 @@ export default function CrearOportunidadForm({
                   </div>
                 )}
 
-                {/* A pedido: subir el archivo NO dispara la lectura sola — queda en
-                    "subido" hasta que se confirma acá, para poder revisar que se subió
-                    lo que corresponde antes de que el robot lo procese. */}
-                {/* A pedido: tarjeta propia (mismo lenguaje visual que
-                    crear-op__lectura-analyzing/summary de acá abajo) en vez del
-                    AttentionBox genérico de antes. */}
-                {lecturaEstado === 'subido' && (
-                  <div className="crear-op__lectura-subido">
-                    <p>
-                      Archivo subido. Confirmá para iniciar la lectura automática de Carta
-                      Automóvil / Cédula Automovil.
-                    </p>
-                    <Button kind="secondary" onClick={handleConfirmarLectura}>
-                      Confirmar lectura
-                    </Button>
-                  </div>
-                )}
-
                 {/* A pedido: si la lectura falla, en vez de trabar el formulario se avisa
                     en amarillo (mismo color que los campos resaltados de abajo, ver
                     VehiculoManualFields#highlightEmpty) y se completa/corrige lo que
-                    haga falta a mano — mismos campos que el caso "No". */}
+                    haga falta a mano — mismos campos que el caso "No". Eliminar el
+                    archivo y probar con otro es la fila de arriba (ver más arriba). */}
                 {lecturaEstado === 'Error' && (
                   <>
                     <AttentionBox type="warning">
                       No pudimos leer todos los datos del documento. Por favor, completá
                       manualmente los campos resaltados en amarillo.
                     </AttentionBox>
-                    {lecturaError && (
-                      <div className="crear-op__error-detail">
-                        <strong>Detalle del error:</strong>
-                        <pre>{lecturaError}</pre>
-                      </div>
-                    )}
+                    <ErrorDetailBox detail={lecturaError} title="Detalle del error:" className="crear-op__error-detail-spacing" />
                     <VehiculoManualFields
                       form={form}
                       setForm={setForm}
@@ -1977,20 +2298,30 @@ export default function CrearOportunidadForm({
                     puede pasar aunque haya terminado "bien", no solo en "Error" — se
                     muestran los mismos campos editables con lo que falte resaltado en
                     amarillo, en vez de texto muerto ("—") sin forma de completarlo.
-                    También se usa para "Editar datos" del resumen de arriba. */}
+                    También se usa para "Editar datos" del resumen de arriba. Eliminar el
+                    archivo y probar con otro es la fila de arriba (ver más arriba). */}
                 {lecturaEstado === 'Leidos' && (!vehiculoLeidoCompleto || editingLeidos) && (
-                  <VehiculoManualFields
-                    form={form}
-                    setForm={setForm}
-                    handleChange={handleChange}
-                    anioOptions={anioOptions}
-                    marcaOptions={marcaOptions}
-                    combustibleOptions={combustibleOptions}
-                    tipoOptions={tipoOptions}
-                    usoOptions={usoOptions}
-                    onModeloChange={handleModeloChangeConOcr}
-                    highlightEmpty={!vehiculoLeidoCompleto}
-                  />
+                  <>
+                    {!vehiculoLeidoCompleto && (
+                      <p className="crear-op__lectura-incompleto-hint">
+                        No pudimos leer todos los datos automáticamente — completá lo que
+                        falta abajo, o eliminá el archivo arriba para volver a intentar
+                        con otro documento.
+                      </p>
+                    )}
+                    <VehiculoManualFields
+                      form={form}
+                      setForm={setForm}
+                      handleChange={handleChange}
+                      anioOptions={anioOptions}
+                      marcaOptions={marcaOptions}
+                      combustibleOptions={combustibleOptions}
+                      tipoOptions={tipoOptions}
+                      usoOptions={usoOptions}
+                      onModeloChange={handleModeloChangeConOcr}
+                      highlightEmpty={!vehiculoLeidoCompleto}
+                    />
+                  </>
                 )}
               </>
             )}
@@ -2006,6 +2337,7 @@ export default function CrearOportunidadForm({
                 tipoOptions={tipoOptions}
                 usoOptions={usoOptions}
                 onModeloChange={handleModeloChange}
+                modeloDisabled={buscandoModeloAnterior}
               />
             )}
           </div>

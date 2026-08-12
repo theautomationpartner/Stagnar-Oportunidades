@@ -12,7 +12,16 @@ import { matchesSearchQuery } from '../services/format'
 // Año+Marca (mejor mostrar de más que dejar el dropdown vacío por un dato que no
 // coincide exacto). Compartido entre CrearOportunidadForm.jsx (paso 2, alta de una
 // oportunidad nueva) y CotizarStepPanel.jsx (edición del paso "Cotizar").
-export default function AutodataModeloPorAnioMarca({ anio, marca, tipo, combustible, value, onChange, placeholder }) {
+export default function AutodataModeloPorAnioMarca({
+  anio,
+  marca,
+  tipo,
+  combustible,
+  value,
+  onChange,
+  placeholder,
+  disabled: forceDisabled = false,
+}) {
   const [options, setOptions] = useState([])
   const [loading, setLoading] = useState(false)
 
@@ -44,7 +53,7 @@ export default function AutodataModeloPorAnioMarca({ anio, marca, tipo, combusti
   }, [anio, marca, tipo, combustible])
 
   const selected = value ? { value: value.id, label: value.name } : null
-  const disabled = !anio || !marca
+  const disabled = forceDisabled || !anio || !marca
 
   return (
     <Dropdown
@@ -53,9 +62,9 @@ export default function AutodataModeloPorAnioMarca({ anio, marca, tipo, combusti
       filterOption={(option, inputValue) => matchesSearchQuery(option.label, inputValue)}
       options={options}
       value={selected}
-      loading={loading}
+      loading={loading || forceDisabled}
       disabled={disabled}
-      placeholder={disabled ? 'Elegí primero Año y Marca' : placeholder || 'Selecciona un modelo'}
+      placeholder={forceDisabled ? 'Buscando el modelo...' : disabled ? 'Elegí primero Año y Marca' : placeholder || 'Selecciona un modelo'}
       noOptionsMessage={loading ? 'Buscando...' : 'Sin modelos para esa combinación'}
       onChange={(option) =>
         onChange(option ? { id: option.value, name: option.label, combustible: option.combustible, tipo: option.tipo } : null)

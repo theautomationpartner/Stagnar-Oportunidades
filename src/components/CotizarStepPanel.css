@@ -136,13 +136,6 @@
   background-color: #fff !important;
 }
 
-.cotizar-step__warning-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-top: 10px;
-}
-
 /* Loader nativo de @vibe/core (ver JSX) — a pedido, todo loading usa el verde de marca
    (--color-verde, ver index.css). */
 .cotizar-step__spinner {
@@ -156,29 +149,8 @@
   font-size: 12px;
 }
 
-.cotizar-step__error-detail {
+.cotizar-step__error-detail-spacing {
   margin-top: 16px;
-  background: #fdf1f2;
-  border: 1px solid #f7c6cc;
-  border-radius: 8px;
-  padding: 14px 16px;
-  color: #a41f36;
-  font-size: 12px;
-}
-
-.cotizar-step__error-detail strong {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 12px;
-}
-
-.cotizar-step__error-detail pre {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: inherit;
-  font-size: 13px;
-  line-height: 2;
 }
 
 /* A pedido, estética tipo mockup: link celeste chico en vez del Button "Editar" de

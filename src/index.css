@@ -22,6 +22,56 @@
   --color-negro: #000000;
 }
 
+/* Tokens de sistema (paleta neutra/estado + radios + sombras) — centralizan los hex
+   sueltos que ya se repetían en cada .css (#323338, #676879, #0073ea, #e2445c, etc.)
+   bajo un solo nombre, para no tener que tocar 10 archivos si alguno cambia. No
+   reemplazan la paleta de marca de arriba (--color-verde sigue siendo el acento
+   principal de Stagnari) — son la base neutra/semántica sobre la que se apoyan
+   botones, cards, badges, etc. */
+/* Jerarquía de color de botones "primary" (Button kind="primary" de @vibe/core, o su
+   equivalente a mano): por defecto el azul de fábrica (--primary-blue) para cualquier
+   CTA de progresión normal; --color-verde (marca) solo para la acción que CIERRA/
+   concluye un flujo (ej. "Concretar Oportunidad" en EmitirStepPanel) o donde el cliente
+   pidió puntualmente ese acento (mockup aprobado); --red solo para acciones
+   destructivas o de "reintentar" sobre un error real (ver .alert-modal__btn--danger).
+   Nada de verde/rojo "porque sí" en un botón nuevo — si no encaja en una de estas 3
+   categorías, va azul. */
+:root {
+  --primary-blue: #0073ea;
+  --primary-blue-hover: #0060c2;
+  --green: #00c875;
+  --green-dark: #037f4c;
+  --red: #e2445c;
+  --yellow: #fdab3d;
+
+  --text-dark: #323338;
+  --text-gray: #676879;
+  --text-muted: #9699a6;
+  --border: #e6e9ef;
+  --bg: #ffffff;
+  --bg-subtle: #f6f7fb;
+
+  --tint-info: #eef6ff;
+  --tint-info-bd: #bcd6f5;
+  --tint-success: #e6f9f1;
+  --tint-success-bd: #bfe6cf;
+  --tint-warning: #fff7e6;
+  --tint-warning-bd: #ffe2b0;
+  --tint-danger: #fdf1f2;
+  --tint-danger-bd: #f7c6cc;
+  --tint-danger-text: #a41f36;
+  --tint-neutral: #f6f7fb;
+  --tint-neutral-bd: #e4e7ee;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.18);
+}
+
 :root {
   --page-gutter: 32px;
 }
@@ -34,8 +84,8 @@
 
 body {
   margin: 0;
-  font-family: 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
-  background: #f6f7fb;
+  font-family: 'Inter', 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-subtle);
 }
 
 /* Los popups de @vibe/core (menú de Dropdown, tooltips, etc.) se portalean a
@@ -60,4 +110,24 @@ body {
    que la regla original (container:not(hasTitle) icon) para ganarle limpio, sin !important. */
 .container_887afa963b:not(.hasTitle_ef9b0b5fb0) .icon_0013d16c97 {
   align-self: center;
+}
+
+/* Animación compartida de "aparición" para tildes de éxito (archivo subido, paso
+   completado) — un pop sutil en vez de materializarse de golpe. Global (no scoped a un
+   componente) porque la usan tanto Stepper.css (paso "done") como FileUploadField.css
+   (archivo cargado); cada uno solo aplica `animation: tilde-lento ...` sobre el ícono
+   que corresponda. */
+@keyframes tilde-lento {
+  from {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }

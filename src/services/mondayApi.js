@@ -632,23 +632,41 @@ export async function fetchPanelItems() {
   return data.boards[0]?.items_page.items ?? []
 }
 
-// Tablero "Clientes" — se usa en el formulario de "Agregar Oportunidades" para buscar un
-// cliente ya cargado (en vez de tipear todo de nuevo) y para avisar si una Cédula nueva
-// ya existe. `name` es el nombre del ítem de monday (acá guardan Nombre+Apellido juntos,
-// sin columnas separadas) y sí admite contains_text como cualquier otra columna
-// (confirmado contra la API real).
-const CLIENTES_BOARD_ID = 18420863014
-const CLIENTE_CEDULA_COLUMN_ID = 'text_mm4vk9aq'
+// Tablero "Contactos" — reemplaza a "Clientes" como fuente de búsqueda/autocompletado
+// del formulario de "Agregar Oportunidades" (a pedido: Clientes es en realidad la
+// cuenta/empresa del CRM — R.U.T, Razón Social — no tiene Teléfono ni Ubicación; el dato
+// de la PERSONA vive acá). Trae también Fecha Nacimiento y Localidad (con su Departamento
+// reflejado desde ahí, ver lookup_mm64sv3a) — antes esos 2 solo existían copiados en
+// Oportunidades anteriores.
+const CONTACTOS_BOARD_ID = 18420863016
+const CONTACTO_CI_COLUMN_ID = 'numeric_mm4vss40'
+const CONTACTO_TELEFONO_COLUMN_ID = 'contact_phone'
+const CONTACTO_FECHA_NACIMIENTO_COLUMN_ID = 'date_mm647ts'
+const CONTACTO_LOCALIDAD_COLUMN_ID = 'board_relation_mm64gmt5'
+// Mirror que refleja el Departamento del Localidad vinculado en CONTACTO_LOCALIDAD_COLUMN_ID
+// (así el Departamento nunca queda desincronizado de la Localidad elegida — no hace falta
+// una conexión manual aparte a Departamentos, ver conversación con el dueño del producto).
+const CONTACTO_DEPARTAMENTO_MIRROR_COLUMN_ID = 'lookup_mm64sv3a'
+const CONTACTO_OPORTUNIDADES_COLUMN_ID = 'board_relation_mm4th3cm'
+// Columna en el tablero OPORTUNIDADES (no Contactos) que guarda la misma relación del
+// otro lado — se escribe acá cuando se crea una Oportunidad nueva para que el historial
+// de "oportunidades vinculadas" del Contacto se arme solo, sin backfill manual.
+const OPORTUNIDAD_CONTACTO_COLUMN_ID = 'board_relation_mm4t623x'
 
-const SEARCH_CLIENTES_QUERY = `
-  query SearchClientes($boardId: ID!, $rules: [ItemsQueryRule!], $limit: Int!) {
+const SEARCH_CONTACTOS_QUERY = `
+  query SearchContactos($boardId: ID!, $rules: [ItemsQueryRule!], $limit: Int!) {
     boards(ids: [$boardId]) {
       items_page(limit: $limit, query_params: { rules: $rules, operator: and }) {
         items {
           id
           name
-          column_values(ids: ["${CLIENTE_CEDULA_COLUMN_ID}"]) {
+          column_values(ids: ["${CONTACTO_CI_COLUMN_ID}", "${CONTACTO_TELEFONO_COLUMN_ID}", "${CONTACTO_FECHA_NACIMIENTO_COLUMN_ID}", "${CONTACTO_LOCALIDAD_COLUMN_ID}", "${CONTACTO_DEPARTAMENTO_MIRROR_COLUMN_ID}"]) {
+            id
             text
+            value
+            ... on BoardRelationValue {
+              display_value
+            }
           }
         }
       }
@@ -656,75 +674,142 @@ const SEARCH_CLIENTES_QUERY = `
   }
 `
 
-function mapClienteItem(item) {
-  return { id: item.id, name: item.name, ci: item.column_values[0]?.text?.trim() || '' }
+function mapContactoItem(item) {
+  const byId = Object.fromEntries(item.column_values.map((cv) => [cv.id, cv]))
+  // Mismo formato que phone_mm519m27 de Oportunidades (ver mapOportunidadItem): el
+  // código de país solo está en el JSON de "value", no en "text".
+  let telefono = ''
+  let telefonoCountryShortName = ''
+  try {
+    const parsedPhone = byId[CONTACTO_TELEFONO_COLUMN_ID]?.value
+      ? JSON.parse(byId[CONTACTO_TELEFONO_COLUMN_ID].value)
+      : null
+    telefono = parsedPhone?.phone || ''
+    telefonoCountryShortName = parsedPhone?.countryShortName || ''
+  } catch {
+    // sin teléfono usable — se deja vacío en vez de romper el resto del resultado
+  }
+  return {
+    id: item.id,
+    name: item.name,
+    ci: byId[CONTACTO_CI_COLUMN_ID]?.text?.trim() || '',
+    fechaNacimiento: byId[CONTACTO_FECHA_NACIMIENTO_COLUMN_ID]?.text?.trim() || '',
+    telefono,
+    telefonoCountryShortName,
+    localidadNombre: byId[CONTACTO_LOCALIDAD_COLUMN_ID]?.display_value?.trim() || '',
+    departamentoNombre: byId[CONTACTO_DEPARTAMENTO_MIRROR_COLUMN_ID]?.text?.trim() || '',
+  }
 }
 
 // A pedido: el modo de búsqueda depende de qué se tipeó — si tiene algún dígito, se
 // busca por Cédula; si es todo letras, por Nombre. No hace falta mezclar los dos modos
 // en la misma consulta.
-export async function searchClientes(term) {
+export async function searchContactos(term) {
   const query = (term ?? '').trim()
   if (query.length < 2) return []
   const isNumeric = /\d/.test(query)
   const rules = isNumeric
-    ? [{ column_id: CLIENTE_CEDULA_COLUMN_ID, compare_value: [query.replace(/\D/g, '')], operator: 'contains_text' }]
+    ? [{ column_id: CONTACTO_CI_COLUMN_ID, compare_value: [query.replace(/\D/g, '')], operator: 'contains_text' }]
     : [{ column_id: 'name', compare_value: [query], operator: 'contains_text' }]
-  const data = await callMondayApi(SEARCH_CLIENTES_QUERY, { boardId: CLIENTES_BOARD_ID, rules, limit: 20 })
+  const data = await callMondayApi(SEARCH_CONTACTOS_QUERY, { boardId: CONTACTOS_BOARD_ID, rules, limit: 20 })
   const items = data.boards[0]?.items_page.items ?? []
-  return items.map(mapClienteItem)
+  return items.map(mapContactoItem)
 }
 
-// Caso "el cliente no existe": antes de crear la oportunidad se avisa si esa Cédula YA
-// está cargada como Cliente, para no duplicar sin darse cuenta. Filtra por coincidencia
+// Caso "el contacto no existe": antes de crear la oportunidad se avisa si esa Cédula YA
+// está cargada como Contacto, para no duplicar sin darse cuenta. Filtra por coincidencia
 // EXACTA después de la consulta (contains_text por sí solo matchearía de más, ej. "593"
 // contra "45934226").
-export async function findClienteByCedula(ci) {
+export async function findContactoByCedula(ci) {
   const digits = (ci ?? '').replace(/\D/g, '')
   if (!digits) return null
-  const data = await callMondayApi(SEARCH_CLIENTES_QUERY, {
-    boardId: CLIENTES_BOARD_ID,
-    rules: [{ column_id: CLIENTE_CEDULA_COLUMN_ID, compare_value: [digits], operator: 'contains_text' }],
+  const data = await callMondayApi(SEARCH_CONTACTOS_QUERY, {
+    boardId: CONTACTOS_BOARD_ID,
+    rules: [{ column_id: CONTACTO_CI_COLUMN_ID, compare_value: [digits], operator: 'contains_text' }],
     limit: 5,
   })
   const items = data.boards[0]?.items_page.items ?? []
-  return items.map(mapClienteItem).find((c) => c.ci === digits) ?? null
+  return items.map(mapContactoItem).find((c) => c.ci === digits) ?? null
 }
 
-const COUNT_OPORTUNIDADES_BY_CI_QUERY = `
-  query CountOportunidadesByCi($boardId: ID!, $rules: [ItemsQueryRule!]) {
-    boards(ids: [$boardId]) {
-      items_page(limit: 100, query_params: { rules: $rules, operator: and }) {
-        items {
-          id
+const FETCH_CONTACTO_OPORTUNIDADES_QUERY = `
+  query FetchContactoOportunidades($itemId: [ID!], $columnIds: [String!]) {
+    items(ids: $itemId) {
+      column_values(ids: ["${CONTACTO_OPORTUNIDADES_COLUMN_ID}"]) {
+        ... on BoardRelationValue {
+          linked_items {
+            id
+            name
+            column_values(ids: $columnIds) {
+              id
+              text
+              ... on BoardRelationValue {
+                display_value
+              }
+            }
+            subitems {
+              column_values(ids: ["dropdown_mm51f4va", "dropdown_mm4w8n8p"]) {
+                id
+                text
+              }
+            }
+          }
         }
       }
     }
   }
 `
 
-// Mismo caso "no existe": además de avisar si ya hay un Cliente con esa Cédula, se avisa
-// cuántas Oportunidades ya se cargaron con ella (puede haber Oportunidades sin que exista
-// todavía un Cliente formal, así que es una consulta aparte, no derivada de la anterior).
-export async function countOportunidadesByCedula(ci) {
-  const digits = (ci ?? '').replace(/\D/g, '')
-  if (!digits) return 0
-  const data = await callMondayApi(COUNT_OPORTUNIDADES_BY_CI_QUERY, {
-    boardId: OPPORTUNITIES_BOARD_ID,
-    rules: [{ column_id: 'numeric_mm51mb0s', compare_value: [digits], operator: 'contains_text' }],
+// A pedido: el historial de "oportunidades anteriores" de un Contacto se lee directo de
+// la relación real Contacto→Oportunidades (más precisa que escanear TODAS las
+// oportunidades cargadas matcheando por CI, que dependía de que la Cédula estuviera bien
+// tipeada en las 2 puntas). Devuelve los ítems CRUDOS (mismo shape que arma ITEMS_QUERY),
+// listos para pasar por mapOpportunities (opportunityMapper.js) del lado del que llama.
+export async function fetchContactoOportunidades(contactoId) {
+  if (!contactoId) return []
+  const data = await callMondayApi(FETCH_CONTACTO_OPORTUNIDADES_QUERY, {
+    itemId: [contactoId],
+    columnIds: OPPORTUNITY_COLUMN_IDS,
   })
-  return data.boards[0]?.items_page.items.length ?? 0
+  return data.items?.[0]?.column_values?.[0]?.linked_items ?? []
 }
 
-// Búsqueda en vivo del tablero Oportunidades, mismo criterio que searchClientes (nombre
-// vs. Cédula según lo tipeado) — a pedido, el buscador de "cliente existente" del
-// formulario de creación busca en LOS DOS tableros a la vez, no solo en Clientes, para
-// poder reusar los datos de una Oportunidad ya cargada si el cliente todavía no tiene un
-// ítem formal en Clientes. A diferencia de Clientes (que no tiene columnas separadas de
-// Nombre/Apellido), acá sí existen (text_mm51b055/text_mm51ez7e) — se usan directo en vez
-// de la heurística de partir el nombre completo. También trae Fecha Nacimiento,
-// Teléfono, Departamento y Localidad (a pedido, se autocompletan también al elegir una
-// Oportunidad) — Cliente no tiene esas columnas, así que esto es exclusivo de acá.
+// Crea un Contacto nuevo cuando la Oportunidad se carga "desde cero" (sin elegir uno
+// existente en el buscador) — a pedido, toda Oportunidad nueva queda con el campo
+// Contacto completo, nunca vacío (ver setConnectedColumnValue con
+// OPORTUNIDAD_CONTACTO_COLUMN_ID en el guardado). `columnValues` usa los mismos ids de
+// columna que documenta mapContactoItem más arriba.
+// Factoreado aparte de createContactoItem (que la llama para completar el ítem recién
+// creado) para poder reusarla también al EDITAR un Contacto ya existente (ver el popup
+// "Editar" en CrearOportunidadForm.jsx) — mismo mutation, solo cambia si el ítem es
+// nuevo o no.
+export async function setContactoColumnValues(itemId, columnValues) {
+  if (!columnValues || Object.keys(columnValues).length === 0) return null
+  const data = await callMondayApi(CHANGE_MULTIPLE_COLUMN_VALUES_MUTATION, {
+    boardId: CONTACTOS_BOARD_ID,
+    itemId,
+    columnValues: JSON.stringify(columnValues),
+  })
+  return data.change_multiple_column_values
+}
+
+export async function createContactoItem(itemName, columnValues) {
+  const created = await callMondayApi(CREATE_ITEM_MUTATION, { boardId: CONTACTOS_BOARD_ID, itemName })
+  const id = created.create_item.id
+  await setContactoColumnValues(id, columnValues)
+  return { id }
+}
+
+export { OPORTUNIDAD_CONTACTO_COLUMN_ID, CONTACTO_CI_COLUMN_ID, CONTACTO_TELEFONO_COLUMN_ID, CONTACTO_FECHA_NACIMIENTO_COLUMN_ID, CONTACTO_LOCALIDAD_COLUMN_ID }
+
+// Búsqueda en vivo del tablero Oportunidades, mismo criterio que searchContactos (nombre
+// vs. Cédula según lo tipeado) — el buscador de "persona existente" del formulario de
+// creación busca en LOS DOS tableros a la vez (ver ExistingRecordSearch en
+// CrearOportunidadForm.jsx), etiquetando estos resultados "Lead" — personas sin Contacto
+// formal todavía, encontradas a través de una Oportunidad vieja. A diferencia de
+// Contactos (que no tiene columnas separadas de Nombre/Apellido), acá sí existen
+// (text_mm51b055/text_mm51ez7e) — se usan directo en vez de la heurística de partir el
+// nombre completo. También trae Fecha Nacimiento, Teléfono, Departamento y Localidad.
 // Modelo (text_mm54fb7m) se trae solo para MOSTRAR en el resultado de la búsqueda (a
 // pedido, ayuda a distinguir de qué vehículo es esta Oportunidad) — no se autocompleta
 // nada del formulario con él, el paso 2 sigue pidiendo el vehículo de la Oportunidad

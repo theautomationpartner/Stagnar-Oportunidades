@@ -2,64 +2,26 @@
   padding: 32px;
   display: flex;
   justify-content: center;
-  /* A pedido: botones (Button de @vibe/core) un poco más redondeados — la librería usa
-     border-radius: var(--border-radius-small) (4px) para sus botones; pisar la variable
-     acá adentro (en vez de globalmente en :root) sube el radio de los botones de este
-     formulario sin afectar el resto de la app. */
-  --border-radius-small: 8px;
-}
-
-/* ModalHeader/ModalContent (@vibe/core) son <div> sin padding propio — sin esto el
-   título y el texto quedan pegados contra el borde redondeado del Modal. */
-/* A pedido: estética tipo mockup para popups de confirmación simples — ícono en
-   círculo celeste centrado, título y descripción abajo, todo dentro de ModalContent
-   (sin ModalHeader propio, que traía su propia línea divisoria). Reusable tal cual si
-   aparece otro popup con esta misma forma más adelante. */
-.confirm-modal__content {
-  padding: 32px 32px 24px;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  text-align: center;
-  gap: 8px;
-}
-
-.confirm-modal__icon {
-  width: 44px;
-  height: 44px;
-  border-radius: 50%;
-  background: #eef6ff;
-  color: #0073ea;
-  font-size: 22px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin-bottom: 8px;
-}
-
-.confirm-modal__title {
-  font-size: 17px;
-  font-weight: 700;
-  color: #323338;
-  margin: 0;
-}
-
-.confirm-modal__desc {
-  font-size: 13px;
-  color: #676879;
-  margin: 0;
 }
 
 .crear-op__card {
   width: 100%;
-  /* A pedido: que use más el ancho de la página en vez de quedar angosto en el centro —
-     antes 640px, ahora deja lugar de sobra para 2 columnas cómodas en desktop. Sigue
-     siendo 100% + max-width, así que en pantallas chicas se sigue achicando igual. */
-  max-width: 1040px;
+  /* A pedido: que use más el ancho de la página en vez de quedar angosto en el centro,
+     pero sin pasarse — un formulario de 1 o 2 columnas estirado a todo un monitor
+     ultrawide queda con los campos igual de angostos y mucho aire de más en el medio.
+     --wide (ver más abajo) sube este techo solo cuando de verdad hace falta más lugar
+     (panel de historial al lado, ver .crear-op__step1-layout). Sigue siendo
+     100% + max-width, así que en pantallas chicas se sigue achicando igual. */
+  max-width: 1100px;
+  transition: max-width 0.2s ease;
   background: #fff;
   border: 1px solid #e6e9ef;
   border-radius: 10px;
   padding: 28px 36px 32px;
+}
+
+.crear-op__card--wide {
+  max-width: 1600px;
 }
 
 @media (max-width: 640px) {
@@ -75,6 +37,13 @@
      celular — se apila en 1 columna, mismo criterio que el resto de la app. */
   .crear-op__fields--grid {
     grid-template-columns: 1fr;
+  }
+
+  /* Mismo sangrado que .crear-op__card de acá arriba (16px en vez de 36px) para que la
+     barra siga llegando justo al borde de la card. */
+  .crear-op__footer {
+    margin: 20px -16px 0;
+    padding: 14px 16px;
   }
 }
 
@@ -105,6 +74,50 @@
   gap: 16px;
 }
 
+/* A pedido: paso 1 partido en 2 "pantallas" que nunca conviven — buscar persona, o ver
+   los datos ya autocompletados (ver el JSX, key="search-screen"/"data-screen" fuerza el
+   remount al alternar) — cada una hereda el mismo layout en columna que tenían sus
+   hijos sueltos antes, directo adentro de .crear-op__fields. La entrada anima con un
+   fade + slide corto, mismo lenguaje que ya usa el resto de la app (ver @keyframes
+   tilde-lento en index.css) — acá un keyframe propio porque el movimiento es
+   traslación, no escala. */
+.crear-op__search-screen,
+.crear-op__data-screen {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  animation: crear-op-screen-in 0.28s ease-out both;
+}
+
+@keyframes crear-op-screen-in {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .crear-op__search-screen,
+  .crear-op__data-screen {
+    animation: none;
+  }
+}
+
+/* "Cambiar persona" — vuelve a la pantalla de búsqueda (ver handleVolverABuscar).
+   Mismo tratamiento tertiary que "Editar" (Datos personales de un Contacto), a la
+   izquierda del todo, arriba de cualquier otro contenido de la pantalla de datos. */
+.crear-op__volver-btn {
+  align-self: flex-start;
+}
+
+.crear-op__volver-btn svg {
+  font-size: 16px;
+}
+
 /* A pedido: estética tipo mockup — campos agrupados en secciones con encabezado propio
    (Datos personales/Contacto/Ubicación/Documentación/Datos de la oportunidad), separadas
    por una línea fina arriba de cada una (menos la primera, que ya viene después del
@@ -126,6 +139,70 @@
   margin: 0 0 14px;
 }
 
+/* A pedido: descripción de solo lectura para un Contacto ya elegido (en vez del
+   formulario editable de siempre) — mismo criterio visual que .cotizar-step__grid
+   (CotizarStepPanel.css): label chico gris arriba, valor abajo en negro. "Editar" abre
+   EditarContactoModal en vez de dejar tocar los campos acá mismo. */
+.crear-op__contacto-resumen-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 14px;
+}
+
+.crear-op__contacto-resumen-head .crear-op__section-title {
+  margin-bottom: 0;
+}
+
+.crear-op__contacto-resumen-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px 24px;
+}
+
+.crear-op__contacto-resumen-field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.crear-op__contacto-resumen-field--full {
+  grid-column: 1 / -1;
+}
+
+.crear-op__contacto-resumen-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #9699a6;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.crear-op__contacto-resumen-value {
+  font-size: 14px;
+  font-weight: 600;
+  color: #323338;
+}
+
+@media (max-width: 640px) {
+  .crear-op__contacto-resumen-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Popup "Editar contacto" (ver EditarContactoModal) — mismo padding/tipografía que el
+   resto de los ModalContent de la app. */
+.crear-op__editar-contacto-content {
+  padding: 28px 32px 8px;
+}
+
+.crear-op__editar-contacto-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #323338;
+  margin: 0 0 20px;
+}
+
 /* A pedido, solo en el paso 1: Nombre/Apellido, CI/Fecha Nacimiento y Departamento/
    Localidad van de a 2 por renglón en vez de uno abajo del otro — con campos cortos como
    estos, una sola columna dejaba mucho espacio vacío a los costados y obligaba a
@@ -140,6 +217,35 @@
 
 .crear-op__field--full {
   grid-column: 1 / -1;
+}
+
+/* A pedido: cuando la persona elegida en "Buscar Persona" tiene oportunidades
+   anteriores, el paso 1 se divide en 2 columnas — formulario a la izquierda, historial
+   a la derecha (ver .crear-op__historial más abajo) — en vez de todo apilado en una
+   sola columna. --solo (sin historial: persona nueva, o búsqueda salteada) vuelve a 1
+   sola columna, ancho completo. */
+.crear-op__step1-layout {
+  display: grid;
+  grid-template-columns: 1fr 360px;
+  align-items: start;
+  gap: 32px;
+}
+
+.crear-op__step1-layout--solo {
+  grid-template-columns: 1fr;
+}
+
+.crear-op__step1-main {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  .crear-op__step1-layout {
+    grid-template-columns: 1fr;
+  }
 }
 
 .crear-op__field-error {
@@ -164,70 +270,8 @@
   font-weight: 400;
 }
 
-/* Tarjeta de confirmación tras elegir un resultado en ExistingRecordSearch (a pedido,
-   estética tipo mockup) — avatar con iniciales + nombre/CI/Tel/Departamento + botón para
-   recién ahí aplicar el autocompletado (ver handleConfirmPreview). */
-.crear-op__preview-card {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 14px 16px;
-  background: #f5f8ff;
-  border: 1px solid #c2d9fb;
-  border-radius: 8px;
-}
-
-.crear-op__preview-avatar {
-  flex-shrink: 0;
-  width: 36px;
-  height: 36px;
-  border-radius: 50%;
-  background: var(--color-verde);
-  color: #fff;
-  font-size: 13px;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-}
-
-.crear-op__preview-info {
-  flex: 1;
-  min-width: 0;
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
-.crear-op__preview-name {
-  font-size: 14px;
-  font-weight: 700;
-  color: #323338;
-}
-
-.crear-op__preview-meta {
-  font-size: 12px;
-  color: #676879;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.crear-op__preview-btn {
-  flex-shrink: 0;
-  background: #eef6ff !important;
-  color: #0073ea !important;
-  border-radius: 20px;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.crear-op__preview-btn:hover {
-  background: #dcedfd !important;
-}
-
-/* A pedido: oportunidades anteriores de la persona elegida (debajo de la tarjeta de
-   confirmación) — lista compacta, una fila por oportunidad, expandible a un detalle
+/* A pedido: oportunidades anteriores de la persona elegida — lista compacta, una fila
+   por oportunidad, expandible a un detalle
    con el bien asegurado y las compañías cotizadas. */
 .crear-op__historial {
   display: flex;
@@ -253,6 +297,53 @@
   font-size: 14px;
 }
 
+/* Contador por estado — a la vez funciona de filtro (tocarlo aplica/saca el filtro, ver
+   handleHistorialFilterClick en el JSX). --counter-color lo pone cada botón inline (es
+   el color real de ese estado en monday, ver StatusBadge) — el punto y el borde/texto
+   activo lo usan, nunca el fondo entero (mismo criterio que StatusBadge: texto/borde a
+   color pleno, fondo a un 10% de opacidad). "Total" es el único sin color propio. */
+.crear-op__historial-counters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  padding: 10px 12px 12px;
+  background: var(--tint-neutral);
+  border-bottom: 1px solid var(--border);
+}
+
+.crear-op__historial-counter {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  border: 1px solid var(--border);
+  background: var(--bg);
+  color: var(--text-gray);
+  border-radius: 20px;
+  padding: 4px 10px;
+  font-size: 11px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.crear-op__historial-counter::before {
+  content: '';
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--counter-color, var(--text-muted));
+  flex-shrink: 0;
+}
+
+.crear-op__historial-counter strong {
+  font-weight: 700;
+}
+
+.crear-op__historial-counter--active {
+  border-color: var(--counter-color, var(--primary-blue));
+  color: var(--counter-color, var(--primary-blue));
+  background: var(--counter-bg, var(--tint-info));
+}
+
 .crear-op__historial-item {
   border-top: 1px solid #e6e9ef;
 }
@@ -265,13 +356,7 @@
   font-size: 12px;
 }
 
-.crear-op__historial-date {
-  color: #676879;
-  flex-shrink: 0;
-}
-
 .crear-op__historial-desc {
-  flex: 1;
   min-width: 0;
   color: #323338;
   font-weight: 600;
@@ -285,6 +370,10 @@
   align-items: center;
   gap: 2px;
   flex-shrink: 0;
+  /* Empuja únicamente este botón a la extrema derecha — .crear-op__historial-desc ya no
+     tiene flex:1 (ver arriba), así que el badge queda pegado al texto en vez de
+     estirarse hasta acá. */
+  margin-left: auto;
   border: none;
   background: none;
   color: #0073ea;
@@ -301,19 +390,6 @@
 .crear-op__historial-detail {
   padding: 4px 12px 14px;
   background: #fafbfd;
-}
-
-.crear-op__historial-detail-header {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
-}
-
-.crear-op__historial-detail-title {
-  font-size: 13px;
-  font-weight: 700;
-  color: #0073ea;
 }
 
 .crear-op__historial-detail-grid {
@@ -352,22 +428,6 @@
 .crear-op__historial-detail-box strong {
   font-size: 13px;
   color: #323338;
-}
-
-.crear-op__historial-companias {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 4px;
-  margin: 2px 0;
-}
-
-.crear-op__historial-compania-tag {
-  font-size: 10px;
-  font-weight: 700;
-  color: #676879;
-  background: #f0f1f5;
-  border-radius: 10px;
-  padding: 2px 8px;
 }
 
 /* A pedido, estética tipo mockup: "Ir a esta oportunidad" a lo ancho completo, en verde
@@ -427,12 +487,12 @@
   border-radius: 10px;
 }
 
-.crear-op__source-tag--cliente {
+.crear-op__source-tag--contacto {
   color: #0073ea;
   background: #eef6ff;
 }
 
-.crear-op__source-tag--oportunidad {
+.crear-op__source-tag--lead {
   color: #9d50dd;
   background: #f5ebfd;
 }
@@ -532,33 +592,101 @@
 /* A pedido, estética tipo mockup: toggle de 2 botones (Sí/No) en vez del dropdown de
    siempre — mismos valores reales ("Si"/"No", ver color_mm51n4j), solo cambia el
    control visual. */
+/* A pedido: control segmentado unido (un solo borde compartido, divisor fino entre
+   opciones, la activa se rellena sólida) en vez de 2 pills sueltas — mismo patrón que
+   el toggle Sí/No de LaBatea (.cobro-sino). */
 .crear-op__toggle {
   display: flex;
-  gap: 12px;
+  border: 1px solid #d0d4e4;
+  border-radius: 8px;
+  overflow: hidden;
 }
 
 .crear-op__toggle-btn {
   flex: 1;
   padding: 14px 16px;
   background: #fff;
-  border: 1px solid #d0d4e4;
-  border-radius: 8px;
+  border: none;
   font-size: 14px;
   font-weight: 600;
   color: #323338;
   cursor: pointer;
   text-align: center;
-  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+  transition: background-color 0.15s ease, color 0.15s ease;
 }
 
-.crear-op__toggle-btn:hover {
-  border-color: #9cc2f2;
+.crear-op__toggle-btn + .crear-op__toggle-btn {
+  border-left: 1px solid #d0d4e4;
+}
+
+.crear-op__toggle-btn:hover:not(.crear-op__toggle-btn--active) {
+  background: #f4f5f7;
 }
 
 .crear-op__toggle-btn--active {
+  background: #0073ea;
+  color: #fff;
+}
+
+.crear-op__toggle-btn:focus-visible {
+  outline: 2px solid #0073ea;
+  outline-offset: -2px;
+}
+
+/* A pedido: "¿Es alguno de estos vehículos?" — tarjetas chicas seleccionables, con
+   borde + fondo celeste tenue cuando está activa (a diferencia del toggle Sí/No de
+   arriba, acá NO conviene el relleno sólido — cada tarjeta tiene 2 líneas de texto que
+   necesitan seguir siendo legibles como texto oscuro sobre claro, no invertido). En
+   fila con wrap, ya que puede haber varias. */
+.crear-op__vehiculos-anteriores {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+
+.crear-op__vehiculo-anterior {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 160px;
+  padding: 10px 14px;
+  background: #fff;
+  border: 1px solid #d0d4e4;
+  border-radius: 8px;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease;
+}
+
+.crear-op__vehiculo-anterior:hover {
+  border-color: #9cc2f2;
+}
+
+.crear-op__vehiculo-anterior--active {
   background: #eef6ff;
   border-color: #0073ea;
+}
+
+.crear-op__vehiculo-anterior-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #323338;
+}
+
+.crear-op__vehiculo-anterior-meta {
+  font-size: 12px;
+  color: #676879;
+}
+
+/* A pedido: con un solo candidato (ver el encabezado adaptativo en el JSX), la tarjeta
+   suma un llamado a la acción explícito — mismo azul que el resto de acentos "primary"
+   de la app, sin fondo propio para no competir con --active (que ya tiñe toda la
+   tarjeta cuando está elegida). */
+.crear-op__vehiculo-anterior-cta {
+  font-size: 12px;
+  font-weight: 700;
   color: #0073ea;
+  margin-top: 2px;
 }
 
 /* A pedido, estética tipo mockup: tarjeta verde con spinner mientras se analiza la
@@ -592,23 +720,6 @@
 /* A pedido: tarjeta propia (mismo lenguaje visual que crear-op__lectura-analyzing/
    summary de acá) en vez del AttentionBox genérico de antes, para "confirmá para
    iniciar la lectura". */
-.crear-op__lectura-subido {
-  display: flex;
-  flex-direction: column;
-  align-items: flex-start;
-  gap: 12px;
-  padding: 16px;
-  background: #eef6ff;
-  border: 1px solid #9cc2f2;
-  border-radius: 8px;
-}
-
-.crear-op__lectura-subido p {
-  margin: 0;
-  font-size: 13px;
-  color: #323338;
-}
-
 /* A pedido, estética tipo mockup: resumen compacto tras leer todo (incluido el Modelo)
    en vez de mostrar los campos sueltos — "Editar datos" los vuelve a mostrar (ver JSX,
    editingLeidos). */
@@ -659,6 +770,15 @@
   font-size: 14px;
 }
 
+/* A pedido: aviso arriba de VehiculoManualFields cuando la lectura vino incompleta —
+   mismo tono ámbar que AttentionBox type="warning", apunta a la fila de arriba
+   ("eliminá el archivo arriba") en vez de tener su propio botón de eliminar duplicado. */
+.crear-op__lectura-incompleto-hint {
+  margin: 0;
+  font-size: 12px;
+  color: #a15c00;
+}
+
 .crear-op__field input {
   padding: 11px 14px;
   border: 1px solid #d0d4e4;
@@ -676,8 +796,12 @@
   border-color: #9fd8b8;
 }
 
+/* A pedido: borde rojo + fondo rojo tenue juntos (no solo el borde, que antes era un
+   rosa pálido apenas visible) — mismo criterio que el resto de los estados de error de
+   la app (ver .error-detail-box). */
 .crear-op__field--invalid input {
-  border-color: #f0a3ae;
+  border-color: var(--red);
+  background: var(--tint-danger);
 }
 
 /* El campo que se está completando/editando ahora mismo se marca en azul — va después
@@ -756,86 +880,6 @@
   }
 }
 
-.crear-op__file {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  flex-wrap: wrap;
-  padding: 12px;
-  background: #f6f9ff;
-  border: 1px dashed #9cc2f2;
-  border-radius: 8px;
-  transition: background-color 0.15s ease, border-color 0.15s ease;
-}
-
-.crear-op__file--drag-over {
-  background: #eef6ff;
-  border-color: #0073ea;
-}
-
-/* A pedido: recubrimiento verde de todo el campo — avisa que este archivo vino solo
-   (autocompletado de una Oportunidad anterior), no que el usuario lo subió a mano. */
-.crear-op__file--highlighted {
-  background: #e9f9f3;
-  border: 1px solid #00c875;
-}
-
-.crear-op__file-preview {
-  width: 40px;
-  height: 40px;
-  object-fit: cover;
-  border-radius: 6px;
-  border: 1px solid #d0d4e4;
-  flex-shrink: 0;
-}
-
-/* A pedido, estética tipo mockup: caja grande centrada (Carta Automóvil, paso 2) en vez
-   de la fila compacta de siempre (Cédula Identidad, paso 1) — mismo componente
-   (FileField), ver el prop `prominent`. */
-.crear-op__file--prominent {
-  flex-direction: column;
-  justify-content: center;
-  padding: 28px 20px;
-  text-align: center;
-}
-
-.crear-op__file-helper {
-  margin: 0 0 4px;
-  font-size: 13px;
-  color: #676879;
-}
-
-.crear-op__file-input {
-  display: none;
-}
-
-.crear-op__file-name {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  font-weight: 400;
-  color: #676879;
-  background: #f6f7fb;
-  border-radius: 6px;
-  padding: 6px 10px;
-}
-
-.crear-op__file-clear {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border: none;
-  background: none;
-  color: #676879;
-  cursor: pointer;
-  padding: 0;
-}
-
-.crear-op__file-clear:hover {
-  color: #e2445c;
-}
-
 .crear-op__empty {
   padding: 32px;
   text-align: center;
@@ -867,41 +911,34 @@
   margin-right: 6px;
 }
 
-.crear-op__error-detail {
+.crear-op__error-detail-spacing {
   margin: 4px 0 0;
-  background: #fdf1f2;
-  border: 1px solid #f7c6cc;
-  border-radius: 8px;
-  padding: 14px 16px;
-  color: #a41f36;
-  font-size: 12px;
 }
 
-.crear-op__error-detail strong {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 12px;
-}
-
-.crear-op__error-detail pre {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: inherit;
-  font-size: 13px;
-  line-height: 1.6;
+.crear-op__error-detail-spacing pre {
   max-height: 220px;
   overflow-y: auto;
 }
 
+/* A pedido: footer pegado abajo (mismo criterio que .opp-detail__footer en
+   OpportunityDetail.css) — así "Cancelar"/"Guardar y continuar" quedan siempre a la
+   vista sin tener que scrollear todo el formulario, sobre todo con el panel de
+   historial al lado (mucho más corto que el form, ver .crear-op__step1-layout).
+   Margen/padding horizontal negativo+positivo para que la barra llegue hasta el borde
+   de la card (que tiene su propio padding, ver .crear-op__card) en vez de quedar
+   angosta en el medio. */
 .crear-op__footer {
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
   display: flex;
   align-items: center;
   justify-content: flex-end;
   gap: 16px;
-  margin-top: 28px;
-  padding-top: 20px;
-  border-top: 1px solid #e6e9ef;
+  margin: 28px -36px 0;
+  padding: 20px 36px;
+  background: var(--bg);
+  border-top: 1px solid var(--border);
 }
 
 .crear-op__footer-actions {

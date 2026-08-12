@@ -9,6 +9,8 @@ import CotizandoModal from './CotizandoModal'
 import ConfirmarStepPanel from './ConfirmarStepPanel'
 import EmitirStepPanel from './EmitirStepPanel'
 import WhatsAppSendModal from './WhatsAppSendModal'
+import ErrorDetailBox from './ErrorDetailBox'
+import './PillTabs.css'
 import {
   fetchOpportunityDetail,
   setSimpleColumnValue,
@@ -879,25 +881,28 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
       opportunity?.estadoLectura === 'Error') &&
     !lecturaDismissed
 
+  // clickable: false mientras el gate de lectura está activo — los paneles de abajo
+  // ignoran activeStep en ese caso (ver el render condicional más abajo), así que dejar
+  // los pasos clickeables ahí llevaría a un click que no hace nada visible.
   const steps = [
-    { key: 'cotizar', label: 'Cotizar', status: hasQuotes ? 'done' : 'active', clickable: true },
+    { key: 'cotizar', label: 'Cotizar', status: hasQuotes ? 'done' : 'active', clickable: !lecturaGateActive },
     {
       key: 'comparar',
       label: 'Comparar y enviar',
       status: compararDone ? 'done' : hasQuotes ? 'active' : 'pending',
-      clickable: true,
+      clickable: !lecturaGateActive,
     },
     {
       key: 'confirmar',
       label: 'Confirmar',
       status: confirmarDone ? 'done' : hasQuotes ? 'active' : 'pending',
-      clickable: true,
+      clickable: !lecturaGateActive,
     },
     {
       key: 'emitir',
       label: 'Emitir · cargar PDF',
       status: emitirDone ? 'done' : emitirActive ? 'active' : 'pending',
-      clickable: true,
+      clickable: !lecturaGateActive,
     },
   ]
 
@@ -907,7 +912,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
         <Button kind="tertiary" className="opp-detail__back-btn" onClick={onBack}>
           <MdArrowBack /> Volver
         </Button>
-        {!loading && !error && opportunity && !lecturaGateActive && (
+        {!loading && !error && opportunity && (
           <Stepper steps={steps} activeKey={activeStep} onSelect={setActiveStep} />
         )}
       </div>
@@ -1014,11 +1019,8 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
                   </div>
                 </AttentionBox>
               )}
-              {opportunity.estadoLectura === 'Error' && lecturaErrorDetail && (
-                <div className="opp-detail__error-detail">
-                  <strong>Detalle del error (último update en la oportunidad):</strong>
-                  <pre>{lecturaErrorDetail}</pre>
-                </div>
+              {opportunity.estadoLectura === 'Error' && (
+                <ErrorDetailBox detail={lecturaErrorDetail} className="opp-detail__error-detail-spacing" />
               )}
             </div>
           ) : (
@@ -1062,7 +1064,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
                     estilos internos vienen de clases hasheadas inyectadas en runtime, no
                     hay hook confiable para "1/3 del ancho cada una" + look propio) —
                     mismo criterio que los botones-pill de Stepper.jsx. */}
-                <div className="opp-detail__cobertura-tabs" role="tablist">
+                <div className="pill-tabs opp-detail__cobertura-tabs" role="tablist">
                   {COBERTURA_TABS.map((tab, index) => (
                     <button
                       key={tab.key}
@@ -1071,8 +1073,8 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
                       aria-selected={coberturaTabIndex === index}
                       className={
                         coberturaTabIndex === index
-                          ? 'opp-detail__cobertura-tab opp-detail__cobertura-tab--active'
-                          : 'opp-detail__cobertura-tab'
+                          ? 'pill-tabs__tab pill-tabs__tab--active opp-detail__cobertura-tab'
+                          : 'pill-tabs__tab opp-detail__cobertura-tab'
                       }
                       onClick={() => setCoberturaTabIndex(index)}
                     >
@@ -1106,12 +1108,11 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
                 )}
               </div>
 
-              {envioErrorDetail && (
-                <div className="opp-detail__error-detail">
-                  <strong>Detalle del error de envío (último update en la oportunidad):</strong>
-                  <pre>{envioErrorDetail}</pre>
-                </div>
-              )}
+              <ErrorDetailBox
+                detail={envioErrorDetail}
+                title="Detalle del error de envío (último update en la oportunidad):"
+                className="opp-detail__error-detail-spacing"
+              />
 
               <div className="opp-detail__footer">
                 <div className="opp-detail__footer-status">

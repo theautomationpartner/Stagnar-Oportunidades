@@ -104,22 +104,8 @@
   margin: 4px 0 20px;
 }
 
-.wa-modal__sending-progress-track {
-  width: 100%;
-  height: 6px;
-  background: #e6e9ef;
-  border-radius: 4px;
-  overflow: hidden;
-}
-
-/* Ancho fijo (no hay forma de medir el progreso real del lado de Make) — transmite "ya
-   casi" sin inventar una precisión que no existe. */
-.wa-modal__sending-progress-fill {
-  width: 90%;
-  height: 100%;
-  background: linear-gradient(90deg, #0073ea, var(--color-verde));
-  border-radius: 4px;
-}
+/* percent=90 fijo en el JSX (no hay forma de medir el progreso real del lado de
+   Make) — transmite "ya casi" sin inventar una precisión que no existe. */
 
 /* A pedido, estética tipo mockup: check verde + "Redirigiendo a Confirmación..." tras
    un envío exitoso — el modal se cierra solo (ver AUTO_CLOSE_DELAY_MS en el JSX). */
@@ -173,27 +159,7 @@
   font-size: 14px;
 }
 
-.wa-modal__error-detail {
-  background: #fdf1f2;
-  border: 1px solid #f7c6cc;
-  border-radius: 8px;
-  padding: 14px 16px;
-  color: #a41f36;
-  font-size: 12px;
-}
-
-.wa-modal__error-detail strong {
-  display: block;
-  margin-bottom: 8px;
-}
-
-.wa-modal__error-detail pre {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: inherit;
-  font-size: 13px;
-  line-height: 1.8;
+.wa-modal__error-detail-spacing pre {
   max-height: 200px;
   overflow-y: auto;
 }

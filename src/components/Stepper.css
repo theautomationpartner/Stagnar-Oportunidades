@@ -119,9 +119,16 @@ button.stepper__step:active {
   background: #e3edfb;
 }
 
+/* A pedido: halo alrededor del círculo (no un rectángulo sobre todo el botón) al
+   navegar con teclado — mismo criterio que ya usa el toggle segmentado (ver
+   .crear-op__toggle-btn:focus-visible, CrearOportunidadForm.css) y coherente con el
+   glow que ya tiene el círculo del paso activo (ver stepper-pulse más abajo). */
 button.stepper__step:focus-visible {
-  outline: 2px solid #0073ea;
-  outline-offset: 2px;
+  outline: none;
+}
+
+button.stepper__step:focus-visible .stepper__circle {
+  box-shadow: 0 0 0 3px rgba(0, 115, 234, 0.4);
 }
 
 .stepper__circle {
@@ -141,9 +148,42 @@ button.stepper__step:focus-visible {
   color: #fff;
 }
 
+/* A pedido: el tilde de "paso completado" aparece con un pequeño pop en vez de
+   materializarse de golpe — mismo patrón que el tilde de archivo subido (ver
+   .tilde-lento en FileUploadField.css). */
+.stepper__circle--done svg {
+  animation: tilde-lento 0.5s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stepper__circle--done svg {
+    animation: none;
+  }
+}
+
 .stepper__circle--active {
   background: #0073ea;
   color: #fff;
+  /* A pedido: el círculo del paso actual "respira" (glow pulsante) para que salte a la
+     vista de un vistazo cuál es el paso en curso, no solo por el color — mismo patrón
+     que ya usan otras apps de este mismo sistema de diseño. */
+  animation: stepper-pulse 1.8s ease-in-out infinite alternate;
+}
+
+@keyframes stepper-pulse {
+  from {
+    box-shadow: 0 0 0 0 rgba(0, 115, 234, 0.35), 0 0 4px 0 rgba(0, 115, 234, 0.25);
+  }
+  to {
+    box-shadow: 0 0 0 6px rgba(0, 115, 234, 0), 0 0 14px 3px rgba(0, 115, 234, 0.55);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .stepper__circle--active {
+    animation: none;
+    box-shadow: 0 0 0 4px rgba(0, 115, 234, 0.22);
+  }
 }
 
 .stepper__circle--pending {

@@ -3,6 +3,8 @@ import { MdSend, MdCheckCircle, MdArrowForward } from 'react-icons/md'
 import { Modal, ModalHeader, ModalContent, ModalFooter, AttentionBox, TextField } from '@vibe/core'
 import { sendQuotesToWhatsApp, getMakeWebhookUrl } from '../services/makeWebhook'
 import GradientSpinner from './GradientSpinner'
+import ErrorDetailBox from './ErrorDetailBox'
+import ProgressBar from './ProgressBar'
 import './WhatsAppSendModal.css'
 
 // A pedido, estética tipo mockup: 1.8s alcanza para que se alcance a leer "¡Propuesta
@@ -88,21 +90,14 @@ export default function WhatsAppSendModal({
                 <p className="wa-modal__sending-subtitle">
                   Procesando imagen y conectando con el destinatario (+{phone})
                 </p>
-                <div className="wa-modal__sending-progress-track">
-                  <div className="wa-modal__sending-progress-fill" />
-                </div>
+                <ProgressBar percent={90} />
               </div>
             )}
 
             {sendFailed && (
               <>
                 <AttentionBox type="negative">Hubo un error al enviar por WhatsApp.</AttentionBox>
-                {envioErrorDetail && (
-                  <div className="wa-modal__error-detail">
-                    <strong>Detalle del error (último update en la oportunidad):</strong>
-                    <pre>{envioErrorDetail}</pre>
-                  </div>
-                )}
+                <ErrorDetailBox detail={envioErrorDetail} className="wa-modal__error-detail-spacing" />
               </>
             )}
 

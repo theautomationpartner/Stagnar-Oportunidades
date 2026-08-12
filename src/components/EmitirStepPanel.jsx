@@ -1,11 +1,13 @@
 import { useEffect, useState } from 'react'
-import { MdCheckCircle, MdDescription, MdClose } from 'react-icons/md'
-import { AttentionBox, Button, IconButton, Modal, ModalContent } from '@vibe/core'
+import { MdCheckCircle } from 'react-icons/md'
+import { AttentionBox, Button, Modal, ModalContent } from '@vibe/core'
 import { formatMoney } from '../services/format'
 import { accentForCompania } from '../services/companyColors'
-import DocumentUploadRow from './DocumentUploadRow'
+import { fetchFileColumnAsFile } from '../services/mondayApi'
+import FileUploadField from './FileUploadField'
 import StatusBadge from './StatusBadge'
 import GradientSpinner from './GradientSpinner'
+import ErrorDetailBox from './ErrorDetailBox'
 import './EmitirStepPanel.css'
 
 // Resumen final de todos los datos con los que se cerró la oportunidad: cliente, bien
@@ -171,61 +173,42 @@ export default function EmitirStepPanel({
           {estadoCreacion && <StatusBadge label={estadoCreacion} color={estadoCreacionColor} />}
         </div>
 
-        {!polizaSubida || polizaBusy ? (
-          <DocumentUploadRow
-            label="Póliza"
-            fileName={polizaFileName}
-            uploading={uploading}
-            deleting={deleting}
-            error={error}
-            onUpload={onUploadPoliza}
-            onDelete={onDeletePoliza}
-            missingMessage="Póliza pendiente de adjuntar"
-          />
-        ) : (
-          // A pedido, estética tipo mockup: fila verde con el archivo + "Cargado
-          // correctamente" y el botón de acción AL LADO (antes: fila de
-          // DocumentUploadRow separada del botón "Confirmar emisión de póliza",
-          // que quedaba debajo). La cruz para sacar el archivo se mantiene (compacta,
-          // a la izquierda del botón) — no estaba en el mockup, pero sin ella no hay
-          // forma de corregir un archivo subido por error una vez "Creada" todavía no
-          // llegó.
-          <div className="emitir-step__poliza-ok">
-            <div className="emitir-step__poliza-ok-info">
-              <MdDescription />
-              <div className="emitir-step__poliza-ok-text">
-                <strong>{polizaFileName}</strong>
-                <span>Cargado correctamente</span>
-              </div>
-            </div>
-            {showConfirmarAction && (
-              <div className="emitir-step__poliza-ok-actions">
-                <IconButton
-                  className="emitir-step__poliza-ok-delete"
-                  icon={MdClose}
-                  onClick={onDeletePoliza}
-                  aria-label="Eliminar póliza"
-                />
-                <Button
-                  kind="primary"
-                  className="emitir-step__confirmar-btn"
-                  onClick={onConfirmarEmision}
-                  disabled={confirmandoEmision || polling}
-                >
-                  <MdCheckCircle />{' '}
-                  {confirmandoEmision ? 'Confirmando...' : 'Concretar Oportunidad'}
-                </Button>
-              </div>
-            )}
-          </div>
-        )}
+        {/* A pedido: mismo campo de archivo (y misma previsualización con lightbox)
+            que el resto de la app — antes esto eran 2 bloques totalmente distintos
+            (DocumentUploadRow mientras faltaba, una fila verde armada a mano una vez
+            cargada). Ahora es un solo FileUploadField siempre; "Concretar Oportunidad"
+            se agrega al lado como extraActions solo mientras corresponde (subida y
+            todavía no "Creada" — una vez creada, ni eliminar ni confirmar tienen
+            sentido, se deja la fila en verde nomás como constancia). */}
+        <FileUploadField
+          label="Póliza"
+          required={false}
+          fileName={polizaFileName}
+          onFetchFile={() => fetchFileColumnAsFile(opportunity.id, 'file_mm5bzdd4')}
+          uploading={uploading}
+          deleting={deleting}
+          error={error}
+          missingMessage="Póliza pendiente de adjuntar"
+          onUpload={onUploadPoliza}
+          onDelete={showConfirmarAction ? onDeletePoliza : undefined}
+          showReplaceButton={false}
+          compactDelete
+          extraActions={
+            showConfirmarAction && (
+              <Button
+                kind="primary"
+                className="emitir-step__confirmar-btn"
+                onClick={onConfirmarEmision}
+                disabled={confirmandoEmision || polling}
+              >
+                <MdCheckCircle /> {confirmandoEmision ? 'Confirmando...' : 'Concretar Oportunidad'}
+              </Button>
+            )
+          }
+        />
         {confirmarEmisionError && <p className="emitir-step__error">Error: {confirmarEmisionError}</p>}
-        {!polling && errorDetail && (
-          <div className="emitir-step__error-detail">
-            <strong>Detalle del error (último update en la oportunidad):</strong>
-            <pre>{errorDetail}</pre>
-          </div>
-        )}
+        {confirmarEmisionError && <p className="emitir-step__error">Error: {confirmarEmisionError}</p>}
+        {!polling && <ErrorDetailBox detail={errorDetail} className="emitir-step__error-detail-spacing" />}
       </div>
 
       {/* A pedido: solo el círculo girando + un texto (sin barra de progreso ni

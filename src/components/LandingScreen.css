@@ -16,16 +16,20 @@
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
-  gap: 24px;
+  gap: 28px;
 }
 
+/* A pedido: tarjetas más grandes — eran las primeras (y únicas) opciones de la
+   pantalla principal, con bastante aire alrededor; un poco más de tamaño las hace más
+   visibles/fáciles de leer de un vistazo sin quedar desproporcionadas para lo poco que
+   hay alrededor. */
 .landing__card {
   display: flex;
   align-items: center;
-  gap: 16px;
-  width: 320px;
-  padding: 20px;
-  border-radius: 12px;
+  gap: 18px;
+  width: 380px;
+  padding: 26px;
+  border-radius: 14px;
   border: 1px solid;
   font: inherit;
   text-align: left;
@@ -58,10 +62,10 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 48px;
-  height: 48px;
+  width: 58px;
+  height: 58px;
   border-radius: 50%;
-  font-size: 22px;
+  font-size: 26px;
 }
 
 .landing__card-icon--primary {
@@ -83,19 +87,19 @@
 }
 
 .landing__card-title {
-  font-size: 16px;
+  font-size: 18px;
   font-weight: 700;
   color: #323338;
 }
 
 .landing__card-desc {
-  font-size: 13px;
+  font-size: 14px;
   color: #676879;
 }
 
 .landing__card-chevron {
   flex-shrink: 0;
-  font-size: 20px;
+  font-size: 22px;
 }
 
 .landing__card-chevron--primary {

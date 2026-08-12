@@ -76,8 +76,18 @@
 .alert-modal__details li {
   font-size: 13px;
   font-weight: 600;
-  color: #e2445c;
   margin-bottom: 2px;
+}
+
+.alert-modal__details--negative li {
+  color: #e2445c;
+}
+
+/* Lista de opciones válidas (ej. "Modelos disponibles") — texto normal, no rojo: no son
+   errores, son alternativas que sí se pueden elegir. */
+.alert-modal__details--neutral li {
+  color: #323338;
+  font-weight: 500;
 }
 
 /* Sin secondaryButton (ver AlertModal.jsx) — el primario ocupa todo el ancho en vez de

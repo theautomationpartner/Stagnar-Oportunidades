@@ -70,6 +70,12 @@
 .sidebar__nav {
   display: flex;
   flex-direction: column;
+  /* Colapsada: .sidebar__nav-item mide 40px fijo (no 100%), así que sin esto quedaba
+     pegado al borde izquierdo del contenedor (align-items normal/stretch no lo mueve
+     porque ya tiene ancho propio) en vez de centrado como el logo/toggle de arriba.
+     Expandida no cambia nada visualmente — ahí .sidebar__nav-item ya pasa a width:100%
+     (ver más abajo) y ocupa todo el ancho igual. */
+  align-items: center;
   gap: 8px;
   flex: 1;
   width: 100%;
@@ -78,6 +84,8 @@
 .sidebar__nav-item {
   width: 40px;
   height: 40px;
+  border: none;
+  background: transparent;
   border-radius: 10px;
   display: flex;
   align-items: center;
@@ -85,6 +93,18 @@
   gap: 10px;
   font-size: 20px;
   color: #9699a6;
+  cursor: pointer;
+  padding: 0;
+  font-family: inherit;
+}
+
+.sidebar__nav-item:hover:not(.sidebar__nav-item--active) {
+  background: #f0f4fa;
+  color: #0073ea;
+}
+
+.sidebar__nav-item--active {
+  cursor: default;
 }
 
 .sidebar--expanded .sidebar__nav-item {

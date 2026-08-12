@@ -1,0 +1,45 @@
+/* Control segmentado tipo "pill" reusado por el paso "Comparar y enviar"
+   (opp-detail__cobertura-tabs) y "Confirmar" (confirmar-step__filter-tabs) — antes cada
+   uno definía el mismo riel/pastilla activa con su propia clase (ver auditoría de
+   estilo). El layout específico de cada instancia (ancho de cada tab, margen) sigue en
+   el CSS de cada componente, combinado con esta clase. */
+.pill-tabs {
+  display: flex;
+  gap: 4px;
+  padding: 4px;
+  background: var(--tint-neutral);
+  border: 1px solid var(--tint-neutral-bd);
+  border-radius: var(--radius-lg);
+}
+
+.pill-tabs__tab {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  border: none;
+  background: transparent;
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-gray);
+  cursor: pointer;
+  white-space: nowrap;
+  transition: background-color 0.15s ease, color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.pill-tabs__tab:hover {
+  color: var(--text-dark);
+}
+
+.pill-tabs__tab--active {
+  background: var(--bg);
+  color: var(--primary-blue);
+  box-shadow: var(--shadow-sm);
+}
+
+.pill-tabs__tab--active:hover {
+  color: var(--primary-blue);
+}

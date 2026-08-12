@@ -153,70 +153,6 @@
   }
 }
 
-/* A pedido, estética tipo mockup: fila verde con el archivo cargado + el botón de
-   acción al lado (antes: DocumentUploadRow + un botón aparte debajo, ver el JSX). Mismo
-   verde/estilo que .doc-upload-row--ok (DocumentUploadRow.css) para que se lea como la
-   misma familia de estado "ok", aunque el layout interno ya es propio. */
-.emitir-step__poliza-ok {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  flex-wrap: wrap;
-  gap: 12px;
-  padding: 12px 14px;
-  border-radius: 8px;
-  background: #e6f9f1;
-}
-
-.emitir-step__poliza-ok-info {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  min-width: 0;
-}
-
-.emitir-step__poliza-ok-info svg {
-  font-size: 22px;
-  color: #037f4c;
-  flex-shrink: 0;
-}
-
-.emitir-step__poliza-ok-text {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  min-width: 0;
-}
-
-.emitir-step__poliza-ok-text strong {
-  font-size: 13px;
-  color: #037f4c;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.emitir-step__poliza-ok-text span {
-  font-size: 12px;
-  color: #037f4c;
-  opacity: 0.75;
-}
-
-.emitir-step__poliza-ok-actions {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  flex-shrink: 0;
-}
-
-.emitir-step__poliza-ok-delete {
-  color: #037f4c !important;
-}
-
-.emitir-step__poliza-ok-delete:hover {
-  background: rgba(3, 127, 76, 0.12) !important;
-}
-
 /* Verde de marca (a pedido) en vez del azul por defecto de kind="primary" — mismo
    criterio que .crear-op__historial-detail-btn (CrearOportunidadForm.css). */
 .emitir-step__confirmar-btn {
@@ -231,10 +167,9 @@
 
 /* A pedido: el botón queda deshabilitado mientras corre la automatización (ver
    `polling` en el JSX) — @vibe/core atenúa los botones disabled con opacity baja, que
-   sobre el fondo verde de acá (.emitir-step__poliza-ok) y el propio verde del botón
-   quedaba prácticamente ilegible (verde clarito sobre verde clarito). Se pisa esa
-   opacity y se define una combinación propia con contraste real en vez de depender de
-   la atenuación genérica de la librería. */
+   sobre el fondo verde de este botón quedaba prácticamente ilegible (verde clarito
+   sobre verde clarito). Se pisa esa opacity y se define una combinación propia con
+   contraste real en vez de depender de la atenuación genérica de la librería. */
 .emitir-step__confirmar-btn:disabled {
   opacity: 1;
   background-color: #9cc9c3 !important;
@@ -265,29 +200,13 @@
   margin: 14px 0 0;
 }
 
-.emitir-step__error-detail {
+.emitir-step__error-detail-spacing {
   margin-top: 16px;
-  background: #fdf1f2;
-  border: 1px solid #f7c6cc;
-  border-radius: 8px;
-  padding: 14px 16px;
-  color: #a41f36;
-  font-size: 12px;
 }
 
-.emitir-step__error-detail strong {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 12px;
-}
-
-.emitir-step__error-detail pre {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: inherit;
-  font-size: 13px;
-  line-height: 2;
+/* Detalle de emisión puede traer bastante texto (respuesta cruda de lectura del PDF) —
+   scrollea en vez de estirar todo el panel. */
+.emitir-step__error-detail-spacing pre {
   max-height: 220px;
   overflow-y: auto;
 }

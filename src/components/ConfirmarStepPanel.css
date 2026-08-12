@@ -84,38 +84,11 @@
   }
 }
 
-/* Mismo criterio que .opp-detail__cobertura-tabs (paso "Comparar y enviar") — control
-   segmentado a mano, sin Tab/TabList de @vibe/core. */
+/* Chrome del control segmentado vive en pill-tabs.css, compartido con
+   .opp-detail__cobertura-tabs (paso "Comparar y enviar") — acá solo lo específico de
+   este uso. */
 .confirmar-step__filter-tabs {
-  display: flex;
-  gap: 4px;
-  padding: 4px;
   flex-shrink: 0;
-  background: #f6f7fb;
-  border: 1px solid #e6e9ef;
-  border-radius: 10px;
-}
-
-.confirmar-step__filter-tab {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  border: none;
-  background: transparent;
-  border-radius: 8px;
-  padding: 8px 14px;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  color: #676879;
-  cursor: pointer;
-  white-space: nowrap;
-}
-
-.confirmar-step__filter-tab--active {
-  background: #fff;
-  color: #0073ea;
-  box-shadow: 0 1px 3px rgba(15, 27, 60, 0.12);
 }
 
 .confirmar-step__empty {

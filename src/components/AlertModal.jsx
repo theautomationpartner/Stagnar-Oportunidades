@@ -21,6 +21,10 @@ export default function AlertModal({
   description,
   detailsTitle,
   detailsList,
+  // 'negative' (default): texto rojo — la lista son ítems que faltan/fallan (ej.
+  // "Campos pendientes"). 'neutral': texto normal — la lista son opciones válidas para
+  // elegir (ej. "Modelos disponibles"), no errores.
+  detailsTone = 'negative',
   // { text, onClick, danger? } — danger pinta el botón primario en rojo (ej.
   // "Reintentar" sobre un error real, no una simple confirmación).
   primaryButton,
@@ -44,7 +48,7 @@ export default function AlertModal({
         <h2 className="alert-modal__title">{title}</h2>
         {description && <p className="alert-modal__desc">{description}</p>}
         {detailsList?.length > 0 && (
-          <div className="alert-modal__details">
+          <div className={`alert-modal__details alert-modal__details--${detailsTone}`}>
             {detailsTitle && <span className="alert-modal__details-title">{detailsTitle}</span>}
             <ul>
               {detailsList.map((item) => (

@@ -4,8 +4,10 @@ import { FaWhatsapp } from 'react-icons/fa'
 import { Button } from '@vibe/core'
 import { formatMoney, CUOTA_COUNTS, toPercentString } from '../services/format'
 import { accentForCompania } from '../services/companyColors'
-import DocumentUploadRow from './DocumentUploadRow'
+import FileUploadField from './FileUploadField'
 import AlertModal from './AlertModal'
+import { fetchFileColumnAsFile } from '../services/mondayApi'
+import './PillTabs.css'
 import './ConfirmarStepPanel.css'
 
 // Subconjunto de COTIZAR_FIELDS que el paso 3 exige verificar antes de emitir: si falta
@@ -263,15 +265,22 @@ export default function ConfirmarStepPanel({
         </p>
         <div className="confirmar-step__docs">
           {documentos.map((doc) => (
-            <DocumentUploadRow
+            <FileUploadField
               key={doc.key}
               label={doc.label}
+              required={false}
               fileName={doc.fileName}
+              // A pedido: mismo campo de archivo (y misma previsualización con
+              // lightbox) que el resto de la app — como este documento ya está subido
+              // a monday de una sesión anterior (no un File en memoria), la
+              // descarga real recién se pide al tocar "ver más grande", no antes.
+              onFetchFile={() => fetchFileColumnAsFile(opportunity.id, doc.columnId)}
               uploading={Boolean(uploadingDoc[doc.columnId])}
               deleting={Boolean(deletingDoc[doc.columnId])}
               error={docUploadError[doc.columnId]}
               onUpload={(file) => onUploadDocument(doc.columnId, file)}
               onDelete={() => onDeleteDocument(doc.columnId)}
+              showReplaceButton={false}
               compactDelete
             />
           ))}
@@ -291,15 +300,13 @@ export default function ConfirmarStepPanel({
               .opp-detail__cobertura-tabs (paso "Comparar y enviar"): sus estilos internos
               vienen de clases hasheadas inyectadas en runtime, no hay hook confiable para
               un look propio. */}
-          <div className="confirmar-step__filter-tabs" role="tablist">
+          <div className="pill-tabs confirmar-step__filter-tabs" role="tablist">
             <button
               type="button"
               role="tab"
               aria-selected={filterTab === 'sent'}
               className={
-                filterTab === 'sent'
-                  ? 'confirmar-step__filter-tab confirmar-step__filter-tab--active'
-                  : 'confirmar-step__filter-tab'
+                filterTab === 'sent' ? 'pill-tabs__tab pill-tabs__tab--active' : 'pill-tabs__tab'
               }
               onClick={() => setFilterTab('sent')}
             >
@@ -310,9 +317,7 @@ export default function ConfirmarStepPanel({
               role="tab"
               aria-selected={filterTab === 'all'}
               className={
-                filterTab === 'all'
-                  ? 'confirmar-step__filter-tab confirmar-step__filter-tab--active'
-                  : 'confirmar-step__filter-tab'
+                filterTab === 'all' ? 'pill-tabs__tab pill-tabs__tab--active' : 'pill-tabs__tab'
               }
               onClick={() => setFilterTab('all')}
             >

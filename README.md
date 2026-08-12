@@ -9,7 +9,6 @@ así que siempre es esa URL. Si algo más está usando el puerto 5173, el servid
 fallar en vez de arrancar en otro puerto — hay que liberar el 5173, no cambiar esto.
 
 ## Pasos
-
 ```bash
 cd app
 npm install     # solo la primera vez, o cuando cambian dependencias

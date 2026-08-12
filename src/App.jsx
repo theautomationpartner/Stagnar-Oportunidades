@@ -124,7 +124,12 @@ export default function App() {
   if (openOpportunityId) {
     return (
       <div className="app-shell">
-        <Sidebar />
+        <Sidebar
+          onNavigateOportunidades={() => {
+            setOpenOpportunityId(null)
+            setView('table')
+          }}
+        />
         <div className="app-shell__main">
           <OpportunityDetail
             opportunityId={openOpportunityId}
@@ -139,7 +144,13 @@ export default function App() {
   if (view === 'landing') {
     return (
       <div className="app-shell">
-        <Sidebar />
+        <Sidebar
+          defaultExpanded
+          onNavigateOportunidades={() => {
+            setOpenOpportunityId(null)
+            setView('table')
+          }}
+        />
         <div className="app-shell__main">
           <LandingScreen onCreateNew={() => setView('create')} onSearchExisting={() => setView('table')} />
         </div>
@@ -150,7 +161,12 @@ export default function App() {
   if (view === 'create') {
     return (
       <div className="app-shell">
-        <Sidebar />
+        <Sidebar
+          onNavigateOportunidades={() => {
+            setOpenOpportunityId(null)
+            setView('table')
+          }}
+        />
         <div className="app-shell__main">
           <CrearOportunidadForm
             schema={schema}

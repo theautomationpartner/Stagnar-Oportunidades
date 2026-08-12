@@ -1,0 +1,264 @@
+/* Mismo lenguaje visual para TODOS los campos de archivo de la app (ver comentario
+   grande en FileUploadField.jsx) — colores por estado ya probados en el resto de la
+   app: verde = cargado, naranja punteado = falta, azul = arrastrando un archivo
+   encima. */
+.file-field {
+  position: relative;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 12px 14px;
+  border-radius: 8px;
+  font-size: 13px;
+  border: 1px solid transparent;
+  transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+.file-field--missing {
+  background: #fff7f0;
+  color: #a15c00;
+  border: 1px dashed #f0c48a;
+}
+
+.file-field--ok {
+  background: #e6f9f1;
+  color: #037f4c;
+  /* A pedido: borde sólido verde una vez que hay archivo (antes transparente, se notaba
+     menos la diferencia con "falta") — mismo criterio que la zona de arrastrar y soltar
+     una vez que acepta el archivo. */
+  border-color: #a6e6c9;
+}
+
+.file-field--drag-over {
+  background: #eef6ff;
+  border-color: #0073ea;
+  color: #0073ea;
+}
+
+/* Archivo que llegó solo (autocompletado de una Oportunidad/Contacto anterior, no
+   elegido a mano) — mismo verde de "cargado" + borde azul y una etiqueta aparte
+   ("· autocompletado") en vez de un color totalmente distinto, para no inventar un
+   tercer lenguaje de color. */
+.file-field--highlighted {
+  border: 1px solid #0073ea;
+}
+
+.file-field__autofill-tag {
+  color: #0073ea;
+  font-weight: 600;
+}
+
+/* A pedido, estética tipo mockup: caja grande centrada (Carta Automóvil, paso 2 de
+   Crear Oportunidad) en vez de la fila compacta de siempre — mismo componente, solo
+   cambia el layout. */
+.file-field--prominent {
+  flex-direction: column;
+  justify-content: center;
+  text-align: center;
+  padding: 28px 20px;
+}
+
+.file-field__helper {
+  margin: 0 0 4px;
+  font-size: 13px;
+  color: inherit;
+  opacity: 0.85;
+}
+
+.file-field__input {
+  display: none;
+}
+
+.file-field__info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.file-field__info > svg {
+  font-size: 18px;
+  flex-shrink: 0;
+}
+
+/* A pedido: el tilde de "archivo cargado" aparece con un pequeño pop en vez de
+   materializarse de golpe — mismo lenguaje que el tilde de paso completado del Stepper
+   (ver @keyframes tilde-lento en index.css). Cubre las 2 formas en que este ícono puede
+   renderizarse (ver FileUploadField.jsx): directo adentro de .file-field__info, o
+   adentro del círculo de preview (.file-field__preview--icon) cuando el archivo es
+   remoto y todavía no se bajó para mostrar el thumbnail real. */
+.file-field--ok .file-field__info > svg,
+.file-field__preview--icon svg {
+  animation: tilde-lento 0.5s ease-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .file-field--ok .file-field__info > svg,
+  .file-field__preview--icon svg {
+    animation: none;
+  }
+}
+
+.file-field__value {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.file-field--missing .file-field__value {
+  font-weight: 400;
+  opacity: 0.9;
+}
+
+/* Miniatura clickeable — mismo lightbox que el resto (ver más abajo). Ícono de lupa
+   que aparece al pasar el mouse, para que se note que se puede agrandar. Mientras no
+   se conocen los bytes todavía (archivo ya subido en otra sesión, ver
+   FileUploadField.jsx#onFetchFile) se muestra el tilde de siempre en su lugar — la
+   descarga recién arranca al tocarlo. */
+.file-field__preview-btn {
+  position: relative;
+  display: inline-flex;
+  flex-shrink: 0;
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: zoom-in;
+}
+
+.file-field__preview {
+  width: 32px;
+  height: 32px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  flex-shrink: 0;
+}
+
+.file-field__preview--icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, 0.6);
+  font-size: 16px;
+  color: inherit;
+}
+
+.file-field__preview-zoom {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0, 0, 0, 0.35);
+  color: #fff;
+  border-radius: 6px;
+  font-size: 15px;
+  opacity: 0;
+  transition: opacity 0.15s ease;
+}
+
+.file-field__preview-btn:hover .file-field__preview-zoom,
+.file-field__preview-btn:focus-visible .file-field__preview-zoom {
+  opacity: 1;
+}
+
+.file-field__btn {
+  flex-shrink: 0;
+}
+
+/* Button kind="secondary" es transparente de fábrica — sobre el fondo verde/naranja de
+   acá casi no se distinguía. Fondo blanco sólido para que se diferencie del fondo de
+   atrás. */
+.file-field--ok .file-field__btn,
+.file-field--missing .file-field__btn {
+  background-color: #fff !important;
+}
+
+.file-field__delete-btn {
+  color: #e2445c;
+  border-color: #f3c1cb;
+}
+
+.file-field__delete-btn:hover {
+  background: #fdf1f2 !important;
+  border-color: #e2445c;
+}
+
+/* Variante compacta (compactDelete): solo la cruz roja, sin texto "Eliminar" — para
+   cuando 2 campos van uno al lado del otro y no hay tanto ancho para un botón con
+   label. */
+.file-field__delete-icon-btn {
+  color: #e2445c !important;
+  flex-shrink: 0;
+}
+
+.file-field__delete-icon-btn:hover {
+  background: #fdf1f2 !important;
+}
+
+.file-field__spinner {
+  color: var(--color-verde);
+  flex-shrink: 0;
+}
+
+.file-field__error {
+  margin: 4px 0 0;
+  color: #e2445c;
+  font-size: 12px;
+}
+
+@media (max-width: 480px) {
+  .file-field:not(.file-field--prominent) {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .file-field__btn {
+    align-self: flex-start;
+  }
+}
+
+/* Lightbox — mismo z-index por encima de un Modal (10000, ver index.css) para no
+   quedar tapado si algún día esto vive adentro de uno. */
+.file-field__lightbox {
+  position: fixed;
+  inset: 0;
+  z-index: 10001;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 42, 0.85);
+  padding: 40px;
+  cursor: zoom-out;
+}
+
+.file-field__lightbox-img {
+  max-width: 90vw;
+  max-height: 90vh;
+  border-radius: 8px;
+  box-shadow: 0 24px 64px rgba(0, 0, 0, 0.4);
+  cursor: default;
+}
+
+.file-field__lightbox-close {
+  position: absolute;
+  top: 20px;
+  right: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border: none;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.15);
+  color: #fff;
+  font-size: 22px;
+  cursor: pointer;
+}
+
+.file-field__lightbox-close:hover {
+  background: rgba(255, 255, 255, 0.25);
+}

@@ -2,6 +2,7 @@ import { MdCheckCircle } from 'react-icons/md'
 import { Modal, ModalContent } from '@vibe/core'
 import { EXPECTED_QUOTE_COUNT_BY_COMPANIA, accentForCompania } from '../services/companyColors'
 import GradientSpinner from './GradientSpinner'
+import ProgressBar from './ProgressBar'
 import './CotizandoModal.css'
 
 // Nombres reales de cada compañía tal cual se muestran acá — no todas llevan "Seguros"
@@ -60,9 +61,7 @@ export default function CotizandoModal({ show, recotizando, progress, onClose })
         <h2 className="cotizando-modal__title">{recotizando ? 'Recotizando' : 'Cotizando'} en aseguradoras...</h2>
         <p className="cotizando-modal__subtitle">{subtitle}</p>
 
-        <div className="cotizando-modal__progress-track">
-          <div className="cotizando-modal__progress-fill" style={{ width: `${percent}%` }} />
-        </div>
+        <ProgressBar percent={percent} className="cotizando-modal__progress-spacing" />
 
         <div className="cotizando-modal__list">
           {COMPANIAS.map((compania) => {
