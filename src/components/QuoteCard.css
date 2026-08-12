@@ -1,18 +1,61 @@
+/* border-left-color se pisa inline por tarjeta (accentForCompania) — mismo criterio de
+   color por compañía que el paso 3 "Confirmar" (ver companyColors.js), pero más fina
+   (2px vs. 4px) y con el borde redondeado en vez de a filo recto.
+   A pedido, estética tipo mockup: layout VERTICAL (columna) en vez de las 3 columnas
+   lado a lado de antes — con 3 tarjetas por renglón (ver .opp-detail__quotes, ahora CSS
+   Grid en vez de "columns") no entraba ancho para eso; ver .quote-card__header más
+   abajo para cómo quedan título/deducible y COSTO TOTAL en la misma fila de arriba. */
 .quote-card {
-  display: grid;
-  grid-template-columns: 1.6fr 1.2fr 0.9fr;
-  gap: 16px;
-  align-items: start;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
   padding: 16px 20px;
   border: 1px solid #e6e9ef;
+  border-left-width: 2px;
   border-radius: 8px;
-  margin-bottom: 12px;
   background: #fff;
 }
 
+.quote-card__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.quote-card__header-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.quote-card__deducible-line {
+  font-size: 12px;
+  color: #676879;
+}
+
+@media (max-width: 480px) {
+  .quote-card__header {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+  }
+
+  .quote-card__total {
+    align-items: flex-start;
+    text-align: left;
+  }
+}
+
+/* Antes un box-shadow inset de 1px alrededor de toda la tarjeta marcaba la selección
+   — se superponía con la línea de color de compañía (border-left, ver más arriba) y
+   quedaban 2 líneas apretadas una al lado de la otra en el borde izquierdo. El
+   border-left-color sigue siendo el de la compañía (viene inline, gana sobre este
+   border-color); acá solo se resaltan los otros 3 lados + un tinte de fondo. */
 .quote-card--selected {
   border-color: #0073ea;
-  box-shadow: 0 0 0 1px #0073ea inset;
+  background: #f7fbff;
 }
 
 .quote-card--blocked {
@@ -30,21 +73,34 @@
   font-size: 13px;
 }
 
+/* Sin "row-gap" (a pedido) — con flex-wrap, "gap" se aplicaba también como espacio
+   VERTICAL entre líneas cuando el renglón envolvía (ej. tarjetas con el tag "Parámetros
+   propios", más largo), y eso hacía esa tarjeta más alta que sus vecinas, rompiendo la
+   alineación pareja de alturas entre tarjetas. column-gap mantiene el espaciado
+   horizontal entre radio/compañía/título en la misma línea. */
 .quote-card__title-row {
   display: flex;
   align-items: center;
-  gap: 10px;
-  margin-bottom: 10px;
+  flex-wrap: wrap;
+  column-gap: 10px;
 }
 
+/* Sin acordeón por compañía (ver .opp-detail__quotes), la compañía de cada
+   cotización se muestra acá adentro de la tarjeta en vez de en un encabezado
+   de grupo aparte. */
+.quote-card__company {
+  font-size: 10px;
+  font-weight: 700;
+  background: #f6f7fb;
+  border-radius: 10px;
+  padding: 2px 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+/* IconButton (@vibe/core) ya pone el reset de botón/cursor/padding — acá
+   solo queda el color del ícono según seleccionado o no. */
 .quote-card__radio {
-  display: inline-flex;
-  border: none;
-  background: none;
-  cursor: pointer;
-  padding: 0;
-  flex-shrink: 0;
-  font-size: 20px;
   color: #c3c6d4;
 }
 
@@ -58,39 +114,33 @@
   font-size: 14px;
 }
 
-.quote-card__custom-tag {
-  font-size: 10px;
-  font-weight: 700;
-  color: #9d50dd;
-  background: #f5ebfd;
-  border-radius: 10px;
-  padding: 2px 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
-
-.quote-card__meta {
+/* Versión corta de la advertencia (ver quote.warning.short) — a pedido, compacta (una
+   línea, sin caja/padding grande) para que la tarjeta no quede más alta que una sin
+   advertencia. La versión completa sigue siendo la caja grande (.quote-card__warning),
+   pero recién adentro de "Parámetros". min-height (no el contenido) es lo que reserva
+   el lugar — el div se renderiza siempre, con o sin advertencia (ver JSX), así todas
+   las tarjetas de un mismo renglón miden lo mismo. */
+.quote-card__meta-warning {
   display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
-}
-
-.quote-card__meta-label {
-  color: #676879;
-  margin-right: 6px;
-}
-
-.quote-card__meta-value {
-  color: #323338;
+  align-items: center;
+  gap: 4px;
+  min-height: 17px;
+  color: #a15c00;
   font-weight: 600;
 }
 
+.quote-card__meta-warning svg {
+  flex-shrink: 0;
+  font-size: 14px;
+}
+
+/* La promo "N cuotas SIN RECARGO" ahora va DEBAJO de la tabla (a pedido) — margin-top en
+   vez de margin-bottom. */
 .quote-card__cuotas-label {
   display: block;
   font-size: 12px;
   color: #676879;
-  margin-bottom: 6px;
+  margin-top: 8px;
 }
 
 .quote-card__cuotas-table {
@@ -98,9 +148,35 @@
   font-size: 12px;
 }
 
+/* Encabezado que aclara qué es cada columna (Cuotas/Valor cuota/Recargo, ver JSX) —
+   mismo lenguaje visual que .quote-card__params-subtitle (gris, chico, mayúsculas). */
+.quote-card__cuotas-table th {
+  padding: 0 12px 4px 0;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  color: #9699a6;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
 .quote-card__cuotas-table td {
-  padding: 2px 8px 2px 0;
+  padding: 2px 12px 2px 0;
   color: #323338;
+}
+
+/* A pedido: cuotas (izquierda) y etiquetas (derecha) en 2 columnas, Flexbox — antes
+   cada una era un renglón propio a lo ancho completo de la tarjeta. */
+.quote-card__body {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 16px;
+  width: 100%;
+}
+
+.quote-card__cuotas {
+  flex: 1;
 }
 
 .quote-card__total {
@@ -109,6 +185,7 @@
   align-items: flex-end;
   gap: 6px;
   text-align: right;
+  flex-shrink: 0;
 }
 
 .quote-card__total-label {
@@ -119,11 +196,60 @@
 .quote-card__total-value {
   font-size: 20px;
   font-weight: 700;
-  color: #323338;
+  color: var(--color-verde);
+}
+
+/* Tags de qué parámetros tiene esta cotización puntual — columna propia al lado de la
+   tabla de cuotas (ver .quote-card__body más arriba), apiladas en vertical. flex:1
+   reparte el ancho mitad y mitad con .quote-card__cuotas (la otra columna del mismo
+   body). Cada compañía trae una cantidad distinta de tags (BSE 5, SURA/SANCOR 4, PORTO
+   6 — 3 comunes + sus 3 opcionales propios, ver PORTO_OPCIONALES en QuoteCard.jsx):
+   apiladas en columna, cada tarjeta terminaba con una altura distinta de esta zona y
+   rompía la alineación entre vecinas del mismo renglón. `height` FIJO (no max-height)
+   — con max-height, una tarjeta con menos tags que el techo (ej. SANCOR, 4) mide su
+   alto real (más bajo) mientras una que sí llega al techo (BSE/PORTO) queda recortada
+   justo en el límite: dos alturas reales distintas, aunque las dos respeten el mismo
+   techo. Con height fijo, TODAS miden exactamente lo mismo acá sea cual sea la
+   cantidad de tags — de menos, sobra aire abajo; de más, scrollea adentro de su propia
+   columna en vez de empujar el resto de la tarjeta.
+   Ojo: NO se usa align-items:stretch en .opp-detail__quotes (el grid que contiene estas
+   tarjetas) a propósito — ver el comentario en OpportunityDetail.css: con stretch, abrir
+   "Parámetros"/"Coberturas" en UNA tarjeta estira TODO el renglón a esa altura y las
+   vecinas cerradas quedan con un hueco vacío enorme debajo de sus botones. Achicar la
+   causa puntual (esta columna) es más seguro que volver a prender stretch. */
+.quote-card__override-tags {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  height: 120px;
+  overflow-y: auto;
+}
+
+/* A pedido: todas las etiquetas posibles (Bonificación, Descuento, RC, Deducible/Edad
+   específicos, Opcionales PORTO) siempre visibles — gris mientras no tengan valor
+   cargado, verdes con el valor apenas lo tienen (mismo verde que el resto de la app usa
+   para "completo", ver checklist de CotizarStepPanel.css). */
+.quote-card__tag {
+  align-self: flex-start;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 10px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.quote-card__tag--empty {
+  color: #9699a6;
+  background: #f6f7fb;
+}
+
+.quote-card__tag--active {
+  color: var(--color-verde);
+  background: #e3f4f3;
 }
 
 .quote-card__warning {
-  grid-column: 1 / -1;
   display: flex;
   align-items: center;
   gap: 6px;
@@ -141,41 +267,61 @@
   flex-shrink: 0;
 }
 
-.quote-card__total-actions {
+/* La versión completa (adentro de "Parámetros") necesita separación de lo que viene
+   después ("DATOS FIJOS"), a diferencia de la corta (pegada a la tabla de cuotas). */
+.quote-card__warning--full {
+  margin-bottom: 12px;
+}
+
+/* A pedido, estética tipo mockup: 2 botones de ancho parejo en vez del único "Ver más"
+   de antes — Parámetros/Coberturas, mutuamente excluyentes (ver openPanel en el JSX). */
+.quote-card__actions {
   display: flex;
   gap: 8px;
 }
 
-.quote-card__detail-btn {
-  padding: 6px 10px;
-  font-size: 12px;
+.quote-card__action-btn {
+  flex: 1;
+  justify-content: center;
 }
 
-.quote-card__params-btn--active {
+.quote-card__action-btn--active {
   background: #eef6ff;
   border-color: #0073ea;
   color: #0073ea;
 }
 
 .quote-card__detail {
-  grid-column: 1 / -1;
   border-top: 1px dashed #e6e9ef;
-  margin-top: 8px;
   padding-top: 10px;
-  display: flex;
-  flex-wrap: wrap;
-  gap: 16px;
   font-size: 12px;
   color: #676879;
 }
 
-.quote-card__incluye {
-  flex-basis: 100%;
+.quote-card__detail-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
 }
 
+.quote-card__incluye {
+  margin-top: 10px;
+}
+
+/* En columnas (el navegador decide cuántas entran según el ancho real de la tarjeta)
+   en vez de 1 viñeta por renglón — con compañías que traen 10+ ítems, una sola columna
+   estiraba la tarjeta entera de alto sin necesidad, desaprovechando el ancho de sobra.
+   Solo la lista, no el título "Incluye:", para que ese quede como encabezado a ancho
+   completo en vez de metido dentro de la 1ra columna. */
 .quote-card__incluye ul {
   margin: 6px 0 0;
   padding-left: 18px;
+  columns: 200px;
+  column-gap: 20px;
+}
+
+.quote-card__incluye li {
+  break-inside: avoid;
 }
 
 .quote-card__incluye li {
@@ -183,16 +329,8 @@
 }
 
 .quote-card__params {
-  grid-column: 1 / -1;
   border-top: 1px solid #e6e9ef;
-  margin-top: 8px;
   padding-top: 12px;
-}
-
-.quote-card__params-note {
-  margin: 0 0 10px;
-  font-size: 12px;
-  color: #676879;
 }
 
 .quote-card__params-subtitle {
@@ -202,6 +340,26 @@
   text-transform: uppercase;
   letter-spacing: 0.02em;
   margin-bottom: 8px;
+}
+
+/* "Restablecer" al lado de la grilla de campos ajustables (a pedido) — align-items:
+   flex-end para que quede a la altura de los inputs, no de los labels de arriba. La
+   grilla ya no necesita su propio margin-bottom (ver .quote-card__params-grid), lo da
+   esta fila. */
+.quote-card__params-adjustable-row {
+  display: flex;
+  align-items: flex-end;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+
+.quote-card__params-adjustable-row .quote-card__params-grid {
+  flex: 1;
+  margin-bottom: 0;
+}
+
+.quote-card__reset-btn {
+  flex-shrink: 0;
 }
 
 .quote-card__params-fixed {
@@ -245,32 +403,6 @@
   color: #676879;
 }
 
-.quote-card__params-field input {
-  padding: 6px 8px;
-  border: 1px solid #d0d4e4;
-  border-radius: 6px;
-  font-size: 13px;
-  color: #323338;
-}
+/* NumberField (@vibe/core) ya trae su propio padding/borde/radio — no queda nada que
+   pisar acá (antes esto apuntaba al <input type="number"> a mano). */
 
-.quote-card__params-field select {
-  padding: 6px 26px 6px 8px;
-  background-position: right 8px center;
-}
-
-.quote-card__params-field--checkbox {
-  flex-direction: row;
-  align-items: center;
-  gap: 6px;
-}
-
-.quote-card__params-field--checkbox input {
-  width: auto;
-  padding: 0;
-}
-
-.quote-card__params-actions {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 10px;
-}

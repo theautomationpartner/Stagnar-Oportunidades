@@ -3,3 +3,16 @@
   background: #f6f7fb;
   padding-bottom: 40px;
 }
+
+/* Sidebar.jsx a la izquierda + contenido a la derecha — layout de las 4 vistas de la
+   app (landing, tabla de Oportunidades, crear, detalle de una Oportunidad). */
+.app-shell {
+  display: flex;
+  min-height: 100vh;
+  background: #f6f7fb;
+}
+
+.app-shell__main {
+  flex: 1;
+  min-width: 0;
+}

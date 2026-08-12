@@ -1,9 +1,15 @@
 .cotizar-step {
-  margin: 20px 32px 32px;
+  margin: 20px var(--page-gutter) 32px;
   padding: 20px 24px;
   background: #fff;
   border: 1px solid #e6e9ef;
   border-radius: 10px;
+}
+
+@media (max-width: 640px) {
+  .cotizar-step {
+    padding: 16px;
+  }
 }
 
 .cotizar-step__head {
@@ -20,12 +26,6 @@
   margin: 0 0 4px;
 }
 
-.cotizar-step__subtitle {
-  font-size: 13px;
-  color: #676879;
-  margin: 0 0 12px;
-}
-
 .cotizar-step__estado {
   display: flex;
   align-items: center;
@@ -36,20 +36,263 @@
   margin-bottom: 8px;
 }
 
-.cotizar-step__grid {
+/* A pedido, estética tipo mockup: ficha del cliente (izquierda) + checklist de datos
+   mínimos para cotizar (derecha) — mismo criterio de 2 columnas que ya usa
+   CrearOportunidadForm.css (.crear-op__step1-layout) para lo mismo. */
+.cotizar-step__top-grid {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 18px;
+  grid-template-columns: 1fr 1fr;
+  gap: 20px;
+  align-items: start;
   margin-bottom: 24px;
 }
 
-.cotizar-step__field {
+@media (max-width: 720px) {
+  .cotizar-step__top-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Mismo lenguaje visual que .crear-op__ficha (CrearOportunidadForm.css) — nombre
+   grande, ubicación con ícono, badges con los datos secundarios. Clase propia (no esa)
+   para no depender de que ese CSS esté cargado en esta pantalla. */
+.cotizar-step__ficha {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px;
+  background: #f6f7fb;
+  border: 1px solid #e6e9ef;
+  border-radius: 10px;
+}
+
+.cotizar-step__ficha-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.cotizar-step__ficha-identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* Mismo círculo que .opp-detail__client-avatar (OpportunityDetail.css) — clase propia
+   para no depender de ese CSS. */
+.cotizar-step__ficha-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #0073ea;
+  color: #fff;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.cotizar-step__ficha-heading {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  padding: 12px 14px;
-  background: #f6f7fb;
-  border-radius: 8px;
+  min-width: 0;
+}
+
+.cotizar-step__ficha-name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #323338;
+  margin: 0;
+}
+
+.cotizar-step__ficha-address {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #676879;
+}
+
+.cotizar-step__ficha-address svg {
+  flex-shrink: 0;
+  font-size: 16px;
+  color: #0073ea;
+}
+
+.cotizar-step__ficha-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.cotizar-step__ficha-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: #fff;
+  border: 1px solid #e6e9ef;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #323338;
+}
+
+.cotizar-step__ficha-badge svg {
+  font-size: 14px;
+  color: #676879;
+}
+
+/* A pedido: el vehículo también en la ficha (antes solo vivía en el checklist de la
+   derecha, ahí solo importa si cada dato está o no) — separado de los badges por una
+   línea fina, mismo criterio visual que .crear-op__lectura-summary
+   (CrearOportunidadForm.css) para el mismo tipo de resumen. */
+.cotizar-step__ficha-vehiculo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 12px;
+  border-top: 1px solid #e6e9ef;
+}
+
+.cotizar-step__ficha-vehiculo-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #9699a6;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.cotizar-step__ficha-vehiculo-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #323338;
+}
+
+.cotizar-step__ficha-vehiculo-meta {
+  font-size: 12px;
+  color: #676879;
+}
+
+/* Checklist de los 9 datos mínimos que la automatización de "Cotizar" necesita
+   completos — mismo criterio de color que el resto de la app (verde = completo,
+   ámbar = falta, ver FileUploadField.css). */
+.cotizar-step__checklist {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 18px 20px;
+  background: #fff;
+  border: 1px solid #e6e9ef;
+  border-radius: 10px;
+}
+
+.cotizar-step__checklist-title {
+  font-size: 13px;
+  font-weight: 700;
+  color: #323338;
+  margin: 0;
+}
+
+.cotizar-step__checklist-items {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* A pedido: aviso de "todo completo" pegado al checklist que describe, no suelto más
+   abajo compitiendo con el resto de la pantalla. */
+.cotizar-step__checklist-attention {
+  margin-top: 4px;
+}
+
+.cotizar-step__checklist-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.cotizar-step__checklist-item svg {
+  flex-shrink: 0;
+  font-size: 16px;
+}
+
+.cotizar-step__checklist-item--ok svg {
+  color: var(--color-verde);
+}
+
+.cotizar-step__checklist-item--missing svg {
+  color: #a15c00;
+}
+
+.cotizar-step__checklist-item--missing {
+  color: #a15c00;
+}
+
+.cotizar-step__checklist-label {
+  color: #676879;
+  flex-shrink: 0;
+}
+
+.cotizar-step__checklist-item--missing .cotizar-step__checklist-label {
+  color: inherit;
+}
+
+.cotizar-step__checklist-value {
+  margin-left: auto;
+  font-weight: 700;
+  color: #323338;
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.cotizar-step__checklist-item--missing .cotizar-step__checklist-value {
+  color: inherit;
+  font-weight: 600;
+}
+
+/* A pedido: grilla de 6 columnas iguales para poder agrupar campos de a 2 (span 3),
+   de a 3 (span 2, Combustible/Tipo/Uso) o dejar uno solo a lo ancho completo (span 6,
+   Modelo) — ver EDIT_FIELD_LAYOUT en el JSX, que define el span de cada campo. */
+.cotizar-step__grid {
+  display: grid;
+  grid-template-columns: repeat(6, 1fr);
+  gap: 18px 20px;
+  margin-bottom: 8px;
+}
+
+@media (max-width: 640px) {
+  .cotizar-step__grid {
+    grid-template-columns: 1fr;
+  }
+
+  /* El span inline (JSX) tiene más especificidad que una regla de clase — hace falta
+     !important acá para que en mobile todos los campos pasen a ocupar el renglón
+     entero sin importar cuánto span traían. */
+  .cotizar-step__field--edit {
+    grid-column: 1 / -1 !important;
+  }
+}
+
+/* A pedido: mismo estilo de campo que el popup "Editar Cliente/Lead" de Agregar
+   Oportunidad (.crear-op__field) — label chico arriba, control simple debajo, sin la
+   tarjeta con fondo/borde propio que tenía antes (competía visualmente con el borde
+   nativo de cada Dropdown/TextField/NumberField de @vibe/core). min-width:0 evita que
+   un valor largo sin espacios (ej. un modelo de Autodata) empuje la columna y
+   desborde la grilla — eso rompía el layout antes.
+   */
+.cotizar-step__field {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
 }
 
 .cotizar-step__field-label {
@@ -60,142 +303,105 @@
   letter-spacing: 0.02em;
 }
 
-.cotizar-step__field-value {
-  font-size: 14px;
-  font-weight: 600;
-  color: #323338;
-}
-
-.cotizar-step__field--edit {
-  background: #fff;
-  border: 1px solid #d0d4e4;
-}
-
 .cotizar-step__field--edit input {
+  width: 100%;
   border: 1px solid #d0d4e4;
-  border-radius: 6px;
-  padding: 7px 8px;
-  font-size: 13px;
+  border-radius: 8px;
+  padding: 10px 12px;
+  font-size: 14px;
   color: #323338;
   background: #fff;
 }
 
-.cotizar-step__edit-actions {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 20px;
+/* Popup "Editar información" (ver JSX) — mismo padding/tipografía que el resto de los
+   ModalContent de la app (ej. .crear-op__editar-contacto-content en
+   CrearOportunidadForm.css). */
+.cotizar-step__editar-content {
+  padding: 28px 32px 8px;
 }
 
-.cotizar-step__banner {
+.cotizar-step__editar-title {
+  font-size: 17px;
+  font-weight: 700;
+  color: #323338;
+  margin: 0 0 20px;
+}
+
+@media (max-width: 480px) {
+  .cotizar-step__head {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
+
+/* A pedido, rediseño: "cotizaciones cargadas" deja de ser un AttentionBox tipo alerta
+   (nada anda mal acá, es un estado esperable) — tarjeta blanca con acento verde a la
+   izquierda, mismo lenguaje que .crear-op__lectura-summary (CrearOportunidadForm.css)
+   para el mismo tipo de "esto ya está resuelto, con una acción al lado". */
+.cotizar-step__quotes-ready {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 16px;
+  padding: 16px 20px;
+  background: #fff;
+  border: 1px solid #e6e9ef;
+  border-left: 3px solid #00c875;
   border-radius: 8px;
-  padding: 14px 18px;
-  font-size: 13px;
 }
 
-.cotizar-step__banner--ok {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  background: #e6f9f1;
-  color: #037f4c;
-  font-weight: 600;
-}
-
-.cotizar-step__banner--ok > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.cotizar-step__banner--ok svg {
-  font-size: 18px;
-  flex-shrink: 0;
-}
-
-.cotizar-step__banner--missing {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  background: #fdf1f2;
-  border: 1px solid #f7c6cc;
-  color: #cc2e49;
-  font-weight: 600;
-  margin-bottom: 16px;
-}
-
-.cotizar-step__banner--missing svg {
-  font-size: 18px;
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-
-.cotizar-step__banner--pending {
-  background: #fff7f0;
-  border: 1px solid #fde3c4;
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  color: #a15c00;
-}
-
-.cotizar-step__banner--pending p {
-  margin: 0;
-  font-weight: 600;
-}
-
-.cotizar-step__banner--warning {
-  background: #fdf1f2;
-  border: 1px solid #f7c6cc;
-  color: #cc2e49;
-}
-
-.cotizar-step__banner--warning p {
-  margin: 0 0 14px;
-  font-weight: 600;
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-}
-
-.cotizar-step__banner--warning svg {
-  font-size: 18px;
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-
-.cotizar-step__warning-actions {
+.cotizar-step__quotes-ready-info {
   display: flex;
   align-items: center;
   gap: 12px;
+  min-width: 0;
 }
 
-.cotizar-step__banner--polling {
+.cotizar-step__quotes-ready-icon {
+  flex-shrink: 0;
+  font-size: 22px;
+  color: #00c875;
+}
+
+.cotizar-step__quotes-ready-text {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.cotizar-step__quotes-ready-text strong {
+  font-size: 14px;
+  color: #323338;
+}
+
+.cotizar-step__quotes-ready-text span {
+  font-size: 13px;
+  color: #676879;
+}
+
+.cotizar-step__quotes-ready-actions {
   display: flex;
   align-items: center;
   gap: 10px;
-  background: #fff7e8;
-  border: 1px solid #fde3c4;
-  color: #a15c00;
-  font-weight: 600;
-}
-
-.cotizar-step__spinner {
-  width: 16px;
-  height: 16px;
-  border-radius: 50%;
-  border: 2px solid #fde3c4;
-  border-top-color: #a15c00;
   flex-shrink: 0;
-  animation: cotizar-step-spin 0.8s linear infinite;
 }
 
-@keyframes cotizar-step-spin {
-  to {
-    transform: rotate(360deg);
+@media (max-width: 480px) {
+  .cotizar-step__quotes-ready-actions {
+    width: 100%;
   }
+
+  .cotizar-step__quotes-ready-actions > * {
+    flex: 1;
+  }
+}
+
+/* Loader nativo de @vibe/core (ver JSX) — a pedido, todo loading usa el verde de marca
+   (--color-verde, ver index.css). */
+.cotizar-step__spinner {
+  color: var(--color-verde);
+  flex-shrink: 0;
 }
 
 .cotizar-step__error {
@@ -204,26 +410,29 @@
   font-size: 12px;
 }
 
-.cotizar-step__error-detail {
-  background: #fdf1f2;
-  border: 1px solid #f7c6cc;
-  border-radius: 8px;
-  padding: 14px 16px;
-  color: #a41f36;
-  font-size: 12px;
+.cotizar-step__error-detail-spacing {
+  margin-top: 16px;
 }
 
-.cotizar-step__error-detail strong {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 12px;
+/* A pedido, estética tipo mockup: link celeste chico en vez del Button "Editar" de
+   siempre — pega mejor al lado del título de sección en vez de competir en peso visual
+   con él. */
+.cotizar-step__edit-link {
+  color: #0073ea !important;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 !important;
 }
 
-.cotizar-step__error-detail pre {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: inherit;
-  max-height: 220px;
-  overflow-y: auto;
+/* A pedido: "Volver a detalles" se sacó (quedaba duplicado con el breadcrumb) — ahora
+   el footer es solo "Cotizar en aseguradoras", alineado a la derecha, separado del
+   resto por una línea (mismo criterio que el footer de CrearOportunidadForm.css). */
+.cotizar-step__footer {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 12px;
+  margin-top: 20px;
+  padding-top: 20px;
+  border-top: 1px solid #e6e9ef;
 }

@@ -56,6 +56,7 @@ export function mapOpportunityItem(item, statusColors = {}) {
   const estadoColor = statusColors.estadoOportunidad?.[estadoLabel] ?? DEFAULT_COLOR
 
   const ultimaCotizacion = textOf(cv, 'date_mm52w0h8') || textOf(cv, 'date__1') || '—'
+  const recotizaciones = Number(textOf(cv, 'numeric_mm658a9j')) || 0
   const asignado = textOf(cv, 'deal_owner')
 
   const estadoCotizacion = textOf(cv, 'color_mm51n7aa')
@@ -63,6 +64,11 @@ export function mapOpportunityItem(item, statusColors = {}) {
   const tipoSujeto = textOf(cv, 'color_mm51mm5v')
   const estadoEnvio = textOf(cv, 'color_mm4wr1t4')
   const estadoEnvioColor = statusColors.estadoEnvio?.[estadoEnvio] ?? DEFAULT_COLOR
+  const estadoCreacion = textOf(cv, 'color_mm5ejysv')
+  const estadoCreacionColor = statusColors.estadoCreacion?.[estadoCreacion] ?? DEFAULT_COLOR
+  const poseeVehiculo = textOf(cv, 'color_mm51n4j')
+  const estadoLectura = textOf(cv, 'color_mm5rzrhk')
+  const estadoLecturaColor = statusColors.estadoLectura?.[estadoLectura] ?? DEFAULT_COLOR
 
   return {
     id: item.id,
@@ -75,13 +81,13 @@ export function mapOpportunityItem(item, statusColors = {}) {
     modelo,
     combustible,
     uso,
-    tipo: textOf(cv, 'color_mm52vycb'),
+    tipo: textOf(cv, 'dropdown_mm5jqdk'),
     edad: textOf(cv, 'numeric_mm527wpm'),
     fechaNacimiento: textOf(cv, 'date_mm516agw'),
     departamento: boardRelationDisplayOf(cv, 'board_relation_mm54tq30'),
-    zonaCirculacion: textOf(cv, 'location_mm51e7g7'),
+    zonaCirculacion: boardRelationDisplayOf(cv, 'board_relation_mm5sqf8t'),
     libretaConducir: textOf(cv, 'file_mm51jy06'),
-    cartaAutomovil: textOf(cv, 'file_mm51xnxq'),
+    cedula: textOf(cv, 'file_mm5pc008'),
     poliza: textOf(cv, 'file_mm5bzdd4'),
     bienLinea1,
     bienLinea2: bienLinea2 || (coberturas.length ? coberturas.join(' / ') : ''),
@@ -93,7 +99,13 @@ export function mapOpportunityItem(item, statusColors = {}) {
     tipoSujeto,
     estadoEnvio,
     estadoEnvioColor,
+    estadoCreacion,
+    estadoCreacionColor,
+    poseeVehiculo,
+    estadoLectura,
+    estadoLecturaColor,
     ultimaCotizacion,
+    recotizaciones,
     asignado,
     asignadoIniciales: initialsOf(asignado),
   }

@@ -1,23 +1,28 @@
 import { useEffect, useMemo, useState } from 'react'
-import TopBar from './components/TopBar'
+import Sidebar from './components/Sidebar'
 import PageHeader from './components/PageHeader'
 import FilterPanel from './components/FilterPanel'
 import OpportunitiesTable from './components/OpportunitiesTable'
 import OpportunityDetail from './components/OpportunityDetail'
-import { fetchOpportunities, fetchDepartamentos } from './services/mondayApi'
+import LandingScreen from './components/LandingScreen'
+import CrearOportunidadForm from './components/CrearOportunidadForm'
+import { fetchOpportunities, fetchDepartamentos, fetchLocalidades } from './services/mondayApi'
 import { mapOpportunities } from './services/opportunityMapper'
 import { fetchFilterAndStatusSchema } from './services/boardSchema'
 import { fetchPanelData } from './services/recargoPanel'
 import './App.css'
 
-const ITEMS_LIMIT = 10
+// Techo real de la API de monday para items_page en una sola página (ver
+// fetchOpportunities en mondayApi.js) — con esto se trae el tablero completo de una,
+// nada de "solo los primeros 10" (los filtros/búsqueda de FilterPanel son client-side
+// sobre lo ya cargado, así que si no está cargado no aparece por más que matchee).
+const ITEMS_FETCH_LIMIT = 500
 
+// A pedido: Marca/Año/Nombre/CI/Teléfono ya no tienen filtro propio (ver
+// FilterPanel.jsx) — quedan cubiertos por la única barra de búsqueda de texto libre
+// (ver el haystack en filteredOpportunities más abajo). Solo quedan acá los 3 "filtros
+// básicos" que un texto libre no puede resolver por ser estados/categorías.
 const EMPTY_FILTERS = {
-  marca: '',
-  anio: '',
-  nombre: '',
-  ci: '',
-  telefono: '',
   estadoCotizacion: '',
   tipoSujeto: '',
   estadoEnvio: '',
@@ -25,25 +30,33 @@ const EMPTY_FILTERS = {
 
 export default function App() {
   const [opportunities, setOpportunities] = useState([])
+  const [boardTotalCount, setBoardTotalCount] = useState(0)
   const [schema, setSchema] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [openOpportunityId, setOpenOpportunityId] = useState(null)
+  // Pantalla previa a la tabla: elegir entre crear una oportunidad nueva o ver las ya
+  // existentes. 'landing' | 'table' | 'create' — se puede ir de una a otra directo,
+  // sin pasar necesariamente por 'landing' de nuevo (botón "Nueva oportunidad" en la
+  // tabla, y "Ver oportunidades existentes" desde el formulario de creación).
+  const [view, setView] = useState('landing')
 
   useEffect(() => {
     let cancelled = false
 
     Promise.all([
-      fetchOpportunities(ITEMS_LIMIT),
+      fetchOpportunities(ITEMS_FETCH_LIMIT),
       fetchFilterAndStatusSchema(),
       fetchDepartamentos(),
+      fetchLocalidades(),
       fetchPanelData(),
     ])
-      .then(([items, fetchedSchema, departamentos, panelData]) => {
+      .then(([{ items, totalCount }, fetchedSchema, departamentos, localidades, panelData]) => {
         if (cancelled) return
-        setSchema({ ...fetchedSchema, departamentos, ...panelData })
+        setSchema({ ...fetchedSchema, departamentos, localidades, ...panelData })
+        setBoardTotalCount(totalCount)
         setOpportunities(
           mapOpportunities(items, {
             estadoOportunidad: fetchedSchema.estadoOportunidad.colorsByLabel,
@@ -67,8 +80,6 @@ export default function App() {
 
   const filterOptions = useMemo(
     () => ({
-      marcas: schema?.marcas ?? [],
-      anios: schema?.anios ?? [],
       estadosCotizacion: schema?.estadoCotizacion.options ?? [],
       tiposSujeto: schema?.tipoSujeto.options ?? [],
       estadosEnvio: schema?.estadoEnvio.options ?? [],
@@ -85,23 +96,26 @@ export default function App() {
 
     return opportunities.filter((opp) => {
       if (term) {
-        const haystack = [opp.clienteNombre, opp.ci, opp.telefono, opp.bienLinea1, opp.companias]
+        // A pedido: "una sola barra de búsqueda para todos los campos posibles" — se
+        // agregan acá marca/año (antes cada uno tenía su propio Dropdown, ver
+        // FilterPanel.jsx) además de lo que ya cubría bienLinea1 (marca+modelo/año).
+        const haystack = [
+          opp.clienteNombre,
+          opp.ci,
+          opp.telefono,
+          opp.bienLinea1,
+          opp.companias,
+          opp.marca,
+          opp.anio,
+        ]
           .join(' ')
           .toLowerCase()
         if (!haystack.includes(term)) return false
       }
 
-      if (filters.marca && opp.marca !== filters.marca) return false
-      if (filters.anio && opp.anio !== filters.anio) return false
       if (filters.estadoCotizacion && opp.estadoCotizacion !== filters.estadoCotizacion) return false
       if (filters.tipoSujeto && opp.tipoSujeto !== filters.tipoSujeto) return false
       if (filters.estadoEnvio && opp.estadoEnvio !== filters.estadoEnvio) return false
-
-      if (filters.nombre && !opp.clienteNombre.toLowerCase().includes(filters.nombre.toLowerCase())) {
-        return false
-      }
-      if (filters.ci && !opp.ci.includes(filters.ci)) return false
-      if (filters.telefono && !opp.telefono.includes(filters.telefono)) return false
 
       return true
     })
@@ -109,35 +123,95 @@ export default function App() {
 
   if (openOpportunityId) {
     return (
-      <OpportunityDetail
-        opportunityId={openOpportunityId}
-        onBack={() => setOpenOpportunityId(null)}
-        schema={schema}
-      />
+      <div className="app-shell">
+        <Sidebar
+          onNavigateOportunidades={() => {
+            setOpenOpportunityId(null)
+            setView('table')
+          }}
+        />
+        <div className="app-shell__main">
+          <OpportunityDetail
+            opportunityId={openOpportunityId}
+            onBack={() => setOpenOpportunityId(null)}
+            schema={schema}
+          />
+        </div>
+      </div>
+    )
+  }
+
+  if (view === 'landing') {
+    return (
+      <div className="app-shell">
+        <Sidebar
+          defaultExpanded
+          onNavigateOportunidades={() => {
+            setOpenOpportunityId(null)
+            setView('table')
+          }}
+        />
+        <div className="app-shell__main">
+          <LandingScreen onCreateNew={() => setView('create')} onSearchExisting={() => setView('table')} />
+        </div>
+      </div>
+    )
+  }
+
+  if (view === 'create') {
+    return (
+      <div className="app-shell">
+        <Sidebar
+          onNavigateOportunidades={() => {
+            setOpenOpportunityId(null)
+            setView('table')
+          }}
+        />
+        <div className="app-shell__main">
+          <CrearOportunidadForm
+            schema={schema}
+            opportunities={opportunities}
+            onCancel={() => setView('landing')}
+            onVerOportunidades={() => setView('table')}
+            onHome={() => setView('landing')}
+            onOpenOportunidad={setOpenOpportunityId}
+            onCreated={(newItemId) => {
+              setView('table')
+              setOpenOpportunityId(newItemId)
+            }}
+          />
+        </div>
+      </div>
     )
   }
 
   return (
-    <div className="app">
-      <TopBar />
-      <PageHeader />
-      <FilterPanel
-        searchTerm={searchTerm}
-        onSearchTermChange={setSearchTerm}
-        filters={filters}
-        onFilterChange={handleFilterChange}
-        filterOptions={filterOptions}
-        onClear={() => {
-          setSearchTerm('')
-          setFilters(EMPTY_FILTERS)
-        }}
-      />
-      <OpportunitiesTable
-        opportunities={filteredOpportunities}
-        loading={loading}
-        error={error}
-        onOpenOpportunity={setOpenOpportunityId}
-      />
+    <div className="app-shell">
+      <Sidebar />
+      <div className="app-shell__main">
+        <div className="app">
+          <PageHeader onCreateNew={() => setView('create')} onHome={() => setView('landing')} />
+          <FilterPanel
+            searchTerm={searchTerm}
+            onSearchTermChange={setSearchTerm}
+            filters={filters}
+            onFilterChange={handleFilterChange}
+            filterOptions={filterOptions}
+            onClear={() => {
+              setSearchTerm('')
+              setFilters(EMPTY_FILTERS)
+            }}
+          />
+          <OpportunitiesTable
+            opportunities={filteredOpportunities}
+            totalLoaded={opportunities.length}
+            boardTotalCount={boardTotalCount}
+            loading={loading}
+            error={error}
+            onOpenOpportunity={setOpenOpportunityId}
+          />
+        </div>
+      </div>
     </div>
   )
 }

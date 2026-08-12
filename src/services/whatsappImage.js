@@ -5,7 +5,7 @@
 // Devuelve un data URL PNG listo para previsualizar en un <img> o mandar a Make.com.
 // Ver /logica-monday-vibe.md.
 import { formatMoney } from './format'
-import { accentForCompania } from './companyColors'
+import { BRAND_COLORS, brandMarkerForCompania } from './companyColors'
 
 const WIDTH = 900
 const CUOTA_COUNTS = [3, 6, 8, 10]
@@ -43,15 +43,27 @@ function wrapText(ctx, text, x, y, maxWidth, lineHeight) {
   return drawWrappedLines(ctx, wrapLines(ctx, text, maxWidth), x, y, lineHeight)
 }
 
+// Canvas roundRect no es soportado en todos los navegadores por igual (Safari lo suma
+// recién en 16.4) — path manual para no depender de eso.
+function roundedRectPath(ctx, x, y, width, height, radius) {
+  ctx.beginPath()
+  ctx.moveTo(x + radius, y)
+  ctx.arcTo(x + width, y, x + width, y + height, radius)
+  ctx.arcTo(x + width, y + height, x, y + height, radius)
+  ctx.arcTo(x, y + height, x, y, radius)
+  ctx.arcTo(x, y, x + width, y, radius)
+  ctx.closePath()
+}
+
 function drawIncluye(ctx, incluye, y) {
   ctx.textAlign = 'left'
-  ctx.fillStyle = '#676879'
+  ctx.fillStyle = BRAND_COLORS.gris
   ctx.font = 'bold 18px Arial'
   ctx.fillText('INCLUYE', 50, y)
   y += 30
 
   ctx.font = INCLUYE_FONT
-  ctx.fillStyle = '#333333'
+  ctx.fillStyle = BRAND_COLORS.negro
   const maxWidth = WIDTH - 100 - INCLUYE_BULLET_INDENT
   for (const item of incluye) {
     ctx.fillText('•', 50, y)
@@ -74,42 +86,61 @@ const MEASURE_CANVAS_HEIGHT = 3000
 // a esto una vez sobre un canvas descartable bien alto para medir hasta dónde llega el
 // contenido, y una segunda vez sobre el canvas real con el alto ya ajustado.
 function drawContent(ctx, opportunity, raw, quote, canvasHeight) {
-  const accent = accentForCompania(raw.compania)
+  // A pedido: la imagen usa 100% los colores del manual de marca (ver BRAND_COLORS) en
+  // vez de un color libre por compañía — el verde es siempre el de encabezado/acento
+  // principal; la compañía se marca con un detalle sutil (ver "pill" más abajo), no
+  // tiñendo toda la tarjeta de un color distinto por compañía.
+  const marker = brandMarkerForCompania(raw.compania)
+  const markerTextColor = marker === BRAND_COLORS.crema ? BRAND_COLORS.negro : BRAND_COLORS.blanco
 
   // Fondo
-  ctx.fillStyle = '#ffffff'
+  ctx.fillStyle = BRAND_COLORS.blanco
   ctx.fillRect(0, 0, WIDTH, canvasHeight)
 
   // Header de marca
-  ctx.fillStyle = accent
+  ctx.fillStyle = BRAND_COLORS.verde
   ctx.fillRect(0, 0, WIDTH, 100)
-  ctx.fillStyle = '#ffffff'
+  ctx.fillStyle = BRAND_COLORS.blanco
   ctx.font = 'bold 34px Arial'
   ctx.textAlign = 'center'
   ctx.fillText('STAGNARI SEGUROS', WIDTH / 2, 62)
 
-  let y = 160
+  let y = 150
   ctx.textAlign = 'left'
 
-  // Compañía · Cobertura
-  ctx.fillStyle = accent
-  ctx.font = 'bold 32px Arial'
-  ctx.fillText(`${raw.compania} · ${raw.cobertura || raw.name}`, 50, y)
-  y += 55
+  // Compañía (pill sutil, color de marca por compañía) + Cobertura (negro, sin acento)
+  const companyLabel = raw.compania || ''
+  ctx.font = 'bold 16px Arial'
+  const pillPaddingX = 14
+  const pillHeight = 32
+  const pillWidth = companyLabel ? ctx.measureText(companyLabel).width + pillPaddingX * 2 : 0
+  if (companyLabel) {
+    roundedRectPath(ctx, 50, y, pillWidth, pillHeight, pillHeight / 2)
+    ctx.fillStyle = marker
+    ctx.fill()
+    ctx.fillStyle = markerTextColor
+    ctx.textAlign = 'center'
+    ctx.fillText(companyLabel, 50 + pillWidth / 2, y + pillHeight / 2 + 5)
+    ctx.textAlign = 'left'
+  }
+  ctx.fillStyle = BRAND_COLORS.negro
+  ctx.font = 'bold 28px Arial'
+  ctx.fillText(raw.cobertura || raw.name, 50 + pillWidth + (companyLabel ? 14 : 0), y + pillHeight - 6)
+  y += pillHeight + 34
 
   // Vehículo
-  ctx.fillStyle = '#222222'
+  ctx.fillStyle = BRAND_COLORS.negro
   ctx.font = 'bold 26px Arial'
   y = wrapText(ctx, opportunity.bienLinea1, 50, y, WIDTH - 100, 32) + 6
   ctx.font = '20px Arial'
-  ctx.fillStyle = '#555555'
+  ctx.fillStyle = BRAND_COLORS.gris
   ctx.fillText(`Año: ${raw.anioVehiculo || opportunity.anio || '—'}`, 50, y)
   y += 45
 
-  // Circulación / Uso / RC
+  // Localidad / Uso / RC
   ctx.font = '20px Arial'
-  ctx.fillStyle = '#333333'
-  ctx.fillText(`Circulación: ${opportunity.zonaCirculacion || opportunity.departamento || '—'}`, 50, y)
+  ctx.fillStyle = BRAND_COLORS.gris
+  ctx.fillText(`Localidad: ${opportunity.zonaCirculacion || opportunity.departamento || '—'}`, 50, y)
   y += 32
   ctx.fillText(`Uso: ${raw.uso || '—'}      RC: ${quote.rc || '—'}`, 50, y)
   y += 32
@@ -117,7 +148,7 @@ function drawContent(ctx, opportunity, raw, quote, canvasHeight) {
   y += 50
 
   // Línea separadora
-  ctx.strokeStyle = '#e6e9ef'
+  ctx.strokeStyle = `${BRAND_COLORS.gris}40`
   ctx.lineWidth = 2
   ctx.beginPath()
   ctx.moveTo(50, y)
@@ -127,11 +158,11 @@ function drawContent(ctx, opportunity, raw, quote, canvasHeight) {
 
   // Costo total
   ctx.textAlign = 'center'
-  ctx.fillStyle = '#676879'
+  ctx.fillStyle = BRAND_COLORS.gris
   ctx.font = '20px Arial'
   ctx.fillText('COSTO TOTAL', WIDTH / 2, y)
   y += 55
-  ctx.fillStyle = '#222222'
+  ctx.fillStyle = BRAND_COLORS.negro
   ctx.font = 'bold 58px Arial'
   ctx.fillText(formatMoney(quote.total), WIDTH / 2, y)
   y += 50
@@ -139,9 +170,9 @@ function drawContent(ctx, opportunity, raw, quote, canvasHeight) {
   // Promo cuotas sin recargo
   if (quote.promo) {
     const boxHeight = 60
-    ctx.fillStyle = `${accent}1a`
+    ctx.fillStyle = `${BRAND_COLORS.verde}1a`
     ctx.fillRect(50, y, WIDTH - 100, boxHeight)
-    ctx.fillStyle = accent
+    ctx.fillStyle = BRAND_COLORS.verde
     ctx.font = 'bold 22px Arial'
     ctx.fillText(
       `➜ ${quote.promo.count} cuotas SIN RECARGO de ${formatMoney(quote.promo.valor)} c/u`,
@@ -158,13 +189,13 @@ function drawContent(ctx, opportunity, raw, quote, canvasHeight) {
   const col1 = 90
   const col2 = WIDTH / 2 - 40
   const col3 = WIDTH - 260
-  ctx.fillStyle = '#676879'
+  ctx.fillStyle = BRAND_COLORS.gris
   ctx.font = 'bold 18px Arial'
   ctx.fillText('CUOTAS', col1, y)
   ctx.fillText('POR CUOTA', col2, y)
   ctx.fillText('TOTAL', col3, y)
   y += 12
-  ctx.strokeStyle = '#e6e9ef'
+  ctx.strokeStyle = `${BRAND_COLORS.gris}40`
   ctx.beginPath()
   ctx.moveTo(50, y)
   ctx.lineTo(WIDTH - 50, y)
@@ -173,7 +204,7 @@ function drawContent(ctx, opportunity, raw, quote, canvasHeight) {
 
   ctx.font = '22px Arial'
   for (const n of CUOTA_COUNTS) {
-    ctx.fillStyle = '#222222'
+    ctx.fillStyle = BRAND_COLORS.negro
     ctx.fillText(`${n}x`, col1, y)
     ctx.fillText(formatMoney(quote.cuotas[n].valor), col2, y)
     ctx.fillText(formatMoney(quote.cuotas[n].total), col3, y)
@@ -188,11 +219,13 @@ function drawContent(ctx, opportunity, raw, quote, canvasHeight) {
   if (quote.warning) {
     y += 20
     ctx.font = 'bold 16px Arial'
-    const warnLines = wrapLines(ctx, `⚠ ${quote.warning}`, WIDTH - 140)
+    // La versión completa (con compañía + requisito puntual) — la corta es solo para la
+    // tarjeta de la app antes de desplegar "Ver más", acá conviene el detalle entero.
+    const warnLines = wrapLines(ctx, `⚠ ${quote.warning.full}`, WIDTH - 140)
     const warnHeight = 20 + warnLines.length * 22 + 16
-    ctx.fillStyle = '#fff7f0'
+    ctx.fillStyle = BRAND_COLORS.crema
     ctx.fillRect(50, y, WIDTH - 100, warnHeight)
-    ctx.fillStyle = '#a15c00'
+    ctx.fillStyle = BRAND_COLORS.negro
     ctx.textAlign = 'center'
     drawWrappedLines(ctx, warnLines, WIDTH / 2, y + 28, 22)
     ctx.textAlign = 'left'
@@ -222,7 +255,7 @@ export function renderQuoteImageDataUrl(opportunity, raw, quote) {
   drawContent(ctx, opportunity, raw, quote, height)
 
   ctx.textAlign = 'center'
-  ctx.fillStyle = '#9699a6'
+  ctx.fillStyle = BRAND_COLORS.gris
   ctx.font = '14px Arial'
   ctx.fillText(
     `Cotización generada el ${new Date().toLocaleDateString('es-UY')} · STAGNARI SEGUROS`,

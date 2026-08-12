@@ -2,50 +2,132 @@
   box-sizing: border-box;
 }
 
+/* Margen horizontal de página, reusado por casi todas las secciones (filtros, tabla,
+   pasos de Cotizar/Confirmar/Emitir, header, etc.) — variable en vez de "32px" repetido
+   en cada .css para poder achicarlo una sola vez en el breakpoint de celular en vez de
+   tener que pisarlo archivo por archivo. 640px como corte "celular promedio" (portrait,
+   ~375-430px de ancho real + boclas del navegador) es el mismo breakpoint que ya se
+   venía usando en LandingScreen.css/EmitirStepPanel.css antes de esta pasada. */
+/* Paleta del manual de marca de Stagnari — mismos hex que BRAND_COLORS en
+   services/companyColors.js (usado del lado JS, para el canvas de la imagen de
+   WhatsApp); acá el equivalente en variables CSS para ir vistiendo el resto de la app
+   con estos colores. No hace falta usar los 6 en todos lados — --color-verde es el más
+   característico de la marca, pensado como acento principal. */
+:root {
+  --color-verde: #008581;
+  --color-crema: #fff5de;
+  --color-gris: #818685;
+  --color-verde-complementario: #7bbb8f;
+  --color-blanco: #ffffff;
+  --color-negro: #000000;
+}
+
+/* Tokens de sistema (paleta neutra/estado + radios + sombras) — centralizan los hex
+   sueltos que ya se repetían en cada .css (#323338, #676879, #0073ea, #e2445c, etc.)
+   bajo un solo nombre, para no tener que tocar 10 archivos si alguno cambia. No
+   reemplazan la paleta de marca de arriba (--color-verde sigue siendo el acento
+   principal de Stagnari) — son la base neutra/semántica sobre la que se apoyan
+   botones, cards, badges, etc. */
+/* Jerarquía de color de botones "primary" (Button kind="primary" de @vibe/core, o su
+   equivalente a mano): por defecto el azul de fábrica (--primary-blue) para cualquier
+   CTA de progresión normal; --color-verde (marca) solo para la acción que CIERRA/
+   concluye un flujo (ej. "Concretar Oportunidad" en EmitirStepPanel) o donde el cliente
+   pidió puntualmente ese acento (mockup aprobado); --red solo para acciones
+   destructivas o de "reintentar" sobre un error real (ver .alert-modal__btn--danger).
+   Nada de verde/rojo "porque sí" en un botón nuevo — si no encaja en una de estas 3
+   categorías, va azul. */
+:root {
+  --primary-blue: #0073ea;
+  --primary-blue-hover: #0060c2;
+  --green: #00c875;
+  --green-dark: #037f4c;
+  --red: #e2445c;
+  --yellow: #fdab3d;
+
+  --text-dark: #323338;
+  --text-gray: #676879;
+  --text-muted: #9699a6;
+  --border: #e6e9ef;
+  --bg: #ffffff;
+  --bg-subtle: #f6f7fb;
+
+  --tint-info: #eef6ff;
+  --tint-info-bd: #bcd6f5;
+  --tint-success: #e6f9f1;
+  --tint-success-bd: #bfe6cf;
+  --tint-warning: #fff7e6;
+  --tint-warning-bd: #ffe2b0;
+  --tint-danger: #fdf1f2;
+  --tint-danger-bd: #f7c6cc;
+  --tint-danger-text: #a41f36;
+  --tint-neutral: #f6f7fb;
+  --tint-neutral-bd: #e4e7ee;
+
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
+  --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
+  --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.18);
+}
+
+:root {
+  --page-gutter: 32px;
+}
+
+@media (max-width: 640px) {
+  :root {
+    --page-gutter: 16px;
+  }
+}
+
 body {
   margin: 0;
-  font-family: 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
-  background: #f6f7fb;
+  font-family: 'Inter', 'Segoe UI', Roboto, -apple-system, BlinkMacSystemFont, sans-serif;
+  background: var(--bg-subtle);
 }
 
-/* Estilo único para todos los <select> de la app (filtros, edición del paso 1, params
-   por cotización, etc.) — antes cada uno heredaba solo el look nativo del navegador
-   (sin flecha propia, esquinas rectas). Centralizado acá para no duplicarlo por
-   componente; los estilos por componente solo definen su propio input de texto/número. */
-select {
-  appearance: none;
-  -webkit-appearance: none;
-  -moz-appearance: none;
-  background-color: #fff;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='10' height='6' viewBox='0 0 10 6'%3E%3Cpath d='M1 1l4 4 4-4' fill='none' stroke='%23676879' stroke-width='1.6' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat;
-  background-position: right 10px center;
-  background-size: 10px 6px;
-  border: 1px solid #d0d4e4;
-  border-radius: 8px;
-  padding: 8px 30px 8px 10px;
-  font-size: 13px;
-  font-family: inherit;
-  color: #323338;
-  cursor: pointer;
-  transition: border-color 0.15s ease, box-shadow 0.15s ease;
+/* Los popups de @vibe/core (menú de Dropdown, tooltips, etc.) se portalean a
+   document.body con position:fixed pero sin z-index propio — quedan a merced del
+   orden del DOM y contenido posicionado de la página (ej. filas de tabla con hover)
+   los puede tapar. "monday-style-dialog-content-wrapper" es una clase estable que
+   vibe le pone a todos estos popups (a diferencia de las clases con hash, que
+   cambian entre versiones), así que forzar el z-index acá cubre cualquier
+   Dropdown/tooltip de la app, no solo uno puntual. Por debajo del z-index de Modal
+   (10000) a propósito, para que un modal siga ganando si algún día coexisten. */
+.monday-style-dialog-content-wrapper {
+  z-index: 9999;
 }
 
-select:hover {
-  border-color: #a7b0c4;
+/* AttentionBox (@vibe/core) alinea su ícono ARRIBA (align-self:start) cuando no tiene
+   `title` — en toda la app lo usamos sin título, con textos cortos de 1-2 líneas, así
+   que el ícono queda visiblemente descentrado respecto al texto (a pedido: centrarlo).
+   Selector con el nombre de clase compilado de la librería, no una clase propia — si
+   una actualización de @vibe/core cambia ese hash, esta regla deja de aplicar sin
+   avisar (mismo riesgo ya asumido arriba con monday-style-dialog-content-wrapper, que
+   sí es una clase estable; ver el comentario de esa clase). Mismo selector/especificidad
+   que la regla original (container:not(hasTitle) icon) para ganarle limpio, sin !important. */
+.container_887afa963b:not(.hasTitle_ef9b0b5fb0) .icon_0013d16c97 {
+  align-self: center;
 }
 
-select:focus-visible {
-  outline: none;
-  border-color: #0073ea;
-  box-shadow: 0 0 0 3px rgba(0, 115, 234, 0.15);
-}
-
-select:disabled {
-  cursor: not-allowed;
-  opacity: 0.6;
-}
-
-select::-ms-expand {
-  display: none;
+/* Animación compartida de "aparición" para tildes de éxito (archivo subido, paso
+   completado) — un pop sutil en vez de materializarse de golpe. Global (no scoped a un
+   componente) porque la usan tanto Stepper.css (paso "done") como FileUploadField.css
+   (archivo cargado); cada uno solo aplica `animation: tilde-lento ...` sobre el ícono
+   que corresponda. */
+@keyframes tilde-lento {
+  from {
+    opacity: 0;
+    transform: scale(0.2);
+  }
+  60% {
+    opacity: 1;
+    transform: scale(1.25);
+  }
+  to {
+    opacity: 1;
+    transform: scale(1);
+  }
 }

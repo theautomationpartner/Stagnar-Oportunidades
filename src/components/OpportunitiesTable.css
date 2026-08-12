@@ -1,12 +1,41 @@
 .opps-table-wrap {
-  margin: 20px 32px 32px;
+  margin: 20px var(--page-gutter) 32px;
   border: 1px solid #e6e9ef;
   border-radius: 10px;
   background: #fff;
   overflow: hidden;
 }
 
+/* La Table de @vibe/core es una grilla de columnas fijas (7 acá) pensada para
+   desktop — en vez de reordenarla como lista de tarjetas (cambio grande de
+   estructura, no solo de CSS), en celular se deja scrollear horizontal: mismo
+   patrón que usa monday.com para sus propios tableros en mobile. min-width en el
+   contenido fuerza que las columnas no se aplasten ilegibles, así el scroll
+   realmente aparece en vez de que el navegador intente encajarlas igual. */
+@media (max-width: 900px) {
+  .opps-table-wrap {
+    overflow-x: auto;
+    margin-left: 0;
+    margin-right: 0;
+    border-left: none;
+    border-right: none;
+    border-radius: 0;
+  }
+
+  .opps-table-wrap__head {
+    padding-left: var(--page-gutter);
+    padding-right: var(--page-gutter);
+  }
+
+  .opps-table-wrap > div:last-child {
+    min-width: 760px;
+  }
+}
+
 .opps-table-wrap__head {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
   padding: 16px 20px;
   font-size: 13px;
   font-weight: 600;
@@ -14,55 +43,40 @@
   border-bottom: 1px solid #e6e9ef;
 }
 
-.opps-table__status {
-  padding: 32px 20px;
-  text-align: center;
-  color: #676879;
-  font-size: 14px;
-}
-
-.opps-table__status--error {
-  color: #e2445c;
-}
-
-.opps-table {
-  width: 100%;
-  border-collapse: collapse;
-  font-size: 13px;
-}
-
-.opps-table thead th {
-  text-align: left;
-  font-weight: 600;
-  color: #676879;
+.opps-table-wrap__cap-warning {
   font-size: 12px;
-  padding: 10px 20px;
-  border-bottom: 1px solid #e6e9ef;
-  white-space: nowrap;
+  font-weight: 400;
+  color: #a26718;
 }
 
-.opps-table tbody td {
-  padding: 14px 20px;
-  border-bottom: 1px solid #f0f1f4;
-  color: #323338;
-  vertical-align: middle;
-}
-
-.opps-table tbody tr:last-child td {
-  border-bottom: none;
-}
+/* Table/TableRow/TableCell de @vibe/core renderizan <div>, no <table>/<tr>/
+   <td> — el resto de las reglas de acá abajo apuntan a nuestras clases
+   propias puestas encima (className en TableRow) o a los wrappers internos
+   de cada celda (ClickableCell), no a selectores de tabla HTML. */
 
 .opps-table__row {
   cursor: pointer;
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
 }
 
-.opps-table tbody tr:hover {
-  background: #f8f9fc;
+.opps-table__row:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 10px rgba(15, 27, 60, 0.08);
+  z-index: 1;
+  position: relative;
 }
 
-.opps-table__row:focus-visible {
+.opps-table__row:focus-within {
   outline: 2px solid #0073ea;
   outline-offset: -2px;
+}
+
+.opps-table__clickable-cell {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  padding: 8px 0;
 }
 
 .opps-table__opp {

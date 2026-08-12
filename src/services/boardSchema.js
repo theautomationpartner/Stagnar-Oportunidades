@@ -10,14 +10,17 @@ const STATUS_COLUMNS = {
   estadoCotizacion: 'color_mm51n7aa',
   tipoSujeto: 'color_mm51mm5v',
   estadoEnvio: 'color_mm4wr1t4',
+  estadoCreacion: 'color_mm5ejysv',
+  estadoLectura: 'color_mm5rzrhk',
   uso: 'color_mm52ey1d',
-  tipo: 'color_mm52vycb',
+  tipoRiesgo: 'color_mm5atxav',
 }
 
 const DROPDOWN_COLUMNS = {
   marcas: 'dropdown_mm51ykrd',
   anios: 'dropdown_mm51mdmq',
   combustibles: 'dropdown_mm52jp01',
+  tipo: 'dropdown_mm5jqdk',
 }
 
 // A diferencia de las anteriores, esta vive en el tablero de subitems (Subelementos de
@@ -77,6 +80,7 @@ export async function fetchFilterAndStatusSchema() {
     marcas: parseDropdownColumn(byId[DROPDOWN_COLUMNS.marcas]).sort((a, b) => a.localeCompare(b)),
     anios: parseDropdownColumn(byId[DROPDOWN_COLUMNS.anios]).sort((a, b) => Number(b) - Number(a)),
     combustibles: parseDropdownColumn(byId[DROPDOWN_COLUMNS.combustibles]),
+    tipo: parseDropdownColumn(byId[DROPDOWN_COLUMNS.tipo]),
     rc: parseDropdownColumn(subitemById[SUBITEM_DROPDOWN_COLUMNS.rc]),
   }
 }

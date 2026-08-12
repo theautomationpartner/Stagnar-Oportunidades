@@ -226,11 +226,18 @@ function computeContado(eff) {
 // A diferencia de "computeContado" (que devuelve null cuando no hay fórmula posible),
 // esto detecta condiciones que SÍ tienen un número calculable pero no cumplen un
 // requisito del negocio — se muestra igual la cotización, con una advertencia.
+// {short, full}: "short" es lo que se ve siempre en la tarjeta (a nivel cotización, sin
+// desplegar nada); "full" es la versión con el detalle completo (compañía, requisito
+// puntual), que recién se muestra al desplegar "Ver más" — y la que se manda en la
+// imagen de WhatsApp (ver whatsappImage.js), donde sí conviene el detalle completo.
 function computeWarning(eff) {
   if (eff.compania === 'SANCOR' && SANCOR_STANDARD_FAMILY.includes(eff.cobertura)) {
     const edad = num(eff.edad)
     if (edad > 0 && edad < 25) {
-      return 'Edad del titular no cumple el mínimo requerido por SANCOR (25 años). Cotización orientativa.'
+      return {
+        short: 'Edad del titular no cumple el mínimo requerido',
+        full: 'Edad del titular no cumple el mínimo requerido por SANCOR (25 años). Cotización orientativa.',
+      }
     }
   }
   return null

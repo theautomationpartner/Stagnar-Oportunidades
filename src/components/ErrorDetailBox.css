@@ -1,0 +1,23 @@
+.error-detail-box {
+  background: var(--tint-danger);
+  border: 1px solid var(--tint-danger-bd);
+  border-radius: var(--radius-md);
+  padding: 14px 16px;
+  color: var(--tint-danger-text);
+  font-size: 12px;
+}
+
+.error-detail-box strong {
+  display: block;
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.error-detail-box pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: inherit;
+  font-size: 13px;
+  line-height: 2;
+}

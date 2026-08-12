@@ -1,0 +1,9 @@
+.gradient-spinner {
+  animation: gradient-spinner-spin 1s linear infinite;
+}
+
+@keyframes gradient-spinner-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}

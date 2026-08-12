@@ -9,7 +9,6 @@ así que siempre es esa URL. Si algo más está usando el puerto 5173, el servid
 fallar en vez de arrancar en otro puerto — hay que liberar el 5173, no cambiar esto.
 
 ## Pasos
-
 ```bash
 cd app
 npm install     # solo la primera vez, o cuando cambian dependencias
@@ -20,9 +19,28 @@ Dejarlo corriendo y abrir http://localhost:5173 en el navegador.
 
 ## Notas
 
-- El archivo `.env` (no versionado) tiene `MONDAY_API_KEY` y `MONDAY_BOARD_ID`. El
-  proxy de `/api/monday` (definido en `vite.config.js`) los usa del lado del servidor
-  para hablar con la API de monday — la key nunca llega al navegador.
+- El archivo `.env` (no versionado) tiene 5 variables:
+  - `MONDAY_API_KEY`: sin prefijo `VITE_` a propósito — solo la usa el servidor (el
+    proxy de `vite.config.js` en local, o `api/monday.js` / `api/monday-file.js` en
+    Vercel) para hablar con la API de monday. Nunca llega al navegador.
+  - `VITE_MONDAY_BOARD_ID` / `VITE_MONDAY_SUBITEMS_BOARD_ID`: IDs del tablero
+    Oportunidades y su tablero de subitems (ver `services/mondayApi.js`). Con prefijo
+    `VITE_` porque el navegador los necesita para armar las queries. Sin configurar,
+    caen al tablero real actual — se pueden pisar por entorno (ej. un Preview de
+    Vercel apuntando a un tablero de prueba en vez del real).
+  - `VITE_MAKE_WEBHOOK_URL`: URL del webhook de Make.com para el envío por WhatsApp.
+  - `MAKE_CARTA_AUTOMOVIL_WEBHOOK_URL`: URL del escenario de Make.com que lee la Carta
+    Automóvil con IA (ver `services/mondayApi.js#leerCartaAutomovil`). Sin prefijo
+    `VITE_` a propósito — a diferencia de `VITE_MAKE_WEBHOOK_URL`, esta URL nunca debe
+    llegar al navegador, solo la usa el servidor (`api/leer-carta-automovil.js` en
+    Vercel, o el proxy de `vite.config.js` en local).
+- En local (`npm run dev`), los proxies de `/api/monday`, `/api/monday-file`,
+  `/api/make-webhook` y `/api/leer-carta-automovil` los pone `vite.config.js` (solo
+  corren en el dev server de Vite). En Vercel (build de producción/preview), esos
+  proxies no existen — los reemplazan las Serverless Functions bajo `api/` (mismo
+  nombre de archivo que la ruta), que leen las mismas variables de entorno del lado del
+  servidor. Configurar las 5 variables en el proyecto de Vercel (Production + Preview +
+  Development) para que el deploy funcione igual que en local.
 - La lógica de negocio (qué se muestra, cómo se calculan las cotizaciones, qué falta)
   está documentada en `/logica-monday-vibe.md`, en la raíz del repo (un nivel arriba
   de esta carpeta `app/`).

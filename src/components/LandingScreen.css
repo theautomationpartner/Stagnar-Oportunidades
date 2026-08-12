@@ -1,0 +1,111 @@
+.landing {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 48px 40px;
+}
+
+@media (max-width: 640px) {
+  .landing {
+    padding: 24px 16px;
+  }
+}
+
+.landing__cards {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 28px;
+}
+
+/* A pedido: tarjetas más grandes — eran las primeras (y únicas) opciones de la
+   pantalla principal, con bastante aire alrededor; un poco más de tamaño las hace más
+   visibles/fáciles de leer de un vistazo sin quedar desproporcionadas para lo poco que
+   hay alrededor. */
+.landing__card {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+  width: 380px;
+  padding: 26px;
+  border-radius: 14px;
+  border: 1px solid;
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: box-shadow 0.15s ease;
+}
+
+.landing__card:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.07);
+}
+
+@media (max-width: 640px) {
+  .landing__card {
+    width: 100%;
+  }
+}
+
+.landing__card--primary {
+  background: #f5f8ff;
+  border-color: #c2d9fb;
+}
+
+.landing__card--secondary {
+  background: #f2fbf7;
+  border-color: #bfe6d4;
+}
+
+.landing__card-icon {
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 58px;
+  height: 58px;
+  border-radius: 50%;
+  font-size: 26px;
+}
+
+.landing__card-icon--primary {
+  background: #e3edff;
+  color: #0073ea;
+}
+
+.landing__card-icon--secondary {
+  background: #dff5ea;
+  color: #037f4c;
+}
+
+.landing__card-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.landing__card-title {
+  font-size: 18px;
+  font-weight: 700;
+  color: #323338;
+}
+
+.landing__card-desc {
+  font-size: 14px;
+  color: #676879;
+}
+
+.landing__card-chevron {
+  flex-shrink: 0;
+  font-size: 22px;
+}
+
+.landing__card-chevron--primary {
+  color: #0073ea;
+}
+
+.landing__card-chevron--secondary {
+  color: #037f4c;
+}

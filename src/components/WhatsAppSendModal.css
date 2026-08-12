@@ -1,99 +1,39 @@
-.wa-modal__overlay {
-  position: fixed;
-  inset: 0;
-  background: rgba(15, 20, 30, 0.5);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  z-index: 100;
-  padding: 24px;
+/* El overlay, la caja del modal, el título y el botón de cerrar, los
+   banners de warning/éxito y la fila de acciones ahora los provee
+   Modal/ModalHeader/ModalFooter/AttentionBox de @vibe/core — pero a
+   diferencia de ModalFooter (que trae su propio padding de fábrica),
+   ModalHeader y ModalContent son un <div> sin padding ni scroll propios:
+   sin esto el título y el contenido quedaban pegados contra el borde
+   redondeado del modal (que además recorta con overflow:hidden), dando el
+   efecto de "cortado en los bordes". */
+.wa-modal__header {
+  padding: 24px 60px 12px 32px;
 }
 
-.wa-modal {
-  background: #fff;
-  border-radius: 12px;
-  width: 100%;
-  max-width: 720px;
-  max-height: 85vh;
+.wa-modal__content {
+  /* Modal es un flex-column con overflow:hidden y max-height fijo — sin
+     flex:1 + min-height:0 el contenido no encoge para tomar su propio
+     scroll y termina recortado por el overflow:hidden del modal en vez de
+     scrollear internamente. */
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 0 32px 24px;
   overflow-y: auto;
-  padding: 24px;
-  box-shadow: 0 12px 40px rgba(0, 0, 0, 0.25);
 }
 
-.wa-modal__head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  margin-bottom: 16px;
+@media (max-width: 640px) {
+  .wa-modal__header {
+    padding: 18px 44px 10px 16px;
+  }
+
+  .wa-modal__content {
+    padding: 0 16px 18px;
+  }
 }
 
-.wa-modal__head h2 {
-  font-size: 18px;
-  margin: 0;
-  color: #323338;
-}
-
-.wa-modal__close {
-  border: none;
-  background: none;
-  cursor: pointer;
-  font-size: 22px;
-  color: #676879;
-  display: flex;
-}
-
-.wa-modal__warning {
-  display: flex;
-  align-items: flex-start;
-  gap: 8px;
-  background: #fff7f0;
-  border: 1px solid #fde3c4;
-  color: #a15c00;
-  border-radius: 8px;
-  padding: 12px 14px;
-  font-size: 13px;
-  margin-bottom: 16px;
-}
-
-.wa-modal__warning svg {
-  font-size: 18px;
-  flex-shrink: 0;
-  margin-top: 1px;
-}
-
-.wa-modal__warning code {
-  background: #ffe9cf;
-  padding: 1px 4px;
-  border-radius: 4px;
-}
-
-.wa-modal__success {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  background: #e6f9f1;
-  color: #037f4c;
-  border-radius: 8px;
-  padding: 16px;
-  font-weight: 600;
-}
-
+/* TextField (@vibe/core) ya trae su propio label/padding/borde — acá solo el margen. */
 .wa-modal__field {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #676879;
   margin-bottom: 18px;
-}
-
-.wa-modal__field input {
-  padding: 10px 12px;
-  border: 1px solid #d0d4e4;
-  border-radius: 8px;
-  font-size: 14px;
-  color: #323338;
 }
 
 .wa-modal__preview-label {
@@ -135,8 +75,91 @@
   margin: 0 0 12px;
 }
 
-.wa-modal__actions {
+.wa-modal__status {
   display: flex;
-  justify-content: flex-end;
+  flex-direction: column;
   gap: 12px;
+}
+
+/* A pedido, estética tipo mockup: tarjeta con GradientSpinner + barra de progreso
+   mientras Make procesa el envío — mismo lenguaje visual que CotizandoModal.css. */
+.wa-modal__sending {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 20px 8px;
+}
+
+.wa-modal__sending-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #323338;
+  margin: 0;
+}
+
+.wa-modal__sending-subtitle {
+  font-size: 13px;
+  color: #676879;
+  margin: 4px 0 20px;
+}
+
+/* percent=90 fijo en el JSX (no hay forma de medir el progreso real del lado de
+   Make) — transmite "ya casi" sin inventar una precisión que no existe. */
+
+/* A pedido, estética tipo mockup: check verde + "Redirigiendo a Confirmación..." tras
+   un envío exitoso — el modal se cierra solo (ver AUTO_CLOSE_DELAY_MS en el JSX). */
+.wa-modal__success {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 20px 8px;
+}
+
+.wa-modal__success-icon {
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  background: #e9f9f3;
+  color: var(--color-verde);
+  font-size: 24px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin-bottom: 12px;
+}
+
+.wa-modal__success-title {
+  font-size: 16px;
+  font-weight: 700;
+  color: #323338;
+  margin: 0;
+}
+
+.wa-modal__success-subtitle {
+  font-size: 13px;
+  color: #676879;
+  margin: 4px 0 16px;
+}
+
+.wa-modal__success-redirect {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #0073ea;
+  background: #eef6ff;
+  border-radius: 14px;
+  padding: 6px 14px;
+}
+
+.wa-modal__success-redirect svg {
+  font-size: 14px;
+}
+
+.wa-modal__error-detail-spacing pre {
+  max-height: 200px;
+  overflow-y: auto;
 }

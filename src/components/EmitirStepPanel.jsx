@@ -1,7 +1,13 @@
+import { useEffect, useState } from 'react'
 import { MdCheckCircle } from 'react-icons/md'
+import { AttentionBox, Button, Modal, ModalContent } from '@vibe/core'
 import { formatMoney } from '../services/format'
 import { accentForCompania } from '../services/companyColors'
-import DocumentUploadRow from './DocumentUploadRow'
+import { fetchFileColumnAsFile } from '../services/mondayApi'
+import FileUploadField from './FileUploadField'
+import StatusBadge from './StatusBadge'
+import GradientSpinner from './GradientSpinner'
+import ErrorDetailBox from './ErrorDetailBox'
 import './EmitirStepPanel.css'
 
 // Resumen final de todos los datos con los que se cerró la oportunidad: cliente, bien
@@ -34,16 +40,40 @@ export default function EmitirStepPanel({
   error,
   onUploadPoliza,
   onDeletePoliza,
+  estadoCreacion,
+  estadoCreacionColor,
+  polling,
+  errorDetail,
+  onConfirmarEmision,
+  confirmandoEmision,
+  confirmarEmisionError,
 }) {
   const elegida = groups.flatMap((g) => g.entries).find((e) => e.raw.propuestaElegida)
   const accent = elegida ? accentForCompania(elegida.raw.compania) : null
+  // A pedido, estética tipo mockup: mientras no esté "Creada" (la automatización de
+  // creación de póliza, ver handleConfirmarEmision en OpportunityDetail.jsx, todavía
+  // corriendo o sin arrancar) se muestra el botón "Concretar Oportunidad" + la cruz para
+  // sacar el archivo si se subió el que no era; una vez "Creada" ya no hace sentido
+  // ninguna de las 2 acciones, se deja solo la fila en verde como constancia.
+  const polizaSubida = Boolean(polizaFileName)
+  const polizaBusy = uploading || deleting
+  const showConfirmarAction = polizaSubida && !polizaBusy && estadoCreacion !== 'Creada'
+
+  // A pedido: cerrar el popup de "Creando póliza..." es solo visual, no corta el
+  // polling de fondo — mismo criterio que CotizandoModal (ver su comentario). Se
+  // resetea a "no cerrado" cada vez que arranca un polling nuevo (ej. reintentar tras
+  // un Error), para que no quede escondido para siempre después del primer cierre.
+  const [dismissed, setDismissed] = useState(false)
+  useEffect(() => {
+    if (polling) setDismissed(false)
+  }, [polling])
 
   return (
     <div className="emitir-step">
       {concretada && (
-        <div className="emitir-step__banner">
-          <MdCheckCircle /> Póliza cargada — la oportunidad se marcó como <strong>Concretada</strong>.
-        </div>
+        <AttentionBox type="positive">
+          Póliza cargada — la oportunidad se marcó como <strong>Concretada</strong>.
+        </AttentionBox>
       )}
 
       <div className="emitir-step__section">
@@ -52,66 +82,70 @@ export default function EmitirStepPanel({
           Última revisión de los datos antes de cargar la póliza.
         </p>
 
-        <div className="emitir-step__columns">
-          <div className="emitir-step__column">
-            <div className="emitir-step__subtitle-label">Cliente</div>
-            <div className="emitir-step__grid">
-              {CLIENTE_FIELDS.map((f) => (
-                <div className="emitir-step__field" key={f.key}>
-                  <span>{f.label}</span>
-                  <strong>{opportunity[f.key] || '—'}</strong>
-                </div>
-              ))}
+        {/* A pedido, estética tipo mockup: Cliente y Bien asegurado apilados, cada uno a
+            todo el ancho (antes lado a lado en 2 columnas) — así los 5 campos de cada
+            sección entran en un solo renglón en vez de amontonarse en la mitad del
+            ancho disponible. */}
+        <div className="emitir-step__subtitle-label">Cliente</div>
+        <div className="emitir-step__grid">
+          {CLIENTE_FIELDS.map((f) => (
+            <div className="emitir-step__field" key={f.key}>
+              <span>{f.label}</span>
+              <strong>{opportunity[f.key] || '—'}</strong>
             </div>
-          </div>
+          ))}
+        </div>
 
-          <div className="emitir-step__column">
-            <div className="emitir-step__subtitle-label">Bien asegurado</div>
-            <div className="emitir-step__grid">
-              {BIEN_FIELDS.map((f) => (
-                <div className="emitir-step__field" key={f.key}>
-                  <span>{f.label}</span>
-                  <strong>{opportunity[f.key] || '—'}</strong>
-                </div>
-              ))}
+        <div className="emitir-step__subtitle-label">Bien asegurado</div>
+        <div className="emitir-step__grid">
+          {BIEN_FIELDS.map((f) => (
+            <div className="emitir-step__field" key={f.key}>
+              <span>{f.label}</span>
+              <strong>{opportunity[f.key] || '—'}</strong>
             </div>
-          </div>
+          ))}
         </div>
 
         {elegida && !elegida.quote.blocked && (
           <>
-            <div className="emitir-step__subtitle-label">Propuesta elegida</div>
-            <div className="emitir-step__chosen" style={{ borderLeftColor: accent }}>
-              <div className="emitir-step__chosen-head">
-                <span style={{ color: accent }}>{elegida.raw.compania}</span>
-                <span>{elegida.raw.cobertura || elegida.raw.name}</span>
-              </div>
-              <div className="emitir-step__grid">
-                <div className="emitir-step__field">
-                  <span>Deducible</span>
-                  <strong>{elegida.quote.deducibleDisplay}</strong>
-                </div>
-                <div className="emitir-step__field">
-                  <span>3 cuotas</span>
-                  <strong>{formatMoney(elegida.quote.cuotas[3].valor)}</strong>
-                </div>
-                <div className="emitir-step__field">
-                  <span>6 cuotas</span>
-                  <strong>{formatMoney(elegida.quote.cuotas[6].valor)}</strong>
-                </div>
-                <div className="emitir-step__field">
-                  <span>8 cuotas</span>
-                  <strong>{formatMoney(elegida.quote.cuotas[8].valor)}</strong>
-                </div>
-                <div className="emitir-step__field">
-                  <span>10 cuotas</span>
-                  <strong>{formatMoney(elegida.quote.cuotas[10].valor)}</strong>
-                </div>
-                <div className="emitir-step__field">
-                  <span>Total</span>
-                  <strong>{formatMoney(elegida.quote.total)}</strong>
-                </div>
-              </div>
+            {/* A pedido, estética tipo mockup: la compañía/cobertura elegida como una
+                sola insignia (antes: encabezado propio adentro de la tarjeta) al lado
+                del título de la sección, y los montos en una tabla de verdad (antes:
+                grilla de cajitas sueltas) con "Total final" resaltado en verde. */}
+            <div className="emitir-step__subtitle-label emitir-step__chosen-label">
+              Propuesta elegida:{' '}
+              <span
+                className="emitir-step__chosen-badge"
+                style={{ color: accent, borderColor: accent }}
+              >
+                {elegida.raw.compania} {elegida.raw.cobertura || elegida.raw.name}
+              </span>
+            </div>
+            <div className="emitir-step__chosen-table-wrap">
+              <table className="emitir-step__chosen-table">
+                <thead>
+                  <tr>
+                    <th>Deducible</th>
+                    <th>3 cuotas</th>
+                    <th>6 cuotas</th>
+                    <th>8 cuotas</th>
+                    <th>10 cuotas</th>
+                    <th className="emitir-step__chosen-table-total">Total final</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  <tr>
+                    <td>{elegida.quote.deducibleDisplay}</td>
+                    <td>{formatMoney(elegida.quote.cuotas[3].valor)}</td>
+                    <td>{formatMoney(elegida.quote.cuotas[6].valor)}</td>
+                    <td>{formatMoney(elegida.quote.cuotas[8].valor)}</td>
+                    <td>{formatMoney(elegida.quote.cuotas[10].valor)}</td>
+                    <td className="emitir-step__chosen-table-total">
+                      {formatMoney(elegida.quote.total)}
+                    </td>
+                  </tr>
+                </tbody>
+              </table>
             </div>
           </>
         )}
@@ -125,21 +159,69 @@ export default function EmitirStepPanel({
       </div>
 
       <div className="emitir-step__section">
-        <h2 className="emitir-step__title">Póliza</h2>
-        <p className="emitir-step__subtitle">
-          Subí el PDF (u otro archivo) de la póliza emitida por la compañía. Al cargarla, la
-          oportunidad pasa automáticamente a "Concretada".
-        </p>
-        <DocumentUploadRow
+        {/* A pedido, estética tipo mockup: el estado de creación va como insignia
+            arriba a la derecha del título (antes: renglón propio "Estado de
+            creación: ..." debajo del subtítulo). */}
+        <div className="emitir-step__poliza-head">
+          <div>
+            <h2 className="emitir-step__title">Póliza</h2>
+            <p className="emitir-step__subtitle">
+              Subí el PDF (u otro archivo) de la póliza emitida por la compañía. Al cargarla, la
+              oportunidad pasa automáticamente a "Concretada".
+            </p>
+          </div>
+          {estadoCreacion && <StatusBadge label={estadoCreacion} color={estadoCreacionColor} />}
+        </div>
+
+        {/* A pedido: mismo campo de archivo (y misma previsualización con lightbox)
+            que el resto de la app — antes esto eran 2 bloques totalmente distintos
+            (DocumentUploadRow mientras faltaba, una fila verde armada a mano una vez
+            cargada). Ahora es un solo FileUploadField siempre; "Concretar Oportunidad"
+            se agrega al lado como extraActions solo mientras corresponde (subida y
+            todavía no "Creada" — una vez creada, ni eliminar ni confirmar tienen
+            sentido, se deja la fila en verde nomás como constancia). */}
+        <FileUploadField
           label="Póliza"
+          required={false}
           fileName={polizaFileName}
+          onFetchFile={() => fetchFileColumnAsFile(opportunity.id, 'file_mm5bzdd4')}
           uploading={uploading}
           deleting={deleting}
           error={error}
+          missingMessage="Póliza pendiente de adjuntar"
           onUpload={onUploadPoliza}
-          onDelete={onDeletePoliza}
+          onDelete={showConfirmarAction ? onDeletePoliza : undefined}
+          showReplaceButton={false}
+          compactDelete
+          extraActions={
+            showConfirmarAction && (
+              <Button
+                kind="primary"
+                className="emitir-step__confirmar-btn"
+                onClick={onConfirmarEmision}
+                disabled={confirmandoEmision || polling}
+              >
+                <MdCheckCircle /> {confirmandoEmision ? 'Confirmando...' : 'Concretar Oportunidad'}
+              </Button>
+            )
+          }
         />
+        {confirmarEmisionError && <p className="emitir-step__error">Error: {confirmarEmisionError}</p>}
+        {confirmarEmisionError && <p className="emitir-step__error">Error: {confirmarEmisionError}</p>}
+        {!polling && <ErrorDetailBox detail={errorDetail} className="emitir-step__error-detail-spacing" />}
       </div>
+
+      {/* A pedido: solo el círculo girando + un texto (sin barra de progreso ni
+          subtítulo aparte) mientras corre la automatización de creación de póliza
+          (color_mm5ejysv) — reemplaza el AttentionBox amarillo inline de antes. */}
+      {polling && !dismissed && (
+        <Modal id="poliza-creando-modal" show onClose={() => setDismissed(true)} size="small">
+          <ModalContent className="emitir-step__creando-content">
+            <GradientSpinner size={48} />
+            <p className="emitir-step__creando-title">Leyendo la póliza y creándola...</p>
+          </ModalContent>
+        </Modal>
+      )}
     </div>
   )
 }

@@ -1,25 +1,8 @@
 .emitir-step {
-  margin: 20px 32px 32px;
+  margin: 20px var(--page-gutter) 32px;
   display: flex;
   flex-direction: column;
   gap: 20px;
-}
-
-.emitir-step__banner {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 14px 18px;
-  border-radius: 8px;
-  background: #e6f9f1;
-  color: #037f4c;
-  font-weight: 600;
-  font-size: 13px;
-}
-
-.emitir-step__banner svg {
-  font-size: 18px;
-  flex-shrink: 0;
 }
 
 .emitir-step__section {
@@ -27,6 +10,12 @@
   background: #fff;
   border: 1px solid #e6e9ef;
   border-radius: 10px;
+}
+
+@media (max-width: 640px) {
+  .emitir-step__section {
+    padding: 16px;
+  }
 }
 
 .emitir-step__title {
@@ -53,18 +42,6 @@
 
 .emitir-step__subtitle-label:first-of-type {
   margin-top: 0;
-}
-
-.emitir-step__columns {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 24px;
-}
-
-@media (max-width: 640px) {
-  .emitir-step__columns {
-    grid-template-columns: 1fr;
-  }
 }
 
 .emitir-step__grid {
@@ -95,33 +72,141 @@
   color: #323338;
 }
 
-.emitir-step__chosen {
-  border-left: 4px solid #0073ea;
-  border-radius: 8px;
-  background: #f6f7fb;
-  padding: 14px 16px;
-}
-
-.emitir-step__chosen-head {
+/* A pedido, estética tipo mockup: compañía/cobertura como una insignia sola al lado del
+   título de la sección (reemplaza la tarjeta con encabezado propio de antes). Mismo
+   color que accentForCompania (viene inline vía style), fondo siempre celeste clarito —
+   no cambia según la compañía, solo el texto/borde. */
+.emitir-step__chosen-label {
   display: flex;
-  align-items: baseline;
-  gap: 10px;
-  margin-bottom: 12px;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.emitir-step__chosen-badge {
+  font-size: 12px;
   font-weight: 700;
+  text-transform: none;
+  letter-spacing: normal;
+  background: #eef6ff;
+  border: 1px solid;
+  border-radius: 12px;
+  padding: 3px 10px;
 }
 
-.emitir-step__chosen-head span:first-child {
-  font-size: 15px;
+/* Tabla de verdad (antes: grilla de cajitas sueltas, ver .emitir-step__grid) — a pedido,
+   estética tipo mockup, con "Total final" resaltado en verde como única columna que
+   realmente importa de un vistazo. */
+.emitir-step__chosen-table-wrap {
+  overflow-x: auto;
 }
 
-.emitir-step__chosen-head span:last-child {
-  font-size: 14px;
-  color: #676879;
-  font-weight: 400;
+.emitir-step__chosen-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.emitir-step__chosen-table th {
+  padding: 10px 12px;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  color: #9699a6;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  background: #f6f7fb;
+  white-space: nowrap;
+}
+
+.emitir-step__chosen-table td {
+  padding: 10px 12px;
+  color: #323338;
+  font-weight: 600;
+  border-top: 1px solid #e6e9ef;
+  white-space: nowrap;
+}
+
+.emitir-step__chosen-table-total {
+  background: #e6f9f1;
+  color: var(--color-verde);
 }
 
 .emitir-step__empty {
   font-size: 13px;
   color: #a15c00;
   margin: 4px 0 0;
+}
+
+/* A pedido, estética tipo mockup: insignia de estado arriba a la derecha del título
+   (reemplaza el renglón "Estado de creación: ..." de antes). */
+.emitir-step__poliza-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+@media (max-width: 480px) {
+  .emitir-step__poliza-head {
+    flex-direction: column;
+  }
+}
+
+/* Verde de marca (a pedido) en vez del azul por defecto de kind="primary" — mismo
+   criterio que .crear-op__historial-detail-btn (CrearOportunidadForm.css). */
+.emitir-step__confirmar-btn {
+  background-color: var(--color-verde) !important;
+  border-color: var(--color-verde) !important;
+  color: #fff !important;
+}
+
+.emitir-step__confirmar-btn:hover {
+  filter: brightness(0.92);
+}
+
+/* A pedido: el botón queda deshabilitado mientras corre la automatización (ver
+   `polling` en el JSX) — @vibe/core atenúa los botones disabled con opacity baja, que
+   sobre el fondo verde de este botón quedaba prácticamente ilegible (verde clarito
+   sobre verde clarito). Se pisa esa opacity y se define una combinación propia con
+   contraste real en vez de depender de la atenuación genérica de la librería. */
+.emitir-step__confirmar-btn:disabled {
+  opacity: 1;
+  background-color: #9cc9c3 !important;
+  border-color: #9cc9c3 !important;
+  color: #04473f !important;
+}
+
+.emitir-step__error {
+  margin: 0;
+  color: #e2445c;
+  font-size: 13px;
+}
+
+/* A pedido: solo el spinner degradé + un texto abajo, sin barra de progreso ni
+   subtítulo aparte. */
+.emitir-step__creando-content {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  padding: 24px 8px;
+}
+
+.emitir-step__creando-title {
+  font-size: 14px;
+  font-weight: 600;
+  color: #676879;
+  margin: 14px 0 0;
+}
+
+.emitir-step__error-detail-spacing {
+  margin-top: 16px;
+}
+
+/* Detalle de emisión puede traer bastante texto (respuesta cruda de lectura del PDF) —
+   scrollea en vez de estirar todo el panel. */
+.emitir-step__error-detail-spacing pre {
+  max-height: 220px;
+  overflow-y: auto;
 }

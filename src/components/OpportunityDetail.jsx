@@ -1,25 +1,20 @@
-import { useEffect, useMemo, useState } from 'react'
-import {
-  MdOpenInNew,
-  MdMoreHoriz,
-  MdInfoOutline,
-  MdFileDownload,
-  MdSend,
-  MdArrowBack,
-  MdAutorenew,
-} from 'react-icons/md'
-import TopBar from './TopBar'
-import ParametersPanel from './ParametersPanel'
-import CompanyGroup from './CompanyGroup'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { MdSend, MdArrowBack, MdAutorenew } from 'react-icons/md'
+import { Button, EmptyState, AttentionBox, Loader } from '@vibe/core'
+import QuoteCard from './QuoteCard'
 import StatusBadge from './StatusBadge'
 import Stepper from './Stepper'
 import CotizarStepPanel from './CotizarStepPanel'
+import CotizandoModal from './CotizandoModal'
 import ConfirmarStepPanel from './ConfirmarStepPanel'
 import EmitirStepPanel from './EmitirStepPanel'
 import WhatsAppSendModal from './WhatsAppSendModal'
+import ErrorDetailBox from './ErrorDetailBox'
+import './PillTabs.css'
 import {
   fetchOpportunityDetail,
   setSimpleColumnValue,
+  setDropdownColumnValue,
   setConnectedColumnValue,
   setSubitemCheckboxValue,
   uploadFileToColumn,
@@ -30,16 +25,20 @@ import { mapOpportunityItem } from '../services/opportunityMapper'
 import { mapSubitemToRawQuote, groupQuotesByCompania } from '../services/quoteMapper'
 import { computeQuote } from '../services/pricingEngine'
 import { applyRecargoLookup } from '../services/recargoPanel'
-import { COTIZAR_FIELDS } from '../services/cotizarFields'
+import { COTIZAR_FIELDS, getMissingCotizarFields } from '../services/cotizarFields'
 import { renderQuoteImageDataUrl } from '../services/whatsappImage'
+import { COBERTURA_TABS, coberturaGroupOf } from '../services/coberturaGroups'
 import './OpportunityDetail.css'
 
 const ESTADO_OPORTUNIDAD_COLUMN_ID = 'deal_stage'
 const ESTADO_COTIZACION_COLUMN_ID = 'color_mm51n7aa'
 const ESTADO_ENVIO_COLUMN_ID = 'color_mm4wr1t4'
+const ESTADO_CREACION_COLUMN_ID = 'color_mm5ejysv'
+const POSEE_VEHICULO_COLUMN_ID = 'color_mm51n4j'
+const ESTADO_LECTURA_COLUMN_ID = 'color_mm5rzrhk'
 const INCLUIR_PROPUESTA_COLUMN_ID = 'boolean_mm4wjdnw'
 const LIBRETA_CONDUCIR_COLUMN_ID = 'file_mm51jy06'
-const CARTA_AUTOMOVIL_COLUMN_ID = 'file_mm51xnxq'
+const CEDULA_COLUMN_ID = 'file_mm5pc008'
 const POLIZA_COLUMN_ID = 'file_mm5bzdd4'
 const PROPUESTA_ELEGIDA_COLUMN_ID = 'boolean_mm5bn41n'
 // Opcionales de PORTO (Granizo/Cristales/Coche Cortesía) — ver handleToggleOpcional abajo
@@ -50,6 +49,13 @@ const OPCIONAL_PORTO_COLUMN_IDS = {
   cocheCortesia: 'boolean_mm5fxd9x',
 }
 const POLL_INTERVAL_MS = 4000
+// Prefijo que cada automatización debe agregar al principio del texto del Update que
+// postea sobre el ítem cuando falla (configurar así del lado del robot de cotización y
+// del escenario de Make.com de envío por WhatsApp) — ver fetchLatestUpdate en mondayApi.js.
+const ERROR_UPDATE_TAG_COTIZAR = '[COTIZAR]'
+const ERROR_UPDATE_TAG_ENVIO = '[ENVIO]'
+const ERROR_UPDATE_TAG_CREAR_POLIZA = '[CREAR_POLIZA]'
+const ERROR_UPDATE_TAG_LEER = '[LEER]'
 
 export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   const [item, setItem] = useState(null)
@@ -59,6 +65,11 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   const [overridesByQuoteId, setOverridesByQuoteId] = useState({})
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [activeStep, setActiveStep] = useState('cotizar')
+  // Solapas "GLOBAL / TRIPLE / General" del paso "Comparar y enviar" — índice de
+  // COBERTURA_TABS, no el texto (así matchea directo con TabList/Tab de @vibe/core). En
+  // 0 arranca en GLOBAL (a pedido, la solapa que se ve primero al entrar), no en
+  // "General" — ver el orden del array en coberturaGroups.js.
+  const [coberturaTabIndex, setCoberturaTabIndex] = useState(0)
   const [marking, setMarking] = useState(false)
   const [markError, setMarkError] = useState(null)
   const [waModalImages, setWaModalImages] = useState(null)
@@ -71,15 +82,44 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   const [confirmingPaso3, setConfirmingPaso3] = useState(false)
   const [confirmPaso3Error, setConfirmPaso3Error] = useState(null)
   const [sendPolling, setSendPolling] = useState(false)
+  const [polizaPolling, setPolizaPolling] = useState(false)
+  const [confirmandoEmision, setConfirmandoEmision] = useState(false)
+  const [confirmarEmisionError, setConfirmarEmisionError] = useState(null)
+  const [lecturaPolling, setLecturaPolling] = useState(false)
+  const [lecturaDismissed, setLecturaDismissed] = useState(false)
   const [cotizarErrorDetail, setCotizarErrorDetail] = useState(null)
+  // A pedido: progreso en vivo por compañía mientras se cotiza/recotiza (ver
+  // CotizandoModal) — {compania: cantidad de subitems ya creados}, se actualiza en cada
+  // tick del polling de abajo (antes se calculaba mid-poll y se descartaba, solo se
+  // usaba una vez llegado al estado terminal).
+  const [cotizarProgress, setCotizarProgress] = useState({})
+  // A pedido: en un RECOTIZAR, el primer paso de la automatización es BORRAR todas las
+  // cotizaciones anteriores y recién después crear las nuevas desde cero — sin esto, los
+  // subitems viejos (todavía sin borrar en el momento de un tick) se contarían como si
+  // ya fueran progreso de la tanda nueva, mostrando compañías "completas" un instante
+  // antes de que esos mismos subitems desaparezcan. Se guarda el set de ids YA
+  // existentes justo antes de arrancar (ver handleMarcarParaCotizar) — useRef porque
+  // el tick del polling (más abajo) lo necesita estable entre renders, no como estado
+  // que dispare un re-render propio.
+  const oldSubitemIdsRef = useRef(new Set())
+  // Cerrar CotizandoModal es solo visual (mismo criterio que WhatsAppSendModal) — no
+  // corta el polling de fondo. Se reinicia a false cada vez que arranca una cotización
+  // nueva (ver handleMarcarParaCotizar), así vuelve a aparecer aunque se haya cerrado
+  // en un intento anterior.
+  const [cotizandoModalDismissed, setCotizandoModalDismissed] = useState(false)
   const [envioErrorDetail, setEnvioErrorDetail] = useState(null)
+  const [polizaErrorDetail, setPolizaErrorDetail] = useState(null)
+  const [lecturaErrorDetail, setLecturaErrorDetail] = useState(null)
 
   // El robot que genera la cotización (o el escenario de Make.com que la envía) postea
   // el detalle del error como un Update nativo de monday sobre el ítem cuando algo falla
-  // — se trae acá el texto del más reciente para mostrarlo junto al estado "Error".
-  const loadErrorUpdate = async () => {
+  // — se trae acá el texto del más reciente para mostrarlo junto al estado "Error". `tag`
+  // filtra por el prefijo que cada automatización agrega a su propio Update (ver
+  // ERROR_UPDATE_TAG_*) para que un error de cotización no tape/mezcle uno de envío o
+  // viceversa cuando los dos existen sobre el mismo ítem.
+  const loadErrorUpdate = async (tag) => {
     try {
-      const update = await fetchLatestUpdate(opportunityId)
+      const update = await fetchLatestUpdate(opportunityId, tag)
       return update?.text_body?.trim() || null
     } catch {
       return null
@@ -91,8 +131,11 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
     setLoading(true)
     setError(null)
     setPolling(false)
+    setLecturaDismissed(false)
     setCotizarErrorDetail(null)
     setEnvioErrorDetail(null)
+    setPolizaErrorDetail(null)
+    setLecturaErrorDetail(null)
 
     fetchOpportunityDetail(opportunityId)
       .then(async (data) => {
@@ -111,6 +154,18 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
         )?.text?.trim()
         const estadoEnvio = data.column_values.find(
           (cv) => cv.id === ESTADO_ENVIO_COLUMN_ID
+        )?.text?.trim()
+        const estadoCreacion = data.column_values.find(
+          (cv) => cv.id === ESTADO_CREACION_COLUMN_ID
+        )?.text?.trim()
+        // El gate de "Leer Cédula y Archivo Automóvil" solo aplica cuando la oportunidad
+        // "Posee Vehículo" (si no, esos documentos se piden directo en el paso 3
+        // Confirmar, sin pasar por ninguna lectura automática).
+        const poseeVehiculo = data.column_values.find(
+          (cv) => cv.id === POSEE_VEHICULO_COLUMN_ID
+        )?.text?.trim()
+        const estadoLectura = data.column_values.find(
+          (cv) => cv.id === ESTADO_LECTURA_COLUMN_ID
         )?.text?.trim()
 
         if (estadoOportunidad === 'Nueva') {
@@ -132,15 +187,36 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
         if (estadoEnvio === 'Enviando') {
           setSendPolling(true)
         }
+        // Mismo criterio para una creación de póliza que quedó "Creando" a mitad de camino.
+        if (estadoCreacion === 'Creando') {
+          setPolizaPolling(true)
+        }
+        // Mismo criterio para una lectura de Cédula/Archivo Automóvil que quedó
+        // "Leer" (en cola, todavía no la tomó el robot) o "Leyendo" (en curso) a mitad
+        // de camino — solo si aplica (Posee Vehículo === "Si"). Ojo: si acá solo se
+        // contemplara "Leyendo", entrar a la oportunidad mientras todavía está en
+        // "Leer" nunca prendería el polling, y la pantalla se quedaría congelada sin
+        // enterarse jamás de que después pasó a "Leidos".
+        if (poseeVehiculo === 'Si' && (estadoLectura === 'Leer' || estadoLectura === 'Leyendo')) {
+          setLecturaPolling(true)
+        }
         // Si la oportunidad ya está sentada en "Error" al entrar (no solo al detectarlo
         // durante el polling), traemos igual el detalle del último Update.
         if (estadoCotizacion === 'Error') {
-          const detail = await loadErrorUpdate()
+          const detail = await loadErrorUpdate(ERROR_UPDATE_TAG_COTIZAR)
           if (!cancelled) setCotizarErrorDetail(detail)
         }
         if (estadoEnvio === 'Error') {
-          const detail = await loadErrorUpdate()
+          const detail = await loadErrorUpdate(ERROR_UPDATE_TAG_ENVIO)
           if (!cancelled) setEnvioErrorDetail(detail)
+        }
+        if (estadoCreacion === 'Error') {
+          const detail = await loadErrorUpdate(ERROR_UPDATE_TAG_CREAR_POLIZA)
+          if (!cancelled) setPolizaErrorDetail(detail)
+        }
+        if (poseeVehiculo === 'Si' && estadoLectura === 'Error') {
+          const detail = await loadErrorUpdate(ERROR_UPDATE_TAG_LEER)
+          if (!cancelled) setLecturaErrorDetail(detail)
         }
       })
       .catch((err) => {
@@ -179,6 +255,21 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
         const mapped = (data.subitems ?? []).map(mapSubitemToRawQuote)
         const raws = applyRecargoLookup(mapped, schema?.recargoLookup ?? {})
 
+        // A pedido: progreso en vivo por compañía (ver CotizandoModal) — a diferencia
+        // de raws/estadoCotizacion (que solo se usan una vez llegado al estado
+        // terminal), esto se actualiza en CADA tick para reflejar los subitems que ya
+        // se fueron creando mientras la automatización sigue corriendo. Se excluyen los
+        // subitems que YA existían antes de arrancar (oldSubitemIdsRef) — en un
+        // recotizar la automatización primero borra todo lo viejo y recién después crea
+        // lo nuevo; sin este filtro, mientras lo viejo todavía no se borró se contaría
+        // como si ya fuera progreso de la tanda nueva.
+        const newRaws = raws.filter((r) => !oldSubitemIdsRef.current.has(r.id))
+        const progressByCompania = {}
+        for (const { compania, quotes } of groupQuotesByCompania(newRaws)) {
+          progressByCompania[compania] = quotes.length
+        }
+        setCotizarProgress(progressByCompania)
+
         if (estadoCotizacion === 'Cotizado (Subitems)' && estadoOportunidad === 'Cotizacion Emitida') {
           setRawQuotes(raws)
           setSelectedIds(new Set(raws.filter((r) => r.incluirPropuesta).map((r) => r.id)))
@@ -189,23 +280,39 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
           setMarkError(
             'La cotización automática terminó en estado "Error". Revisá la oportunidad en monday e intentá nuevamente.'
           )
-          setCotizarErrorDetail(await loadErrorUpdate())
+          setCotizarErrorDetail(await loadErrorUpdate(ERROR_UPDATE_TAG_COTIZAR))
         }
       } catch {
         // hiccup de red puntual: seguimos intentando en el próximo tick
       }
     }
 
+    // Los navegadores frenan drásticamente los setInterval de una pestaña en segundo
+    // plano (o minimizada) — si el usuario cambia de pestaña mientras espera, el
+    // polling puede tardar mucho más de POLL_INTERVAL_MS en volver a correr. Al
+    // recuperar el foco/visibilidad forzamos un tick inmediato para no depender de
+    // que el navegador decida retomar el intervalo por su cuenta.
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') tick()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', handleVisibility)
+
     const id = setInterval(tick, POLL_INTERVAL_MS)
     return () => {
       cancelled = true
       clearInterval(id)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleVisibility)
     }
   }, [polling, opportunityId, schema])
 
   // Refleja en vivo los cambios de color_mm4wr1t4 (Estado Envio) mientras Make.com
   // procesa el envío por WhatsApp: reconsulta cada POLL_INTERVAL_MS y corta el polling
-  // apenas llega a un estado terminal ("Enviado" o "Error").
+  // apenas llega a un estado terminal ("Enviado" o "Error"). El paso activo pasa a
+  // "Confirmar" recién acá, cuando "Enviado" se confirma de verdad — no al aceptar el
+  // envío (que solo deja "Enviando") — para que no dependa de la sincronización con el
+  // auto-cierre del modal de WhatsApp.
   useEffect(() => {
     if (!sendPolling) return undefined
     let cancelled = false
@@ -222,25 +329,135 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
 
         if (estadoEnvio === 'Enviado' || estadoEnvio === 'Error') {
           setSendPolling(false)
-          if (estadoEnvio === 'Error') setEnvioErrorDetail(await loadErrorUpdate())
+          if (estadoEnvio === 'Error') {
+            setEnvioErrorDetail(await loadErrorUpdate(ERROR_UPDATE_TAG_ENVIO))
+          } else {
+            setActiveStep('confirmar')
+          }
         }
       } catch {
         // hiccup de red puntual: seguimos intentando en el próximo tick
       }
     }
 
+    // Mismo fix que en el polling de "Estado Cotización": recuperar foco/visibilidad
+    // fuerza un tick inmediato en vez de esperar a que el navegador retome el
+    // setInterval frenado por estar la pestaña en segundo plano.
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') tick()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', handleVisibility)
+
     const id = setInterval(tick, POLL_INTERVAL_MS)
     return () => {
       cancelled = true
       clearInterval(id)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleVisibility)
     }
   }, [sendPolling, opportunityId])
+
+  // Refleja en vivo los cambios de color_mm5ejysv (Crear Poliza) mientras se procesa la
+  // emisión de la póliza tras confirmarla: reconsulta cada POLL_INTERVAL_MS y corta el
+  // polling apenas llega a un estado terminal ("Creada" o "Error").
+  useEffect(() => {
+    if (!polizaPolling) return undefined
+    let cancelled = false
+
+    const tick = async () => {
+      try {
+        const data = await fetchOpportunityDetail(opportunityId)
+        if (cancelled || !data) return
+        setItem(data)
+
+        const estadoCreacion = data.column_values.find(
+          (cv) => cv.id === ESTADO_CREACION_COLUMN_ID
+        )?.text?.trim()
+
+        if (estadoCreacion === 'Creada' || estadoCreacion === 'Error') {
+          setPolizaPolling(false)
+          if (estadoCreacion === 'Error') {
+            setPolizaErrorDetail(await loadErrorUpdate(ERROR_UPDATE_TAG_CREAR_POLIZA))
+          }
+        }
+      } catch {
+        // hiccup de red puntual: seguimos intentando en el próximo tick
+      }
+    }
+
+    // Mismo fix que en los otros dos polling: recuperar foco/visibilidad fuerza un tick
+    // inmediato en vez de esperar a que el navegador retome el setInterval frenado por
+    // estar la pestaña en segundo plano.
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') tick()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', handleVisibility)
+
+    const id = setInterval(tick, POLL_INTERVAL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleVisibility)
+    }
+  }, [polizaPolling, opportunityId])
+
+  // Refleja en vivo los cambios de color_mm5rzrhk (Leer Cédula y Archivo Automóvil)
+  // mientras se procesa la lectura automática de esos documentos: reconsulta cada
+  // POLL_INTERVAL_MS y corta el polling apenas llega a un estado terminal ("Leidos" o
+  // "Error"). Solo se prende cuando aplica (ver mount effect — Posee Vehículo === "Si").
+  useEffect(() => {
+    if (!lecturaPolling) return undefined
+    let cancelled = false
+
+    const tick = async () => {
+      try {
+        const data = await fetchOpportunityDetail(opportunityId)
+        if (cancelled || !data) return
+        setItem(data)
+
+        const estadoLectura = data.column_values.find(
+          (cv) => cv.id === ESTADO_LECTURA_COLUMN_ID
+        )?.text?.trim()
+
+        if (estadoLectura === 'Leidos' || estadoLectura === 'Error') {
+          setLecturaPolling(false)
+          if (estadoLectura === 'Error') {
+            setLecturaErrorDetail(await loadErrorUpdate(ERROR_UPDATE_TAG_LEER))
+          }
+        }
+      } catch {
+        // hiccup de red puntual: seguimos intentando en el próximo tick
+      }
+    }
+
+    // Mismo fix que en los otros polling: recuperar foco/visibilidad fuerza un tick
+    // inmediato en vez de esperar a que el navegador retome el setInterval frenado por
+    // estar la pestaña en segundo plano.
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') tick()
+    }
+    document.addEventListener('visibilitychange', handleVisibility)
+    window.addEventListener('focus', handleVisibility)
+
+    const id = setInterval(tick, POLL_INTERVAL_MS)
+    return () => {
+      cancelled = true
+      clearInterval(id)
+      document.removeEventListener('visibilitychange', handleVisibility)
+      window.removeEventListener('focus', handleVisibility)
+    }
+  }, [lecturaPolling, opportunityId])
 
   const statusColors = useMemo(
     () => ({
       estadoOportunidad: schema?.estadoOportunidad?.colorsByLabel ?? {},
       estadoCotizacion: schema?.estadoCotizacion?.colorsByLabel ?? {},
       estadoEnvio: schema?.estadoEnvio?.colorsByLabel ?? {},
+      estadoCreacion: schema?.estadoCreacion?.colorsByLabel ?? {},
+      estadoLectura: schema?.estadoLectura?.colorsByLabel ?? {},
     }),
     [schema]
   )
@@ -251,14 +468,17 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
       marcas: schema?.marcas ?? [],
       combustibles: schema?.combustibles ?? [],
       uso: schema?.uso?.options ?? [],
-      tipo: schema?.tipo?.options ?? [],
+      tipo: schema?.tipo ?? [],
+      // A diferencia de los de arriba (listas de strings), estos dos son listas de
+      // {id, name} — los campos "connected" del paso Cotizar (Departamento, Zona de
+      // circulación/Localidad) los necesitan así para armar la conexión real.
+      departamentos: schema?.departamentos ?? [],
+      localidades: schema?.localidades ?? [],
     }),
     [schema]
   )
 
   const rcOptions = schema?.rc ?? []
-
-  const departamentos = schema?.departamentos ?? []
 
   const opportunity = useMemo(
     () => (item ? mapOpportunityItem(item, statusColors) : null),
@@ -290,6 +510,21 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   }, [rawQuotes, overridesByQuoteId, opportunity, schema])
 
   const hasQuotes = rawQuotes.length > 0
+  // A pedido: el botón "Cotizar" (paso 1, cuando todavía no hay ninguna cotización) vive
+  // en la tarjeta de cliente, no en CotizarStepPanel — mismo criterio de "faltan campos"
+  // que ese panel usa para su propio banner de advertencia.
+  const canCotizar = opportunity ? getMissingCotizarFields(opportunity).length === 0 : false
+
+  // Solapa activa del paso "Comparar y enviar": "general" no filtra nada (como antes);
+  // "GLOBAL"/"TRIPLE" solo dejan pasar las cotizaciones de esa familia de cobertura,
+  // sin importar la compañía (ver coberturaGroups.js — las 2 familias ya cubren todas
+  // las coberturas reales, no dependen de qué compañía sea).
+  const activeCoberturaTab = COBERTURA_TABS[coberturaTabIndex]?.key ?? 'general'
+  const visibleQuoteEntries = useMemo(() => {
+    const flat = groups.flatMap((g) => g.entries.map((e) => ({ ...e, compania: g.compania })))
+    if (activeCoberturaTab === 'general') return flat
+    return flat.filter((e) => coberturaGroupOf(e.raw.cobertura) === activeCoberturaTab)
+  }, [groups, activeCoberturaTab])
 
   const toggleSelected = (id) => {
     setSelectedIds((prev) => {
@@ -321,19 +556,6 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
     setRawQuotes((prev) => prev.map((r) => (r.id === rawId ? { ...r, [field]: checked } : r)))
   }
 
-  // "Aplicar a toda [Compañía]": la misma configuración de parámetros (Bonificación,
-  // Descuento, deducible/edad específico) se replica en todas las cotizaciones de esa
-  // compañía, no solo en la tarjeta desde la que se apretó el botón.
-  const handleApplyCompanyOverrides = (compania, values) => {
-    setOverridesByQuoteId((prev) => {
-      const next = { ...prev }
-      for (const raw of rawQuotes) {
-        if (raw.compania === compania) next[raw.id] = values
-      }
-      return next
-    })
-  }
-
   const handleMarcarParaCotizar = async () => {
     setMarking(true)
     setMarkError(null)
@@ -346,6 +568,9 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
           cv.id === ESTADO_COTIZACION_COLUMN_ID ? { ...cv, text: 'Cotizar' } : cv
         ),
       }))
+      oldSubitemIdsRef.current = new Set(rawQuotes.map((r) => r.id))
+      setCotizarProgress({})
+      setCotizandoModalDismissed(false)
       setPolling(true)
     } catch (err) {
       setMarkError(err.message)
@@ -411,9 +636,15 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
       ),
     }))
     setSendPolling(true)
+    // A pedido: el paso pasa a "Confirmar" recién cuando el polling de abajo confirma
+    // que Estado Envío llegó de verdad a "Enviado" — no acá (apenas se acepta el envío,
+    // "Enviando" todavía). Antes se cambiaba de una en este punto y el modal de
+    // WhatsApp (que se queda abierto tapando la pantalla hasta el estado terminal) lo
+    // disimulaba, pero si se cerraba a mano antes de tiempo se veía "Confirmar" con el
+    // envío todavía en curso.
   }
 
-  // Sube Libreta de Conducir / Carta Automóvil (paso 3, columnas "file" de la
+  // Sube Libreta de Conducir/Carta Automóvil y Cédula (paso 3, columnas "file" de la
   // oportunidad) directo a monday. El check visual del paso 3 depende de que el `text`
   // de la columna deje de estar vacío, así que actualizamos el `item` en memoria con el
   // nombre del archivo apenas la mutation confirma el upload (sin esperar a un refetch).
@@ -435,7 +666,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
     }
   }
 
-  // Botón "Eliminar" de cualquier columna file (Libreta/Carta en paso 3, Póliza en paso
+  // Botón "Eliminar" de cualquier columna file (Libreta/Cédula en paso 3, Póliza en paso
   // 4): update_assets_on_item con "files: []" vacía la columna (ver mondayApi.js —
   // change_simple_column_value no soporta columnas file). Genérico por columnId, igual
   // que handleUploadDocument.
@@ -455,28 +686,60 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
     }
   }
 
-  // Paso 4: subir la póliza (file_mm5bzdd4) cierra el flujo — a pedido, una vez que la
-  // mutation de subida confirma, la oportunidad pasa directo a "Concretada" (mismo
-  // helper setSimpleColumnValue que ya usa "Cotizar", apuntando a Estado Oportunidad en
-  // vez de Estado Cotización).
+  // Paso 4: subir la póliza (file_mm5bzdd4) — a pedido, YA NO pasa la oportunidad a
+  // "Concretada" sola (antes lo hacía apenas confirmaba la subida); eso se movió al
+  // botón "Concretar Oportunidad" (ver handleConfirmarEmision más abajo), que es la
+  // acción explícita que de verdad cierra la oportunidad.
   const handleUploadPoliza = async (file) => {
     setUploadingDoc((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: true }))
     setDocUploadError((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: null }))
     try {
+      // A pedido: que nunca quede más de 1 archivo cargado en Póliza — add_file_to_column
+      // (uploadFileToColumn) SUMA el archivo a la columna en vez de reemplazar el que ya
+      // hubiera, así que si ya había uno se limpia primero (mismo helper que usa
+      // "Eliminar", clearFileColumn) antes de subir el nuevo.
+      if (opportunity.poliza) {
+        await clearFileColumn(opportunityId, POLIZA_COLUMN_ID)
+      }
       await uploadFileToColumn(opportunityId, POLIZA_COLUMN_ID, file)
-      await setSimpleColumnValue(opportunityId, ESTADO_OPORTUNIDAD_COLUMN_ID, 'Concretada')
       setItem((prev) => ({
         ...prev,
-        column_values: prev.column_values.map((cv) => {
-          if (cv.id === POLIZA_COLUMN_ID) return { ...cv, text: file.name }
-          if (cv.id === ESTADO_OPORTUNIDAD_COLUMN_ID) return { ...cv, text: 'Concretada' }
-          return cv
-        }),
+        column_values: prev.column_values.map((cv) =>
+          cv.id === POLIZA_COLUMN_ID ? { ...cv, text: file.name } : cv
+        ),
       }))
     } catch (err) {
       setDocUploadError((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: err.message }))
     } finally {
       setUploadingDoc((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: false }))
+    }
+  }
+
+  // Botón "Concretar Oportunidad": dispara la automatización que crea/emite la póliza
+  // (color_mm5ejysv, "Crear Poliza") poniéndola en "Crear" — mismo mecanismo que
+  // "Cotizar" sobre Estado Cotización, prende el polling en vivo de esa columna — Y,
+  // a pedido, es acá (no al subir el archivo) donde la oportunidad pasa de verdad a
+  // "Concretada", ya que es el botón que dice eso mismo.
+  const handleConfirmarEmision = async () => {
+    setConfirmandoEmision(true)
+    setConfirmarEmisionError(null)
+    setPolizaErrorDetail(null)
+    try {
+      await setSimpleColumnValue(opportunityId, ESTADO_CREACION_COLUMN_ID, 'Crear')
+      await setSimpleColumnValue(opportunityId, ESTADO_OPORTUNIDAD_COLUMN_ID, 'Concretada')
+      setItem((prev) => ({
+        ...prev,
+        column_values: prev.column_values.map((cv) => {
+          if (cv.id === ESTADO_CREACION_COLUMN_ID) return { ...cv, text: 'Crear' }
+          if (cv.id === ESTADO_OPORTUNIDAD_COLUMN_ID) return { ...cv, text: 'Concretada' }
+          return cv
+        }),
+      }))
+      setPolizaPolling(true)
+    } catch (err) {
+      setConfirmarEmisionError(err.message)
+    } finally {
+      setConfirmandoEmision(false)
     }
   }
 
@@ -504,45 +767,76 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   }
 
   const handleSaveCotizarFields = async (formValues) => {
-    const currentDeptId = departamentos.find((d) => d.name === opportunity.departamento)?.id ?? ''
-
     for (const field of COTIZAR_FIELDS) {
-      if (field.kind === 'connected') continue
+      if (field.kind === 'connected' || field.kind === 'autodata') continue
       const newValue = formValues[field.key] ?? ''
       const oldValue = opportunity[field.key] ?? ''
       if (newValue === oldValue) continue
-      await setSimpleColumnValue(opportunityId, field.columnId, newValue)
+      // Las columnas "dropdown" (a diferencia de "status"/"number"/"date") no se pueden
+      // escribir con un string pelado vía change_simple_column_value: si el label es
+      // puramente numérico (Año, ej. "2006"), monday lo confunde con el ID interno del
+      // label en vez de buscarlo por nombre y el valor queda vacío en silencio. Ver
+      // dropdownColumnValue en mondayApi.js.
+      if (field.kind === 'dropdown') {
+        await setDropdownColumnValue(opportunityId, field.columnId, newValue)
+      } else {
+        await setSimpleColumnValue(opportunityId, field.columnId, newValue)
+      }
     }
 
-    if (formValues.departamentoId !== currentDeptId) {
-      const deptField = COTIZAR_FIELDS.find((f) => f.key === 'departamento')
-      const ids = formValues.departamentoId ? [Number(formValues.departamentoId)] : []
-      await setConnectedColumnValue(opportunityId, deptField.columnId, ids)
+    // Campos "connected" (Departamento, Zona de circulación/Localidad): cada uno se
+    // guarda como conexión (change_column_value con item_ids), no como texto — solo si
+    // realmente cambió respecto al que ya tenía la oportunidad (matcheado por nombre
+    // contra la lista real, ya que `opportunity[field.key]` guarda el nombre, no el id).
+    const connectedNameByColumnId = {}
+    for (const field of COTIZAR_FIELDS) {
+      if (field.kind !== 'connected') continue
+      const options = dropdownOptions[field.optionsKey] ?? []
+      const currentId = options.find((o) => o.name === opportunity[field.key])?.id ?? ''
+      const newId = formValues[field.idKey] ?? ''
+      if (newId !== currentId) {
+        await setConnectedColumnValue(opportunityId, field.columnId, newId ? [Number(newId)] : [])
+      }
+      connectedNameByColumnId[field.columnId] = options.find((o) => o.id === newId)?.name ?? ''
     }
 
-    const nuevoDepartamentoNombre =
-      departamentos.find((d) => d.id === formValues.departamentoId)?.name ?? ''
+    // Modelo (Autodata): solo se escribe si en esta edición se eligió uno nuevo del
+    // buscador — se guarda como conexión (igual que Departamento) Y como texto, los dos
+    // juntos acá mismo. Antes solo se dejaba armada la conexión, a la espera de que la
+    // automatización de "Cotizar" terminara de asentar el texto real de
+    // `text_mm54fb7m` (y vaciar la conexión) — pero si se edita el Modelo sin volver a
+    // cotizar/recotizar enseguida, ese texto quedaba desactualizado en monday
+    // indefinidamente (bug reportado). Como acá ya se sabe el nombre elegido, no hace
+    // falta esperar a ninguna automatización para escribirlo.
+    if (formValues.modeloSeleccion) {
+      const modeloField = COTIZAR_FIELDS.find((f) => f.key === 'modelo')
+      await setConnectedColumnValue(opportunityId, modeloField.connectedColumnId, [
+        Number(formValues.modeloSeleccion.id),
+      ])
+      await setSimpleColumnValue(opportunityId, modeloField.columnId, formValues.modeloSeleccion.name)
+    }
 
     const textByColumnId = {
       numeric_mm51mb0s: formValues.ci,
       dropdown_mm51mdmq: formValues.anio,
-      text_mm54fb7m: formValues.modelo,
+      // Muestra ya la elección nueva del buscador Autodata si se hizo una; si no, sigue
+      // mostrando el texto real actual tal cual estaba.
+      text_mm54fb7m: formValues.modeloSeleccion?.name ?? formValues.modelo,
       dropdown_mm51ykrd: formValues.marca,
       dropdown_mm52jp01: formValues.combustible,
       color_mm52ey1d: formValues.uso,
-      color_mm52vycb: formValues.tipo,
+      dropdown_mm5jqdk: formValues.tipo,
       date_mm516agw: formValues.fechaNacimiento,
-      location_mm51e7g7: formValues.zonaCirculacion,
     }
 
     setItem((prev) => ({
       ...prev,
       column_values: prev.column_values.map((cv) => {
         if (cv.id in textByColumnId) return { ...cv, text: textByColumnId[cv.id] }
-        // Departamento es board_relation: el mapper lee `display_value`, no `text`
+        // Los "connected" son board_relation: el mapper lee `display_value`, no `text`
         // (ver opportunityMapper.js#boardRelationDisplayOf) — hay que actualizar ese
         // campo para que el optimistic update se vea reflejado.
-        if (cv.id === 'board_relation_mm54tq30') return { ...cv, display_value: nuevoDepartamentoNombre }
+        if (cv.id in connectedNameByColumnId) return { ...cv, display_value: connectedNameByColumnId[cv.id] }
         return cv
       }),
     }))
@@ -575,84 +869,176 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   const emitirActive =
     !emitirDone && (opportunity?.estadoLabel === 'Cotizacion aceptada' || Boolean(opportunity?.poliza))
 
+  // Gate previo al paso 1: solo aplica si la oportunidad "Posee Vehículo" (si no, esos
+  // documentos se piden directo en el paso 3 Confirmar, sin lectura automática de por
+  // medio). Cubre "Leer" (en cola) y "Leyendo" (en curso) — no se puede saltear ninguno
+  // de los dos a mano; en "Error" sí se puede continuar igual (por si la lectura
+  // automática falló y hay que cargar los datos a mano).
+  const lecturaGateActive =
+    opportunity?.poseeVehiculo === 'Si' &&
+    (opportunity?.estadoLectura === 'Leer' ||
+      opportunity?.estadoLectura === 'Leyendo' ||
+      opportunity?.estadoLectura === 'Error') &&
+    !lecturaDismissed
+
+  // clickable: false mientras el gate de lectura está activo — los paneles de abajo
+  // ignoran activeStep en ese caso (ver el render condicional más abajo), así que dejar
+  // los pasos clickeables ahí llevaría a un click que no hace nada visible.
   const steps = [
-    { key: 'cotizar', label: 'Cotizar', status: hasQuotes ? 'done' : 'active', clickable: true },
+    {
+      key: 'cotizar',
+      label: 'Cotizar',
+      // A pedido: subtítulo propio por paso (antes uno solo, fijo, repetido en los 4)
+      // — qué se hace concretamente en ESE paso, no una bajada genérica de toda la
+      // pantalla.
+      subtitle: 'Generá cotizaciones automáticas con las aseguradoras para este vehículo.',
+      status: hasQuotes ? 'done' : 'active',
+      clickable: !lecturaGateActive,
+    },
     {
       key: 'comparar',
       label: 'Comparar y enviar',
+      subtitle: 'Compará las opciones obtenidas y enviá las mejores por WhatsApp al cliente.',
       status: compararDone ? 'done' : hasQuotes ? 'active' : 'pending',
-      clickable: true,
+      clickable: !lecturaGateActive,
     },
     {
       key: 'confirmar',
       label: 'Confirmar',
+      subtitle: 'Confirmá la propuesta que eligió el cliente y la documentación del asegurado.',
       status: confirmarDone ? 'done' : hasQuotes ? 'active' : 'pending',
-      clickable: true,
+      clickable: !lecturaGateActive,
     },
     {
       key: 'emitir',
       label: 'Emitir · cargar PDF',
+      subtitle: 'Subí la póliza final emitida por la aseguradora y cerrá la oportunidad.',
       status: emitirDone ? 'done' : emitirActive ? 'active' : 'pending',
-      clickable: true,
+      clickable: !lecturaGateActive,
     },
   ]
+  const activeStepIndex = steps.findIndex((s) => s.key === activeStep)
 
   return (
     <div className="app">
-      <TopBar />
-
       <div className="opp-detail__breadcrumb">
-        <button className="opp-detail__back-btn" type="button" onClick={onBack}>
-          <MdArrowBack /> Volver a Oportunidades
-        </button>
-        <span className="opp-detail__breadcrumb-trail">
-          <span> &gt; </span>
-          <span>
-            {opportunity ? `${opportunity.oppNumber} · ${opportunity.clienteNombre}` : '...'}
-          </span>
-        </span>
+        <Button kind="tertiary" className="opp-detail__back-btn" onClick={onBack}>
+          <MdArrowBack /> Volver
+        </Button>
+        {!loading && !error && opportunity && (
+          <Stepper steps={steps} activeKey={activeStep} onSelect={setActiveStep} />
+        )}
       </div>
 
-      {loading && <div className="opp-detail__status">Cargando cotizaciones...</div>}
+      {loading && (
+        <div className="opp-detail__status">
+          <Loader size={64} className="opp-detail__loading-spinner" />
+          Cargando cotizaciones...
+        </div>
+      )}
       {error && <div className="opp-detail__status opp-detail__status--error">Error: {error}</div>}
 
       {!loading && !error && opportunity && (
         <>
+          {/* A pedido: título dinámico por paso (antes "Cotizaciones" fijo sin importar
+              en qué paso estuvieras) — con el número a la izquierda del nombre, en un
+              globo azul igual al círculo del paso activo en el Stepper de arriba
+              (mismo color, mismo "globo" — ver .stepper__circle--active en
+              Stepper.css). */}
           <div className="opp-detail__header">
-            <div>
-              <h1 className="opp-detail__title">Cotizaciones</h1>
-              <p className="opp-detail__subtitle">
-                Cotizá, comparalá y enviá las mejores opciones a tu cliente.
-              </p>
+            <div className="opp-detail__title-row">
+              <span className="opp-detail__title-badge">{activeStepIndex + 1}</span>
+              <h1 className="opp-detail__title">{steps[activeStepIndex]?.label}</h1>
             </div>
-            <div className="opp-detail__header-actions">
-              <button className="btn btn--outline" type="button">
-                <MdOpenInNew /> Ver en la oportunidad
-              </button>
-              <button className="btn btn--icon" type="button">
-                <MdMoreHoriz />
-              </button>
-            </div>
+            <p className="opp-detail__subtitle">{steps[activeStepIndex]?.subtitle}</p>
           </div>
 
-          <div className="opp-detail__client-card">
-            <div className="opp-detail__client-avatar">{opportunity.clienteNombre.slice(0, 2).toUpperCase()}</div>
-            <div className="opp-detail__client-info">
-              <span className="opp-detail__client-name">{opportunity.clienteNombre}</span>
-              <span className="opp-detail__client-meta">
-                {opportunity.bienLinea1} {opportunity.bienLinea2 && `· ${opportunity.bienLinea2}`}
-              </span>
-              {opportunity.ci && <span className="opp-detail__client-meta">CI {opportunity.ci}</span>}
+          {/* A pedido: en el paso "Cotizar" esta tarjeta ya no se muestra — avatar,
+              nombre e id de oportunidad quedaban repitiendo lo que la ficha de abajo
+              (CotizarStepPanel) ya muestra completo (avatar, nombre, CI, Nacimiento,
+              Teléfono, Ubicación, Vehículo, id de monday). En el resto de los pasos
+              sigue igual: bien asegurado, nota de Edad/Combustible/Teléfono y
+              "Recotizar" en Comparar/Confirmar. */}
+          {activeStep !== 'cotizar' && (
+            <div className="opp-detail__client-card">
+              <div className="opp-detail__client-card-main">
+                <div className="opp-detail__client-avatar">{opportunity.clienteNombre.slice(0, 2).toUpperCase()}</div>
+                <div className="opp-detail__client-info">
+                  <span className="opp-detail__client-name">{opportunity.clienteNombre}</span>
+                  <span className="opp-detail__client-meta">
+                    {opportunity.bienLinea1} {opportunity.bienLinea2 && `· ${opportunity.bienLinea2}`}
+                  </span>
+                  {opportunity.ci && <span className="opp-detail__client-meta">CI {opportunity.ci}</span>}
+                </div>
+
+                {/* A pedido, estética tipo mockup: número corto de la oportunidad como
+                    tag, visible en cualquier paso (salvo "Cotizar", ver arriba). */}
+                <span className="opp-detail__client-opp-badge">{opportunity.oppNumber}</span>
+
+                {/* A pedido: en vez de la aclaración de "Parámetros", acá va la lista de
+                    datos de la oportunidad (Edad, Combustible, Teléfono — antes en el
+                    panel lateral eliminado), en una sola línea para no sumar alto; el
+                    botón "Recotizar" sigue al lado, en el mismo renglón que
+                    Nombre/Bien/CI. En el paso "Confirmar" (antes tenía su propio botón
+                    "Recotizar" más abajo, junto a la sección "Datos del cliente" que se
+                    eliminó) solo se sube el botón, sin la lista de datos. */}
+                {(activeStep === 'comparar' || activeStep === 'confirmar') && hasQuotes && (
+                  <div
+                    className={
+                      activeStep === 'comparar'
+                        ? 'opp-detail__client-card-note'
+                        : 'opp-detail__client-card-note opp-detail__client-card-note--btn-only'
+                    }
+                  >
+                    {activeStep === 'comparar' && (
+                      <span className="opp-detail__client-card-data">
+                        <span>Edad: {opportunity.edad ? `${opportunity.edad} años` : '—'}</span>
+                        <span>Combustible: {opportunity.combustible || '—'}</span>
+                        <span>Teléfono: {opportunity.telefono || '—'}</span>
+                      </span>
+                    )}
+                    <Button kind="secondary" className="opp-detail__recotizar-btn" onClick={() => setActiveStep('cotizar')}>
+                      <MdAutorenew /> Recotizar
+                    </Button>
+                  </div>
+                )}
+              </div>
             </div>
-            <StatusBadge
-              label={opportunity.estadoCotizacion || 'Sin estado'}
-              color={opportunity.estadoCotizacionColor}
-            />
-          </div>
+          )}
 
-          <Stepper steps={steps} activeKey={activeStep} onSelect={setActiveStep} />
-
-          {activeStep === 'cotizar' && (
+          {lecturaGateActive ? (
+            <div className="opp-detail__lectura-gate">
+              <div className="opp-detail__lectura-gate-estado">
+                <span>Estado de lectura:</span>
+                <StatusBadge label={opportunity.estadoLectura} color={opportunity.estadoLecturaColor} />
+              </div>
+              {(opportunity.estadoLectura === 'Leer' || opportunity.estadoLectura === 'Leyendo') && (
+                <AttentionBox type="warning" icon={false}>
+                  <Loader size={13} className="opp-detail__envio-spinner" />
+                  {opportunity.estadoLectura === 'Leer'
+                    ? 'En cola para leer Cédula y Carta Automóvil...'
+                    : 'Leyendo Cédula y Carta Automóvil...'}{' '}
+                  esto puede tardar unos segundos. La pantalla se va a actualizar sola apenas
+                  esté lista.
+                </AttentionBox>
+              )}
+              {opportunity.estadoLectura === 'Error' && (
+                <AttentionBox type="negative">
+                  <div className="opp-detail__lectura-gate-row">
+                    <span>No se pudieron leer los documentos automáticamente.</span>
+                    <Button kind="secondary" onClick={() => setLecturaDismissed(true)}>
+                      Continuar de todas formas
+                    </Button>
+                  </div>
+                </AttentionBox>
+              )}
+              {opportunity.estadoLectura === 'Error' && (
+                <ErrorDetailBox detail={lecturaErrorDetail} className="opp-detail__error-detail-spacing" />
+              )}
+            </div>
+          ) : (
+            <>
+              {activeStep === 'cotizar' && (
             <CotizarStepPanel
               opportunity={opportunity}
               hasQuotes={hasQuotes}
@@ -660,82 +1046,86 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
               marking={marking}
               markError={markError}
               dropdownOptions={dropdownOptions}
-              departamentos={departamentos}
               onSave={handleSaveCotizarFields}
               estadoCotizacion={opportunity.estadoCotizacion}
               estadoCotizacionColor={opportunity.estadoCotizacionColor}
               polling={polling}
               errorDetail={cotizarErrorDetail}
+              onGoToComparar={() => setActiveStep('comparar')}
             />
           )}
 
           {activeStep === 'comparar' && !hasQuotes && (
             <div className="opp-detail__no-quotes">
-              <p>
-                Todavía no hay ninguna cotización cargada para esta oportunidad — no hay nada para
-                comparar o enviar.
-              </p>
-              <button className="btn btn--primary" type="button" onClick={() => setActiveStep('cotizar')}>
-                Ir al paso 1 (Cotizar)
-              </button>
+              <EmptyState
+                title="Todavía no hay nada para comparar"
+                description='No hay ninguna cotización cargada para esta oportunidad — no hay nada para comparar o enviar.'
+                mainAction={{ text: 'Ir al paso 1 (Cotizar)', onClick: () => setActiveStep('cotizar') }}
+              />
             </div>
           )}
 
           {activeStep === 'comparar' && hasQuotes && (
             <>
-              <div className="opp-detail__info-bar">
-                <span>
-                  <MdInfoOutline /> Cada cotización puede ajustar sus propios parámetros (edad,
-                  bonificación, descuento, recargo, deducible) con el botón "Parámetros" de su
-                  tarjeta.
-                </span>
-                <button
-                  className="btn btn--outline"
-                  type="button"
-                  onClick={() => setActiveStep('cotizar')}
-                >
-                  <MdAutorenew /> Recotizar
-                </button>
-              </div>
-
               <div className="opp-detail__body">
-                <ParametersPanel
-                  context={{
-                    edad: opportunity.edad,
-                    bien: opportunity.bienLinea1,
-                    combustible: opportunity.combustible,
-                    ci: opportunity.ci,
-                    telefono: opportunity.telefono,
-                    nombre: opportunity.clienteNombre,
-                  }}
-                />
-
-                <div className="opp-detail__quotes">
-                  {groups.map((g, index) => (
-                    <CompanyGroup
-                      key={g.compania}
-                      compania={g.compania}
-                      entries={g.entries}
-                      selectedIds={selectedIds}
-                      onToggleSelected={toggleSelected}
-                      defaultOpen={index === 0}
-                      overridesByQuoteId={overridesByQuoteId}
-                      onApplyOverrides={handleApplyQuoteOverrides}
-                      onResetOverrides={handleResetQuoteOverrides}
-                      onApplyToCompany={handleApplyCompanyOverrides}
-                      onToggleOpcional={handleToggleOpcional}
-                      rcOptions={rcOptions}
-                    />
+                {/* Solapas por familia de cobertura (a pedido) — "General" muestra todo,
+                    como antes; "GLOBAL"/"TRIPLE" filtran sin importar la compañía. Sin
+                    solapas/acordeón POR COMPAÑÍA: todas las cotizaciones de la solapa
+                    activa van en una sola grilla de a 2 por renglón, con la compañía de
+                    cada una mostrada adentro de su propia tarjeta (ver QuoteCard).
+                    Control segmentado a mano (en vez de Tab/TabList de @vibe/core, cuyos
+                    estilos internos vienen de clases hasheadas inyectadas en runtime, no
+                    hay hook confiable para "1/3 del ancho cada una" + look propio) —
+                    mismo criterio que los botones-pill de Stepper.jsx. */}
+                <div className="pill-tabs opp-detail__cobertura-tabs" role="tablist">
+                  {COBERTURA_TABS.map((tab, index) => (
+                    <button
+                      key={tab.key}
+                      type="button"
+                      role="tab"
+                      aria-selected={coberturaTabIndex === index}
+                      className={
+                        coberturaTabIndex === index
+                          ? 'pill-tabs__tab pill-tabs__tab--active opp-detail__cobertura-tab'
+                          : 'pill-tabs__tab opp-detail__cobertura-tab'
+                      }
+                      onClick={() => setCoberturaTabIndex(index)}
+                    >
+                      {tab.label}
+                    </button>
                   ))}
                 </div>
+
+                {visibleQuoteEntries.length === 0 ? (
+                  <EmptyState
+                    title="Sin cotizaciones en esta familia"
+                    description="No hay cotizaciones con cobertura GLOBAL o TRIPLE (según corresponda) para esta oportunidad."
+                  />
+                ) : (
+                  <div className="opp-detail__quotes">
+                    {visibleQuoteEntries.map(({ raw, quote }) => (
+                      <QuoteCard
+                        key={raw.id}
+                        raw={raw}
+                        quote={quote}
+                        selected={selectedIds.has(raw.id)}
+                        onToggleSelected={() => toggleSelected(raw.id)}
+                        overrides={overridesByQuoteId[raw.id] ?? {}}
+                        onApplyOverrides={(values) => handleApplyQuoteOverrides(raw.id, values)}
+                        onResetOverrides={() => handleResetQuoteOverrides(raw.id)}
+                        onToggleOpcional={(field, checked) => handleToggleOpcional(raw.id, field, checked)}
+                        rcOptions={rcOptions}
+                      />
+                    ))}
+                  </div>
+                )}
               </div>
 
-              {envioErrorDetail && (
-                <div className="opp-detail__error-detail">
-                  <strong>Detalle del error de envío (último update en la oportunidad):</strong>
-                  <pre>{envioErrorDetail}</pre>
-                </div>
-              )}
+              <ErrorDetailBox
+                detail={envioErrorDetail}
+                title="Detalle del error de envío (último update en la oportunidad):"
+                className="opp-detail__error-detail-spacing"
+              />
 
               <div className="opp-detail__footer">
                 <div className="opp-detail__footer-status">
@@ -743,24 +1133,21 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
                   {opportunity.estadoEnvio && (
                     <span className="opp-detail__envio-status">
                       {sendPolling && (
-                        <span className="opp-detail__envio-spinner" aria-hidden="true" />
+                        <Loader size={13} className="opp-detail__envio-spinner" />
                       )}
                       <StatusBadge label={opportunity.estadoEnvio} color={opportunity.estadoEnvioColor} />
                     </span>
                   )}
                 </div>
                 <div className="opp-detail__footer-actions">
-                  <button className="btn btn--outline" type="button">
-                    <MdFileDownload /> Descargar comparativo
-                  </button>
-                  <button
-                    className="btn btn--whatsapp"
-                    type="button"
+                  <Button
+                    kind="primary"
+                    color="positive"
                     onClick={handleOpenWhatsAppModal}
                     disabled={selectedIds.size === 0}
                   >
                     <MdSend /> Enviar seleccionadas por WhatsApp
-                  </button>
+                  </Button>
                 </div>
               </div>
             </>
@@ -768,13 +1155,11 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
 
           {activeStep === 'confirmar' && !hasQuotes && (
             <div className="opp-detail__no-quotes">
-              <p>
-                Todavía no hay ninguna cotización cargada para esta oportunidad — no hay nada que
-                confirmar.
-              </p>
-              <button className="btn btn--primary" type="button" onClick={() => setActiveStep('cotizar')}>
-                Ir al paso 1 (Cotizar)
-              </button>
+              <EmptyState
+                title="Todavía no hay nada que confirmar"
+                description="No hay ninguna cotización cargada para esta oportunidad."
+                mainAction={{ text: 'Ir al paso 1 (Cotizar)', onClick: () => setActiveStep('cotizar') }}
+              />
             </div>
           )}
 
@@ -785,19 +1170,18 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
               onSetElegida={handleSetElegida}
               settingElegidaId={settingElegidaId}
               elegidaError={elegidaError}
-              onRecotizar={() => setActiveStep('cotizar')}
               documentos={[
                 {
                   key: 'libretaConducir',
-                  label: 'Libreta de Conducir',
+                  label: 'Libreta de Conducir / Carta Automóvil',
                   columnId: LIBRETA_CONDUCIR_COLUMN_ID,
                   fileName: opportunity.libretaConducir,
                 },
                 {
-                  key: 'cartaAutomovil',
-                  label: 'Carta Automóvil',
-                  columnId: CARTA_AUTOMOVIL_COLUMN_ID,
-                  fileName: opportunity.cartaAutomovil,
+                  key: 'cedula',
+                  label: 'Cédula de Identidad',
+                  columnId: CEDULA_COLUMN_ID,
+                  fileName: opportunity.cedula,
                 },
               ]}
               uploadingDoc={uploadingDoc}
@@ -813,13 +1197,11 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
 
           {activeStep === 'emitir' && !hasQuotes && (
             <div className="opp-detail__no-quotes">
-              <p>
-                Todavía no hay ninguna cotización cargada para esta oportunidad — no hay nada que
-                emitir.
-              </p>
-              <button className="btn btn--primary" type="button" onClick={() => setActiveStep('cotizar')}>
-                Ir al paso 1 (Cotizar)
-              </button>
+              <EmptyState
+                title="Todavía no hay nada que emitir"
+                description="No hay ninguna cotización cargada para esta oportunidad."
+                mainAction={{ text: 'Ir al paso 1 (Cotizar)', onClick: () => setActiveStep('cotizar') }}
+              />
             </div>
           )}
 
@@ -834,7 +1216,16 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
               error={docUploadError[POLIZA_COLUMN_ID]}
               onUploadPoliza={handleUploadPoliza}
               onDeletePoliza={() => handleDeleteDocument(POLIZA_COLUMN_ID)}
+              estadoCreacion={opportunity.estadoCreacion}
+              estadoCreacionColor={opportunity.estadoCreacionColor}
+              polling={polizaPolling}
+              errorDetail={polizaErrorDetail}
+              onConfirmarEmision={handleConfirmarEmision}
+              confirmandoEmision={confirmandoEmision}
+              confirmarEmisionError={confirmarEmisionError}
             />
+          )}
+            </>
           )}
         </>
       )}
@@ -845,8 +1236,17 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
           images={waModalImages}
           onClose={() => setWaModalImages(null)}
           onSent={handleWhatsAppSent}
+          sendPolling={sendPolling}
+          envioErrorDetail={envioErrorDetail}
         />
       )}
+
+      <CotizandoModal
+        show={polling && !cotizandoModalDismissed}
+        recotizando={hasQuotes}
+        progress={cotizarProgress}
+        onClose={() => setCotizandoModalDismissed(true)}
+      />
     </div>
   )
 }

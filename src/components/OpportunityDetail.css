@@ -1,41 +1,42 @@
+/* "Volver" y el Stepper van en este mismo renglón de arriba (antes el Stepper tenía su
+   propio renglón entero para él solo, y acá solo iba el breadcrumb "> OPP-XXXX ·
+   Cliente", que se sacó). Grid de 3 columnas (1fr / auto / 1fr) en vez de flex — a
+   pedido, así el Stepper (2do hijo, cae en la columna del medio) queda centrado en el
+   medio de la página sin importar el ancho de "Volver": solo hay 2 hijos, así que la
+   3ra columna (1fr) queda sin ítem pero igual reserva su espacio — hace de contrapeso
+   simétrico con la 1ra, sin necesidad de agregar un div vacío en el JSX. */
 .opp-detail__breadcrumb {
-  display: flex;
+  display: grid;
+  grid-template-columns: 1fr auto 1fr;
   align-items: center;
-  gap: 4px;
-  padding: 16px 32px 0;
+  gap: 24px;
+  padding: 16px var(--page-gutter) 0;
   font-size: 13px;
   color: #676879;
 }
 
+@media (max-width: 900px) {
+  .opp-detail__breadcrumb {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* Button (@vibe/core, kind="tertiary") ya pone su propio color/padding/hover
+   — acá solo el ajuste de alineación con el borde de la pantalla. justify-self:start
+   porque .opp-detail__breadcrumb es grid (1fr auto 1fr, ver más arriba) — sin esto, el
+   botón se estira para ocupar toda su columna (1fr) en vez de quedar pegado a la
+   izquierda con su ancho natural. */
 .opp-detail__back-btn {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
-  border: none;
-  background: none;
-  cursor: pointer;
-  padding: 6px 10px 6px 6px;
+  justify-self: start;
   margin-left: -6px;
-  border-radius: 6px;
-  color: #0073ea;
-  font-size: 13px;
-  font-weight: 600;
-}
-
-.opp-detail__back-btn:hover {
-  background: #eef6ff;
-}
-
-.opp-detail__back-btn svg {
-  font-size: 17px;
-}
-
-.opp-detail__breadcrumb-trail {
-  color: #676879;
 }
 
 .opp-detail__status {
   padding: 40px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 14px;
   text-align: center;
   color: #676879;
 }
@@ -44,18 +45,61 @@
   color: #e2445c;
 }
 
+/* Pantalla de carga al abrir una oportunidad desde la tabla — Loader nativo de
+   @vibe/core (ver JSX) en vez de un spinner armado a mano; el SVG usa
+   stroke:currentColor, así que alcanza con "color" acá. A pedido, todo loading usa el
+   verde de marca (--color-verde, ver index.css) — antes un morado (#3F1A6A) pedido en
+   otro momento de este proyecto, y más chico (36px, ver JSX). */
+.opp-detail__loading-spinner {
+  color: var(--color-verde);
+}
+
 .opp-detail__header {
+  padding: 8px var(--page-gutter) 0;
+}
+
+.opp-detail__title-row {
   display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  padding: 8px 32px 0;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 4px;
+}
+
+/* Mismo círculo azul que .stepper__circle--active (Stepper.css) — "globo" con el
+   número del paso, a la izquierda del nombre. Sin la animación de pulso de ese (ahí
+   tiene sentido para llamar la atención entre 4 círculos chicos; acá, al lado de un
+   título grande, ya es protagonista sin necesidad de moverse). */
+.opp-detail__title-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  flex-shrink: 0;
+  border-radius: 50%;
+  background: #0073ea;
+  color: #fff;
+  font-size: 15px;
+  font-weight: 700;
 }
 
 .opp-detail__title {
   font-size: 26px;
   font-weight: 700;
   color: #323338;
-  margin: 0 0 4px;
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .opp-detail__title {
+    font-size: 20px;
+  }
+
+  .opp-detail__title-badge {
+    width: 26px;
+    height: 26px;
+    font-size: 13px;
+  }
 }
 
 .opp-detail__subtitle {
@@ -64,19 +108,26 @@
   margin: 0;
 }
 
-.opp-detail__header-actions {
-  display: flex;
-  gap: 8px;
-}
-
+/* Los datos de la oportunidad (Edad/Combustible/Teléfono, antes en el panel lateral
+   eliminado) van como 2do renglón de esta misma tarjeta — por eso pasa a column en vez
+   de ser directo la fila avatar/info/nota (ver .opp-detail__client-card-main más abajo). */
 .opp-detail__client-card {
-  margin: 16px 32px 0;
-  padding: 16px 20px;
+  margin: 16px var(--page-gutter) 0;
   background: #fff;
   border: 1px solid #e6e9ef;
   border-radius: 10px;
   display: flex;
+  flex-direction: column;
+}
+
+/* A pedido: la aclaración de "Parámetros" + botón "Recotizar" van al lado de
+   Nombre/Bien/CI, en el mismo renglón — info crece para ocupar el medio, la nota queda
+   pegada a la derecha; en pantallas angostas la nota baja a su propio renglón. */
+.opp-detail__client-card-main {
+  padding: 16px 20px;
+  display: flex;
   align-items: center;
+  flex-wrap: wrap;
   gap: 14px;
 }
 
@@ -97,7 +148,8 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  flex: 1;
+  flex: 1 1 200px;
+  min-width: 160px;
 }
 
 .opp-detail__client-name {
@@ -110,33 +162,105 @@
   color: #676879;
 }
 
-.opp-detail__info-bar {
-  margin: 16px 32px 0;
-  padding: 12px 16px;
+/* A pedido, estética tipo mockup: número corto de la oportunidad (OPP-XXXX) como tag —
+   flex-shrink:0 para que no se lo coma .opp-detail__client-info (flex:1) si el nombre
+   es largo. */
+.opp-detail__client-opp-badge {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: #0073ea;
   background: #eef6ff;
-  border: 1px solid #cfe3fb;
-  border-radius: 8px;
+  border: 1px solid #9cc2f2;
+  border-radius: 12px;
+  padding: 3px 10px;
+}
+
+/* Renglón de la aclaración de "Parámetros" + botón "Recotizar", al lado de
+   Nombre/Bien/CI (ver .opp-detail__client-card-main). No crece agresivo — deja que
+   .opp-detail__client-info ocupe el medio y esto quede pegado a la derecha; en
+   pantallas angostas baja a su propio renglón (flex-wrap del padre). */
+.opp-detail__client-card-note {
   display: flex;
   align-items: center;
+  flex-wrap: wrap;
   justify-content: space-between;
+  gap: 12px;
+  flex: 1 1 320px;
+  min-width: 0;
   font-size: 13px;
   color: #323338;
 }
 
-.opp-detail__info-bar > span {
-  display: inline-flex;
-  align-items: center;
-  gap: 6px;
+/* Paso "Cotizar" (sin cotizaciones todavía): si "Cotizar" falla, el error queda en su
+   propio renglón (flex-basis:100%, ver flex-wrap de arriba) en vez de apretado al lado
+   del botón. */
+.opp-detail__client-card-note-error {
+  flex-basis: 100%;
+  color: #e2445c;
+  font-size: 12px;
 }
 
-.opp-detail__info-bar svg {
-  font-size: 18px;
-  color: #0073ea;
-  flex-shrink: 0;
+/* Paso "Confirmar": solo el botón "Recotizar" acá, sin lista de datos al lado — no
+   crece (si no, al ser el único hijo quedaría flotando lejos del borde derecho de la
+   tarjeta en vez de pegado a él); .opp-detail__client-info ya se encarga de empujarlo
+   hacia la derecha. */
+.opp-detail__client-card-note--btn-only {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+}
+
+/* Paso "Cotizar" (sin cotizaciones todavía): a pedido, el texto va pegado al botón en
+   vez de separado por todo el ancho de sobra (space-between de .opp-detail__client-card-
+   note) — mismo criterio de no crecer que --btn-only, para que el par quede agrupado
+   contra el borde derecho de la tarjeta. */
+.opp-detail__client-card-note--tight {
+  flex: 0 0 auto;
+  justify-content: flex-end;
+  gap: 14px;
+}
+
+@media (max-width: 640px) {
+  .opp-detail__client-card-note {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .opp-detail__client-card-data {
+    white-space: normal;
+  }
+
+  .opp-detail__recotizar-btn {
+    width: 100%;
+  }
+}
+
+/* Datos de la oportunidad (antes en el panel lateral "Datos de la oportunidad",
+   eliminado; antes de eso, una aclaración de texto acá mismo) — a pedido, en una sola
+   línea (nowrap + ellipsis) para no sumarle alto a la tarjeta. */
+.opp-detail__client-card-data {
+  display: flex;
+  gap: 14px;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  color: #676879;
+}
+
+.opp-detail__client-card-data > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* Button kind="secondary" es transparente de fábrica — sobre el fondo
+   celeste de este info-bar casi no se notaba. Fondo blanco sólido para que
+   se diferencie. */
+.opp-detail__recotizar-btn {
+  background-color: #fff !important;
 }
 
 .opp-detail__no-quotes {
-  margin: 20px 32px 32px;
+  margin: 20px var(--page-gutter) 32px;
   padding: 32px;
   background: #fff;
   border: 1px dashed #d0d4e4;
@@ -145,21 +269,69 @@
   color: #676879;
 }
 
+@media (max-width: 640px) {
+  .opp-detail__no-quotes {
+    padding: 20px;
+  }
+}
+
 .opp-detail__no-quotes p {
   margin: 0 0 16px;
   font-size: 14px;
 }
 
 .opp-detail__body {
-  display: flex;
-  gap: 20px;
-  margin: 20px 32px 32px;
-  align-items: flex-start;
+  margin: 20px var(--page-gutter) 32px;
 }
 
+/* Chrome del control segmentado (riel + pastilla activa) vive en pill-tabs.css,
+   compartido con confirmar-step__filter-tabs — acá solo lo específico de este uso: 3
+   botones a exactamente 1/3 del ancho cada uno. */
+.opp-detail__cobertura-tabs {
+  margin-bottom: 18px;
+}
+
+.opp-detail__cobertura-tab {
+  flex: 1 1 0;
+}
+
+/* De a 2 cotizaciones por columna — vuelta a "columns" (a pedido, de nuevo): con "grid"
+   las 2 tarjetas de un mismo renglón comparten el alto del renglón entero, así que al
+   desplegar "Ver más" en una, la otra (más corta) deja un hueco gris vacío debajo hasta
+   igualar esa altura — es lo que se estaba viendo. Con columns cada tarjeta ocupa solo
+   lo que necesita, sin ese hueco; la contra (ya charlada) es que al fluir cada columna
+   de forma independiente, las tarjetas de la izquierda y la derecha no siempre quedan a
+   la misma altura leyendo en horizontal. 2 columnas solo cuando hay ancho de sobra para
+   que cada tarjeta (grilla interna de 3 columnas, ver QuoteCard.css) no quede apretada;
+   si no, 1 columna a ancho completo. */
+/* A pedido, estética tipo mockup: grilla de 3 por renglón (antes 2, con "columns" — un
+   flujo tipo masonry que apilaba tarjetas de alto distinto sin alinearlas por fila). CSS
+   Grid en vez de "columns": con QuoteCard ahora en layout vertical (ver QuoteCard.css)
+   las tarjetas de un mismo renglón quedan prolijamente alineadas entre sí, cosa que
+   "columns" no garantiza (reparte por columna completa, no por fila). */
+/* align-items:start (no el "stretch" de fábrica de Grid) — a pedido: con stretch, al
+   abrir "Parámetros"/"Coberturas" en UNA tarjeta, todo el RENGLÓN de la grilla crecía a
+   esa altura y las tarjetas vecinas (cerradas) se estiraban igual, dejando un hueco
+   vacío enorme entre sus botones y el resto de su contenido. Con start, cada tarjeta
+   mide solo lo que necesita — abrir una no infla a las de al lado. */
 .opp-detail__quotes {
-  flex: 1;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  align-items: start;
+  gap: 16px;
   min-width: 0;
+}
+
+@media (max-width: 1300px) {
+  .opp-detail__quotes {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 720px) {
+  .opp-detail__quotes {
+    grid-template-columns: 1fr;
+  }
 }
 
 .opp-detail__footer {
@@ -167,10 +339,11 @@
   bottom: 0;
   background: #fff;
   border-top: 1px solid #e6e9ef;
-  padding: 14px 32px;
+  padding: 14px var(--page-gutter);
   display: flex;
   align-items: center;
   justify-content: space-between;
+  gap: 12px;
   font-size: 13px;
   color: #323338;
   font-weight: 600;
@@ -182,49 +355,43 @@
   gap: 14px;
 }
 
+@media (max-width: 640px) {
+  .opp-detail__footer {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .opp-detail__footer-status {
+    flex-wrap: wrap;
+  }
+
+  .opp-detail__footer-actions {
+    justify-content: stretch;
+  }
+
+  .opp-detail__footer-actions > * {
+    flex: 1;
+  }
+}
+
 .opp-detail__envio-status {
   display: inline-flex;
   align-items: center;
   gap: 8px;
 }
 
+/* Loader nativo de @vibe/core (ver JSX) — a pedido, todo loading usa el verde de marca
+   (--color-verde, ver index.css) en vez del azul de acento habitual. */
 .opp-detail__envio-spinner {
-  width: 13px;
-  height: 13px;
-  border-radius: 50%;
-  border: 2px solid #cfe3fb;
-  border-top-color: #0073ea;
+  color: var(--color-verde);
   flex-shrink: 0;
-  animation: opp-detail-envio-spin 0.8s linear infinite;
 }
 
-@keyframes opp-detail-envio-spin {
-  to {
-    transform: rotate(360deg);
-  }
+.opp-detail__error-detail-spacing {
+  margin: 0 var(--page-gutter) 20px;
 }
 
-.opp-detail__error-detail {
-  margin: 0 32px 20px;
-  background: #fdf1f2;
-  border: 1px solid #f7c6cc;
-  border-radius: 8px;
-  padding: 14px 16px;
-  color: #a41f36;
-  font-size: 12px;
-}
-
-.opp-detail__error-detail strong {
-  display: block;
-  margin-bottom: 8px;
-  font-size: 12px;
-}
-
-.opp-detail__error-detail pre {
-  margin: 0;
-  white-space: pre-wrap;
-  word-break: break-word;
-  font-family: inherit;
+.opp-detail__error-detail-spacing pre {
   max-height: 220px;
   overflow-y: auto;
 }
@@ -234,7 +401,38 @@
   gap: 12px;
 }
 
-.btn--whatsapp {
-  background: #00c875;
-  color: #fff;
+.opp-detail__lectura-gate {
+  margin: 20px var(--page-gutter) 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.opp-detail__lectura-gate-estado {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #676879;
+}
+
+.opp-detail__lectura-gate-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.opp-detail__lectura-gate-row > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+@media (max-width: 480px) {
+  .opp-detail__lectura-gate-row {
+    flex-direction: column;
+    align-items: stretch;
+  }
 }

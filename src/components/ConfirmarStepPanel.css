@@ -1,5 +1,5 @@
 .confirmar-step {
-  margin: 20px 32px 32px;
+  margin: 20px var(--page-gutter) 32px;
   display: flex;
   flex-direction: column;
   gap: 20px;
@@ -10,6 +10,21 @@
   background: #fff;
   border: 1px solid #e6e9ef;
   border-radius: 10px;
+}
+
+@media (max-width: 640px) {
+  .confirmar-step__section {
+    padding: 16px;
+  }
+
+  .confirmar-step__confirm {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .confirmar-step__confirm-btn {
+    width: 100%;
+  }
 }
 
 .confirmar-step__title {
@@ -23,17 +38,6 @@
   font-size: 13px;
   color: #676879;
   margin: 0 0 16px;
-}
-
-.confirmar-step__section-head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.confirmar-step__section-head .confirmar-step__subtitle {
-  margin-bottom: 0;
 }
 
 .confirmar-step__confirm {
@@ -53,75 +57,77 @@
   flex-shrink: 0;
 }
 
-.confirmar-step__checklist {
+/* A pedido: los 2 documentos uno al lado del otro en vez de apilados. */
+.confirmar-step__docs {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
+  grid-template-columns: repeat(2, 1fr);
   gap: 12px;
 }
 
-.confirmar-step__check {
+@media (max-width: 640px) {
+  .confirmar-step__docs {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* A pedido, estética tipo mockup: título + solapas de filtro en el mismo renglón. */
+.confirmar-step__props-head {
   display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 8px;
-  font-size: 13px;
-}
-
-.confirmar-step__check svg {
-  font-size: 18px;
-  flex-shrink: 0;
-}
-
-.confirmar-step__check--ok {
-  background: #e6f9f1;
-  color: #037f4c;
-}
-
-.confirmar-step__check--missing {
-  background: #fff7f0;
-  color: #a15c00;
-}
-
-.confirmar-step__check-label {
-  font-weight: 700;
-  min-width: 120px;
-}
-
-.confirmar-step__check-value {
-  color: inherit;
-  opacity: 0.85;
-}
-
-.confirmar-step__docs {
-  display: flex;
-  flex-direction: column;
-  gap: 10px;
-}
-
-.confirmar-step__companies {
-  display: flex;
-  flex-direction: column;
+  align-items: flex-start;
+  justify-content: space-between;
   gap: 16px;
 }
 
-.confirmar-step__company-row {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 14px;
+@media (max-width: 640px) {
+  .confirmar-step__props-head {
+    flex-direction: column;
+  }
 }
 
-.confirmar-step__company-row .confirmar-step__card {
-  flex: 1 1 200px;
-  max-width: 260px;
+/* Chrome del control segmentado vive en pill-tabs.css, compartido con
+   .opp-detail__cobertura-tabs (paso "Comparar y enviar") — acá solo lo específico de
+   este uso. */
+.confirmar-step__filter-tabs {
+  flex-shrink: 0;
 }
 
+.confirmar-step__empty {
+  margin: 0;
+  padding: 20px 0;
+  text-align: center;
+  color: #9699a6;
+  font-size: 13px;
+}
+
+/* A pedido, estética tipo mockup: grilla pareja de 3 por renglón (antes agrupadas en
+   filas por compañía) — el color del borde izquierdo (accentForCompania) ya identifica
+   de qué compañía es cada una, no hace falta agruparlas visualmente aparte. */
+.confirmar-step__grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 16px;
+}
+
+@media (max-width: 1000px) {
+  .confirmar-step__grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 640px) {
+  .confirmar-step__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+/* A pedido, estética tipo mockup: mismo lenguaje visual que .quote-card (paso
+   "Comparar y enviar") — layout vertical, sin el alto fijo de antes (ahora hay tabla de
+   cuotas adentro, el contenido real varía más que solo 2 líneas de texto truncadas). */
 .confirmar-step__card {
-  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 6px;
-  padding: 16px;
+  gap: 12px;
+  padding: 16px 20px;
   border: 1px solid #d0d4e4;
   border-left-width: 4px;
   border-radius: 10px;
@@ -133,43 +139,116 @@
   background: #eef6ff;
 }
 
+.confirmar-step__card-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.confirmar-step__card-header-main {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.confirmar-step__card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Ícono de "ya se envió por WhatsApp" — inline adelante de la compañía (ver el
+   comentario grande en el JSX sobre por qué ya no es una insignia flotante). */
 .confirmar-step__card-wa {
-  position: absolute;
-  top: 12px;
-  right: 12px;
   display: flex;
   align-items: center;
   justify-content: center;
-  width: 22px;
-  height: 22px;
+  width: 20px;
+  height: 20px;
   border-radius: 50%;
   background: #00c875;
   color: #fff;
-  font-size: 13px;
+  font-size: 11px;
+  flex-shrink: 0;
 }
 
 .confirmar-step__card-compania {
   font-weight: 700;
-  color: #323338;
-  padding-right: 26px;
+  flex-shrink: 0;
 }
 
 .confirmar-step__card-cobertura {
   font-size: 13px;
   color: #676879;
-  min-height: 32px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  min-width: 0;
 }
 
+.confirmar-step__card-deducible {
+  font-size: 12px;
+  color: #676879;
+}
+
+.confirmar-step__card-total-block {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+  text-align: right;
+  flex-shrink: 0;
+}
+
+.confirmar-step__card-total-label {
+  font-size: 11px;
+  color: #676879;
+}
+
+/* Mismo verde que el costo total del paso 2 (ver .quote-card__total-value en
+   QuoteCard.css) — a pedido, para que se lea igual en los 2 pasos. */
 .confirmar-step__card-total {
   font-size: 18px;
   font-weight: 700;
+  color: var(--color-verde);
+}
+
+/* Mismo lenguaje visual que .quote-card__cuotas-table (paso "Comparar y enviar"). */
+.confirmar-step__card-cuotas-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+}
+
+.confirmar-step__card-cuotas-table th {
+  padding: 0 12px 4px 0;
+  text-align: left;
+  font-size: 10px;
+  font-weight: 700;
+  color: #9699a6;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.confirmar-step__card-cuotas-table td {
+  padding: 2px 12px 2px 0;
   color: #323338;
-  margin: 4px 0 8px;
+}
+
+.confirmar-step__card-promo {
+  display: block;
+  font-size: 12px;
+  color: #676879;
+  margin-top: 6px;
 }
 
 .confirmar-step__card-btn {
   justify-content: center;
   width: 100%;
+  margin-top: auto;
 }
 
 .confirmar-step__error {
@@ -214,6 +293,18 @@
   display: grid;
   grid-template-columns: repeat(4, 1fr);
   gap: 14px;
+}
+
+@media (max-width: 640px) {
+  .confirmar-step__chosen-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+
+@media (max-width: 400px) {
+  .confirmar-step__chosen-grid {
+    grid-template-columns: 1fr;
+  }
 }
 
 .confirmar-step__chosen-grid > div {
