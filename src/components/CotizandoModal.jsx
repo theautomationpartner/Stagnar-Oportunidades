@@ -5,15 +5,8 @@ import GradientSpinner from './GradientSpinner'
 import ProgressBar from './ProgressBar'
 import './CotizandoModal.css'
 
-// Nombres reales de cada compañía tal cual se muestran acá — no todas llevan "Seguros"
-// (PORTO es "Seguro" singular, SURA no lleva sufijo).
-const DISPLAY_NAME_BY_COMPANIA = {
-  BSE: 'BSE Seguros',
-  SANCOR: 'SANCOR Seguros',
-  PORTO: 'PORTO Seguro',
-  SURA: 'SURA',
-}
-
+// A pedido: el código corto de la compañía (BSE/SANCOR/PORTO/SURA), sin "Seguros" —
+// mismo criterio que el resto de la app (ej. .quote-card__company en QuoteCard.jsx).
 const COMPANIAS = Object.keys(EXPECTED_QUOTE_COUNT_BY_COMPANIA)
 
 // A pedido: popup con el avance en vivo de la cotización automática, compañía por
@@ -71,7 +64,7 @@ export default function CotizandoModal({ show, recotizando, progress, onClose })
             return (
               <div className="cotizando-modal__item" key={compania}>
                 <span className="cotizando-modal__item-name" style={{ color: accentForCompania(compania) }}>
-                  {DISPLAY_NAME_BY_COMPANIA[compania]}
+                  {compania}
                 </span>
                 <span
                   className={
