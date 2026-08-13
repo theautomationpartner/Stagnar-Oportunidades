@@ -10,6 +10,7 @@ import ConfirmarStepPanel from './ConfirmarStepPanel'
 import EmitirStepPanel from './EmitirStepPanel'
 import WhatsAppSendModal from './WhatsAppSendModal'
 import ErrorDetailBox from './ErrorDetailBox'
+import ClientFicha from './ClientFicha'
 import './PillTabs.css'
 import {
   fetchOpportunityDetail,
@@ -717,23 +718,22 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
 
   // Botón "Concretar Oportunidad": dispara la automatización que crea/emite la póliza
   // (color_mm5ejysv, "Crear Poliza") poniéndola en "Crear" — mismo mecanismo que
-  // "Cotizar" sobre Estado Cotización, prende el polling en vivo de esa columna — Y,
-  // a pedido, es acá (no al subir el archivo) donde la oportunidad pasa de verdad a
-  // "Concretada", ya que es el botón que dice eso mismo.
+  // "Cotizar" sobre Estado Cotización, prende el polling en vivo de esa columna. A
+  // pedido: el paso a "Concretada" (deal_stage) NO lo escribe la app acá — queda en
+  // manos de la automatización real de monday, el polling de acá abajo ya refresca el
+  // ítem completo en cada tick (ver el useEffect de polizaPolling) y va a reflejar solo
+  // cuando de verdad haya pasado en monday, no antes.
   const handleConfirmarEmision = async () => {
     setConfirmandoEmision(true)
     setConfirmarEmisionError(null)
     setPolizaErrorDetail(null)
     try {
       await setSimpleColumnValue(opportunityId, ESTADO_CREACION_COLUMN_ID, 'Crear')
-      await setSimpleColumnValue(opportunityId, ESTADO_OPORTUNIDAD_COLUMN_ID, 'Concretada')
       setItem((prev) => ({
         ...prev,
-        column_values: prev.column_values.map((cv) => {
-          if (cv.id === ESTADO_CREACION_COLUMN_ID) return { ...cv, text: 'Crear' }
-          if (cv.id === ESTADO_OPORTUNIDAD_COLUMN_ID) return { ...cv, text: 'Concretada' }
-          return cv
-        }),
+        column_values: prev.column_values.map((cv) =>
+          cv.id === ESTADO_CREACION_COLUMN_ID ? { ...cv, text: 'Crear' } : cv
+        ),
       }))
       setPolizaPolling(true)
     } catch (err) {
@@ -953,56 +953,25 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
             <p className="opp-detail__subtitle">{steps[activeStepIndex]?.subtitle}</p>
           </div>
 
-          {/* A pedido: en el paso "Cotizar" esta tarjeta ya no se muestra — avatar,
-              nombre e id de oportunidad quedaban repitiendo lo que la ficha de abajo
-              (CotizarStepPanel) ya muestra completo (avatar, nombre, CI, Nacimiento,
-              Teléfono, Ubicación, Vehículo, id de monday). En el resto de los pasos
-              sigue igual: bien asegurado, nota de Edad/Combustible/Teléfono y
-              "Recotizar" en Comparar/Confirmar. */}
+          {/* A pedido: mismo ClientFicha que el paso "Cotizar" (antes esta tarjeta era
+              una versión más simple, con menos datos) en el resto de los pasos — así se
+              ve igual en toda la oportunidad, no solo acá. "Editar" manda al paso
+              "Cotizar" (ahí vive la edición real, ver CotizarStepPanel). "Recotizar"
+              sigue disponible en Comparar/Confirmar mientras ya haya cotizaciones. */}
           {activeStep !== 'cotizar' && (
             <div className="opp-detail__client-card">
-              <div className="opp-detail__client-card-main">
-                <div className="opp-detail__client-avatar">{opportunity.clienteNombre.slice(0, 2).toUpperCase()}</div>
-                <div className="opp-detail__client-info">
-                  <span className="opp-detail__client-name">{opportunity.clienteNombre}</span>
-                  <span className="opp-detail__client-meta">
-                    {opportunity.bienLinea1} {opportunity.bienLinea2 && `· ${opportunity.bienLinea2}`}
-                  </span>
-                  {opportunity.ci && <span className="opp-detail__client-meta">CI {opportunity.ci}</span>}
-                </div>
-
-                {/* A pedido, estética tipo mockup: número corto de la oportunidad como
-                    tag, visible en cualquier paso (salvo "Cotizar", ver arriba). */}
-                <span className="opp-detail__client-opp-badge">{opportunity.oppNumber}</span>
-
-                {/* A pedido: en vez de la aclaración de "Parámetros", acá va la lista de
-                    datos de la oportunidad (Edad, Combustible, Teléfono — antes en el
-                    panel lateral eliminado), en una sola línea para no sumar alto; el
-                    botón "Recotizar" sigue al lado, en el mismo renglón que
-                    Nombre/Bien/CI. En el paso "Confirmar" (antes tenía su propio botón
-                    "Recotizar" más abajo, junto a la sección "Datos del cliente" que se
-                    eliminó) solo se sube el botón, sin la lista de datos. */}
-                {(activeStep === 'comparar' || activeStep === 'confirmar') && hasQuotes && (
-                  <div
-                    className={
-                      activeStep === 'comparar'
-                        ? 'opp-detail__client-card-note'
-                        : 'opp-detail__client-card-note opp-detail__client-card-note--btn-only'
-                    }
-                  >
-                    {activeStep === 'comparar' && (
-                      <span className="opp-detail__client-card-data">
-                        <span>Edad: {opportunity.edad ? `${opportunity.edad} años` : '—'}</span>
-                        <span>Combustible: {opportunity.combustible || '—'}</span>
-                        <span>Teléfono: {opportunity.telefono || '—'}</span>
-                      </span>
-                    )}
+              <ClientFicha
+                opportunity={opportunity}
+                onEdit={() => setActiveStep('cotizar')}
+                tag={opportunity.oppNumber}
+                actions={
+                  (activeStep === 'comparar' || activeStep === 'confirmar') && hasQuotes ? (
                     <Button kind="secondary" className="opp-detail__recotizar-btn" onClick={() => setActiveStep('cotizar')}>
                       <MdAutorenew /> Recotizar
                     </Button>
-                  </div>
-                )}
-              </div>
+                  ) : null
+                }
+              />
             </div>
           )}
 

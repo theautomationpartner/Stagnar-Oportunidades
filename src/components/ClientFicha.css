@@ -1,0 +1,161 @@
+/* Mismo lenguaje visual que .crear-op__ficha (CrearOportunidadForm.css) — nombre
+   grande, ubicación con ícono, badges con los datos secundarios. Clase propia (no esa)
+   para no depender de que ese CSS esté cargado en la pantalla que use este componente. */
+.client-ficha {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 18px 20px;
+  background: #f6f7fb;
+  border: 1px solid #e6e9ef;
+  border-radius: 10px;
+}
+
+.client-ficha__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.client-ficha__header-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
+.client-ficha__identity {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 0;
+}
+
+/* Mismo círculo que .opp-detail__client-avatar (OpportunityDetail.css) — clase propia
+   para no depender de ese CSS. */
+.client-ficha__avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: #0073ea;
+  color: #fff;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.client-ficha__heading {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+.client-ficha__name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.client-ficha__name {
+  font-size: 18px;
+  font-weight: 700;
+  color: #323338;
+  margin: 0;
+}
+
+/* A pedido: número corto de la oportunidad (OPP-XXXX) como tag al lado del nombre —
+   solo lo usa OpportunityDetail.jsx (ver prop `tag`), CotizarStepPanel no lo pasa. */
+.client-ficha__tag {
+  flex-shrink: 0;
+  font-size: 11px;
+  font-weight: 700;
+  color: #0073ea;
+  background: #eef6ff;
+  padding: 2px 8px;
+  border-radius: 10px;
+}
+
+.client-ficha__address {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  color: #676879;
+}
+
+.client-ficha__address svg {
+  flex-shrink: 0;
+  font-size: 16px;
+  color: #0073ea;
+}
+
+.client-ficha__badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.client-ficha__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 5px 12px;
+  background: #fff;
+  border: 1px solid #e6e9ef;
+  border-radius: 20px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #323338;
+}
+
+.client-ficha__badge svg {
+  font-size: 14px;
+  color: #676879;
+}
+
+.client-ficha__vehiculo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding-top: 12px;
+  border-top: 1px solid #e6e9ef;
+}
+
+.client-ficha__vehiculo-label {
+  font-size: 11px;
+  font-weight: 700;
+  color: #9699a6;
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.client-ficha__vehiculo-title {
+  font-size: 15px;
+  font-weight: 700;
+  color: #323338;
+}
+
+.client-ficha__vehiculo-meta {
+  font-size: 12px;
+  color: #676879;
+}
+
+/* A pedido, estética tipo mockup: link celeste chico en vez de un Button "Editar" de
+   siempre — pega mejor al lado del nombre en vez de competir en peso visual con él. */
+.client-ficha__edit-link {
+  color: #0073ea !important;
+  font-size: 13px;
+  font-weight: 600;
+  padding: 0 !important;
+}
+
+@media (max-width: 480px) {
+  .client-ficha__header {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

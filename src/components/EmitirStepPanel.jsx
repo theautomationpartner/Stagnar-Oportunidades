@@ -8,6 +8,7 @@ import FileUploadField from './FileUploadField'
 import StatusBadge from './StatusBadge'
 import GradientSpinner from './GradientSpinner'
 import ErrorDetailBox from './ErrorDetailBox'
+import AlertModal from './AlertModal'
 import './EmitirStepPanel.css'
 
 // Resumen final de todos los datos con los que se cerró la oportunidad: cliente, bien
@@ -29,6 +30,26 @@ const BIEN_FIELDS = [
   { key: 'combustible', label: 'Combustible' },
   { key: 'uso', label: 'Uso' },
 ]
+
+// A pedido: chequeo explícito acá (paso 4), no solo confiar en el gate del paso 3
+// (ConfirmarStepPanel) — cubre el caso de volver atrás y borrar un dato después de
+// haber confirmado, o entrar directo a este paso en una oportunidad vieja. Mismos
+// campos que ya se muestran en "Resumen final" (CLIENTE_FIELDS/BIEN_FIELDS) + los 2
+// documentos del asegurado (Cédula/Libreta, ver `opportunity.cedula`/
+// `.libretaConducir` — mismos nombres que usa ConfirmarStepPanel). "Propuesta elegida"
+// queda afuera a propósito — este paso ya deja explícito que se puede cargar la póliza
+// sin una elegida (ver el aviso más abajo, "Todavía no se eligió..."), no hace falta
+// bloquear algo que el resto de la pantalla dice que es opcional.
+const DOCS_FIELDS = [
+  { key: 'libretaConducir', label: 'Libreta de Conducir / Carta Automóvil' },
+  { key: 'cedula', label: 'Cédula de Identidad' },
+]
+
+function getMissingLabels(opportunity) {
+  return [...CLIENTE_FIELDS, ...BIEN_FIELDS, ...DOCS_FIELDS]
+    .filter((f) => !opportunity[f.key])
+    .map((f) => f.label)
+}
 
 export default function EmitirStepPanel({
   opportunity,
@@ -67,6 +88,30 @@ export default function EmitirStepPanel({
   useEffect(() => {
     if (polling) setDismissed(false)
   }, [polling])
+
+  // A pedido: chequeo antes de subir la Póliza y antes de "Concretar Oportunidad" (ver
+  // getMissingLabels más arriba) — si falta algo, se avisa con el mismo popup
+  // compartido que el resto de la app (AlertModal) en vez de dejar pasar con datos a
+  // medias.
+  const [validationError, setValidationError] = useState(null)
+
+  const handleUploadAttempt = (file) => {
+    const missing = getMissingLabels(opportunity)
+    if (missing.length > 0) {
+      setValidationError(missing)
+      return
+    }
+    onUploadPoliza(file)
+  }
+
+  const handleConcretarAttempt = () => {
+    const missing = getMissingLabels(opportunity)
+    if (missing.length > 0) {
+      setValidationError(missing)
+      return
+    }
+    onConfirmarEmision()
+  }
 
   return (
     <div className="emitir-step">
@@ -189,7 +234,7 @@ export default function EmitirStepPanel({
           deleting={deleting}
           error={error}
           missingMessage="Póliza pendiente de adjuntar"
-          onUpload={onUploadPoliza}
+          onUpload={handleUploadAttempt}
           onDelete={showConfirmarAction ? onDeletePoliza : undefined}
           showReplaceButton={false}
           compactDelete
@@ -198,7 +243,7 @@ export default function EmitirStepPanel({
               <Button
                 kind="primary"
                 className="emitir-step__confirmar-btn"
-                onClick={onConfirmarEmision}
+                onClick={handleConcretarAttempt}
                 disabled={confirmandoEmision || polling}
               >
                 <MdCheckCircle /> {confirmandoEmision ? 'Confirmando...' : 'Concretar Oportunidad'}
@@ -207,9 +252,21 @@ export default function EmitirStepPanel({
           }
         />
         {confirmarEmisionError && <p className="emitir-step__error">Error: {confirmarEmisionError}</p>}
-        {confirmarEmisionError && <p className="emitir-step__error">Error: {confirmarEmisionError}</p>}
         {!polling && <ErrorDetailBox detail={errorDetail} className="emitir-step__error-detail-spacing" />}
       </div>
+
+      {validationError && (
+        <AlertModal
+          id="emitir-faltan-datos-modal"
+          type="warning"
+          title="Faltan datos requeridos"
+          description="No podés continuar porque hay información obligatoria que no ha sido completada."
+          detailsTitle="Campos pendientes:"
+          detailsList={validationError}
+          onClose={() => setValidationError(null)}
+          primaryButton={{ text: 'Entendido', onClick: () => setValidationError(null) }}
+        />
+      )}
 
       {/* A pedido: solo el círculo girando + un texto (sin barra de progreso ni
           subtítulo aparte) mientras corre la automatización de creación de póliza

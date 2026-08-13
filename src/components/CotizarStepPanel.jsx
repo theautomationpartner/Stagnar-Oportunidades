@@ -1,13 +1,5 @@
 import { useEffect, useState } from 'react'
-import {
-  MdEdit,
-  MdAutorenew,
-  MdArrowForward,
-  MdLocationOn,
-  MdSmartphone,
-  MdCheckCircle,
-  MdWarningAmber,
-} from 'react-icons/md'
+import { MdAutorenew, MdArrowForward, MdCheckCircle, MdWarningAmber } from 'react-icons/md'
 import { Button, Dropdown, AttentionBox, Loader, TextField, NumberField, Modal, ModalContent, ModalFooter } from '@vibe/core'
 import { COTIZAR_FIELDS, getMissingCotizarFields } from '../services/cotizarFields'
 import { fetchAutodataModelosByAnioMarca } from '../services/mondayApi'
@@ -16,6 +8,7 @@ import StatusBadge from './StatusBadge'
 import AutodataModeloPorAnioMarca from './AutodataModeloPorAnioMarca'
 import AlertModal from './AlertModal'
 import ErrorDetailBox from './ErrorDetailBox'
+import ClientFicha from './ClientFicha'
 import './CotizarStepPanel.css'
 
 // A pedido: orden propio del popup "Editar información" — de a 2 por renglón cuando
@@ -342,58 +335,10 @@ export default function CotizarStepPanel({
       </div>
 
       <div className="cotizar-step__top-grid">
-        <div className="cotizar-step__ficha">
-          <div className="cotizar-step__ficha-header">
-            <div className="cotizar-step__ficha-identity">
-              {/* A pedido: mismo avatar (iniciales sobre círculo azul) que ya usa la
-                  tarjeta de arriba de todo (opp-detail__client-avatar en
-                  OpportunityDetail.jsx) — clase propia acá para no depender de que
-                  ese CSS esté cargado en esta pantalla. */}
-              <div className="cotizar-step__ficha-avatar">{opportunity.clienteNombre.slice(0, 2).toUpperCase()}</div>
-              <div className="cotizar-step__ficha-heading">
-                <h3 className="cotizar-step__ficha-name">{opportunity.clienteNombre}</h3>
-                <span className="cotizar-step__ficha-address">
-                  <MdLocationOn />
-                  {ubicacion || 'Sin ubicación cargada'}
-                </span>
-              </div>
-            </div>
-            <Button kind="tertiary" className="cotizar-step__edit-link" onClick={startEditing}>
-              <MdEdit /> Editar
-            </Button>
-          </div>
-          <div className="cotizar-step__ficha-badges">
-            <span className="cotizar-step__ficha-badge">CI: {opportunity.ci || '—'}</span>
-            <span className="cotizar-step__ficha-badge">Nacimiento: {opportunity.fechaNacimiento || '—'}</span>
-            <span className="cotizar-step__ficha-badge">
-              <MdSmartphone />
-              {opportunity.telefono || '—'}
-            </span>
-            {/* A pedido: id real del ítem en monday, como dato extra — útil para ir a
-                buscarlo directo en monday si hace falta (soporte, debug), sin tener
-                que andar deduciéndolo de la URL. */}
-            <span className="cotizar-step__ficha-badge">ID: {opportunity.id}</span>
-          </div>
-
-          {/* A pedido: el vehículo también en la ficha, no solo en el checklist de la
-              derecha (ahí solo importa si CADA dato está o no — acá se lee de corrido,
-              como ya se arma en CrearOportunidadForm/OpportunityDetail para el mismo
-              vehículo, ver bienLinea1/bienLinea2 en opportunityMapper.js). */}
-          <div className="cotizar-step__ficha-vehiculo">
-            <span className="cotizar-step__ficha-vehiculo-label">Vehículo</span>
-            <strong className="cotizar-step__ficha-vehiculo-title">
-              {[opportunity.marca, opportunity.modelo].filter(Boolean).join(' ') || 'Sin vehículo cargado'}
-              {opportunity.anio && ` (${opportunity.anio})`}
-            </strong>
-            {(opportunity.combustible || opportunity.tipo || opportunity.uso) && (
-              <span className="cotizar-step__ficha-vehiculo-meta">
-                {[opportunity.combustible, opportunity.tipo, opportunity.uso && `Uso ${opportunity.uso}`]
-                  .filter(Boolean)
-                  .join(' · ')}
-              </span>
-            )}
-          </div>
-        </div>
+        {/* Ficha del cliente/Lead — componente compartido con OpportunityDetail.jsx
+            (ver ClientFicha.jsx), para que se vea igual en todos los pasos de la
+            oportunidad, no solo acá. */}
+        <ClientFicha opportunity={opportunity} onEdit={startEditing} />
 
         <div className="cotizar-step__checklist">
           <h3 className="cotizar-step__checklist-title">Datos mínimos para cotizar</h3>

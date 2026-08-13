@@ -114,155 +114,25 @@
   margin: 0;
 }
 
-/* Los datos de la oportunidad (Edad/Combustible/Teléfono, antes en el panel lateral
-   eliminado) van como 2do renglón de esta misma tarjeta — por eso pasa a column en vez
-   de ser directo la fila avatar/info/nota (ver .opp-detail__client-card-main más abajo). */
+/* A pedido: mismo componente ClientFicha (ver CotizarStepPanel.jsx/ClientFicha.jsx) en
+   el resto de los pasos de la oportunidad, no solo en "Cotizar" — trae su propia caja
+   (fondo/borde/radio), acá solo hace falta el margen exterior con el resto de la
+   pantalla. */
 .opp-detail__client-card {
   margin: 16px var(--page-gutter) 0;
-  background: #fff;
-  border: 1px solid #e6e9ef;
-  border-radius: 10px;
-  display: flex;
-  flex-direction: column;
 }
 
-/* A pedido: la aclaración de "Parámetros" + botón "Recotizar" van al lado de
-   Nombre/Bien/CI, en el mismo renglón — info crece para ocupar el medio, la nota queda
-   pegada a la derecha; en pantallas angostas la nota baja a su propio renglón. */
-.opp-detail__client-card-main {
-  padding: 16px 20px;
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  gap: 14px;
-}
-
-.opp-detail__client-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: #0073ea;
-  color: #fff;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.opp-detail__client-info {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  flex: 1 1 200px;
-  min-width: 160px;
-}
-
-.opp-detail__client-name {
-  font-weight: 700;
-  color: #323338;
-}
-
-.opp-detail__client-meta {
-  font-size: 12px;
-  color: #676879;
-}
-
-/* A pedido, estética tipo mockup: número corto de la oportunidad (OPP-XXXX) como tag —
-   flex-shrink:0 para que no se lo coma .opp-detail__client-info (flex:1) si el nombre
-   es largo. */
-.opp-detail__client-opp-badge {
-  flex-shrink: 0;
-  font-size: 11px;
-  font-weight: 700;
-  color: #0073ea;
-  background: #eef6ff;
-  border: 1px solid #9cc2f2;
-  border-radius: 12px;
-  padding: 3px 10px;
-}
-
-/* Renglón de la aclaración de "Parámetros" + botón "Recotizar", al lado de
-   Nombre/Bien/CI (ver .opp-detail__client-card-main). No crece agresivo — deja que
-   .opp-detail__client-info ocupe el medio y esto quede pegado a la derecha; en
-   pantallas angostas baja a su propio renglón (flex-wrap del padre). */
-.opp-detail__client-card-note {
-  display: flex;
-  align-items: center;
-  flex-wrap: wrap;
-  justify-content: space-between;
-  gap: 12px;
-  flex: 1 1 320px;
-  min-width: 0;
-  font-size: 13px;
-  color: #323338;
-}
-
-/* Paso "Cotizar" (sin cotizaciones todavía): si "Cotizar" falla, el error queda en su
-   propio renglón (flex-basis:100%, ver flex-wrap de arriba) en vez de apretado al lado
-   del botón. */
-.opp-detail__client-card-note-error {
-  flex-basis: 100%;
-  color: #e2445c;
-  font-size: 12px;
-}
-
-/* Paso "Confirmar": solo el botón "Recotizar" acá, sin lista de datos al lado — no
-   crece (si no, al ser el único hijo quedaría flotando lejos del borde derecho de la
-   tarjeta en vez de pegado a él); .opp-detail__client-info ya se encarga de empujarlo
-   hacia la derecha. */
-.opp-detail__client-card-note--btn-only {
-  flex: 0 0 auto;
-  justify-content: flex-end;
-}
-
-/* Paso "Cotizar" (sin cotizaciones todavía): a pedido, el texto va pegado al botón en
-   vez de separado por todo el ancho de sobra (space-between de .opp-detail__client-card-
-   note) — mismo criterio de no crecer que --btn-only, para que el par quede agrupado
-   contra el borde derecho de la tarjeta. */
-.opp-detail__client-card-note--tight {
-  flex: 0 0 auto;
-  justify-content: flex-end;
-  gap: 14px;
+/* Recotizar (Comparar/Confirmar, ver prop `actions` de ClientFicha): Button
+   kind="secondary" es transparente de fábrica — sobre el fondo celeste del header de la
+   ficha casi no se notaba. Fondo blanco sólido para que se diferencie. */
+.opp-detail__recotizar-btn {
+  background-color: #fff !important;
 }
 
 @media (max-width: 640px) {
-  .opp-detail__client-card-note {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .opp-detail__client-card-data {
-    white-space: normal;
-  }
-
   .opp-detail__recotizar-btn {
     width: 100%;
   }
-}
-
-/* Datos de la oportunidad (antes en el panel lateral "Datos de la oportunidad",
-   eliminado; antes de eso, una aclaración de texto acá mismo) — a pedido, en una sola
-   línea (nowrap + ellipsis) para no sumarle alto a la tarjeta. */
-.opp-detail__client-card-data {
-  display: flex;
-  gap: 14px;
-  min-width: 0;
-  overflow: hidden;
-  white-space: nowrap;
-  color: #676879;
-}
-
-.opp-detail__client-card-data > span {
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-
-/* Button kind="secondary" es transparente de fábrica — sobre el fondo
-   celeste de este info-bar casi no se notaba. Fondo blanco sólido para que
-   se diferencie. */
-.opp-detail__recotizar-btn {
-  background-color: #fff !important;
 }
 
 .opp-detail__no-quotes {

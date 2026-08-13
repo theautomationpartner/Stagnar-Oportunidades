@@ -53,130 +53,9 @@
   }
 }
 
-/* Mismo lenguaje visual que .crear-op__ficha (CrearOportunidadForm.css) — nombre
-   grande, ubicación con ícono, badges con los datos secundarios. Clase propia (no esa)
-   para no depender de que ese CSS esté cargado en esta pantalla. */
-.cotizar-step__ficha {
-  display: flex;
-  flex-direction: column;
-  gap: 14px;
-  padding: 18px 20px;
-  background: #f6f7fb;
-  border: 1px solid #e6e9ef;
-  border-radius: 10px;
-}
-
-.cotizar-step__ficha-header {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.cotizar-step__ficha-identity {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  min-width: 0;
-}
-
-/* Mismo círculo que .opp-detail__client-avatar (OpportunityDetail.css) — clase propia
-   para no depender de ese CSS. */
-.cotizar-step__ficha-avatar {
-  width: 40px;
-  height: 40px;
-  border-radius: 50%;
-  background: #0073ea;
-  color: #fff;
-  font-weight: 700;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  flex-shrink: 0;
-}
-
-.cotizar-step__ficha-heading {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  min-width: 0;
-}
-
-.cotizar-step__ficha-name {
-  font-size: 18px;
-  font-weight: 700;
-  color: #323338;
-  margin: 0;
-}
-
-.cotizar-step__ficha-address {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  font-size: 13px;
-  color: #676879;
-}
-
-.cotizar-step__ficha-address svg {
-  flex-shrink: 0;
-  font-size: 16px;
-  color: #0073ea;
-}
-
-.cotizar-step__ficha-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 8px;
-}
-
-.cotizar-step__ficha-badge {
-  display: inline-flex;
-  align-items: center;
-  gap: 5px;
-  padding: 5px 12px;
-  background: #fff;
-  border: 1px solid #e6e9ef;
-  border-radius: 20px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #323338;
-}
-
-.cotizar-step__ficha-badge svg {
-  font-size: 14px;
-  color: #676879;
-}
-
-/* A pedido: el vehículo también en la ficha (antes solo vivía en el checklist de la
-   derecha, ahí solo importa si cada dato está o no) — separado de los badges por una
-   línea fina, mismo criterio visual que .crear-op__lectura-summary
-   (CrearOportunidadForm.css) para el mismo tipo de resumen. */
-.cotizar-step__ficha-vehiculo {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-  padding-top: 12px;
-  border-top: 1px solid #e6e9ef;
-}
-
-.cotizar-step__ficha-vehiculo-label {
-  font-size: 11px;
-  font-weight: 700;
-  color: #9699a6;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
-
-.cotizar-step__ficha-vehiculo-title {
-  font-size: 15px;
-  font-weight: 700;
-  color: #323338;
-}
-
-.cotizar-step__ficha-vehiculo-meta {
-  font-size: 12px;
-  color: #676879;
-}
+/* La ficha del cliente/Lead (izquierda) es ahora el componente compartido
+   ClientFicha.jsx/css — mismo motivo que el comentario de arriba: se repite igual en
+   el resto de los pasos de la oportunidad (ver OpportunityDetail.jsx). */
 
 /* Checklist de los 9 datos mínimos que la automatización de "Cotizar" necesita
    completos — mismo criterio de color que el resto de la app (verde = completo,
@@ -412,16 +291,6 @@
 
 .cotizar-step__error-detail-spacing {
   margin-top: 16px;
-}
-
-/* A pedido, estética tipo mockup: link celeste chico en vez del Button "Editar" de
-   siempre — pega mejor al lado del título de sección en vez de competir en peso visual
-   con él. */
-.cotizar-step__edit-link {
-  color: #0073ea !important;
-  font-size: 13px;
-  font-weight: 600;
-  padding: 0 !important;
 }
 
 /* A pedido: "Volver a detalles" se sacó (quedaba duplicado con el breadcrumb) — ahora
