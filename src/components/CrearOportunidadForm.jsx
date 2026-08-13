@@ -997,6 +997,17 @@ export default function CrearOportunidadForm({
     setBusquedaResuelta(false)
   }
 
+  // Bug reportado: "Inicio"/"Buscar Oportunidad" salían del formulario sin pasar por
+  // handleVolverABuscar, así que no limpiaban lo persistido (ver PERSISTED_SEARCH_KEY
+  // más arriba) — al volver a "Crear Oportunidad" para cargar una persona distinta,
+  // esa selección vieja (todavía dentro del TTL de 10 minutos) se restauraba sola.
+  // Salir del formulario por cualquier camino (no solo "Buscar persona") tiene que
+  // descartar la selección sin confirmar, igual que la cruz de "Buscar Persona".
+  const handleExit = (destino) => {
+    clearPersistedSearch()
+    destino?.()
+  }
+
   // Solo corre cuando NO hay un resultado elegido a propósito por "Buscar Persona" (search
   // salteada — "crear de 0" — y el usuario sigue completando Nombre/Apellido/CI a mano) —
   // avisa (sin bloquear) si esa persona ya está cargada como Contacto, por Cédula o por
@@ -1604,8 +1615,8 @@ export default function CrearOportunidadForm({
             onSelect={(key) => handleStepClick(STEPS.findIndex((s) => s.key === key))}
           />
           <div className="crear-op__header-actions">
-            <IconButton icon={MdSearch} onClick={onVerOportunidades} aria-label="Buscar Oportunidad" />
-            <IconButton icon={MdHome} onClick={onHome} aria-label="Inicio" />
+            <IconButton icon={MdSearch} onClick={() => handleExit(onVerOportunidades)} aria-label="Buscar Oportunidad" />
+            <IconButton icon={MdHome} onClick={() => handleExit(onHome)} aria-label="Inicio" />
           </div>
         </div>
 
@@ -1643,9 +1654,21 @@ export default function CrearOportunidadForm({
                 {!resultadoSeleccionado && showDuplicadoModal && duplicadoCheck?.contacto && (
                   <AlertModal
                     id="duplicado-cedula-modal"
-                    type="info"
-                    title="Cédula de Identidad existente en Clientes"
-                    description="Usaremos los datos de este cliente para completar los datos personales."
+                    type="warning"
+                    title="Cédula de Identidad ya registrada"
+                    description={
+                      <>
+                        Encontramos esta Cédula de Identidad ya cargada en el tablero Clientes:
+                        <br />
+                        <br />
+                        Nombre: <strong>{duplicadoCheck.contacto.name}</strong>
+                        <br />
+                        Situación: <strong>{duplicadoCheck.contacto.situacion || 'Cliente'}</strong>
+                        <br />
+                        <br />
+                        ¿Deseás continuar con la información de este registro?
+                      </>
+                    }
                     onClose={handleCancelDuplicadoModal}
                     secondaryButton={{ text: 'Cancelar', onClick: handleCancelDuplicadoModal }}
                     primaryButton={{ text: 'Confirmar', onClick: handleConfirmDuplicadoContacto }}
@@ -2256,7 +2279,7 @@ export default function CrearOportunidadForm({
                 <MdArrowBack /> Buscar persona
               </Button>
             ) : (
-              <Button kind="secondary" className="crear-op__footer-back" onClick={onCancel} disabled={saving}>
+              <Button kind="secondary" className="crear-op__footer-back" onClick={() => handleExit(onCancel)} disabled={saving}>
                 <MdArrowBack /> Cancelar
               </Button>
             )
