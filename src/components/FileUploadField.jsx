@@ -298,6 +298,7 @@ export default function FileUploadField({
                   <IconButton
                     className="file-field__mini-remove"
                     icon={MdClose}
+                    size="xs"
                     onClick={onDelete}
                     aria-label={deleteLabel}
                     title={deleteLabel}
