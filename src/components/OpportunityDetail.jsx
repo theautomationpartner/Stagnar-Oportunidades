@@ -954,11 +954,14 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
           </div>
 
           {/* A pedido: mismo ClientFicha que el paso "Cotizar" (antes esta tarjeta era
-              una versión más simple, con menos datos) en el resto de los pasos — así se
-              ve igual en toda la oportunidad, no solo acá. "Editar" manda al paso
+              una versión más simple, con menos datos) en Comparar/Confirmar — así se ve
+              igual en toda la oportunidad, no solo en "Cotizar". "Editar" manda al paso
               "Cotizar" (ahí vive la edición real, ver CotizarStepPanel). "Recotizar"
-              sigue disponible en Comparar/Confirmar mientras ya haya cotizaciones. */}
-          {activeStep !== 'cotizar' && (
+              sigue disponible en Comparar/Confirmar mientras ya haya cotizaciones. En
+              "Emitir" esta tarjeta NO se muestra (a pedido, evitar duplicarla) — ese
+              paso ya tiene su propia ClientFicha de solo lectura en "Resumen final"
+              (ver EmitirStepPanel.jsx), con la propuesta elegida adentro. */}
+          {activeStep !== 'cotizar' && activeStep !== 'emitir' && (
             <div className="opp-detail__client-card">
               <ClientFicha
                 opportunity={opportunity}
@@ -1109,6 +1112,12 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
                   )}
                 </div>
                 <div className="opp-detail__footer-actions">
+                  {/* A pedido: se puede pasar a "Confirmar" sin haber enviado nada por
+                      WhatsApp — útil cuando el cliente ya eligió la propuesta por otro
+                      medio (llamada, presencial) y no hace falta mandarle nada más. */}
+                  <Button kind="secondary" onClick={() => setActiveStep('confirmar')}>
+                    Continuar sin enviar
+                  </Button>
                   <Button
                     kind="primary"
                     color="positive"

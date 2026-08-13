@@ -10,7 +10,10 @@ import './ClientFicha.css'
 // `tag`: badge chico al lado del nombre (ej. el número corto de la oportunidad, solo lo
 // usa OpportunityDetail). `actions`: nodo extra en el header, al lado de "Editar" (ej.
 // "Recotizar", solo en Comparar/Confirmar). `onEdit` ausente esconde el link "Editar".
-export default function ClientFicha({ opportunity, onEdit, tag, actions }) {
+// `children`: contenido extra dentro de la misma tarjeta, debajo del Vehículo (ej. la
+// propuesta elegida en el paso "Emitir", ver EmitirStepPanel.jsx) — para no repetir la
+// info personal/del vehículo en una tarjeta aparte.
+export default function ClientFicha({ opportunity, onEdit, tag, actions, children }) {
   const ubicacion = [opportunity.departamento, opportunity.zonaCirculacion].filter(Boolean).join(' — ')
 
   return (
@@ -66,6 +69,8 @@ export default function ClientFicha({ opportunity, onEdit, tag, actions }) {
           </span>
         )}
       </div>
+
+      {children}
     </div>
   )
 }

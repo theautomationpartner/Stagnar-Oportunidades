@@ -9,6 +9,7 @@ import StatusBadge from './StatusBadge'
 import GradientSpinner from './GradientSpinner'
 import ErrorDetailBox from './ErrorDetailBox'
 import AlertModal from './AlertModal'
+import ClientFicha from './ClientFicha'
 import './EmitirStepPanel.css'
 
 // Resumen final de todos los datos con los que se cerró la oportunidad: cliente, bien
@@ -127,80 +128,66 @@ export default function EmitirStepPanel({
           Última revisión de los datos antes de cargar la póliza.
         </p>
 
-        {/* A pedido, estética tipo mockup: Cliente y Bien asegurado apilados, cada uno a
-            todo el ancho (antes lado a lado en 2 columnas) — así los 5 campos de cada
-            sección entran en un solo renglón en vez de amontonarse en la mitad del
-            ancho disponible. */}
-        <div className="emitir-step__subtitle-label">Cliente</div>
-        <div className="emitir-step__grid">
-          {CLIENTE_FIELDS.map((f) => (
-            <div className="emitir-step__field" key={f.key}>
-              <span>{f.label}</span>
-              <strong>{opportunity[f.key] || '—'}</strong>
+        {/* A pedido: misma ficha del cliente que el resto de los pasos (ver
+            ClientFicha.jsx) en vez de la grilla de campos Cliente/Bien asegurado — sin
+            `onEdit`, así no aparece el link "Editar" (acá es último repaso antes de
+            cargar la póliza, no un lugar para tocar datos). La propuesta elegida va
+            adentro de esta misma tarjeta (children), no en una sección aparte — antes
+            se repetía la info personal/del vehículo (esta ficha + la de arriba de todo
+            en OpportunityDetail.jsx, que ahora se esconde en este paso, ver
+            OpportunityDetail.jsx). */}
+        <ClientFicha opportunity={opportunity}>
+          {elegida && !elegida.quote.blocked && (
+            <div className="emitir-step__chosen-in-ficha">
+              {/* A pedido, estética tipo mockup: la compañía/cobertura elegida como una
+                  sola insignia (antes: encabezado propio adentro de la tarjeta) al lado
+                  del título de la sección, y los montos en una tabla de verdad (antes:
+                  grilla de cajitas sueltas) con "Total final" resaltado en verde. */}
+              <div className="emitir-step__subtitle-label emitir-step__chosen-label">
+                Propuesta elegida:{' '}
+                <span
+                  className="emitir-step__chosen-badge"
+                  style={{ color: accent, borderColor: accent }}
+                >
+                  {elegida.raw.compania} {elegida.raw.cobertura || elegida.raw.name}
+                </span>
+              </div>
+              <div className="emitir-step__chosen-table-wrap">
+                <table className="emitir-step__chosen-table">
+                  <thead>
+                    <tr>
+                      <th>Deducible</th>
+                      <th>3 cuotas</th>
+                      <th>6 cuotas</th>
+                      <th>8 cuotas</th>
+                      <th>10 cuotas</th>
+                      <th className="emitir-step__chosen-table-total">Total final</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    <tr>
+                      <td>{elegida.quote.deducibleDisplay}</td>
+                      <td>{formatMoney(elegida.quote.cuotas[3].valor)}</td>
+                      <td>{formatMoney(elegida.quote.cuotas[6].valor)}</td>
+                      <td>{formatMoney(elegida.quote.cuotas[8].valor)}</td>
+                      <td>{formatMoney(elegida.quote.cuotas[10].valor)}</td>
+                      <td className="emitir-step__chosen-table-total">
+                        {formatMoney(elegida.quote.total)}
+                      </td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
             </div>
-          ))}
-        </div>
+          )}
 
-        <div className="emitir-step__subtitle-label">Bien asegurado</div>
-        <div className="emitir-step__grid">
-          {BIEN_FIELDS.map((f) => (
-            <div className="emitir-step__field" key={f.key}>
-              <span>{f.label}</span>
-              <strong>{opportunity[f.key] || '—'}</strong>
-            </div>
-          ))}
-        </div>
-
-        {elegida && !elegida.quote.blocked && (
-          <>
-            {/* A pedido, estética tipo mockup: la compañía/cobertura elegida como una
-                sola insignia (antes: encabezado propio adentro de la tarjeta) al lado
-                del título de la sección, y los montos en una tabla de verdad (antes:
-                grilla de cajitas sueltas) con "Total final" resaltado en verde. */}
-            <div className="emitir-step__subtitle-label emitir-step__chosen-label">
-              Propuesta elegida:{' '}
-              <span
-                className="emitir-step__chosen-badge"
-                style={{ color: accent, borderColor: accent }}
-              >
-                {elegida.raw.compania} {elegida.raw.cobertura || elegida.raw.name}
-              </span>
-            </div>
-            <div className="emitir-step__chosen-table-wrap">
-              <table className="emitir-step__chosen-table">
-                <thead>
-                  <tr>
-                    <th>Deducible</th>
-                    <th>3 cuotas</th>
-                    <th>6 cuotas</th>
-                    <th>8 cuotas</th>
-                    <th>10 cuotas</th>
-                    <th className="emitir-step__chosen-table-total">Total final</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  <tr>
-                    <td>{elegida.quote.deducibleDisplay}</td>
-                    <td>{formatMoney(elegida.quote.cuotas[3].valor)}</td>
-                    <td>{formatMoney(elegida.quote.cuotas[6].valor)}</td>
-                    <td>{formatMoney(elegida.quote.cuotas[8].valor)}</td>
-                    <td>{formatMoney(elegida.quote.cuotas[10].valor)}</td>
-                    <td className="emitir-step__chosen-table-total">
-                      {formatMoney(elegida.quote.total)}
-                    </td>
-                  </tr>
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-
-        {!elegida && (
-          <p className="emitir-step__empty">
-            Todavía no se eligió una propuesta en el paso 3 — se puede cargar la póliza igual,
-            pero conviene volver a "Confirmar" y elegir una antes de emitir.
-          </p>
-        )}
+          {!elegida && (
+            <p className="emitir-step__empty emitir-step__chosen-in-ficha">
+              Todavía no se eligió una propuesta en el paso 3 — se puede cargar la póliza igual,
+              pero conviene volver a "Confirmar" y elegir una antes de emitir.
+            </p>
+          )}
+        </ClientFicha>
       </div>
 
       <div className="emitir-step__section">

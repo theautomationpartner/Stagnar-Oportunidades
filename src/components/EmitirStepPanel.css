@@ -44,32 +44,13 @@
   margin-top: 0;
 }
 
-.emitir-step__grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
-  gap: 12px;
-}
-
-.emitir-step__field {
-  display: flex;
-  flex-direction: column;
-  gap: 4px;
-  padding: 10px 12px;
-  background: #f6f7fb;
-  border-radius: 8px;
-}
-
-.emitir-step__field span {
-  font-size: 11px;
-  font-weight: 600;
-  color: #676879;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
-
-.emitir-step__field strong {
-  font-size: 14px;
-  color: #323338;
+/* A pedido: la propuesta elegida ahora vive adentro de ClientFicha (children, ver
+   EmitirStepPanel.jsx) en vez de una sección aparte que repetía la info personal/del
+   vehículo — mismo criterio visual que .client-ficha__vehiculo (línea fina arriba) para
+   separarla del resto de la ficha. */
+.emitir-step__chosen-in-ficha {
+  padding-top: 12px;
+  border-top: 1px solid #e6e9ef;
 }
 
 /* A pedido, estética tipo mockup: compañía/cobertura como una insignia sola al lado del
@@ -94,9 +75,9 @@
   padding: 3px 10px;
 }
 
-/* Tabla de verdad (antes: grilla de cajitas sueltas, ver .emitir-step__grid) — a pedido,
-   estética tipo mockup, con "Total final" resaltado en verde como única columna que
-   realmente importa de un vistazo. */
+/* Tabla de verdad (antes: grilla de cajitas sueltas) — a pedido, estética tipo mockup,
+   con "Total final" resaltado en verde como única columna que realmente importa de un
+   vistazo. */
 .emitir-step__chosen-table-wrap {
   overflow-x: auto;
 }
