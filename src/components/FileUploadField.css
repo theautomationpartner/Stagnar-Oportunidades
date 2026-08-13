@@ -7,12 +7,25 @@
   display: flex;
   align-items: center;
   gap: 12px;
-  flex-wrap: wrap;
   padding: 12px 14px;
   border-radius: 8px;
   font-size: 13px;
   border: 1px solid transparent;
   transition: background-color 0.15s ease, border-color 0.15s ease, color 0.15s ease;
+}
+
+/* A pedido, estética tipo mockup "mini": fila única compacta y de alto fijo (Cédula,
+   Libreta/Carta, Póliza — los documentos del formulario) en vez del layout apilado que
+   antes compartían con la caja grande de Carta Automóvil (ver .file-field--prominent
+   más abajo) — quedaban más altos de lo necesario al ir varios uno debajo del otro.
+   Ícono+texto a la izquierda, acción a la derecha (space-between); sin flex-wrap
+   porque el nombre largo trunca con ellipsis (ver .file-field__mini-name) en vez de
+   pasar a una segunda línea. */
+.file-field:not(.file-field--prominent) {
+  height: 38px;
+  padding: 0 6px 0 12px;
+  justify-content: space-between;
+  flex-wrap: nowrap;
 }
 
 .file-field--missing {
@@ -21,10 +34,11 @@
   border: 1px dashed var(--tint-neutral-bd);
 }
 
-/* A pedido, estética tipo mockup: una vez cargado, apilado (imagen más grande arriba,
-   dato del archivo debajo, acciones al final) en vez de todo en una sola fila — el
-   estado "falta" (ver .file-field--missing) sigue en fila, más compacto porque no tiene
-   imagen que mostrar. */
+/* A pedido, estética tipo mockup: una vez cargado, la caja grande de Carta Automóvil
+   (.file-field--prominent, ver más abajo) se apila (imagen más grande arriba, dato del
+   archivo debajo, acciones al final) — el resto de los campos (fila "mini" de arriba)
+   se queda en una sola fila, no hace falta apilar nada sin una miniatura grande que
+   mostrar. */
 .file-field--ok {
   background: #e6f9f1;
   color: #037f4c;
@@ -32,8 +46,6 @@
      menos la diferencia con "falta") — mismo criterio que la zona de arrastrar y soltar
      una vez que acepta el archivo. */
   border-color: #a6e6c9;
-  flex-direction: column;
-  align-items: flex-start;
 }
 
 .file-field--drag-over {
@@ -98,16 +110,169 @@
   display: none;
 }
 
-.file-field__info {
+/* A pedido, estética tipo dropzone: ícono en círculo celeste + texto de acción grande,
+   caja grande de Carta Automóvil sin archivo todavía (ver .file-field--prominent). El
+   botón real que dispara el selector va escondido adentro de "Hacé clic para subir"
+   (ver .file-field__dropzone-highlight) — el resto del párrafo es texto plano. */
+.file-field__dropzone-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  margin: 0 auto 4px;
+  border-radius: 50%;
+  background: #e0e7ff;
+  color: #4f46e5;
+  font-size: 22px;
+}
+
+.file-field__dropzone-text {
+  margin: 0;
+  font-size: 14px;
+  font-weight: 500;
+  color: inherit;
+}
+
+/* <button> nativo, no @vibe/core — necesita quedar disfrazado de texto plano (sin
+   fondo/borde propios) para leerse como parte de la misma oración que "o arrastrá y
+   soltá tu archivo", pero sigue siendo un elemento real enfocable con teclado. */
+.file-field__dropzone-highlight {
+  border: none;
+  background: none;
+  padding: 0;
+  font: inherit;
+  font-weight: 700;
+  color: #4f46e5;
+  cursor: pointer;
+}
+
+.file-field__dropzone-highlight:hover,
+.file-field__dropzone-highlight:focus-visible {
+  text-decoration: underline;
+}
+
+/* Fila "mini" sin archivo (ver .file-field:not(.file-field--prominent) más arriba) —
+   ícono + texto de qué documento hace falta (armado a partir de `label` en el JSX, ver
+   FileUploadField.jsx) a la izquierda, "Buscar" a la derecha. */
+.file-field__mini-placeholder {
   display: flex;
   align-items: center;
   gap: 8px;
   min-width: 0;
+  overflow: hidden;
 }
 
-.file-field__info > svg {
-  font-size: 18px;
+.file-field__mini-placeholder svg {
+  font-size: 16px;
   flex-shrink: 0;
+}
+
+.file-field__mini-placeholder span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* <button> nativo con la misma pinta que .mini-file-btn del mockup: chico, gris, sin
+   asumir protagonismo — toda la fila ya es clickeable (label que envuelve el <input>),
+   este botón existe sobre todo para que se pueda disparar con teclado. */
+.file-field__mini-btn {
+  flex-shrink: 0;
+  height: 26px;
+  padding: 0 10px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.6);
+  color: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.file-field__mini-btn:hover {
+  background: #fff;
+}
+
+/* Fila "mini" con archivo — tilde/preview + nombre a la izquierda, acciones a la
+   derecha. */
+.file-field__mini-info {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
+/* A pedido: miniatura del archivo (imagen real si hay preview, si no la extensión
+   como badge, ej. "PDF") en vez del tilde genérico de antes — mismo lenguaje que un
+   ícono de archivo con badge, escalado a la fila de 38px. `button` (clickeable, abre
+   el lightbox/pestaña nueva) cuando hay algo para ver (ver canPreview en el JSX);
+   `span` estático en el resto de los casos (ej. un PDF recién elegido, todavía sin
+   forma de previsualizarlo del lado del cliente). */
+.file-field__mini-thumb {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 6px;
+  border: 1px solid rgba(0, 0, 0, 0.12);
+  background: #fff;
+  color: #037f4c;
+  font-size: 9px;
+  font-weight: 700;
+  overflow: hidden;
+  padding: 0;
+  cursor: zoom-in;
+}
+
+.file-field__mini-thumb--static {
+  cursor: default;
+}
+
+.file-field__mini-thumb-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.file-field__mini-name {
+  font-weight: 600;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.file-field__mini-actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+.file-field__mini-link {
+  border: none;
+  background: none;
+  padding: 4px 6px;
+  color: #0073ea;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.file-field__mini-link:hover {
+  text-decoration: underline;
+}
+
+.file-field__mini-remove {
+  color: #e2445c !important;
+  flex-shrink: 0;
+}
+
+.file-field__mini-remove:hover {
+  background: #fdf1f2 !important;
 }
 
 .file-field__ok-icon {
@@ -133,23 +298,12 @@
   }
 }
 
+/* Solo la usa la caja grande de Carta Automóvil ya cargada (.file-field--prominent.
+   file-field--ok, ver JSX) — tiene toda la fila para ella sola, ahí conviene que un
+   nombre largo pase a una segunda línea en vez de truncarse (a diferencia de la fila
+   "mini", ver .file-field__mini-name, que sí trunca con ellipsis). */
 .file-field__value {
   font-weight: 600;
-}
-
-/* Ellipsis en una sola línea solo en el estado "falta" (.file-field__info es la fila
-   ícono+texto+botón apretada de ese estado) — el dato del archivo ya cargado (ver
-   .file-field--ok más arriba) tiene toda la fila para él solo, ahí conviene que un
-   nombre largo pase a una segunda línea en vez de cortarse. */
-.file-field__info .file-field__value {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-}
-
-.file-field--missing .file-field__value {
-  font-weight: 400;
-  opacity: 0.9;
 }
 
 /* Miniatura clickeable — mismo lightbox que el resto (ver más abajo). Ícono de lupa
@@ -225,13 +379,11 @@
   gap: 8px;
 }
 
-/* Button kind="secondary" es transparente de fábrica — sobre el fondo verde/naranja de
-   acá casi no se distinguía. Fondo blanco sólido para que se diferencie del fondo de
-   atrás. :not(--prominent) porque el botón "Subir archivo" de la variante prominent es
-   kind="primary" (texto blanco de fábrica) — forzarle fondo blanco también dejaba el
-   botón en blanco sobre blanco, sin texto visible. */
-.file-field--ok:not(.file-field--prominent) .file-field__btn,
-.file-field--missing:not(.file-field--prominent) .file-field__btn {
+/* Button kind="secondary" es transparente de fábrica — sobre el fondo verde de acá casi
+   no se distinguía. Fondo blanco sólido para que se diferencie del fondo de atrás.
+   (Solo lo usa la caja grande de Carta Automóvil ya cargada — el resto de los campos
+   usa la fila "mini", que no tiene ningún .file-field__btn, ver más arriba.) */
+.file-field--prominent.file-field--ok .file-field__btn {
   background-color: #fff !important;
 }
 
@@ -266,17 +418,6 @@
   margin: 4px 0 0;
   color: #e2445c;
   font-size: 12px;
-}
-
-@media (max-width: 480px) {
-  .file-field:not(.file-field--prominent) {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .file-field__btn {
-    align-self: flex-start;
-  }
 }
 
 /* Lightbox — mismo z-index por encima de un Modal (10000, ver index.css) para no

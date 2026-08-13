@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { MdUploadFile, MdClose, MdCheckCircle, MdWarningAmber, MdZoomIn, MdDeleteOutline } from 'react-icons/md'
+import { MdUploadFile, MdClose, MdCheckCircle, MdZoomIn, MdDeleteOutline } from 'react-icons/md'
 import { Button, IconButton, Loader } from '@vibe/core'
 import './FileUploadField.css'
 
@@ -73,6 +73,10 @@ export default function FileUploadField({
   const busy = uploading || deleting
   const uploaded = Boolean(file || fileName)
   const displayName = file ? file.name : displayFileName(fileName)
+  // A pedido: mini thumbnail con la extensión del archivo (ej. "PDF") cuando no hay
+  // preview de imagen para mostrar — mismo criterio que un ícono de archivo con badge,
+  // más compacto que apilar ícono + extensión en 26px.
+  const fileExtension = displayName.split('.').pop()?.slice(0, 4).toUpperCase() || ''
 
   // Preview de un File en memoria (elegido a mano o ya bajado con onFetchFile) — un PDF
   // no se puede mostrar como thumbnail sin una librería aparte, ahí solo se ve el
@@ -189,9 +193,7 @@ export default function FileUploadField({
           onChange={handleFileChange}
           disabled={disabled || busy}
         />
-        {prominent && !uploaded && helperText && <p className="file-field__helper">{helperText}</p>}
-
-        {uploaded ? (
+        {uploaded && prominent && (
           // A pedido: apilado (imagen más grande arriba, dato del archivo debajo,
           // acciones al final) en vez de todo en una sola fila — mismo orden que el
           // mockup (card-body: image-container / data-container / actions-container).
@@ -245,25 +247,128 @@ export default function FileUploadField({
               {extraActions}
             </div>
           </>
-        ) : (
+        )}
+
+        {uploaded && !prominent && (
+          // A pedido: fila única compacta ("mini") para los campos de documentación
+          // del formulario (Cédula, Libreta/Carta, Póliza) — antes usaban el mismo
+          // layout apilado de arriba, pensado para la caja grande de Carta Automóvil,
+          // y quedaban más altos de lo necesario al ir varios uno debajo del otro.
           <>
-            <div className="file-field__info">
-              {busy ? <Loader size={16} className="file-field__spinner" /> : <MdWarningAmber />}
-              {(uploading || deleting || missingMessage) && (
-                <span className="file-field__value">
-                  {uploading ? 'Subiendo...' : deleting ? 'Eliminando...' : missingMessage}
+            <span className="file-field__mini-info">
+              {busy ? (
+                <Loader size={14} className="file-field__spinner" />
+              ) : canPreview ? (
+                <button
+                  type="button"
+                  className="file-field__mini-thumb"
+                  onClick={handleOpenPreview}
+                  aria-label="Ver archivo"
+                >
+                  {fetchingPreview ? (
+                    <Loader size={12} />
+                  ) : previewUrl ? (
+                    <img className="file-field__mini-thumb-img" src={previewUrl} alt="" />
+                  ) : (
+                    fileExtension
+                  )}
+                </button>
+              ) : (
+                <span className="file-field__mini-thumb file-field__mini-thumb--static">
+                  {previewUrl ? <img className="file-field__mini-thumb-img" src={previewUrl} alt="" /> : fileExtension}
                 </span>
               )}
-            </div>
+              <span className="file-field__mini-name">
+                {uploading ? 'Subiendo...' : deleting ? 'Eliminando...' : displayName}
+              </span>
+            </span>
             {!busy && (
-              <Button
-                kind={prominent ? 'primary' : 'secondary'}
-                className="file-field__btn"
+              <span className="file-field__mini-actions">
+                {onUpload && showReplaceButton && (
+                  <button
+                    type="button"
+                    className="file-field__mini-link"
+                    onClick={() => inputRef.current?.click()}
+                    disabled={disabled}
+                  >
+                    {buttonLabel || 'Cambiar'}
+                  </button>
+                )}
+                {onDelete && (
+                  <IconButton
+                    className="file-field__mini-remove"
+                    icon={MdClose}
+                    onClick={onDelete}
+                    aria-label={deleteLabel}
+                    title={deleteLabel}
+                  />
+                )}
+                {extraActions}
+              </span>
+            )}
+          </>
+        )}
+
+        {!uploaded && prominent && (
+          // A pedido, estética tipo dropzone: ícono en círculo + texto de acción
+          // grande en vez del ícono de advertencia + botón de siempre — el botón real
+          // (necesario para poder disparar el selector de archivo con el teclado, el
+          // <input> de abajo está oculto y no es tabulable) queda escondido adentro
+          // del texto destacado "Hacé clic para subir".
+          <>
+            {busy ? (
+              <Loader size={24} className="file-field__spinner" />
+            ) : (
+              <span className="file-field__dropzone-icon">
+                <MdUploadFile />
+              </span>
+            )}
+            <p className="file-field__dropzone-text">
+              {busy ? (
+                uploading ? 'Subiendo...' : 'Eliminando...'
+              ) : (
+                <>
+                  <button
+                    type="button"
+                    className="file-field__dropzone-highlight"
+                    onClick={() => inputRef.current?.click()}
+                    disabled={disabled}
+                  >
+                    Hacé clic para subir
+                  </button>{' '}
+                  o arrastrá y soltá tu archivo
+                </>
+              )}
+            </p>
+            {!busy && helperText && <p className="file-field__helper">{helperText}</p>}
+          </>
+        )}
+
+        {!uploaded && !prominent && (
+          // A pedido, estética tipo dropzone: misma idea que arriba pero en una fila
+          // compacta — ícono + texto de qué archivo hace falta (a partir de `label`,
+          // para que siempre se refiera puntualmente a ese documento y no a "tu
+          // archivo" genérico) + un botón chico de "Buscar" a la derecha.
+          <>
+            <span className="file-field__mini-placeholder">
+              {busy ? <Loader size={14} className="file-field__spinner" /> : <MdUploadFile />}
+              <span>
+                {uploading
+                  ? 'Subiendo...'
+                  : deleting
+                    ? 'Eliminando...'
+                    : missingMessage || `Adjuntar ${label || 'archivo'}...`}
+              </span>
+            </span>
+            {!busy && (
+              <button
+                type="button"
+                className="file-field__mini-btn"
                 onClick={() => inputRef.current?.click()}
                 disabled={disabled}
               >
-                <MdUploadFile /> {buttonLabel || 'Subir archivo'}
-              </Button>
+                Buscar
+              </button>
             )}
           </>
         )}
