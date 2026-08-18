@@ -16,10 +16,6 @@
   border: 1px solid var(--border-subtle);
   border-radius: 10px;
   box-shadow: var(--shadow-floating);
-  /* A pedido: mismo alto que el checklist de al lado (ver align-items: stretch en
-     .cotizar-step__top-grid, CotizarStepPanel.css) — antes cada tarjeta medía lo que
-     su propio contenido pedía, quedando el layout visiblemente desparejo. */
-  height: 100%;
   transition: transform 0.2s ease, box-shadow 0.2s ease;
 }
 
@@ -126,14 +122,12 @@
   gap: 8px;
 }
 
-/* A pedido (auditoría UI/UX): relleno gris neutro (antes: pill blanca con borde) —
-   ahora que la propia tarjeta ya es blanca (ver más arriba), un badge blanco sobre
-   blanco no se distinguía; el gris de --bg-badge + texto oscuro (--text-badge,
-   contraste 8.9:1, pasa WCAG AAA) lo resuelve sin depender de un borde.
-   border-radius 6px (antes 20px, "pill") — más chico y cuadrado, mismo lenguaje
-   "etiqueta de dato" que un badge, no un botón. font-weight 500 (antes 600) — texto
-   chico (12px) + peso alto generaba tensión visual/saturación; 500 alcanza para
-   distinguirlo del texto normal sin la sensación de "todo en negrita". */
+/* A pedido: relleno gris neutro (antes: pill blanca con borde) — ahora que la propia
+   tarjeta ya es blanca (ver más arriba), un badge blanco sobre blanco no se
+   distinguía; el gris de --bg-badge + texto oscuro (--text-badge, contraste 8.9:1,
+   pasa WCAG AAA) lo resuelve sin depender de un borde. border-radius 6px (antes
+   20px, "pill") — más chico y cuadrado, mismo lenguaje "etiqueta de dato" que un
+   badge, no un botón. */
 .client-ficha__badge {
   display: inline-flex;
   align-items: center;
@@ -142,7 +136,7 @@
   background: var(--bg-badge);
   border-radius: 6px;
   font-size: 12px;
-  font-weight: 500;
+  font-weight: 600;
   color: var(--text-badge);
 }
 
@@ -185,17 +179,6 @@
   font-size: 13px;
   font-weight: 600;
   padding: 0 !important;
-}
-
-/* A pedido (auditoría UI/UX): estado de foco explícito para navegación por teclado —
-   mismo criterio (outline sólido, no depender del que traiga la librería por
-   default) que ya usa el resto de los controles a medida de la app, ej.
-   .crear-op__toggle-btn:focus-visible (CrearOportunidadForm.css). offset chico
-   porque el link no tiene padding propio (ver arriba, padding:0 !important). */
-.client-ficha__edit-link:focus-visible {
-  outline: 2px solid #0073ea;
-  outline-offset: 3px;
-  border-radius: 4px;
 }
 
 @media (max-width: 480px) {

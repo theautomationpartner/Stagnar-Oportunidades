@@ -200,20 +200,12 @@ button.stepper__step:focus-visible .stepper__circle {
   line-height: 1.25;
 }
 
-/* A pedido (auditoría UI/UX): --green (#00c875) como texto sobre blanco da ~2.2:1 —
-   muy por debajo del mínimo 4.5:1 de WCAG AA para texto normal. --green-dark
-   (#037f4c, ya usado en otros lados de la app) da ~5:1. El círculo del paso (fondo
-   sólido + texto blanco) no cambia — ahí el contraste lo da el par fondo/texto, no
-   este token. */
 .stepper__label--done {
-  color: var(--green-dark);
+  color: #00c875;
 }
 
-/* --primary-blue (#0073ea) da ~4.5:1, justo en el límite (cualquier redondeo de
-   navegador/herramienta lo puede hacer fallar) — --primary-blue-hover (#0060c2, ya
-   definido más arriba) da ~6:1, con margen real. */
 .stepper__label--active {
-  color: var(--primary-blue-hover);
+  color: #0073ea;
 }
 
 .stepper__label--viewing {
