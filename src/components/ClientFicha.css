@@ -157,6 +157,13 @@
   gap: 2px;
   padding-top: 12px;
   border-top: 1px solid #e6e9ef;
+  /* A pedido (auditoría UI/UX): con la tarjeta ahora estirada a la altura del
+     checklist de al lado (ver height:100% más arriba), si el contenido propio es más
+     corto quedaba un hueco vacío suelto al final de la tarjeta — empujar esta última
+     sección hacia abajo (en vez de dejar el hueco después de ella) hace que el
+     espacio de sobra se sienta como aire entre secciones, no como una tarjeta "a
+     medio llenar". */
+  margin-top: auto;
 }
 
 .client-ficha__vehiculo-label {
