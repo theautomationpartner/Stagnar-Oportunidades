@@ -113,12 +113,10 @@
 .cotizar-step__checklist-items {
   display: flex;
   flex-direction: column;
-  /* A pedido (auditoría UI/UX, 2da pasada): el espaciado entre filas ahora lo da el
-     padding vertical + la línea punteada de cada fila (ver .cotizar-step__checklist-item
-     más abajo) en vez de un gap del contenedor — mismo patrón de "lista con
-     separadores" que --border-bottom: dashed pide, sin doble espacio (gap + padding
-     compitiendo). */
-  gap: 0;
+  /* A pedido (auditoría UI/UX): antes 8px — con texto chico (13px) y bastante peso
+     (ver checklist-value más abajo), 8px de separación quedaba apretado para escanear
+     de un vistazo cuál falta y cuál no. */
+  gap: 12px;
 }
 
 /* A pedido: aviso de "todo completo" pegado al checklist que describe, no suelto más
@@ -127,23 +125,11 @@
   margin-top: 4px;
 }
 
-/* A pedido (auditoría UI/UX, 2da pasada): línea punteada por fila + más padding
-   vertical (antes solo el gap del contenedor) — separa mejor cada dato al escanear.
-   align-items: flex-start (antes center) porque el valor ahora puede ocupar 2 líneas
-   (ver checklist-value más abajo, ya no trunca con "..." un modelo largo) — con
-   center, el ícono quedaría descentrado respecto de la primera línea en esos casos. */
 .cotizar-step__checklist-item {
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   gap: 8px;
   font-size: 13px;
-  padding: 10px 0;
-  border-bottom: 1px dashed var(--border-subtle);
-}
-
-.cotizar-step__checklist-item:last-child {
-  border-bottom: none;
-  padding-bottom: 0;
 }
 
 .cotizar-step__checklist-item svg {
@@ -173,18 +159,16 @@
 }
 
 .cotizar-step__checklist-value {
-  /* A pedido (auditoría UI/UX, 2da pasada): antes nowrap + ellipsis — un valor largo
-     (ej. el nombre completo de un modelo de Autodata) se cortaba de golpe con "...".
-     flex:1 (en vez de margin-left:auto) + quitar nowrap deja que ocupe el ancho
-     restante de la fila y pase a una 2da línea si hace falta, en vez de truncar. */
-  flex: 1 1 auto;
-  min-width: 0;
+  margin-left: auto;
   /* A pedido (auditoría UI/UX): antes 700 — a 13px, ese peso sobre un bloque de 9
      filas se sentía "todo en negrita", generando tensión visual. 600 mantiene el
      valor destacado frente al label sin ese efecto. */
   font-weight: 600;
   color: #323338;
   text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .cotizar-step__checklist-item--missing .cotizar-step__checklist-value {
