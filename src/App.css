@@ -1,6 +1,10 @@
 .app {
   min-height: 100vh;
-  background: #f6f7fb;
+  /* A pedido (auditoría UI/UX): canvas blanco puro (antes gris #f6f7fb) — las
+     tarjetas secundarias (ClientFicha, checklist de Cotizar, etc.) ahora se
+     distinguen por su propio borde + sombra "flotante" en vez de por contraste de
+     color contra la página (ver --bg-canvas/--shadow-floating, index.css). */
+  background: var(--bg-canvas);
   padding-bottom: 40px;
 }
 
@@ -9,7 +13,7 @@
 .app-shell {
   display: flex;
   min-height: 100vh;
-  background: #f6f7fb;
+  background: var(--bg-canvas);
 }
 
 .app-shell__main {

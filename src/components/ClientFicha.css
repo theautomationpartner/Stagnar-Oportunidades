@@ -1,14 +1,41 @@
 /* Mismo lenguaje visual que .crear-op__ficha (CrearOportunidadForm.css) — nombre
    grande, ubicación con ícono, badges con los datos secundarios. Clase propia (no esa)
-   para no depender de que ese CSS esté cargado en la pantalla que use este componente. */
+   para no depender de que ese CSS esté cargado en la pantalla que use este componente.
+   A pedido (auditoría UI/UX): tarjeta "flotante" (blanco + borde + sombra suave) en vez
+   de fondo gris plano — con la página ahora en blanco puro (ver --bg-canvas, App.css),
+   un fondo gris ya no hacía falta para distinguirla, y una sombra se nota mejor. El
+   leve levantamiento al pasar el mouse (hover) es puramente decorativo — no hay nada
+   clickeable en toda la tarjeta (Editar/Recotizar son sus propios botones), así que no
+   cambia el cursor ni agrega semántica de interacción. */
 .client-ficha {
   display: flex;
   flex-direction: column;
   gap: 14px;
   padding: 18px 20px;
-  background: #f6f7fb;
-  border: 1px solid #e6e9ef;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
   border-radius: 10px;
+  box-shadow: var(--shadow-floating);
+  /* A pedido: mismo alto que el checklist de al lado (ver align-items: stretch en
+     .cotizar-step__top-grid, CotizarStepPanel.css) — antes cada tarjeta medía lo que
+     su propio contenido pedía, quedando el layout visiblemente desparejo. */
+  height: 100%;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.client-ficha:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-floating-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .client-ficha {
+    transition: none;
+  }
+
+  .client-ficha:hover {
+    transform: none;
+  }
 }
 
 .client-ficha__header {
@@ -99,22 +126,29 @@
   gap: 8px;
 }
 
+/* A pedido (auditoría UI/UX): relleno gris neutro (antes: pill blanca con borde) —
+   ahora que la propia tarjeta ya es blanca (ver más arriba), un badge blanco sobre
+   blanco no se distinguía; el gris de --bg-badge + texto oscuro (--text-badge,
+   contraste 8.9:1, pasa WCAG AAA) lo resuelve sin depender de un borde.
+   border-radius 6px (antes 20px, "pill") — más chico y cuadrado, mismo lenguaje
+   "etiqueta de dato" que un badge, no un botón. font-weight 500 (antes 600) — texto
+   chico (12px) + peso alto generaba tensión visual/saturación; 500 alcanza para
+   distinguirlo del texto normal sin la sensación de "todo en negrita". */
 .client-ficha__badge {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  padding: 5px 12px;
-  background: #fff;
-  border: 1px solid #e6e9ef;
-  border-radius: 20px;
+  padding: 4px 8px;
+  background: var(--bg-badge);
+  border-radius: 6px;
   font-size: 12px;
-  font-weight: 600;
-  color: #323338;
+  font-weight: 500;
+  color: var(--text-badge);
 }
 
 .client-ficha__badge svg {
   font-size: 14px;
-  color: #676879;
+  color: var(--text-badge);
 }
 
 .client-ficha__vehiculo {
@@ -151,6 +185,17 @@
   font-size: 13px;
   font-weight: 600;
   padding: 0 !important;
+}
+
+/* A pedido (auditoría UI/UX): estado de foco explícito para navegación por teclado —
+   mismo criterio (outline sólido, no depender del que traiga la librería por
+   default) que ya usa el resto de los controles a medida de la app, ej.
+   .crear-op__toggle-btn:focus-visible (CrearOportunidadForm.css). offset chico
+   porque el link no tiene padding propio (ver arriba, padding:0 !important). */
+.client-ficha__edit-link:focus-visible {
+  outline: 2px solid #0073ea;
+  outline-offset: 3px;
+  border-radius: 4px;
 }
 
 @media (max-width: 480px) {

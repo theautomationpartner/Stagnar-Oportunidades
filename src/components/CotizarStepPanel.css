@@ -1,8 +1,15 @@
 .cotizar-step {
-  margin: 20px var(--page-gutter) 32px;
+  /* A pedido (auditoría UI/UX): en monitores anchos el contenido (ficha + checklist,
+     angostos por naturaleza) quedaba estirado a todo el ancho disponible con mucho
+     aire muerto a la derecha — se limita el ancho y se centra, mismo criterio que
+     .crear-op__card (CrearOportunidadForm.css). width:min() en vez de max-width +
+     margin:auto solo: en celular sigue respetando el gutter de página en vez de ir
+     pegado a los bordes (min() elige el menor entre 1100px y "100% menos 2 gutters"). */
+  width: min(1100px, 100% - 2 * var(--page-gutter));
+  margin: 20px auto 32px;
   padding: 20px 24px;
-  background: #fff;
-  border: 1px solid #e6e9ef;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
   border-radius: 10px;
 }
 
@@ -43,7 +50,12 @@
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 20px;
-  align-items: start;
+  /* A pedido (auditoría UI/UX): antes "start" — cada tarjeta medía lo que su propio
+     contenido pedía, quedando el layout visiblemente desparejo (una más alta que la
+     otra). "stretch" (default real de Grid) hace que las dos ocupen la altura de la
+     más alta — ver además height:100% en .client-ficha (ClientFicha.css) y el mismo
+     alto ya buscado en .cotizar-step__checklist más abajo. */
+  align-items: stretch;
   margin-bottom: 24px;
 }
 
@@ -65,9 +77,30 @@
   flex-direction: column;
   gap: 10px;
   padding: 18px 20px;
-  background: #fff;
-  border: 1px solid #e6e9ef;
+  /* A pedido (auditoría UI/UX): tarjeta "flotante" (mismo criterio que ClientFicha.css,
+     al lado de esta en el grid) — sombra suave + leve levantamiento al pasar el mouse,
+     en vez de apoyarse solo en el borde para distinguirse del canvas blanco de la
+     página. */
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
   border-radius: 10px;
+  box-shadow: var(--shadow-floating);
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.cotizar-step__checklist:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-floating-hover);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .cotizar-step__checklist {
+    transition: none;
+  }
+
+  .cotizar-step__checklist:hover {
+    transform: none;
+  }
 }
 
 .cotizar-step__checklist-title {
@@ -80,7 +113,10 @@
 .cotizar-step__checklist-items {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  /* A pedido (auditoría UI/UX): antes 8px — con texto chico (13px) y bastante peso
+     (ver checklist-value más abajo), 8px de separación quedaba apretado para escanear
+     de un vistazo cuál falta y cuál no. */
+  gap: 12px;
 }
 
 /* A pedido: aviso de "todo completo" pegado al checklist que describe, no suelto más
@@ -124,7 +160,10 @@
 
 .cotizar-step__checklist-value {
   margin-left: auto;
-  font-weight: 700;
+  /* A pedido (auditoría UI/UX): antes 700 — a 13px, ese peso sobre un bloque de 9
+     filas se sentía "todo en negrita", generando tensión visual. 600 mantiene el
+     valor destacado frente al label sin ese efecto. */
+  font-weight: 600;
   color: #323338;
   text-align: right;
   overflow: hidden;
@@ -237,10 +276,15 @@
   min-width: 0;
 }
 
+/* A pedido (auditoría UI/UX): --green (#00c875) sobre blanco da ~2.2:1 — no llega ni
+   al mínimo de 3:1 que pide WCAG para componentes no textuales (íconos), y este es
+   además el único indicador real de "cotizaciones cargadas" (el borde izquierdo es
+   solo un acento, no alcanza solo para usuarios con daltonismo). --green-dark
+   (#037f4c) da ~5:1 sin cambiar de familia de color. */
 .cotizar-step__quotes-ready-icon {
   flex-shrink: 0;
   font-size: 22px;
-  color: #00c875;
+  color: var(--green-dark);
 }
 
 .cotizar-step__quotes-ready-text {

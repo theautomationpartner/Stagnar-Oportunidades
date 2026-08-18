@@ -16,6 +16,14 @@ import './ClientFicha.css'
 export default function ClientFicha({ opportunity, onEdit, tag, actions, children }) {
   const ubicacion = [opportunity.departamento, opportunity.zonaCirculacion].filter(Boolean).join(' — ')
 
+  // A pedido (auditoría UI/UX): el nombre del Modelo en Autodata suele venir con la
+  // Marca ya pegada adelante (ej. "PEUGEOT - 206 1.6 Presence...") — concatenar Marca +
+  // Modelo tal cual duplicaba el dato ("PEUGEOT PEUGEOT - 206..."). Si el Modelo ya
+  // empieza con la Marca (sin importar mayúsculas), se muestra solo el Modelo.
+  const { marca, modelo } = opportunity
+  const modeloYaIncluyeMarca = Boolean(marca && modelo && modelo.toLowerCase().startsWith(marca.toLowerCase()))
+  const vehiculoTitulo = modeloYaIncluyeMarca ? modelo : [marca, modelo].filter(Boolean).join(' ')
+
   return (
     <div className="client-ficha">
       <div className="client-ficha__header">
@@ -58,7 +66,7 @@ export default function ClientFicha({ opportunity, onEdit, tag, actions, childre
       <div className="client-ficha__vehiculo">
         <span className="client-ficha__vehiculo-label">Vehículo</span>
         <strong className="client-ficha__vehiculo-title">
-          {[opportunity.marca, opportunity.modelo].filter(Boolean).join(' ') || 'Sin vehículo cargado'}
+          {vehiculoTitulo || 'Sin vehículo cargado'}
           {opportunity.anio && ` (${opportunity.anio})`}
         </strong>
         {(opportunity.combustible || opportunity.tipo || opportunity.uso) && (
