@@ -2227,32 +2227,39 @@ export default function CrearOportunidadForm({
                   </>
                 )}
 
-                <div className="crear-op__section">
-                  <h3 className="crear-op__section-title">Documentación</h3>
-                  <div className="crear-op__fields--grid">
-                    {/* A pedido: Cédula Identidad se pide acá, en el paso 1, en vez de
-                        repetida en las 2 ramas del paso 2 (Posee Vehículo Sí/No) —
-                        opcional, no bloquea avanzar. El archivo queda en memoria hasta
-                        que exista el ítem (se crea recién en el paso 2 o al guardar);
-                        handleGuardar tiene el fallback que lo sube si todavía no se
-                        subió para entonces. */}
-                    <FileUploadField
-                      label="Cédula Identidad"
-                      required={false}
-                      file={form.cedulaIdentidad}
-                      onUpload={handleCedulaIdentidadChange}
-                      onDelete={() => handleCedulaIdentidadChange(null)}
-                      fullWidth
-                      highlighted={cedulaAutofilled}
-                    />
-                    {cedulaAutofillLoading && (
-                      <p className="crear-op__autofill">
-                        <Loader size={13} className="crear-op__lectura-spinner" /> Buscando Cédula Identidad de una
-                        oportunidad anterior...
-                      </p>
-                    )}
+                {/* A pedido: cuando ya se está pidiendo la Cédula arriba para leerla con
+                    IA (ver tieneCedulaLead), este segundo campo quedaba mostrando el
+                    mismo documento 2 veces en la misma pantalla — se oculta acá; el
+                    archivo elegido arriba ya queda cargado como Cédula Identidad solo
+                    (ver handleCedulaLeadChange, llama a handleCedulaIdentidadChange). */}
+                {tieneCedulaLead !== 'Si' && (
+                  <div className="crear-op__section">
+                    <h3 className="crear-op__section-title">Documentación</h3>
+                    <div className="crear-op__fields--grid">
+                      {/* A pedido: Cédula Identidad se pide acá, en el paso 1, en vez de
+                          repetida en las 2 ramas del paso 2 (Posee Vehículo Sí/No) —
+                          opcional, no bloquea avanzar. El archivo queda en memoria hasta
+                          que exista el ítem (se crea recién en el paso 2 o al guardar);
+                          handleGuardar tiene el fallback que lo sube si todavía no se
+                          subió para entonces. */}
+                      <FileUploadField
+                        label="Cédula Identidad"
+                        required={false}
+                        file={form.cedulaIdentidad}
+                        onUpload={handleCedulaIdentidadChange}
+                        onDelete={() => handleCedulaIdentidadChange(null)}
+                        fullWidth
+                        highlighted={cedulaAutofilled}
+                      />
+                      {cedulaAutofillLoading && (
+                        <p className="crear-op__autofill">
+                          <Loader size={13} className="crear-op__lectura-spinner" /> Buscando Cédula Identidad de una
+                          oportunidad anterior...
+                        </p>
+                      )}
+                    </div>
                   </div>
-                </div>
+                )}
 
               </div>
 
