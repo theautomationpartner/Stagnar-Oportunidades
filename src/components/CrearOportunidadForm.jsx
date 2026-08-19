@@ -63,9 +63,9 @@ import './CrearOportunidadForm.css'
 // el texto que usan los botones "Volver a.../Continuar a..." del footer (ver más abajo)
 // — separado de `label` por si algún paso necesita decir algo distinto en cada lugar.
 const STEPS = [
-  { key: 'personales', label: 'Seleccionar Cliente', navLabel: 'Seleccionar Cliente' },
+  { key: 'personales', label: 'Seleccionar Persona', navLabel: 'Seleccionar Persona' },
   { key: 'tipo-riesgo', label: 'Tipo de Riesgo', navLabel: 'Tipo de Riesgo' },
-  { key: 'riesgo', label: 'Datos del riesgo', navLabel: 'Datos del Riesgo' },
+  { key: 'riesgo', label: 'Datos del Riesgo', navLabel: 'Datos del Riesgo' },
 ]
 
 // Único label real (con emoji, tal cual está configurado en monday) que muestra el resto
@@ -1635,7 +1635,7 @@ export default function CrearOportunidadForm({
             {!busquedaResuelta ? (
               <div className="crear-op__search-screen" key="search-screen">
                 <label className="crear-op__field crear-op__field--full">
-                  <span>Buscar Persona</span>
+                  <span>Seleccionar Persona</span>
                   <ExistingRecordSearch value={searchPreview} onChange={handleSearchPreview} />
                   <Button kind="tertiary" className="crear-op__skip-btn" onClick={handleSaltearBusqueda}>
                     Crear Lead
@@ -2059,14 +2059,19 @@ export default function CrearOportunidadForm({
 
         {stepIndex === 2 && (
           <div className="crear-op__fields">
+            {/* A pedido: título propio del paso (antes no tenía ninguno) — mismo texto
+                que STEPS[2].label, para que el título de arriba de la pantalla
+                coincida siempre con el nombre que ya muestra el Stepper, igual que
+                pasa en los pasos 1 y 2. */}
+            <h3 className="crear-op__section-title">Datos del Riesgo</h3>
             {esAutomovil && (
               <>
-                {/* A pedido, estética tipo mockup: título + subtítulo propios del paso
-                    (antes no tenía), y el toggle de 2 botones en vez del dropdown
-                    "Si"/"No" — mismos valores reales que color_mm51n4j, solo cambia el
-                    control. A pedido: se sacó la selección de "¿es alguno de estos
-                    vehículos?" (ver git history) — este paso deja solo la pregunta de
-                    abajo, ahora más destacada (ver .crear-op__risk-subtitle). */}
+                {/* A pedido, estética tipo mockup: subtítulo propio del paso, y el
+                    toggle de 2 botones en vez del dropdown "Si"/"No" — mismos valores
+                    reales que color_mm51n4j, solo cambia el control. A pedido: se sacó
+                    la selección de "¿es alguno de estos vehículos?" (ver git history)
+                    — este paso deja solo la pregunta de abajo, ahora más destacada
+                    (ver .crear-op__risk-subtitle). */}
                 <p className="crear-op__risk-subtitle">¿Tenés la Cédula o Carta del vehículo a cotizar?</p>
                 <div className="crear-op__toggle">
                   <button

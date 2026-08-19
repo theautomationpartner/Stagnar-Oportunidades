@@ -72,7 +72,10 @@
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  width: 96px;
+  /* A pedido: antes 96px — labels más largos (ej. "Seleccionar Persona", "Datos del
+     Riesgo") quedaban partidos en 2 líneas. Ancho de sobra para que el más largo
+     entre en un solo renglón (ver white-space:nowrap en .stepper__label). */
+  width: 140px;
 }
 
 /* A pedido: mejorar el hover — antes (sin chrome propio, ver el comentario grande de
@@ -198,6 +201,10 @@ button.stepper__step:focus-visible .stepper__circle {
   color: #9699a6;
   text-align: center;
   line-height: 1.25;
+  /* A pedido: que no salte de línea — el ancho de sobra de .stepper__step (140px, ver
+     más arriba) ya alcanza para el más largo de los labels reales de la app en un
+     solo renglón. */
+  white-space: nowrap;
 }
 
 .stepper__label--done {
@@ -222,13 +229,14 @@ button.stepper__step:focus-visible .stepper__circle {
      hijos en flex-start (ver más arriba), así que sin este offset la línea quedaría
      pegada arriba, a la altura del círculo en vez de cruzarlo por el medio. Con el
      label ahora abajo del círculo (columna, no al lado), no hace falta tanto ancho como
-     antes para separar un paso del siguiente — el propio ancho de .stepper__step (96px)
-     ya da aire de sobra. */
+     antes para separar un paso del siguiente — el propio ancho de .stepper__step
+     (140px, ver más arriba) ya da aire de sobra. A pedido: 56px -> 72px, un poco más
+     de separación entre un paso y el siguiente. */
   flex: 0 0 auto;
-  width: 56px;
+  width: 72px;
   height: 2px;
   background: #e6e9ef;
-  margin: 11px 4px 0;
+  margin: 11px 6px 0;
 }
 
 .stepper__line--done {
