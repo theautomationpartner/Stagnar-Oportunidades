@@ -237,6 +237,36 @@
   grid-column: 1 / -1;
 }
 
+/* A pedido: título grande del paso 1 (círculo azul numerado + texto), mismo lenguaje
+   que ya usa el Stepper de arriba (mismo azul, ver --primary-blue) — reemplaza el
+   label chico de siempre ("Seleccionar Persona") solo en este campo, sin subtítulo
+   debajo. */
+.crear-op__step-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.crear-op__step-badge {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: var(--primary-blue);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.crear-op__step-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+
 /* A pedido: cuando la persona elegida en "Buscar Persona" tiene oportunidades
    anteriores, el paso 1 se divide en 2 columnas — formulario a la izquierda, historial
    a la derecha (ver .crear-op__historial más abajo) — en vez de todo apilado en una

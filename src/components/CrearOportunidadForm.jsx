@@ -1635,7 +1635,18 @@ export default function CrearOportunidadForm({
             {!busquedaResuelta ? (
               <div className="crear-op__search-screen" key="search-screen">
                 <label className="crear-op__field crear-op__field--full">
-                  <span>Seleccionar Persona</span>
+                  {/* A pedido: título grande tipo mockup — círculo azul numerado ("1",
+                      mismo paso que muestra el Stepper de arriba) + título, sin
+                      subtítulo debajo. aria-hidden en el círculo: es un adorno visual
+                      que repite el número de paso que un lector de pantalla ya
+                      anuncia por otro lado (el Stepper es navegable con aria-selected,
+                      ver Stepper.jsx) — no hace falta que lo lea de nuevo acá. */}
+                  <span className="crear-op__step-heading">
+                    <span className="crear-op__step-badge" aria-hidden="true">
+                      1
+                    </span>
+                    <span className="crear-op__step-title">Seleccionar Persona</span>
+                  </span>
                   <ExistingRecordSearch value={searchPreview} onChange={handleSearchPreview} />
                   <Button kind="tertiary" className="crear-op__skip-btn" onClick={handleSaltearBusqueda}>
                     Crear Lead
