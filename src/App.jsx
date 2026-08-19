@@ -6,7 +6,7 @@ import OpportunitiesTable from './components/OpportunitiesTable'
 import OpportunityDetail from './components/OpportunityDetail'
 import LandingScreen from './components/LandingScreen'
 import CrearOportunidadForm from './components/CrearOportunidadForm'
-import { fetchOpportunities, fetchDepartamentos, fetchLocalidades } from './services/mondayApi'
+import { fetchOpportunities, fetchDepartamentos, fetchLocalidades, fetchCurrentMondayUser } from './services/mondayApi'
 import { mapOpportunities } from './services/opportunityMapper'
 import { fetchFilterAndStatusSchema } from './services/boardSchema'
 import { fetchPanelData } from './services/recargoPanel'
@@ -42,6 +42,22 @@ export default function App() {
   // sin pasar necesariamente por 'landing' de nuevo (botón "Nueva oportunidad" en la
   // tabla, y "Ver oportunidades existentes" desde el formulario de creación).
   const [view, setView] = useState('landing')
+  // Nombre + avatar reales de quien está mirando la app (pie de Sidebar.jsx) — se pide
+  // una sola vez acá arriba (en vez de en cada instancia de Sidebar, que se
+  // monta/desmonta con cada cambio de pantalla) y se pasa como prop a las 4. Nunca
+  // bloquea el resto de la app: queda en null (Sidebar cae a su fallback genérico) si
+  // no hay contexto de monday disponible o si falla, ver fetchCurrentMondayUser.
+  const [mondayUser, setMondayUser] = useState(null)
+
+  useEffect(() => {
+    let cancelled = false
+    fetchCurrentMondayUser().then((user) => {
+      if (!cancelled) setMondayUser(user)
+    })
+    return () => {
+      cancelled = true
+    }
+  }, [])
 
   useEffect(() => {
     let cancelled = false
@@ -125,6 +141,7 @@ export default function App() {
     return (
       <div className="app-shell">
         <Sidebar
+          user={mondayUser}
           onNavigateOportunidades={() => {
             setOpenOpportunityId(null)
             setView('table')
@@ -146,6 +163,7 @@ export default function App() {
       <div className="app-shell">
         <Sidebar
           defaultExpanded
+          user={mondayUser}
           onNavigateOportunidades={() => {
             setOpenOpportunityId(null)
             setView('table')
@@ -162,6 +180,7 @@ export default function App() {
     return (
       <div className="app-shell">
         <Sidebar
+          user={mondayUser}
           onNavigateOportunidades={() => {
             setOpenOpportunityId(null)
             setView('table')
@@ -187,7 +206,7 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar />
+      <Sidebar user={mondayUser} />
       <div className="app-shell__main">
         <div className="app">
           <PageHeader onCreateNew={() => setView('create')} onHome={() => setView('landing')} />

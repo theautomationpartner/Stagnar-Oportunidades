@@ -128,6 +128,11 @@
   display: flex;
   align-items: center;
   gap: 10px;
+  /* A pedido: sin esto, un nombre largo (ver .sidebar__user-name) no tiene forma de
+     truncar — un hijo flex no se achica por debajo de su contenido por default
+     ("min-width: auto" implícito), así que el texto se saldría del ancho fijo de la
+     barra (200px expandida, ver .sidebar--expanded) en vez de cortarse con "...". */
+  min-width: 0;
 }
 
 .sidebar--expanded .sidebar__footer {
@@ -146,11 +151,28 @@
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
+  /* Recorta la <img> (ver más abajo) al círculo — sin esto, una foto que no venga ya
+     recortada cuadrada asomaría por las esquinas del avatar. */
+  overflow: hidden;
 }
 
+.sidebar__avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+/* A pedido: un nombre real puede ser bastante más largo que "María Clara" — trunca con
+   "..." en vez de romper el ancho fijo de la barra (ver min-width:0 en
+   .sidebar__footer, imprescindible para que este overflow/ellipsis funcione adentro de
+   un flex). El `title` del span (ver JSX) muestra el nombre completo al pasar el mouse,
+   sea cual sea su largo. */
 .sidebar__user-name {
   font-size: 13px;
   font-weight: 600;
   color: #323338;
   white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
 }

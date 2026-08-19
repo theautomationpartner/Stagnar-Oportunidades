@@ -12,7 +12,17 @@ import './Sidebar.css'
 // — y se resetea — según `defaultExpanded`, que App.jsx manda en true solo en la
 // pantalla principal (landing) y en false en el resto: A pedido, la barra abre sola
 // nada más al entrar a la principal, no en cualquier otra pantalla.
-export default function Sidebar({ active = true, onNavigateOportunidades, defaultExpanded = false }) {
+// A pedido: iniciales a partir del nombre real (ej. "Santiago González" -> "SG") —
+// primera letra del primer y del último "token", para no quedar con solo 1 letra en
+// nombres compuestos ni con demasiadas en nombres con 3+ palabras.
+function initialsOf(name) {
+  const parts = name.trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return '?'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+}
+
+export default function Sidebar({ active = true, onNavigateOportunidades, defaultExpanded = false, user }) {
   const [expanded, setExpanded] = useState(defaultExpanded)
 
   useEffect(() => {
@@ -50,11 +60,25 @@ export default function Sidebar({ active = true, onNavigateOportunidades, defaul
         </button>
       </nav>
 
+      {/* A pedido: nombre + avatar reales de quien está mirando la app en monday (ver
+          fetchCurrentMondayUser, App.jsx) — `user` llega null mientras carga o si no
+          hay contexto de monday disponible (dev/preview standalone), ahí se muestra
+          un fallback genérico en vez de romper el pie de la barra. `title` en los 2
+          (avatar Y nombre) para poder ver el nombre completo pasando el mouse, sin
+          importar si está expandida o no — colapsada solo se ve el avatar. */}
       <div className="sidebar__footer">
-        <span className="sidebar__avatar" title="María Clara · Productor">
-          MC
+        <span className="sidebar__avatar" title={user?.name || 'Usuario de monday'}>
+          {user?.photo ? (
+            <img className="sidebar__avatar-img" src={user.photo} alt="" />
+          ) : (
+            initialsOf(user?.name || '?')
+          )}
         </span>
-        {expanded && <span className="sidebar__user-name">María Clara</span>}
+        {expanded && (
+          <span className="sidebar__user-name" title={user?.name || 'Usuario de monday'}>
+            {user?.name || 'Usuario de monday'}
+          </span>
+        )}
       </div>
     </aside>
   )

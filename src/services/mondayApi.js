@@ -1,3 +1,14 @@
+import mondaySdk from 'monday-sdk-js'
+
+// SDK cliente de monday (no confundir con `callMondayApi` de acá abajo, que pega
+// contra /api/monday con la API key del servidor) — se usa solo para lo que hace
+// falta el contexto del VIEWER (quién está mirando la app ahora mismo dentro de
+// monday), ver fetchCurrentMondayUser más abajo. `monday.get('context')` habla por
+// postMessage con la ventana padre (monday.com) — fuera de ese iframe (dev local,
+// preview de Vercel abierta suelta) nunca llega respuesta, por eso esa función corre
+// con un timeout en vez de esperar para siempre.
+const monday = mondaySdk()
+
 // Configurables por variable de entorno (VITE_ para que el navegador las lea) para
 // poder apuntar un deploy de Vercel (ej. Preview, para que otras personas testeen) a un
 // tablero de prueba distinto del real de producción, sin tocar código. Sin configurar,
@@ -691,6 +702,44 @@ export async function fetchLocalidades() {
     name: item.name,
     departamento: item.column_values.find((cv) => cv.id === LOCALIDAD_DEPARTAMENTO_COLUMN_ID)?.text ?? '',
   }))
+}
+
+const CURRENT_USER_QUERY = `
+  query GetUser($userId: [ID!]) {
+    users(ids: $userId) {
+      name
+      photo_thumb_small
+    }
+  }
+`
+
+// Corre una promesa con un techo — sin esto, monday.get('context') se queda esperando
+// para siempre si la app no está corriendo adentro del iframe real de monday.com (dev
+// local, una preview de Vercel abierta suelta en una pestaña) porque esa respuesta
+// llega por postMessage desde la ventana padre, que ahí no existe.
+function withTimeout(promise, ms) {
+  return Promise.race([promise, new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))])
+}
+
+// A pedido: nombre + foto de perfil de la persona que está mirando la app AHORA MISMO
+// dentro de monday (Sidebar.jsx, pie de la barra) — a diferencia del resto de este
+// archivo (que pega contra /api/monday con la API key del servidor, siempre la misma
+// "cuenta de servicio"), esto necesita el SDK cliente de monday para preguntarle a la
+// ventana padre quién es el usuario actual. Devuelve null (sin tirar error) si no hay
+// contexto de monday disponible (dev/preview standalone) o si algo falla — Sidebar.jsx
+// se queda con su fallback genérico en ese caso, nunca rompe la barra.
+export async function fetchCurrentMondayUser() {
+  try {
+    const context = await withTimeout(monday.get('context'), 4000)
+    const userId = context?.data?.user?.id
+    if (!userId) return null
+    const data = await callMondayApi(CURRENT_USER_QUERY, { userId: [String(userId)] })
+    const user = data.users?.[0]
+    if (!user) return null
+    return { name: user.name, photo: user.photo_thumb_small || null }
+  } catch {
+    return null
+  }
 }
 
 export async function fetchPanelItems() {
