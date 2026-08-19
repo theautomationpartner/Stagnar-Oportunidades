@@ -3,6 +3,17 @@ export function formatMoney(value) {
   return `$ ${Number(value).toLocaleString('es-UY')}`
 }
 
+// Las columnas "date" de monday devuelven texto tipo "2026-08-11" o, si la columna
+// tiene hora habilitada, "2026-08-11 11:39:00" — acá se corta a dd/mm/aa siempre,
+// sin hora, sin importar cuál de los 2 formatos llegó (ver opportunityMapper.js,
+// "Última cotización" en la tabla de Oportunidades).
+export function formatShortDate(text) {
+  if (!text) return '—'
+  const [year, month, day] = text.slice(0, 10).split('-')
+  if (!year || !month || !day) return text
+  return `${day}/${month}/${year.slice(2)}`
+}
+
 // Compartido entre QuoteCard.jsx (paso "Comparar y enviar") y ConfirmarStepPanel.jsx
 // (paso "Confirmar", mismo lenguaje visual de tarjeta) — las 4 cuotas que trae toda
 // cotización real (recargo3/6/8/10 en el subitem de monday, ver pricingEngine.js).

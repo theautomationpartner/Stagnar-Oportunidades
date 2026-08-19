@@ -27,7 +27,7 @@
     padding-right: var(--page-gutter);
   }
 
-  .opps-table-wrap > div:last-child {
+  .opps-table-wrap__table {
     min-width: 760px;
   }
 }
@@ -47,6 +47,21 @@
   font-size: 12px;
   font-weight: 400;
   color: #a26718;
+}
+
+.opps-table-wrap__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 14px 20px;
+  border-top: 1px solid #e6e9ef;
+}
+
+.opps-table-wrap__pagination-label {
+  font-size: 13px;
+  font-weight: 600;
+  color: #323338;
 }
 
 /* Table/TableRow/TableCell de @vibe/core renderizan <div>, no <table>/<tr>/
@@ -79,21 +94,12 @@
   padding: 8px 0;
 }
 
-.opps-table__opp {
-  display: flex;
-  flex-direction: column;
-  gap: 2px;
-}
-
+/* A pedido: se sacó el nombre del cliente de acá abajo (quedaba repetido con la
+   columna "Cliente" al lado, ver JSX) — la columna "Oportunidad" ahora es solo el ID. */
 .opps-table__opp-id {
   font-weight: 700;
   color: #0073ea;
   font-size: 13px;
-}
-
-.opps-table__opp-name {
-  color: #676879;
-  font-size: 12px;
 }
 
 .opps-table__cliente {
@@ -113,8 +119,25 @@
   font-size: 12px;
 }
 
+/* A pedido: "Bien" traía marca/modelo + combustible/uso pisados por el ancho parejo
+   por defecto de las 7 columnas (ver COLUMNS, JSX) — con el ancho propio que le
+   quedó ahora alcanza, pero además se deja envolver en vez de cortar con "..." por
+   si un modelo particular sigue siendo más largo que la columna. */
+.opps-table__bien {
+  white-space: normal;
+  line-height: 1.35;
+}
+
 .opps-table__bien-meta {
   color: #676879;
   font-size: 12px;
   margin-top: 2px;
+}
+
+/* A pedido: el avatar de "Asignado a" pegado al borde derecho de la tabla en vez de
+   contra el borde izquierdo de su columna (que quedaba con un hueco raro al lado del
+   divisor de "Última cotización"). */
+.opps-table__asignado-cell {
+  justify-content: flex-end;
+  padding-right: 12px;
 }

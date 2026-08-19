@@ -3,6 +3,8 @@
 // Los colores de estado NO se hardcodean: vienen de statusColors, leido en el momento
 // desde la config real de las columnas (ver services/boardSchema.js).
 
+import { formatShortDate } from './format'
+
 const DEFAULT_COLOR = { bg: '#c4c4c4', border: '#b0b0b0' }
 
 function textOf(columnValues, columnId) {
@@ -55,7 +57,7 @@ export function mapOpportunityItem(item, statusColors = {}) {
   const estadoLabel = textOf(cv, 'deal_stage') || 'Sin estado'
   const estadoColor = statusColors.estadoOportunidad?.[estadoLabel] ?? DEFAULT_COLOR
 
-  const ultimaCotizacion = textOf(cv, 'date_mm52w0h8') || textOf(cv, 'date__1') || '—'
+  const ultimaCotizacion = formatShortDate(textOf(cv, 'date_mm52w0h8') || textOf(cv, 'date__1'))
   const recotizaciones = Number(textOf(cv, 'numeric_mm658a9j')) || 0
   const asignado = textOf(cv, 'deal_owner')
 
@@ -72,7 +74,7 @@ export function mapOpportunityItem(item, statusColors = {}) {
 
   return {
     id: item.id,
-    oppNumber: `OPP-${item.id.slice(-4)}`,
+    oppNumber: `ID-${item.id}`,
     clienteNombre,
     ci: textOf(cv, 'numeric_mm51mb0s'),
     telefono: textOf(cv, 'phone_mm519m27'),

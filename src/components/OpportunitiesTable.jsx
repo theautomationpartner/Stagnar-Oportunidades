@@ -1,16 +1,26 @@
-import { Table, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell, EmptyState } from '@vibe/core'
+import { MdChevronLeft, MdChevronRight } from 'react-icons/md'
+import { Table, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell, EmptyState, Button } from '@vibe/core'
 import Avatar from './Avatar'
 import StatusBadge from './StatusBadge'
 import './OpportunitiesTable.css'
 
+// A pedido: anchos explícitos en vez del reparto parejo por defecto (7 columnas a
+// ancho igual) — "Bien" y "Cliente" traen 2 líneas de texto y quedaban muy angostas
+// (se veían cortadas); "Última cotización" ahora es una fecha corta (dd/mm/aa, ver
+// formatShortDate) y "Asignado a" solo un avatar, así que les alcanza con bastante
+// menos.
+// Mismo tamaño de página que usa App.jsx para cortar `opportunities` — acá solo hace
+// falta para calcular el rango "mostrando X-Y" del encabezado (ver más abajo).
+const PAGE_SIZE = 20
+
 const COLUMNS = [
-  { id: 'oportunidad', title: 'Oportunidad' },
-  { id: 'cliente', title: 'Cliente' },
-  { id: 'bien', title: 'Bien' },
-  { id: 'companias', title: 'Compañías cotizadas' },
-  { id: 'estado', title: 'Estado' },
-  { id: 'ultimaCotizacion', title: 'Última cotización' },
-  { id: 'asignado', title: 'Asignado a' },
+  { id: 'oportunidad', title: 'Oportunidad', width: '13%' },
+  { id: 'cliente', title: 'Cliente', width: '21%' },
+  { id: 'bien', title: 'Bien', width: '21%' },
+  { id: 'companias', title: 'Compañías cotizadas', width: '15%' },
+  { id: 'estado', title: 'Estado', width: '14%' },
+  { id: 'ultimaCotizacion', title: 'Última cotización', width: '9%' },
+  { id: 'asignado', title: 'Asignado a', width: '7%' },
 ]
 
 function handleRowKeyDown(event, onOpen) {
@@ -25,10 +35,10 @@ function handleRowKeyDown(event, onOpen) {
 // onClick en TableRow (el componente nativo no lo soporta, solo className/
 // style/id). El foco por teclado vive únicamente en la primera celda de la
 // fila, como punto de entrada accesible equivalente al de toda la fila.
-function ClickableCell({ children, onOpen, focusable, ariaLabel }) {
+function ClickableCell({ children, onOpen, focusable, ariaLabel, className }) {
   return (
     <div
-      className="opps-table__clickable-cell"
+      className={className ? `opps-table__clickable-cell ${className}` : 'opps-table__clickable-cell'}
       onClick={onOpen}
       role={focusable ? 'button' : undefined}
       aria-label={focusable ? ariaLabel : undefined}
@@ -42,28 +52,34 @@ function ClickableCell({ children, onOpen, focusable, ariaLabel }) {
 
 export default function OpportunitiesTable({
   opportunities,
+  totalFiltered,
   totalLoaded,
   boardTotalCount,
   loading,
   error,
+  page,
+  totalPages,
+  onPageChange,
   onOpenOpportunity,
 }) {
-  // opportunities ya viene filtrado (búsqueda/filtros de FilterPanel, client-side sobre
-  // lo cargado) — totalLoaded es cuántas oportunidades se trajeron del tablero antes de
-  // filtrar, y boardTotalCount es el total REAL del tablero (items_count, sin el límite
-  // de la consulta). Si coinciden, se cargó todo y el conteo de abajo es sobre el
-  // universo completo; si boardTotalCount > totalLoaded, se llegó al techo de la
+  // `opportunities` acá es solo la página actual (20, ver PAGE_SIZE en App.jsx) —
+  // `totalFiltered` es el total de resultados de la búsqueda/filtros (sobre TODO lo
+  // cargado, no solo esta página) y `totalLoaded` cuántas oportunidades se trajeron del
+  // tablero antes de filtrar. boardTotalCount es el total REAL del tablero (items_count,
+  // sin el límite de la consulta) — si es mayor a totalLoaded, se llegó al techo de la
   // consulta (500) y hay que avisar en vez de dejar creer que se buscó sobre todo.
-  const isFiltered = opportunities.length !== totalLoaded
+  const isFiltered = totalFiltered !== totalLoaded
   const hitFetchCap = boardTotalCount > totalLoaded
+  const firstShown = totalFiltered === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const lastShown = totalFiltered === 0 ? 0 : firstShown + opportunities.length - 1
 
   return (
     <section className="opps-table-wrap">
       <div className="opps-table-wrap__head">
         <span>
           {isFiltered
-            ? `${opportunities.length} resultado${opportunities.length === 1 ? '' : 's'} de ${totalLoaded} oportunidades`
-            : `Oportunidades encontradas (${opportunities.length})`}
+            ? `${totalFiltered} resultado${totalFiltered === 1 ? '' : 's'} de ${totalLoaded} oportunidades — mostrando ${firstShown}-${lastShown}`
+            : `Oportunidades encontradas (${totalFiltered}) — mostrando ${firstShown}-${lastShown}`}
         </span>
         {hitFetchCap && (
           <span className="opps-table-wrap__cap-warning">
@@ -76,7 +92,11 @@ export default function OpportunitiesTable({
       {/* size="large" (48px) no alcanza para 2 líneas de texto + avatar de
           nuestras celdas (el row height del Table de @vibe/core es fijo, no
           crece solo con el contenido) — se pisa la variable CSS que usa
-          internamente para darle más alto real. */}
+          internamente para darle más alto real. Envuelta en su propio div
+          (opps-table-wrap__table) para que el min-width del scroll horizontal en
+          mobile (ver CSS) apunte puntual a la tabla y no a la barra de paginación de
+          más abajo, que ahora también es un hijo directo de .opps-table-wrap. */}
+      <div className="opps-table-wrap__table">
       <Table
         columns={COLUMNS}
         size="large"
@@ -98,10 +118,7 @@ export default function OpportunitiesTable({
               <TableRow key={opp.id} className="opps-table__row">
                 <TableCell>
                   <ClickableCell onOpen={openThisOpportunity} focusable ariaLabel={ariaLabel}>
-                    <div className="opps-table__opp">
-                      <span className="opps-table__opp-id">{opp.oppNumber}</span>
-                      <span className="opps-table__opp-name">{opp.clienteNombre}</span>
-                    </div>
+                    <span className="opps-table__opp-id">{opp.oppNumber}</span>
                   </ClickableCell>
                 </TableCell>
                 <TableCell>
@@ -138,7 +155,7 @@ export default function OpportunitiesTable({
                   <ClickableCell onOpen={openThisOpportunity}>{opp.ultimaCotizacion}</ClickableCell>
                 </TableCell>
                 <TableCell>
-                  <ClickableCell onOpen={openThisOpportunity}>
+                  <ClickableCell onOpen={openThisOpportunity} className="opps-table__asignado-cell">
                     <Avatar label={opp.asignadoIniciales} />
                   </ClickableCell>
                 </TableCell>
@@ -147,6 +164,25 @@ export default function OpportunitiesTable({
           })}
         </TableBody>
       </Table>
+      </div>
+
+      {/* A pedido: paginado de a 20 (ver PAGE_SIZE, App.jsx) — solo Anterior/Siguiente +
+          "Página X de Y", nada de números de página sueltos (con 500 oportunidades como
+          techo, la lista de páginas sería larguísima). Se esconde con 1 sola página, no
+          tiene sentido mostrar controles que no hacen nada. */}
+      {totalPages > 1 && (
+        <div className="opps-table-wrap__pagination">
+          <Button kind="tertiary" onClick={() => onPageChange(page - 1)} disabled={page <= 1}>
+            <MdChevronLeft /> Anterior
+          </Button>
+          <span className="opps-table-wrap__pagination-label">
+            Página {page} de {totalPages}
+          </span>
+          <Button kind="tertiary" onClick={() => onPageChange(page + 1)} disabled={page >= totalPages}>
+            Siguiente <MdChevronRight />
+          </Button>
+        </div>
+      )}
     </section>
   )
 }
