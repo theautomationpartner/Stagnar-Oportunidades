@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MdPersonAddAlt, MdMenu, MdMenuOpen } from 'react-icons/md'
+import { MdHome, MdPersonAddAlt, MdMenu, MdMenuOpen } from 'react-icons/md'
 import stagnariLogo from '../assets/stagnari-logo.png'
 import stagnariLogoSimple from '../assets/stagnari-logo-simple.png'
 import './Sidebar.css'
@@ -22,7 +22,17 @@ function initialsOf(name) {
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
 }
 
-export default function Sidebar({ active = true, onNavigateOportunidades, defaultExpanded = false, user }) {
+// A pedido: se saca el botón "← Volver" de arriba de las pantallas de Oportunidad (ver
+// OpportunityDetail.jsx) y en su lugar la barra lateral suma esta sección "Inicio" —
+// `activeSection` reemplaza al viejo `active` (booleano, solo pensaba en "Oportunidades")
+// para poder marcar cuál de las 2 secciones está resaltada según la pantalla actual.
+export default function Sidebar({
+  activeSection = 'oportunidades',
+  onNavigateOportunidades,
+  onNavigateHome,
+  defaultExpanded = false,
+  user,
+}) {
   const [expanded, setExpanded] = useState(defaultExpanded)
 
   useEffect(() => {
@@ -51,7 +61,20 @@ export default function Sidebar({ active = true, onNavigateOportunidades, defaul
       <nav className="sidebar__nav" aria-label="Secciones">
         <button
           type="button"
-          className={active ? 'sidebar__nav-item sidebar__nav-item--active' : 'sidebar__nav-item'}
+          className={
+            activeSection === 'inicio' ? 'sidebar__nav-item sidebar__nav-item--active' : 'sidebar__nav-item'
+          }
+          title="Inicio"
+          onClick={onNavigateHome}
+        >
+          <MdHome />
+          {expanded && <span className="sidebar__nav-label">Inicio</span>}
+        </button>
+        <button
+          type="button"
+          className={
+            activeSection === 'oportunidades' ? 'sidebar__nav-item sidebar__nav-item--active' : 'sidebar__nav-item'
+          }
           title="Oportunidades"
           onClick={onNavigateOportunidades}
         >
