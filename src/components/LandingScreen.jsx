@@ -1,4 +1,4 @@
-import { MdPersonAddAlt, MdSearch, MdChevronRight } from 'react-icons/md'
+import { MdNoteAdd, MdSearch, MdChevronRight } from 'react-icons/md'
 import './LandingScreen.css'
 
 export default function LandingScreen({ onCreateNew, onSearchExisting }) {
@@ -7,11 +7,11 @@ export default function LandingScreen({ onCreateNew, onSearchExisting }) {
       <div className="landing__cards">
         <button type="button" className="landing__card landing__card--primary" onClick={onCreateNew}>
           <span className="landing__card-icon landing__card-icon--primary">
-            <MdPersonAddAlt />
+            <MdNoteAdd />
           </span>
           <span className="landing__card-body">
             <span className="landing__card-title">Nueva oportunidad</span>
-            <span className="landing__card-desc">Crear desde cero.</span>
+            <span className="landing__card-desc">Crear</span>
           </span>
           <MdChevronRight className="landing__card-chevron landing__card-chevron--primary" />
         </button>
