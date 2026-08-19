@@ -62,24 +62,23 @@ export default function Sidebar({ active = true, onNavigateOportunidades, defaul
 
       {/* A pedido: nombre + avatar reales de quien está mirando la app en monday (ver
           fetchCurrentMondayUser, App.jsx) — `user` llega null mientras carga o si no
-          hay contexto de monday disponible (dev/preview standalone), ahí se muestra
-          un fallback genérico en vez de romper el pie de la barra. `title` en los 2
-          (avatar Y nombre) para poder ver el nombre completo pasando el mouse, sin
-          importar si está expandida o no — colapsada solo se ve el avatar. */}
-      <div className="sidebar__footer">
-        <span className="sidebar__avatar" title={user?.name || 'Usuario de monday'}>
-          {user?.photo ? (
-            <img className="sidebar__avatar-img" src={user.photo} alt="" />
-          ) : (
-            initialsOf(user?.name || '?')
-          )}
-        </span>
-        {expanded && (
-          <span className="sidebar__user-name" title={user?.name || 'Usuario de monday'}>
-            {user?.name || 'Usuario de monday'}
+          hay contexto de monday disponible (dev/preview standalone). A pedido: sin
+          nombre no se muestra nada (ni placeholder ni iniciales genéricas), el pie de
+          la barra directamente no se renderiza en ese caso. `title` para ver el
+          nombre completo pasando el mouse, sin importar si está expandida o no —
+          colapsada solo se ve el avatar. */}
+      {user?.name && (
+        <div className="sidebar__footer">
+          <span className="sidebar__avatar" title={user.name}>
+            {user.photo ? <img className="sidebar__avatar-img" src={user.photo} alt="" /> : initialsOf(user.name)}
           </span>
-        )}
-      </div>
+          {expanded && (
+            <span className="sidebar__user-name" title={user.name}>
+              {user.name}
+            </span>
+          )}
+        </div>
+      )}
     </aside>
   )
 }
