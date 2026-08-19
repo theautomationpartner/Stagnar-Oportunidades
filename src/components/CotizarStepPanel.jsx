@@ -424,7 +424,17 @@ export default function CotizarStepPanel({
                           return
                         }
                         if (f.kind === 'connected') return handleFieldChange(f.idKey, v)
-                        if (f.key === 'modelo') return handleFieldChange('modeloSeleccion', v)
+                        if (f.key === 'modelo') {
+                          // A pedido: bug reportado — al elegir un modelo nuevo del buscador
+                          // Autodata quedaba guardado solo en `modeloSeleccion` (lo que
+                          // muestra el campo), pero la validación de "Guardar"
+                          // (getMissingCotizarFields) mira `form.modelo`, que nunca se
+                          // actualizaba — daba "Modelo" como campo faltante aunque ya
+                          // estuviera elegido. Ahora se pisan los 2 juntos.
+                          setSaveError(null)
+                          setForm((prev) => ({ ...prev, modeloSeleccion: v, modelo: v?.name ?? prev.modelo }))
+                          return
+                        }
                         return handleFieldChange(f.key, v)
                       }}
                       options={
@@ -469,9 +479,17 @@ export default function CotizarStepPanel({
 
       {!editingSection && polling && (
         <AttentionBox type="warning" icon={false}>
-          <Loader size={13} className="cotizar-step__spinner" />
-          {hasQuotes ? 'Recotizando' : 'Cotizando'} con las compañías... esto puede tardar unos
-          segundos. La pantalla se va a actualizar sola apenas esté lista.
+          {/* A pedido: se veía roto (mucho espacio vacío debajo del texto) — el Loader
+              suelto como hijo de AttentionBox (icon={false} le saca el slot de ícono
+              propio, ver AttentionBoxDefault) terminaba adentro del <Text> interno que
+              arma el texto, no en un layout pensado para ícono+texto. Envueltos los 2
+              en un span propio con flex, quedan alineados sin importar cómo el <Text>
+              de adentro renderice ese único hijo. */}
+          <span className="cotizar-step__polling-text">
+            <Loader size={13} className="cotizar-step__spinner" />
+            {hasQuotes ? 'Recotizando' : 'Cotizando'} con las compañías... esto puede tardar unos
+            segundos. La pantalla se va a actualizar sola apenas esté lista.
+          </span>
         </AttentionBox>
       )}
 
@@ -564,12 +582,11 @@ export default function CotizarStepPanel({
       {(markError || errorDetail) && !errorModalDismissed && (
         <AlertModal
           id="cotizar-error-modal"
-          type="error"
-          title={hasQuotes ? 'Error al recotizar' : 'Error al cotizar'}
-          description="No se pudo completar la cotización con las aseguradoras. Podés revisar el detalle del error más abajo, en esta misma pantalla, antes de reintentar."
+          type="warning"
+          title="No se pudo completar la cotización"
+          description="Faltan datos necesarios para realizar la cotización. Revisá la información ingresada y completá los campos requeridos."
           onClose={() => setErrorModalDismissed(true)}
-          secondaryButton={{ text: 'Cancelar', onClick: () => setErrorModalDismissed(true) }}
-          primaryButton={{ text: 'Reintentar', danger: true, onClick: onMarcarParaCotizar, disabled: marking }}
+          primaryButton={{ text: 'Entendido', onClick: () => setErrorModalDismissed(true) }}
         />
       )}
 

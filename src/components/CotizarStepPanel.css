@@ -259,6 +259,14 @@
   flex-shrink: 0;
 }
 
+/* A pedido: el AttentionBox de "Cotizando/Recotizando..." se veía roto (Loader + texto
+   sin alinear, mucho espacio vacío debajo) — ver comentario en el JSX. */
+.cotizar-step__polling-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .cotizar-step__error {
   margin: 0;
   color: #e2445c;

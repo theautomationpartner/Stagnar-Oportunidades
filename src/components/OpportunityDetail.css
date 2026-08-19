@@ -247,6 +247,15 @@
   flex-shrink: 0;
 }
 
+/* A pedido: el AttentionBox de "Leyendo Cédula..." se veía roto (Loader + texto sin
+   alinear, mucho espacio vacío debajo) — mismo arreglo que .cotizar-step__polling-text
+   en CotizarStepPanel.css. */
+.opp-detail__lectura-gate-polling-text {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .opp-detail__error-detail-spacing {
   margin: 0 var(--page-gutter) 20px;
 }
