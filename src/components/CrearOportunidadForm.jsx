@@ -64,8 +64,8 @@ import './CrearOportunidadForm.css'
 // — separado de `label` por si algún paso necesita decir algo distinto en cada lugar.
 const STEPS = [
   { key: 'personales', label: 'Seleccionar Persona', navLabel: 'Seleccionar Persona' },
-  { key: 'tipo-riesgo', label: 'Tipo de Riesgo', navLabel: 'Tipo de Riesgo' },
-  { key: 'riesgo', label: 'Datos del Riesgo', navLabel: 'Datos del Riesgo' },
+  { key: 'tipo-riesgo', label: 'Seleccionar Tipo de Riesgo', navLabel: 'Seleccionar Tipo de Riesgo' },
+  { key: 'riesgo', label: 'Cargar Datos del Riesgo', navLabel: 'Cargar Datos del Riesgo' },
 ]
 
 // Único label real (con emoji, tal cual está configurado en monday) que muestra el resto
@@ -709,6 +709,25 @@ function EditarContactoModal({ form, departamentoOptions, localidades, onSave, o
         }}
       />
     </Modal>
+  )
+}
+
+// Título grande de cada paso (círculo azul numerado + texto, sin subtítulo) — mismo
+// número que ese paso muestra en el Stepper de arriba (ver STEPS), así que el título
+// nunca queda desincronizado del contador si algún día cambia el orden/cantidad de
+// pasos. `number` a mano (no `stepIndex + 1`) porque el llamado a este componente vive
+// adentro de un `{stepIndex === N && (...)}` puntual, no en un .map — no hay de dónde
+// sacar el índice ahí. aria-hidden en el círculo: es un adorno visual que repite un
+// número que un lector de pantalla ya anuncia por otro lado (el Stepper es navegable
+// con aria-selected, ver Stepper.jsx), no hace falta leerlo de nuevo acá.
+function StepHeading({ number, title }) {
+  return (
+    <span className="crear-op__step-heading">
+      <span className="crear-op__step-badge" aria-hidden="true">
+        {number}
+      </span>
+      <span className="crear-op__step-title">{title}</span>
+    </span>
   )
 }
 
@@ -1635,18 +1654,7 @@ export default function CrearOportunidadForm({
             {!busquedaResuelta ? (
               <div className="crear-op__search-screen" key="search-screen">
                 <label className="crear-op__field crear-op__field--full">
-                  {/* A pedido: título grande tipo mockup — círculo azul numerado ("1",
-                      mismo paso que muestra el Stepper de arriba) + título, sin
-                      subtítulo debajo. aria-hidden en el círculo: es un adorno visual
-                      que repite el número de paso que un lector de pantalla ya
-                      anuncia por otro lado (el Stepper es navegable con aria-selected,
-                      ver Stepper.jsx) — no hace falta que lo lea de nuevo acá. */}
-                  <span className="crear-op__step-heading">
-                    <span className="crear-op__step-badge" aria-hidden="true">
-                      1
-                    </span>
-                    <span className="crear-op__step-title">Seleccionar Persona</span>
-                  </span>
+                  <StepHeading number={1} title="Seleccionar Persona" />
                   <ExistingRecordSearch value={searchPreview} onChange={handleSearchPreview} />
                   <Button kind="tertiary" className="crear-op__skip-btn" onClick={handleSaltearBusqueda}>
                     Crear Lead
@@ -2051,8 +2059,8 @@ export default function CrearOportunidadForm({
                 pasos reales del flujo. Llega completado con el default de Vehículo (ver
                 el useEffect que arranca con TIPO_RIESGO_AUTOMOVIL), pero se puede
                 cambiar libremente acá. */}
+            <StepHeading number={2} title="Seleccionar Tipo de Riesgo" />
             <div className="crear-op__section">
-              <h3 className="crear-op__section-title">Tipo de Riesgo</h3>
               <div className="crear-op__fields--grid">
                 <label className="crear-op__field crear-op__field--full">
                   <span>Tipo de Riesgo <Required /></span>
@@ -2070,11 +2078,7 @@ export default function CrearOportunidadForm({
 
         {stepIndex === 2 && (
           <div className="crear-op__fields">
-            {/* A pedido: título propio del paso (antes no tenía ninguno) — mismo texto
-                que STEPS[2].label, para que el título de arriba de la pantalla
-                coincida siempre con el nombre que ya muestra el Stepper, igual que
-                pasa en los pasos 1 y 2. */}
-            <h3 className="crear-op__section-title">Datos del Riesgo</h3>
+            <StepHeading number={3} title="Cargar Datos del Riesgo" />
             {esAutomovil && (
               <>
                 {/* A pedido, estética tipo mockup: subtítulo propio del paso, y el

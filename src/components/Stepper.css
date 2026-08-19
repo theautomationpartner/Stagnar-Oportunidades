@@ -72,10 +72,11 @@
   align-items: center;
   gap: 6px;
   flex-shrink: 0;
-  /* A pedido: antes 96px — labels más largos (ej. "Seleccionar Persona", "Datos del
-     Riesgo") quedaban partidos en 2 líneas. Ancho de sobra para que el más largo
+  /* A pedido: antes 96px, después 140px — los pasos de Agregar Oportunidad pasaron a
+     nombres de acción más largos ("Seleccionar Tipo de Riesgo", "Cargar Datos del
+     Riesgo") que ya no entraban ni con 140px. Ancho de sobra para que el más largo
      entre en un solo renglón (ver white-space:nowrap en .stepper__label). */
-  width: 140px;
+  width: 190px;
 }
 
 /* A pedido: mejorar el hover — antes (sin chrome propio, ver el comentario grande de
