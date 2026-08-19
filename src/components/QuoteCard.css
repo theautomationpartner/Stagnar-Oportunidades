@@ -216,14 +216,26 @@
    tarjetas) a propósito — ver el comentario en OpportunityDetail.css: con stretch, abrir
    "Parámetros"/"Coberturas" en UNA tarjeta estira TODO el renglón a esa altura y las
    vecinas cerradas quedan con un hueco vacío enorme debajo de sus botones. Achicar la
-   causa puntual (esta columna) es más seguro que volver a prender stretch. */
+   causa puntual (esta columna) es más seguro que volver a prender stretch.
+   A pedido: antes, más de ~5 tags (PORTO, 6 en total con sus 3 opcionales) scrolleaban
+   verticalmente dentro de esta columna — ahora, con la misma altura fija de 120px,
+   flex-wrap arma una 2da columna a la derecha en vez de scrollear (mismo criterio que
+   una lista en "flujo de diario"/newspaper columns, pero con flexbox column + wrap en
+   vez de CSS columns, que no deja controlar bien el orden vertical-antes-que-horizontal
+   que se necesita acá). overflow:hidden (no auto/visible) como techo de seguridad: si
+   alguna vez hay tantos tags que ni 2 columnas entran en el ancho disponible, se
+   recortan en vez de desbordar la tarjeta — no debería pasar en la práctica (6 tags como
+   máximo hoy, ver PORTO_OPCIONALES en QuoteCard.jsx), pero es más seguro que dejarlo
+   "visible" y arriesgar que se superponga con la tabla de cuotas de al lado. */
 .quote-card__override-tags {
   flex: 1;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  gap: 6px 12px;
   height: 120px;
-  overflow-y: auto;
+  overflow: hidden;
 }
 
 /* A pedido: todas las etiquetas posibles (Bonificación, Descuento, RC, Deducible/Edad
@@ -237,6 +249,14 @@
   border-radius: 10px;
   padding: 2px 8px;
   white-space: nowrap;
+  /* A pedido: si el valor cargado es un número grande (ej. Bonificación sin tope
+     real), la etiqueta no puede crecer sin límite — eso es lo que la hacía chocar/
+     superponerse con la columna de cuotas de al lado. max-width + ellipsis: se trunca
+     con "..." en vez de desbordar; el valor completo sigue disponible en
+     "Parámetros" si hace falta verlo entero. */
+  max-width: 150px;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .quote-card__tag--empty {
