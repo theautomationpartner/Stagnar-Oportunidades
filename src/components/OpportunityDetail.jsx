@@ -128,7 +128,12 @@ export default function OpportunityDetail({
   const loadErrorUpdate = async (tag) => {
     try {
       const update = await fetchLatestUpdate(opportunityId, tag)
-      return update?.text_body?.trim() || null
+      const text = update?.text_body?.trim()
+      if (!text) return null
+      // A pedido: se muestra el texto tal cual quedó en monday, sin el prefijo que usa
+      // fetchLatestUpdate para filtrar por Update (ej. "[COTIZAR]") — ese tag es un
+      // detalle interno nuestro, no algo que la persona que lee el error necesite ver.
+      return (text.startsWith(tag) ? text.slice(tag.length) : text).trim()
     } catch {
       return null
     }
@@ -1013,12 +1018,17 @@ export default function OpportunityDetail({
               </div>
               {(opportunity.estadoLectura === 'Leer' || opportunity.estadoLectura === 'Leyendo') && (
                 <AttentionBox type="warning" icon={false}>
-                  <Loader size={13} className="opp-detail__envio-spinner" />
-                  {opportunity.estadoLectura === 'Leer'
-                    ? 'En cola para leer Cédula y Carta Automóvil...'
-                    : 'Leyendo Cédula y Carta Automóvil...'}{' '}
-                  esto puede tardar unos segundos. La pantalla se va a actualizar sola apenas
-                  esté lista.
+                  {/* A pedido: mismo arreglo que el AttentionBox de "Cotizando..." en
+                      CotizarStepPanel.jsx (ver su comentario) — Loader + texto envueltos
+                      en un span propio con flex, en vez de sueltos como hijos directos. */}
+                  <span className="opp-detail__lectura-gate-polling-text">
+                    <Loader size={13} className="opp-detail__envio-spinner" />
+                    {opportunity.estadoLectura === 'Leer'
+                      ? 'En cola para leer Cédula y Carta Automóvil...'
+                      : 'Leyendo Cédula y Carta Automóvil...'}{' '}
+                    esto puede tardar unos segundos. La pantalla se va a actualizar sola apenas
+                    esté lista.
+                  </span>
                 </AttentionBox>
               )}
               {opportunity.estadoLectura === 'Error' && (
