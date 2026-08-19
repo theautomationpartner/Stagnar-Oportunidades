@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { MdSend, MdArrowBack, MdAutorenew } from 'react-icons/md'
+import { MdSend, MdAutorenew, MdArrowBack } from 'react-icons/md'
 import { Button, EmptyState, AttentionBox, Loader } from '@vibe/core'
 import QuoteCard from './QuoteCard'
 import StatusBadge from './StatusBadge'
@@ -11,6 +11,7 @@ import EmitirStepPanel from './EmitirStepPanel'
 import WhatsAppSendModal from './WhatsAppSendModal'
 import ErrorDetailBox from './ErrorDetailBox'
 import ClientFicha from './ClientFicha'
+import StepFooter from './StepFooter'
 import './PillTabs.css'
 import {
   fetchOpportunityDetail,
@@ -58,7 +59,13 @@ const ERROR_UPDATE_TAG_ENVIO = '[ENVIO]'
 const ERROR_UPDATE_TAG_CREAR_POLIZA = '[CREAR_POLIZA]'
 const ERROR_UPDATE_TAG_LEER = '[LEER]'
 
-export default function OpportunityDetail({ opportunityId, onBack, schema }) {
+export default function OpportunityDetail({
+  opportunityId,
+  onBack,
+  schema,
+  showReturnToCrearFlow = false,
+  onOpportunityAction,
+}) {
   const [item, setItem] = useState(null)
   const [rawQuotes, setRawQuotes] = useState([])
   const [loading, setLoading] = useState(true)
@@ -553,11 +560,13 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   // real de la cotización — si el cliente ya tiene o quiere el opcional — así que se
   // escribe directo en monday al tildar/destildar, igual que "Propuesta elegida".
   const handleToggleOpcional = async (rawId, field, checked) => {
+    onOpportunityAction?.()
     await setSubitemCheckboxValue(rawId, OPCIONAL_PORTO_COLUMN_IDS[field], checked)
     setRawQuotes((prev) => prev.map((r) => (r.id === rawId ? { ...r, [field]: checked } : r)))
   }
 
   const handleMarcarParaCotizar = async () => {
+    onOpportunityAction?.()
     setMarking(true)
     setMarkError(null)
     setCotizarErrorDetail(null)
@@ -583,6 +592,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   // "Propuesta elegida" es de único valor por oportunidad: si había otra marcada, la
   // desmarcamos en monday antes de marcar la nueva, para no dejar dos subitems en true.
   const handleSetElegida = async (rawId) => {
+    onOpportunityAction?.()
     setSettingElegidaId(rawId)
     setElegidaError(null)
     try {
@@ -611,6 +621,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   // Marca en monday las cotizaciones recién enviadas por WhatsApp como "Incluir Propuesta",
   // para que el paso Confirmar pueda listarlas como "enviadas" de forma persistente.
   const handleWhatsAppSent = async (sentEntries) => {
+    onOpportunityAction?.()
     const idsToMark = sentEntries.map((e) => e.raw.id).filter((id) => {
       const raw = rawQuotes.find((r) => r.id === id)
       return raw && !raw.incluirPropuesta
@@ -650,6 +661,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   // de la columna deje de estar vacío, así que actualizamos el `item` en memoria con el
   // nombre del archivo apenas la mutation confirma el upload (sin esperar a un refetch).
   const handleUploadDocument = async (columnId, file) => {
+    onOpportunityAction?.()
     setUploadingDoc((prev) => ({ ...prev, [columnId]: true }))
     setDocUploadError((prev) => ({ ...prev, [columnId]: null }))
     try {
@@ -672,6 +684,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   // change_simple_column_value no soporta columnas file). Genérico por columnId, igual
   // que handleUploadDocument.
   const handleDeleteDocument = async (columnId) => {
+    onOpportunityAction?.()
     setDeletingDoc((prev) => ({ ...prev, [columnId]: true }))
     setDocUploadError((prev) => ({ ...prev, [columnId]: null }))
     try {
@@ -692,6 +705,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   // botón "Concretar Oportunidad" (ver handleConfirmarEmision más abajo), que es la
   // acción explícita que de verdad cierra la oportunidad.
   const handleUploadPoliza = async (file) => {
+    onOpportunityAction?.()
     setUploadingDoc((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: true }))
     setDocUploadError((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: null }))
     try {
@@ -724,6 +738,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   // ítem completo en cada tick (ver el useEffect de polizaPolling) y va a reflejar solo
   // cuando de verdad haya pasado en monday, no antes.
   const handleConfirmarEmision = async () => {
+    onOpportunityAction?.()
     setConfirmandoEmision(true)
     setConfirmarEmisionError(null)
     setPolizaErrorDetail(null)
@@ -748,6 +763,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   // monday que la cotización fue aceptada (mismo estado real "Cotizacion aceptada" que
   // ya hace aterrizar directo en el paso 4 al reabrir la oportunidad) y avanzar la UI.
   const handleConfirmarPaso3 = async () => {
+    onOpportunityAction?.()
     setConfirmingPaso3(true)
     setConfirmPaso3Error(null)
     try {
@@ -767,6 +783,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   }
 
   const handleSaveCotizarFields = async (formValues) => {
+    onOpportunityAction?.()
     for (const field of COTIZAR_FIELDS) {
       if (field.kind === 'connected' || field.kind === 'autodata') continue
       const newValue = formValues[field.key] ?? ''
@@ -891,14 +908,14 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
       // A pedido: subtítulo propio por paso (antes uno solo, fijo, repetido en los 4)
       // — qué se hace concretamente en ESE paso, no una bajada genérica de toda la
       // pantalla.
-      subtitle: 'Generá cotizaciones automáticas con las aseguradoras para este vehículo.',
+      subtitle: 'Generá cotizaciones automáticas con las aseguradoras para esta Oportunidad.',
       status: hasQuotes ? 'done' : 'active',
       clickable: !lecturaGateActive,
     },
     {
       key: 'comparar',
       label: 'Comparar y enviar',
-      subtitle: 'Compará las opciones obtenidas y enviá las mejores por WhatsApp al cliente.',
+      subtitle: 'Compará las cotizaciones disponibles y enviá las seleccionadas por WhatsApp al cliente.',
       status: compararDone ? 'done' : hasQuotes ? 'active' : 'pending',
       clickable: !lecturaGateActive,
     },
@@ -922,9 +939,19 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
   return (
     <div className="app">
       <div className="opp-detail__breadcrumb">
-        <Button kind="tertiary" className="opp-detail__back-btn" onClick={onBack}>
-          <MdArrowBack /> Volver
-        </Button>
+        {/* A pedido: solo aparece cuando se entró a esta Oportunidad apretando "Ir a
+            esta oportunidad" (historial del Cliente/Lead en Crear Oportunidad, paso 1)
+            — `showReturnToCrearFlow` lo prende App.jsx solo en ese camino, no si se
+            abrió desde la tabla o recién creada. Se apaga solo (ver
+            `onOpportunityAction`, App.jsx) en cuanto se hace alguna acción real adentro
+            de la Oportunidad — ya no tendría sentido "volver" a terminar de cargarla,
+            quedó en curso. Mismo `onBack` que ya usa el footer de Cotizar (ver
+            CotizarStepPanel.jsx), acá visible arriba en cualquiera de los 4 pasos. */}
+        {showReturnToCrearFlow && (
+          <Button kind="tertiary" className="opp-detail__back-btn" onClick={onBack}>
+            <MdArrowBack /> Volver a Persona Seleccionada
+          </Button>
+        )}
         {!loading && !error && opportunity && (
           <Stepper steps={steps} activeKey={activeStep} onSelect={setActiveStep} />
         )}
@@ -1024,6 +1051,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
               polling={polling}
               errorDetail={cotizarErrorDetail}
               onGoToComparar={() => setActiveStep('comparar')}
+              onBack={onBack}
             />
           )}
 
@@ -1099,35 +1127,42 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
                 className="opp-detail__error-detail-spacing"
               />
 
-              <div className="opp-detail__footer">
-                <div className="opp-detail__footer-status">
-                  <span>{selectedIds.size} opciones seleccionadas</span>
-                  {opportunity.estadoEnvio && (
-                    <span className="opp-detail__envio-status">
-                      {sendPolling && (
-                        <Loader size={13} className="opp-detail__envio-spinner" />
-                      )}
-                      <StatusBadge label={opportunity.estadoEnvio} color={opportunity.estadoEnvioColor} />
-                    </span>
-                  )}
-                </div>
-                <div className="opp-detail__footer-actions">
-                  {/* A pedido: se puede pasar a "Confirmar" sin haber enviado nada por
-                      WhatsApp — útil cuando el cliente ya eligió la propuesta por otro
-                      medio (llamada, presencial) y no hace falta mandarle nada más. */}
-                  <Button kind="secondary" onClick={() => setActiveStep('confirmar')}>
-                    Continuar sin enviar
-                  </Button>
-                  <Button
-                    kind="primary"
-                    color="positive"
-                    onClick={handleOpenWhatsAppModal}
-                    disabled={selectedIds.size === 0}
-                  >
-                    <MdSend /> Enviar seleccionadas por WhatsApp
-                  </Button>
-                </div>
-              </div>
+              {/* A pedido: mismo footer pegado abajo del todo que los otros 3 pasos de
+                  la Oportunidad (ver StepFooter) — "Volver" a la izquierda vuelve a
+                  Cotizar, el contador de seleccionadas + estado de envío quedan al
+                  lado (extraLeft) en vez de competir por el lugar de "el siguiente
+                  paso", que ahora es siempre a la derecha. */}
+              <StepFooter
+                onBack={() => setActiveStep('cotizar')}
+                extraLeft={
+                  <div className="opp-detail__footer-status">
+                    <span>{selectedIds.size} opciones seleccionadas</span>
+                    {opportunity.estadoEnvio && (
+                      <span className="opp-detail__envio-status">
+                        {sendPolling && (
+                          <Loader size={13} className="opp-detail__envio-spinner" />
+                        )}
+                        <StatusBadge label={opportunity.estadoEnvio} color={opportunity.estadoEnvioColor} />
+                      </span>
+                    )}
+                  </div>
+                }
+              >
+                {/* A pedido: se puede pasar a "Confirmar" sin haber enviado nada por
+                    WhatsApp — útil cuando el cliente ya eligió la propuesta por otro
+                    medio (llamada, presencial) y no hace falta mandarle nada más. */}
+                <Button kind="secondary" onClick={() => setActiveStep('confirmar')}>
+                  Continuar sin enviar
+                </Button>
+                <Button
+                  kind="primary"
+                  color="positive"
+                  onClick={handleOpenWhatsAppModal}
+                  disabled={selectedIds.size === 0}
+                >
+                  <MdSend /> Enviar seleccionadas por WhatsApp
+                </Button>
+              </StepFooter>
             </>
           )}
 
@@ -1157,7 +1192,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
                 },
                 {
                   key: 'cedula',
-                  label: 'Cédula de Identidad',
+                  label: 'Cédula de Identidad (frente)',
                   columnId: CEDULA_COLUMN_ID,
                   fileName: opportunity.cedula,
                 },
@@ -1170,6 +1205,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
               confirming={confirmingPaso3}
               confirmError={confirmPaso3Error}
               onConfirmar={handleConfirmarPaso3}
+              onBack={() => setActiveStep('comparar')}
             />
           )}
 
@@ -1201,6 +1237,7 @@ export default function OpportunityDetail({ opportunityId, onBack, schema }) {
               onConfirmarEmision={handleConfirmarEmision}
               confirmandoEmision={confirmandoEmision}
               confirmarEmisionError={confirmarEmisionError}
+              onBack={() => setActiveStep('confirmar')}
             />
           )}
             </>

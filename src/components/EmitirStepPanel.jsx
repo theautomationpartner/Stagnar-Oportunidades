@@ -5,6 +5,7 @@ import { formatMoney } from '../services/format'
 import { accentForCompania } from '../services/companyColors'
 import { fetchFileColumnAsFile } from '../services/mondayApi'
 import FileUploadField from './FileUploadField'
+import StepFooter from './StepFooter'
 import StatusBadge from './StatusBadge'
 import GradientSpinner from './GradientSpinner'
 import ErrorDetailBox from './ErrorDetailBox'
@@ -69,6 +70,7 @@ export default function EmitirStepPanel({
   onConfirmarEmision,
   confirmandoEmision,
   confirmarEmisionError,
+  onBack,
 }) {
   const elegida = groups.flatMap((g) => g.entries).find((e) => e.raw.propuestaElegida)
   const accent = elegida ? accentForCompania(elegida.raw.compania) : null
@@ -208,10 +210,10 @@ export default function EmitirStepPanel({
         {/* A pedido: mismo campo de archivo (y misma previsualización con lightbox)
             que el resto de la app — antes esto eran 2 bloques totalmente distintos
             (DocumentUploadRow mientras faltaba, una fila verde armada a mano una vez
-            cargada). Ahora es un solo FileUploadField siempre; "Concretar Oportunidad"
-            se agrega al lado como extraActions solo mientras corresponde (subida y
-            todavía no "Creada" — una vez creada, ni eliminar ni confirmar tienen
-            sentido, se deja la fila en verde nomás como constancia). */}
+            cargada). Ahora es un solo FileUploadField siempre — "Concretar
+            Oportunidad" ya no vive acá adentro (ver extraActions de antes), se movió
+            al footer de abajo, mismo lugar que en los otros 3 pasos de la
+            Oportunidad. */}
         <FileUploadField
           label="Póliza"
           required={false}
@@ -225,22 +227,29 @@ export default function EmitirStepPanel({
           onDelete={showConfirmarAction ? onDeletePoliza : undefined}
           showReplaceButton={false}
           compactDelete
-          extraActions={
-            showConfirmarAction && (
-              <Button
-                kind="primary"
-                className="emitir-step__confirmar-btn"
-                onClick={handleConcretarAttempt}
-                disabled={confirmandoEmision || polling}
-              >
-                <MdCheckCircle /> {confirmandoEmision ? 'Confirmando...' : 'Concretar Oportunidad'}
-              </Button>
-            )
-          }
         />
         {confirmarEmisionError && <p className="emitir-step__error">Error: {confirmarEmisionError}</p>}
         {!polling && <ErrorDetailBox detail={errorDetail} className="emitir-step__error-detail-spacing" />}
       </div>
+
+      {/* A pedido: mismo footer pegado abajo del todo que los otros 3 pasos de la
+          Oportunidad (ver StepFooter) — "Volver" vuelve a Confirmar. "Concretar
+          Oportunidad" (a la derecha, el "siguiente paso"/acción final acá) solo
+          mientras corresponde — mismo gate que antes (showConfirmarAction: subida y
+          todavía no "Creada"); una vez creada, ni eliminar ni confirmar tienen
+          sentido, el footer queda solo con "Volver". */}
+      <StepFooter onBack={onBack}>
+        {showConfirmarAction && (
+          <Button
+            kind="primary"
+            className="emitir-step__confirmar-btn"
+            onClick={handleConcretarAttempt}
+            disabled={confirmandoEmision || polling}
+          >
+            <MdCheckCircle /> {confirmandoEmision ? 'Confirmando...' : 'Concretar Oportunidad'}
+          </Button>
+        )}
+      </StepFooter>
 
       {validationError && (
         <AlertModal

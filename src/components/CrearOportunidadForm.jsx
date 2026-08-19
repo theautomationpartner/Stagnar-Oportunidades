@@ -13,6 +13,8 @@ import {
   MdLocationOn,
   MdSmartphone,
   MdDescription,
+  MdPerson,
+  MdCall,
 } from 'react-icons/md'
 import {
   Button,
@@ -861,13 +863,27 @@ function EditarLeadModal({ form, departamentoOptions, localidades, onSave, onClo
   )
 }
 
+// A pedido: título de sección con ícono en círculo de color al lado (mockup) en vez del
+// texto solo — reusado por las 3 secciones tituladas del paso 1 (Datos personales/
+// Contacto/Ubicación, ver más abajo).
+function SectionTitle({ icon: Icon, children }) {
+  return (
+    <div className="crear-op__section-title-row">
+      <span className="crear-op__section-icon">
+        <Icon />
+      </span>
+      <h3 className="crear-op__section-title">{children}</h3>
+    </div>
+  )
+}
+
 // Fila de Teléfono, reusada tanto por el formulario manual ("No tengo la Cédula") como
 // por el perfil leído con IA ("Sí" + lectura ok) — la IA no devuelve teléfono, así que
 // en los 2 casos hay que pedirlo aparte.
 function TelefonoField({ form, handleChange, resetKey }) {
   return (
     <div className="crear-op__section">
-      <h3 className="crear-op__section-title">Contacto</h3>
+      <SectionTitle icon={MdCall}>Contacto</SectionTitle>
       <div className="crear-op__fields--grid">
         <label className="crear-op__field crear-op__field--full">
           <span>Teléfono <Required /></span>
@@ -937,15 +953,21 @@ export default function CrearOportunidadForm({
   onOpenOportunidad,
   onCreated,
 }) {
-  const [stepIndex, setStepIndex] = useState(0)
   // Calculado una sola vez, al montar (ver loadPersistedSearch) — de acá salen los
-  // valores iniciales de form/resultadoSeleccionado/searchPreview/busquedaResuelta más
-  // abajo, para que la Oportunidad anterior a medio cargar (si hay una vigente, dentro
-  // de PERSISTED_SEARCH_TTL_MS) aparezca ya autocompleta desde el primer render.
+  // valores iniciales de stepIndex/form/resultadoSeleccionado/searchPreview/
+  // busquedaResuelta más abajo, para que la Oportunidad anterior a medio cargar (si hay
+  // una vigente, dentro de PERSISTED_SEARCH_TTL_MS) aparezca ya autocompleta, en el
+  // mismo paso en el que se había quedado, desde el primer render.
   const [initialPersistedSearch] = useState(loadPersistedSearch)
+  // A pedido: si volvió con el paso 2 o 3 ya guardado (ver el useEffect de
+  // savePersistedSearch más abajo), arranca directo ahí en vez de en 0 — típicamente
+  // pasa al volver de "Ir a esta oportunidad" (historial de acá abajo) a medio cargar
+  // el paso 2/3 de esta.
+  const [stepIndex, setStepIndex] = useState(() => initialPersistedSearch?.stepIndex ?? 0)
   const [form, setForm] = useState(() => ({
     ...buildInitialForm(),
     ...(initialPersistedSearch?.personales ?? {}),
+    ...(initialPersistedSearch?.riesgo ?? {}),
   }))
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
@@ -1187,6 +1209,7 @@ export default function CrearOportunidadForm({
     savePersistedSearch({
       searchPreview,
       resultadoSeleccionado,
+      stepIndex,
       personales: resultadoSeleccionado
         ? {
             nombre: form.nombre,
@@ -1199,12 +1222,43 @@ export default function CrearOportunidadForm({
             localidadId: form.localidadId,
           }
         : null,
+      // A pedido: además de los datos personales, se guarda en qué paso estaba y el
+      // progreso de "Tipo de Riesgo"/"Datos del Riesgo" — así "Volver" desde una
+      // Oportunidad anterior abierta en el medio (ver "Ir a esta oportunidad" en el
+      // historial de acá abajo) repone el paso exacto en el que estaba, no solo los
+      // datos personales con el paso reseteado a 1. Los archivos elegidos (Carta
+      // Automóvil/Cédula Identidad) NO se guardan acá — un File no es serializable a
+      // JSON, se pierden en el viaje (hay que volver a elegirlos).
+      riesgo: {
+        tipoRiesgo: form.tipoRiesgo,
+        poseeVehiculo: form.poseeVehiculo,
+        modeloSeleccion: form.modeloSeleccion,
+        marca: form.marca,
+        anio: form.anio,
+        combustible: form.combustible,
+        uso: form.uso,
+        tipo: form.tipo,
+      },
     })
-    // Solo cuando cambia la selección/confirmación — no en cada tecla de Nombre/Apellido/
-    // CI/Teléfono editados a mano después (guardamos la foto de ese momento, no cada
-    // cambio posterior; igual sigue vigente por el resto del TTL).
+    // Se guarda cuando cambia la selección/confirmación, el paso, o alguno de los
+    // campos de riesgo/vehículo (todos de selección discreta — dropdown/toggle, no
+    // texto libre) — no en cada tecla de Nombre/Apellido/CI/Teléfono editados a mano
+    // (esos quedan afuera del array a propósito, guardamos la foto de ese momento, no
+    // cada cambio posterior; igual sigue vigente por el resto del TTL).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchPreview, resultadoSeleccionado])
+  }, [
+    searchPreview,
+    resultadoSeleccionado,
+    stepIndex,
+    form.tipoRiesgo,
+    form.poseeVehiculo,
+    form.modeloSeleccion,
+    form.marca,
+    form.anio,
+    form.combustible,
+    form.uso,
+    form.tipo,
+  ])
 
   // Limpia el gate de "¿Tenés la Cédula de Identidad?" (ver JSX del paso 1) y todo lo
   // que haya quedado de un intento anterior de leerla con IA — se llama tanto al
@@ -2045,7 +2099,7 @@ export default function CrearOportunidadForm({
                     </span>
                   </div>
                 ) : (
-                  <>
+                  <div className="crear-op__form-card">
                     {/* A pedido: antes de mostrar el formulario a mano para "Crear Lead",
                         se pregunta si tienen la Cédula de Identidad — mismo criterio que
                         "¿Tenés la Cédula o Carta del vehículo?" del paso 3 (mismo toggle,
@@ -2054,42 +2108,132 @@ export default function CrearOportunidadForm({
                         solo lectura (mismo lenguaje que la ficha de un Cliente/Lead ya
                         elegido, ver más arriba) en vez de un formulario — "Editar" abre un
                         popup para corregir lo que la IA haya leído mal (ver
-                        EditarLeadModal). "No" cae al formulario de siempre. */}
+                        EditarLeadModal). "No" cae al formulario de siempre. A pedido: la
+                        pregunta y lo que aparece según la respuesta (subir Cédula, o los
+                        campos Nombre/Apellido/CI/Fecha) van en la MISMA sección — antes
+                        eran 2 .crear-op__section separadas, con un salto/gap en el medio
+                        de lo que es conceptualmente un solo bloque ("Datos personales"). */}
                     <div className="crear-op__section">
-                      <h3 className="crear-op__section-title">Datos personales</h3>
+                      <SectionTitle icon={MdPerson}>Datos personales</SectionTitle>
                       <p className="crear-op__risk-subtitle">¿Tenés el frente de la Cédula de Identidad de la persona?</p>
                       <DocumentChoiceToggle value={tieneCedulaLead} onChange={setTieneCedulaLead} />
-                    </div>
 
-                    {tieneCedulaLead === 'Si' && (
-                      <div className="crear-op__section">
-                        {!cedulaLeadFile ? (
-                          <FileUploadField
-                            label="Cédula de Identidad (frente)"
-                            file={cedulaLeadFile}
-                            onUpload={handleCedulaLeadChange}
-                            prominent
-                            helperText="Subí una foto o PDF del FRENTE de la Cédula de Identidad para completar los datos automáticamente."
-                            buttonLabel="Adjuntar frente de la Cédula"
+                      {tieneCedulaLead === 'Si' && (
+                        <div className="crear-op__section-subblock">
+                          {!cedulaLeadFile ? (
+                            <FileUploadField
+                              label="Cédula de Identidad (frente)"
+                              file={cedulaLeadFile}
+                              onUpload={handleCedulaLeadChange}
+                              prominent
+                              helperText="Subí una foto o PDF del FRENTE de la Cédula de Identidad para completar los datos automáticamente."
+                              buttonLabel="Adjuntar frente de la Cédula"
+                            />
+                          ) : (
+                            <FileUploadField
+                              label="Cédula de Identidad (frente)"
+                              file={cedulaLeadFile}
+                              uploading={leyendoCedulaLead}
+                              onDelete={() => handleCedulaLeadChange(null)}
+                              deleteLabel="Eliminar archivo y reintentar"
+                              showReplaceButton={false}
+                            />
+                          )}
+                          {cedulaLeadError && (
+                            <AttentionBox type="warning" className="crear-op__lead-error">
+                              No pudimos leer los datos automáticamente. Completá lo que falta con
+                              "Editar", o eliminá el archivo de arriba para probar con otro documento.
+                            </AttentionBox>
+                          )}
+                        </div>
+                      )}
+
+                      {tieneCedulaLead === 'No' && (
+                        <div className="crear-op__fields--grid crear-op__section-subblock">
+                          {/* TextField nativo de @vibe/core en vez de <label> + ClearableInput a
+                              mano — ya trae label (title/required), botón de limpiar (icon/
+                              onIconClick/clearOnIconClick) y el borde verde/rojo (validation) de
+                              fábrica. `icon` SIEMPRE en MdClear, nunca condicionado a si hay
+                              valor (`form.x ? MdClear : undefined`) — internamente el
+                              componente ya oculta el ícono solo cuando el campo está vacío, así
+                              que ese condicional era redundante Y además el causante de una
+                              excepción real: si el valor se limpia desde AFUERA (no tipeando,
+                              ver la cruz de "Buscar Persona" más arriba), hay un instante en
+                              que su estado interno de debounce todavía no bajó a vacío mientras
+                              `icon` ya pasó a `undefined` — esa combinación (valor todavía
+                              verdadero + ícono ya indefinido) hace que el componente intente
+                              leer `icon.length` y tira "Cannot read properties of undefined"
+                              (pantalla en blanco). Pasando siempre un ícono definido, esa
+                              combinación imposible de lograr no existe más. */}
+                          <TextField
+                            key={`nombre-${textFieldsResetKey}`}
+                            wrapperClassName="crear-op__field"
+                            title="Nombre"
+                            required
+                            placeholder="Ingresa el nombre"
+                            value={form.nombre}
+                            onChange={(value) => handleChange('nombre', value)}
+                            icon={MdClear}
+                            onIconClick={() => handleChange('nombre', '')}
+                            validation={form.nombre ? { status: 'success' } : undefined}
                           />
-                        ) : (
-                          <FileUploadField
-                            label="Cédula de Identidad (frente)"
-                            file={cedulaLeadFile}
-                            uploading={leyendoCedulaLead}
-                            onDelete={() => handleCedulaLeadChange(null)}
-                            deleteLabel="Eliminar archivo y reintentar"
-                            showReplaceButton={false}
+                          <TextField
+                            key={`apellido-${textFieldsResetKey}`}
+                            wrapperClassName="crear-op__field"
+                            title="Apellido"
+                            required
+                            placeholder="Ingresa el apellido"
+                            value={form.apellido}
+                            onChange={(value) => handleChange('apellido', value)}
+                            icon={MdClear}
+                            onIconClick={() => handleChange('apellido', '')}
+                            validation={form.apellido ? { status: 'success' } : undefined}
                           />
-                        )}
-                        {cedulaLeadError && (
-                          <AttentionBox type="warning" className="crear-op__lead-error">
-                            No pudimos leer los datos automáticamente. Completá lo que falta con
-                            "Editar", o eliminá el archivo de arriba para probar con otro documento.
-                          </AttentionBox>
-                        )}
-                      </div>
-                    )}
+                          <TextField
+                            key={`ci-${textFieldsResetKey}`}
+                            wrapperClassName="crear-op__field"
+                            title="CI"
+                            required
+                            placeholder="Ej: 4.123.456-7"
+                            value={form.ci}
+                            onChange={(value) => handleChange('ci', value)}
+                            icon={MdClear}
+                            onIconClick={() => handleChange('ci', '')}
+                            validation={
+                              ciError(form.ci)
+                                ? { status: 'error', text: ciError(form.ci) }
+                                : form.ci
+                                  ? { status: 'success' }
+                                  : undefined
+                            }
+                          />
+                          <label className={`crear-op__field${fieldStateClass(form.fechaNacimiento, fechaError(form.fechaNacimiento))}`}>
+                            <span>Fecha Nacimiento <Required /></span>
+                            <div className="crear-op__date-wrap">
+                              <input
+                                type="date"
+                                value={form.fechaNacimiento}
+                                max={maxFechaNacimiento()}
+                                onChange={(e) => handleChange('fechaNacimiento', e.target.value)}
+                              />
+                              {form.fechaNacimiento && (
+                                <button
+                                  type="button"
+                                  className="crear-op__date-clear"
+                                  onClick={() => handleChange('fechaNacimiento', '')}
+                                  aria-label="Borrar campo"
+                                >
+                                  <MdClear />
+                                </button>
+                              )}
+                            </div>
+                            {fechaError(form.fechaNacimiento) && (
+                              <span className="crear-op__field-error">{fechaError(form.fechaNacimiento)}</span>
+                            )}
+                          </label>
+                        </div>
+                      )}
+                    </div>
 
                     {tieneCedulaLead === 'Si' && leadPerfilListo && (
                       <>
@@ -2122,96 +2266,10 @@ export default function CrearOportunidadForm({
 
                     {tieneCedulaLead === 'No' && (
                       <>
-                        <div className="crear-op__section">
-                          <div className="crear-op__fields--grid">
-                            {/* TextField nativo de @vibe/core en vez de <label> + ClearableInput a
-                                mano — ya trae label (title/required), botón de limpiar (icon/
-                                onIconClick/clearOnIconClick) y el borde verde/rojo (validation) de
-                                fábrica. `icon` SIEMPRE en MdClear, nunca condicionado a si hay
-                                valor (`form.x ? MdClear : undefined`) — internamente el
-                                componente ya oculta el ícono solo cuando el campo está vacío, así
-                                que ese condicional era redundante Y además el causante de una
-                                excepción real: si el valor se limpia desde AFUERA (no tipeando,
-                                ver la cruz de "Buscar Persona" más arriba), hay un instante en
-                                que su estado interno de debounce todavía no bajó a vacío mientras
-                                `icon` ya pasó a `undefined` — esa combinación (valor todavía
-                                verdadero + ícono ya indefinido) hace que el componente intente
-                                leer `icon.length` y tira "Cannot read properties of undefined"
-                                (pantalla en blanco). Pasando siempre un ícono definido, esa
-                                combinación imposible de lograr no existe más. */}
-                            <TextField
-                              key={`nombre-${textFieldsResetKey}`}
-                              wrapperClassName="crear-op__field"
-                              title="Nombre"
-                              required
-                              placeholder="Ingresa el nombre"
-                              value={form.nombre}
-                              onChange={(value) => handleChange('nombre', value)}
-                              icon={MdClear}
-                              onIconClick={() => handleChange('nombre', '')}
-                              validation={form.nombre ? { status: 'success' } : undefined}
-                            />
-                            <TextField
-                              key={`apellido-${textFieldsResetKey}`}
-                              wrapperClassName="crear-op__field"
-                              title="Apellido"
-                              required
-                              placeholder="Ingresa el apellido"
-                              value={form.apellido}
-                              onChange={(value) => handleChange('apellido', value)}
-                              icon={MdClear}
-                              onIconClick={() => handleChange('apellido', '')}
-                              validation={form.apellido ? { status: 'success' } : undefined}
-                            />
-                            <TextField
-                              key={`ci-${textFieldsResetKey}`}
-                              wrapperClassName="crear-op__field"
-                              title="CI"
-                              required
-                              placeholder="Ej: 4.123.456-7"
-                              value={form.ci}
-                              onChange={(value) => handleChange('ci', value)}
-                              icon={MdClear}
-                              onIconClick={() => handleChange('ci', '')}
-                              validation={
-                                ciError(form.ci)
-                                  ? { status: 'error', text: ciError(form.ci) }
-                                  : form.ci
-                                    ? { status: 'success' }
-                                    : undefined
-                              }
-                            />
-                            <label className={`crear-op__field${fieldStateClass(form.fechaNacimiento, fechaError(form.fechaNacimiento))}`}>
-                              <span>Fecha Nacimiento <Required /></span>
-                              <div className="crear-op__date-wrap">
-                                <input
-                                  type="date"
-                                  value={form.fechaNacimiento}
-                                  max={maxFechaNacimiento()}
-                                  onChange={(e) => handleChange('fechaNacimiento', e.target.value)}
-                                />
-                                {form.fechaNacimiento && (
-                                  <button
-                                    type="button"
-                                    className="crear-op__date-clear"
-                                    onClick={() => handleChange('fechaNacimiento', '')}
-                                    aria-label="Borrar campo"
-                                  >
-                                    <MdClear />
-                                  </button>
-                                )}
-                              </div>
-                              {fechaError(form.fechaNacimiento) && (
-                                <span className="crear-op__field-error">{fechaError(form.fechaNacimiento)}</span>
-                              )}
-                            </label>
-                          </div>
-                        </div>
-
                         <TelefonoField form={form} handleChange={handleChange} resetKey={textFieldsResetKey} />
 
                         <div className="crear-op__section">
-                          <h3 className="crear-op__section-title">Ubicación</h3>
+                          <SectionTitle icon={MdLocationOn}>Ubicación</SectionTitle>
                           <div className="crear-op__fields--grid">
                             <label className="crear-op__field">
                               <span>Departamento <Required /></span>
@@ -2256,7 +2314,7 @@ export default function CrearOportunidadForm({
                         onSave={handleSaveLeadPerfil}
                       />
                     )}
-                  </>
+                  </div>
                 )}
 
               </div>

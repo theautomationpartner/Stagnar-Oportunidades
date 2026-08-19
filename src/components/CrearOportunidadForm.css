@@ -107,25 +107,78 @@
   }
 }
 
-/* A pedido: estética tipo mockup — campos agrupados en secciones con encabezado propio
-   (Datos personales/Contacto/Ubicación/Documentación/Datos de la oportunidad), separadas
-   por una línea fina arriba de cada una (menos la primera, que ya viene después del
-   buscador de arriba). */
+/* Tarjeta blanca + sombra suave (mismo lenguaje que .crear-op__ficha) — por defecto,
+   cada .crear-op__section es su propia tarjeta (así se sigue viendo bien un uso
+   suelto, ej. "Ramo" en el paso 2, que no tiene más secciones al lado). Cuando varias
+   secciones van juntas (Datos personales/Contacto/Ubicación, paso 1), A PEDIDO van dentro
+   de UN solo .crear-op__form-card compartido en vez de cada una en su propia tarjeta
+   separada (quedaban "saltos" — cards sueltas con gap entre sí) — la regla de más abajo
+   les saca la tarjeta propia en ese caso, .crear-op__form-card pasa a ser la única. */
 .crear-op__section {
-  padding-top: 20px;
-  border-top: 1px solid #e6e9ef;
+  padding: 20px 22px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  box-shadow: var(--shadow-floating);
 }
 
-.crear-op__section:first-of-type {
-  padding-top: 0;
-  border-top: none;
+.crear-op__form-card {
+  display: flex;
+  flex-direction: column;
+  gap: 28px;
+  padding: 20px 22px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: 10px;
+  box-shadow: var(--shadow-floating);
+}
+
+.crear-op__form-card .crear-op__section {
+  padding: 0;
+  background: none;
+  border: none;
+  box-shadow: none;
+}
+
+/* A pedido: dentro de "Datos personales" (ver JSX), el bloque de campos que aparece
+   según la respuesta del toggle (Nombre/Apellido/CI/Fecha, o la subida de la Cédula)
+   ahora vive DENTRO de la misma sección/tarjeta que el toggle, no en una aparte — antes
+   quedaba como su propia .crear-op__section con un salto/gap raro en el medio de lo que
+   conceptualmente es un solo bloque. Esto es solo el margen de separación respecto al
+   toggle de arriba. */
+.crear-op__section-subblock {
+  margin-top: 20px;
+}
+
+/* Fila del ícono en círculo de color + título (ver SectionTitle, JSX) — antes el título
+   iba solo, en mayúsculas/negrita, y se confundía con los labels de los campos de abajo
+   (mismo tamaño/peso). Ahora el ícono da una referencia visual instantánea de qué sección
+   es, sin tener que leer el texto. */
+.crear-op__section-title-row {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 16px;
+}
+
+.crear-op__section-icon {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 32px;
+  height: 32px;
+  border-radius: 9px;
+  background: #eef6ff;
+  color: #0073ea;
+  font-size: 17px;
 }
 
 .crear-op__section-title {
-  font-size: 13px;
+  font-size: 16px;
   font-weight: 700;
   color: #323338;
-  margin: 0 0 14px;
+  margin: 0;
 }
 
 /* A pedido: "ficha" de solo lectura para un Cliente/Lead ya elegido (en vez del
@@ -645,24 +698,27 @@
   font-size: 16px;
 }
 
+/* A pedido (mockup): los labels de los campos (Nombre/CI/Teléfono/etc.) vuelven a negro
+   — la jerarquía con el título de sección ahora la da el tamaño (16px + ícono en
+   .crear-op__section-title-row) y que cada sección es su propia tarjeta (ver
+   .crear-op__section), no hace falta un color de acento distinto acá. */
 .crear-op__field {
   display: flex;
   flex-direction: column;
   gap: 6px;
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: #323338;
 }
 
-/* A pedido: mismo tamaño/peso de título en TODOS los campos — el TextField nativo de
-   @vibe/core (Nombre/Apellido/CI) trae su propia tipografía (--font-text2-normal, más
-   chica) para el <label> que arma FieldLabel puertas adentro, distinta a la de arriba
-   (que ya heredan los <label><span> armados a mano, ej. Fecha Nacimiento/Teléfono). Acá
-   apunta al <label> REAL que renderiza @vibe/core adentro del wrapper que le pasamos vía
-   wrapperClassName — no pisa .crear-op__field en sí (que ya ES el <label> en nuestro
-   markup a mano, sin ninguno anidado adentro). */
+/* El TextField nativo de @vibe/core (Nombre/Apellido/CI) trae su propia tipografía
+   (--font-text2-normal) para el <label> que arma FieldLabel puertas adentro, distinta
+   a la de arriba (que ya heredan los <label><span> armados a mano, ej. Fecha
+   Nacimiento/Teléfono). Acá apunta al <label> REAL que renderiza @vibe/core adentro del
+   wrapper que le pasamos vía wrapperClassName — no pisa .crear-op__field en sí (que ya
+   ES el <label> en nuestro markup a mano, sin ninguno anidado adentro). */
 .crear-op__field label {
-  font-size: 14px;
+  font-size: 13px;
   font-weight: 600;
   color: #323338;
 }

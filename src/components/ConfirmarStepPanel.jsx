@@ -5,6 +5,7 @@ import { Button } from '@vibe/core'
 import { formatMoney, CUOTA_COUNTS, toPercentString } from '../services/format'
 import { accentForCompania } from '../services/companyColors'
 import FileUploadField from './FileUploadField'
+import StepFooter from './StepFooter'
 import AlertModal from './AlertModal'
 import { fetchFileColumnAsFile } from '../services/mondayApi'
 import './PillTabs.css'
@@ -218,6 +219,7 @@ export default function ConfirmarStepPanel({
   confirming,
   confirmError,
   onConfirmar,
+  onBack,
 }) {
   const [validationError, setValidationError] = useState(null)
   const entries = groups.flatMap((g) => g.entries)
@@ -255,8 +257,38 @@ export default function ConfirmarStepPanel({
     onConfirmar()
   }
 
+  // A pedido: la Cédula de Identidad se pide aparte, fuera de la sección "Documentación"
+  // — es un dato de la persona (el frente nomás, no ambos lados), no un documento del
+  // trámite como Libreta de Conducir/Carta Automóvil, así que no tiene sentido agruparla
+  // con esos. El resto de `documentos` (lo que venga de OpportunityDetail.jsx además de
+  // "cedula") sigue en "Documentación" de siempre.
+  const cedulaDoc = documentos.find((d) => d.key === 'cedula')
+  const otrosDocumentos = documentos.filter((d) => d.key !== 'cedula')
+
   return (
     <div className="confirmar-step">
+      {cedulaDoc && (
+        <div className="confirmar-step__section">
+          <h2 className="confirmar-step__title">Cédula de Identidad</h2>
+          <p className="confirmar-step__subtitle">Solo hace falta el frente.</p>
+          <div className="confirmar-step__docs">
+            <FileUploadField
+              label={cedulaDoc.label}
+              required={false}
+              fileName={cedulaDoc.fileName}
+              onFetchFile={() => fetchFileColumnAsFile(opportunity.id, cedulaDoc.columnId)}
+              uploading={Boolean(uploadingDoc[cedulaDoc.columnId])}
+              deleting={Boolean(deletingDoc[cedulaDoc.columnId])}
+              error={docUploadError[cedulaDoc.columnId]}
+              onUpload={(file) => onUploadDocument(cedulaDoc.columnId, file)}
+              onDelete={() => onDeleteDocument(cedulaDoc.columnId)}
+              showReplaceButton={false}
+              compactDelete
+            />
+          </div>
+        </div>
+      )}
+
       <div className="confirmar-step__section">
         <h2 className="confirmar-step__title">Documentación</h2>
         <p className="confirmar-step__subtitle">
@@ -264,7 +296,7 @@ export default function ConfirmarStepPanel({
           subir directo desde acá.
         </p>
         <div className="confirmar-step__docs">
-          {documentos.map((doc) => (
+          {otrosDocumentos.map((doc) => (
             <FileUploadField
               key={doc.key}
               label={doc.label}
@@ -349,24 +381,24 @@ export default function ConfirmarStepPanel({
 
       <ChosenProposal elegida={elegida} />
 
-      <div className="confirmar-step__section confirmar-step__confirm">
-        <div>
-          <h2 className="confirmar-step__title">Confirmar</h2>
-          <p className="confirmar-step__subtitle">
-            Verifica que los datos del cliente y la documentación estén completos, que haya una
-            propuesta elegida, y pasa al paso 4 (Emitir).
-          </p>
-          {confirmError && <p className="confirmar-step__error">Error: {confirmError}</p>}
-        </div>
-        <Button
-          kind="primary"
-          className="confirmar-step__confirm-btn"
-          onClick={handleConfirmClick}
-          disabled={confirming}
-        >
+      <div className="confirmar-step__section">
+        <h2 className="confirmar-step__title">Confirmar</h2>
+        <p className="confirmar-step__subtitle">
+          Verifica que los datos del cliente y la documentación estén completos, que haya una
+          propuesta elegida, y pasa al paso 4 (Emitir).
+        </p>
+        {confirmError && <p className="confirmar-step__error">Error: {confirmError}</p>}
+      </div>
+
+      {/* A pedido: mismo footer pegado abajo del todo que los otros 3 pasos de la
+          Oportunidad (ver StepFooter) — antes era una tarjeta flotante con esquinas
+          redondeadas separada del borde (bottom:16px), distinta del resto. "Volver"
+          vuelve a Comparar y enviar. */}
+      <StepFooter onBack={onBack}>
+        <Button kind="primary" onClick={handleConfirmClick} disabled={confirming}>
           <MdCheckCircle /> {confirming ? 'Confirmando...' : 'Confirmar'}
         </Button>
-      </div>
+      </StepFooter>
 
       {validationError && (
         <AlertModal

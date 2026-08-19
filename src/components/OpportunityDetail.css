@@ -1,10 +1,9 @@
-/* "Volver" y el Stepper van en este mismo renglón de arriba (antes el Stepper tenía su
-   propio renglón entero para él solo, y acá solo iba el breadcrumb "> OPP-XXXX ·
-   Cliente", que se sacó). Grid de 3 columnas (1fr / auto / 1fr) en vez de flex — a
-   pedido, así el Stepper (2do hijo, cae en la columna del medio) queda centrado en el
-   medio de la página sin importar el ancho de "Volver": solo hay 2 hijos, así que la
-   3ra columna (1fr) queda sin ítem pero igual reserva su espacio — hace de contrapeso
-   simétrico con la 1ra, sin necesidad de agregar un div vacío en el JSX. */
+/* "Volver a Persona Seleccionada" y el Stepper van en este mismo renglón de arriba.
+   Grid de 3 columnas (1fr / auto / 1fr) en vez de flex — así el Stepper (2do hijo, cae
+   en la columna del medio) queda centrado en el medio de la página sin importar el
+   ancho del botón: solo hay 2 hijos, así que la 3ra columna (1fr) queda sin ítem pero
+   igual reserva su espacio — hace de contrapeso simétrico con la 1ra, sin necesidad de
+   agregar un div vacío en el JSX. */
 .opp-detail__breadcrumb {
   display: grid;
   grid-template-columns: 1fr auto 1fr;
@@ -29,6 +28,13 @@
 .opp-detail__back-btn {
   justify-self: start;
   margin-left: -6px;
+}
+
+/* El botón de acá arriba es condicional (ver `showReturnToCrearFlow`, JSX) — sin este
+   grid-column fijo, cuando no está presente el Stepper (único hijo) cae solo en la 1ra
+   columna del grid (auto-placement) y queda pegado a la izquierda en vez de centrado. */
+.opp-detail__breadcrumb .stepper {
+  grid-column: 2;
 }
 
 .opp-detail__status {
@@ -210,43 +216,21 @@
   }
 }
 
-.opp-detail__footer {
-  position: sticky;
-  bottom: 0;
-  background: #fff;
-  border-top: 1px solid #e6e9ef;
-  padding: 14px var(--page-gutter);
+/* A pedido: el contenedor sticky de este footer ahora es StepFooter.css (compartido
+   con los otros 3 pasos de la Oportunidad) — esta clase queda solo para el contador de
+   seleccionadas + estado de envío, que van en el slot `extraLeft` de StepFooter. */
+.opp-detail__footer-status {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 12px;
+  gap: 14px;
   font-size: 13px;
   color: #323338;
   font-weight: 600;
 }
 
-.opp-detail__footer-status {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-}
-
 @media (max-width: 640px) {
-  .opp-detail__footer {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
   .opp-detail__footer-status {
     flex-wrap: wrap;
-  }
-
-  .opp-detail__footer-actions {
-    justify-content: stretch;
-  }
-
-  .opp-detail__footer-actions > * {
-    flex: 1;
   }
 }
 
@@ -270,11 +254,6 @@
 .opp-detail__error-detail-spacing pre {
   max-height: 220px;
   overflow-y: auto;
-}
-
-.opp-detail__footer-actions {
-  display: flex;
-  gap: 12px;
 }
 
 .opp-detail__lectura-gate {

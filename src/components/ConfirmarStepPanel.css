@@ -16,15 +16,6 @@
   .confirmar-step__section {
     padding: 16px;
   }
-
-  .confirmar-step__confirm {
-    flex-direction: column;
-    align-items: stretch;
-  }
-
-  .confirmar-step__confirm-btn {
-    width: 100%;
-  }
 }
 
 .confirmar-step__title {
@@ -38,34 +29,6 @@
   font-size: 13px;
   color: #676879;
   margin: 0 0 16px;
-}
-
-/* A pedido: sticky footer — con muchas cotizaciones cargadas, el botón "Confirmar"
-   quedaba varias pantallas más abajo, había que scrollear todo el paso para
-   encontrarlo. Se queda pegado abajo de la ventana mientras se scrollea el resto
-   (position: sticky, no fixed — respeta el padding-bottom de .app cuando se llega al
-   final de verdad, no tapa el piso de la página). Mismo fondo celeste (no transparente)
-   + sombra hacia arriba para que se note que "flota" sobre el contenido que sigue
-   scrolleando detrás. */
-.confirmar-step__confirm {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 16px;
-  background: #eef6ff;
-  border-color: #cfe3fb;
-  position: sticky;
-  bottom: 16px;
-  z-index: 5;
-  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.12);
-}
-
-.confirmar-step__confirm .confirmar-step__subtitle {
-  margin-bottom: 0;
-}
-
-.confirmar-step__confirm-btn {
-  flex-shrink: 0;
 }
 
 /* A pedido: los 2 documentos uno al lado del otro en vez de apilados. */

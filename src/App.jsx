@@ -18,6 +18,13 @@ import './App.css'
 // sobre lo ya cargado, así que si no está cargado no aparece por más que matchee).
 const ITEMS_FETCH_LIMIT = 500
 
+// A pedido: la tabla de Oportunidades pagina de a 20 en vez de mostrar las 500
+// cargadas de una — el fetch de arriba (ITEMS_FETCH_LIMIT) sigue trayendo TODO el
+// tablero igual, esto es solo paginación de la vista/tabla (client-side, ver
+// filteredOpportunities/pagedOpportunities más abajo), así que la búsqueda y los
+// filtros siguen actuando sobre el universo completo, no solo sobre la página visible.
+const PAGE_SIZE = 20
+
 // A pedido: Marca/Año/Nombre/CI/Teléfono ya no tienen filtro propio (ver
 // FilterPanel.jsx) — quedan cubiertos por la única barra de búsqueda de texto libre
 // (ver el haystack en filteredOpportunities más abajo). Solo quedan acá los 3 "filtros
@@ -36,7 +43,15 @@ export default function App() {
   const [error, setError] = useState(null)
   const [searchTerm, setSearchTerm] = useState('')
   const [filters, setFilters] = useState(EMPTY_FILTERS)
+  const [page, setPage] = useState(1)
   const [openOpportunityId, setOpenOpportunityId] = useState(null)
+  // A pedido: el botón "Volver a Persona Seleccionada" de arriba de la Oportunidad (ver
+  // OpportunityDetail.jsx) solo aparece cuando se llegó ahí apretando "Ir a esta
+  // oportunidad" en el historial de Crear Oportunidad (paso 1) — no si se abrió desde la
+  // tabla ni recién creada. Se apaga solo (ver handleOpportunityAction más abajo) en
+  // cuanto se hace alguna acción adentro de la Oportunidad: en ese punto ya no tiene
+  // sentido "volver" a terminar de crearla, la Oportunidad ya está en curso.
+  const [openedFromCrearFlow, setOpenedFromCrearFlow] = useState(false)
   // Pantalla previa a la tabla: elegir entre crear una oportunidad nueva o ver las ya
   // existentes. 'landing' | 'table' | 'create' — se puede ir de una a otra directo,
   // sin pasar necesariamente por 'landing' de nuevo (botón "Nueva oportunidad" en la
@@ -137,6 +152,19 @@ export default function App() {
     })
   }, [opportunities, searchTerm, filters])
 
+  // A pedido: vuelve a la página 1 en cuanto cambia la búsqueda o algún filtro — si no,
+  // se podía quedar en una página que ya no existe (ej. estabas en la página 5 y el
+  // nuevo resultado filtrado solo tiene 2 páginas).
+  useEffect(() => {
+    setPage(1)
+  }, [searchTerm, filters])
+
+  const totalPages = Math.max(1, Math.ceil(filteredOpportunities.length / PAGE_SIZE))
+  const pagedOpportunities = useMemo(
+    () => filteredOpportunities.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
+    [filteredOpportunities, page]
+  )
+
   if (openOpportunityId) {
     return (
       <div className="app-shell">
@@ -144,13 +172,24 @@ export default function App() {
           user={mondayUser}
           onNavigateOportunidades={() => {
             setOpenOpportunityId(null)
+            setOpenedFromCrearFlow(false)
             setView('table')
+          }}
+          onNavigateHome={() => {
+            setOpenOpportunityId(null)
+            setOpenedFromCrearFlow(false)
+            setView('landing')
           }}
         />
         <div className="app-shell__main">
           <OpportunityDetail
             opportunityId={openOpportunityId}
-            onBack={() => setOpenOpportunityId(null)}
+            onBack={() => {
+              setOpenOpportunityId(null)
+              setOpenedFromCrearFlow(false)
+            }}
+            showReturnToCrearFlow={openedFromCrearFlow}
+            onOpportunityAction={() => setOpenedFromCrearFlow(false)}
             schema={schema}
           />
         </div>
@@ -163,10 +202,17 @@ export default function App() {
       <div className="app-shell">
         <Sidebar
           defaultExpanded
+          activeSection="inicio"
           user={mondayUser}
           onNavigateOportunidades={() => {
             setOpenOpportunityId(null)
+            setOpenedFromCrearFlow(false)
             setView('table')
+          }}
+          onNavigateHome={() => {
+            setOpenOpportunityId(null)
+            setOpenedFromCrearFlow(false)
+            setView('landing')
           }}
         />
         <div className="app-shell__main">
@@ -183,7 +229,13 @@ export default function App() {
           user={mondayUser}
           onNavigateOportunidades={() => {
             setOpenOpportunityId(null)
+            setOpenedFromCrearFlow(false)
             setView('table')
+          }}
+          onNavigateHome={() => {
+            setOpenOpportunityId(null)
+            setOpenedFromCrearFlow(false)
+            setView('landing')
           }}
         />
         <div className="app-shell__main">
@@ -193,8 +245,12 @@ export default function App() {
             onCancel={() => setView('landing')}
             onVerOportunidades={() => setView('table')}
             onHome={() => setView('landing')}
-            onOpenOportunidad={setOpenOpportunityId}
+            onOpenOportunidad={(id) => {
+              setOpenedFromCrearFlow(true)
+              setOpenOpportunityId(id)
+            }}
             onCreated={(newItemId) => {
+              setOpenedFromCrearFlow(false)
               setView('table')
               setOpenOpportunityId(newItemId)
             }}
@@ -206,10 +262,10 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar user={mondayUser} />
+      <Sidebar user={mondayUser} onNavigateHome={() => setView('landing')} />
       <div className="app-shell__main">
         <div className="app">
-          <PageHeader onCreateNew={() => setView('create')} onHome={() => setView('landing')} />
+          <PageHeader onCreateNew={() => setView('create')} />
           <FilterPanel
             searchTerm={searchTerm}
             onSearchTermChange={setSearchTerm}
@@ -222,12 +278,19 @@ export default function App() {
             }}
           />
           <OpportunitiesTable
-            opportunities={filteredOpportunities}
+            opportunities={pagedOpportunities}
+            totalFiltered={filteredOpportunities.length}
             totalLoaded={opportunities.length}
             boardTotalCount={boardTotalCount}
             loading={loading}
             error={error}
-            onOpenOpportunity={setOpenOpportunityId}
+            page={page}
+            totalPages={totalPages}
+            onPageChange={setPage}
+            onOpenOpportunity={(id) => {
+              setOpenedFromCrearFlow(false)
+              setOpenOpportunityId(id)
+            }}
           />
         </div>
       </div>
