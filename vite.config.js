@@ -176,6 +176,50 @@ function leerCartaAutomovilProxy(env) {
   }
 }
 
+// Lee la Cédula de Identidad con IA al crear un Lead desde cero (ver
+// mondayApi.js#leerCedula) — mismo patrón que leerCartaAutomovilProxy de acá arriba:
+// CORS de un Custom Webhook de Make pegado directo desde el navegador, más ocultar la
+// URL real (MAKE_LEER_CEDULA_WEBHOOK_URL, sin prefijo VITE_ a propósito).
+function leerCedulaProxy(env) {
+  return {
+    name: 'leer-cedula-proxy',
+    configureServer(server) {
+      server.middlewares.use('/api/leer-cedula', async (req, res) => {
+        if (req.method !== 'POST') {
+          res.statusCode = 405
+          res.end('Method not allowed')
+          return
+        }
+
+        const targetUrl = env.MAKE_LEER_CEDULA_WEBHOOK_URL
+        if (!targetUrl) {
+          res.statusCode = 500
+          res.end(JSON.stringify({ error: 'MAKE_LEER_CEDULA_WEBHOOK_URL no está configurada' }))
+          return
+        }
+
+        const chunks = []
+        req.on('data', (chunk) => chunks.push(chunk))
+        req.on('end', async () => {
+          try {
+            const makeRes = await fetch(targetUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': req.headers['content-type'] },
+              body: Buffer.concat(chunks),
+            })
+            const data = await makeRes.text()
+            res.statusCode = makeRes.status
+            res.end(data)
+          } catch (err) {
+            res.statusCode = 502
+            res.end(JSON.stringify({ error: String(err) }))
+          }
+        })
+      })
+    },
+  }
+}
+
 // Descarga el archivo real de una columna "file" ya subida (a pedido: reusar la Cédula
 // Identidad de una Oportunidad anterior al elegirla en el buscador, ver
 // mondayApi.js#fetchFileColumnAsFile). El asset guarda el binario en S3, no en
@@ -246,6 +290,7 @@ export default defineConfig(({ mode }) => {
       mondayFileProxy(env),
       makeWebhookProxy(env),
       leerCartaAutomovilProxy(env),
+      leerCedulaProxy(env),
       mondayAssetProxy(env),
     ],
     server: {

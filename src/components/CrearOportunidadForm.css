@@ -945,6 +945,12 @@
   margin: 4px 0 0;
 }
 
+/* Aviso de "no pudimos leer la Cédula" (ver handleCedulaLeadChange) — separación del
+   campo de archivo de arriba, mismo criterio que .crear-op__error-detail-spacing. */
+.crear-op__lead-error {
+  margin-top: 12px;
+}
+
 .crear-op__error-detail-spacing pre {
   max-height: 220px;
   overflow-y: auto;

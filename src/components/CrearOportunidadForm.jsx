@@ -38,6 +38,7 @@ import {
   uploadFileToColumn,
   dropdownColumnValue,
   leerCartaAutomovil,
+  leerCedula,
   deleteItem,
   fetchItemState,
   searchContactos,
@@ -216,6 +217,21 @@ function splitNombreApellido(fullName) {
   const parts = fullName.trim().split(/\s+/).filter(Boolean)
   if (parts.length <= 1) return { nombre: fullName.trim(), apellido: '' }
   return { nombre: parts[0], apellido: parts.slice(1).join(' ') }
+}
+
+// El escenario de Make que lee la Cédula de Identidad con IA (ver
+// mondayApi.js#leerCedula) puede devolver la fecha como texto "dd/mm/aaaa" (formato
+// que suele traer una CI uruguaya) en vez del "aaaa-mm-dd" que espera el
+// <input type="date"> de acá — se convierte si matchea ese patrón; si no, se deja tal
+// cual (el popup de "Editar" deja corregirla a mano si hace falta).
+function normalizeFechaIA(raw) {
+  const value = (raw ?? '').trim()
+  if (!value) return ''
+  if (/^\d{4}-\d{2}-\d{2}$/.test(value)) return value
+  const match = value.match(/^(\d{1,2})[/-](\d{1,2})[/-](\d{4})$/)
+  if (!match) return value
+  const [, d, m, y] = match
+  return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
 }
 
 // Búsqueda contra el tablero Clientes (18420863014) para precargar los datos personales
@@ -712,6 +728,144 @@ function EditarContactoModal({ form, departamentoOptions, localidades, onSave, o
   )
 }
 
+// Popup "Editar" para el perfil de un Lead recién leído con IA (ver
+// handleCedulaLeadChange más abajo) — a diferencia de EditarContactoModal (que escribe
+// DIRECTO a un Contacto real que ya existe en monday), acá todavía no hay ningún ítem
+// creado: "Guardar" solo actualiza el `form` local, igual que cualquier campo tipeado a
+// mano. Por eso también incluye Nombre/Apellido/CI (EditarContactoModal los deja
+// afuera a propósito, son datos de identidad de un Contacto ya dado de alta) — acá son
+// justo los campos que la IA pudo haber leído mal y hay que poder corregir.
+function EditarLeadModal({ form, departamentoOptions, localidades, onSave, onClose }) {
+  const [nombre, setNombre] = useState(form.nombre)
+  const [apellido, setApellido] = useState(form.apellido)
+  const [ci, setCi] = useState(form.ci)
+  const [fechaNacimiento, setFechaNacimiento] = useState(form.fechaNacimiento)
+  const [departamentoId, setDepartamentoId] = useState(form.departamentoId)
+  const [localidadId, setLocalidadId] = useState(form.localidadId)
+
+  const selectedDepartamento = departamentoOptions.find((o) => o.value === departamentoId) ?? null
+  const localidadOptions = localidades
+    .filter((l) => !selectedDepartamento || l.departamento === selectedDepartamento.label)
+    .map((l) => ({ value: l.id, label: l.name }))
+  const selectedLocalidad = localidadOptions.find((o) => o.value === localidadId) ?? null
+
+  const ciErr = ciError(ci)
+  const fechaErr = fechaError(fechaNacimiento)
+  const canSave =
+    nombre.trim() && apellido.trim() && ci.trim() && !ciErr && fechaNacimiento && !fechaErr && departamentoId && localidadId
+
+  return (
+    <Modal id="editar-lead-modal" show onClose={onClose} size="medium">
+      <ModalContent className="crear-op__editar-contacto-content">
+        <h2 className="crear-op__editar-contacto-title">Editar datos personales</h2>
+        <div className="crear-op__fields--grid">
+          <label className="crear-op__field">
+            <span>Nombre <Required /></span>
+            <input type="text" value={nombre} onChange={(e) => setNombre(e.target.value)} />
+          </label>
+          <label className="crear-op__field">
+            <span>Apellido <Required /></span>
+            <input type="text" value={apellido} onChange={(e) => setApellido(e.target.value)} />
+          </label>
+          <label className={`crear-op__field${fieldStateClass(ci, ciErr)}`}>
+            <span>CI <Required /></span>
+            <input type="text" value={ci} onChange={(e) => setCi(e.target.value)} />
+            {ciErr && <span className="crear-op__field-error">{ciErr}</span>}
+          </label>
+          <label className={`crear-op__field${fieldStateClass(fechaNacimiento, fechaErr)}`}>
+            <span>Fecha Nacimiento <Required /></span>
+            <div className="crear-op__date-wrap">
+              <input
+                type="date"
+                value={fechaNacimiento}
+                max={maxFechaNacimiento()}
+                onChange={(e) => setFechaNacimiento(e.target.value)}
+              />
+            </div>
+            {fechaErr && <span className="crear-op__field-error">{fechaErr}</span>}
+          </label>
+          <label className="crear-op__field">
+            <span>Departamento <Required /></span>
+            <RequiredDropdown
+              options={departamentoOptions}
+              value={selectedDepartamento}
+              placeholder="Escribe para buscar resultados"
+              searchable
+              onChange={(option) => {
+                setDepartamentoId(option?.value ?? '')
+                setLocalidadId('')
+              }}
+            />
+          </label>
+          <label className="crear-op__field">
+            <span>Localidad <Required /></span>
+            <RequiredDropdown
+              options={localidadOptions}
+              value={selectedLocalidad}
+              placeholder={selectedDepartamento ? 'Escribe para buscar resultados' : 'Elegí primero un departamento'}
+              disabled={!selectedDepartamento}
+              searchable
+              onChange={(option) => setLocalidadId(option?.value ?? '')}
+            />
+          </label>
+        </div>
+      </ModalContent>
+      <ModalFooter
+        secondaryButton={{ text: 'Cancelar', onClick: onClose }}
+        primaryButton={{
+          text: 'Guardar',
+          disabled: !canSave,
+          onClick: () => onSave({ nombre, apellido, ci: stripCi(ci), fechaNacimiento, departamentoId, localidadId }),
+        }}
+      />
+    </Modal>
+  )
+}
+
+// Fila de Teléfono, reusada tanto por el formulario manual ("No tengo la Cédula") como
+// por el perfil leído con IA ("Sí" + lectura ok) — la IA no devuelve teléfono, así que
+// en los 2 casos hay que pedirlo aparte.
+function TelefonoField({ form, handleChange, resetKey }) {
+  return (
+    <div className="crear-op__section">
+      <h3 className="crear-op__section-title">Contacto</h3>
+      <div className="crear-op__fields--grid">
+        <label className="crear-op__field crear-op__field--full">
+          <span>Teléfono <Required /></span>
+          <div className="crear-op__phone">
+            <div className="crear-op__phone-code">
+              <RequiredDropdown
+                options={CODIGO_PAIS_OPTIONS}
+                value={CODIGO_PAIS_OPTIONS.find((o) => o.value === form.codigoPais) ?? null}
+                onChange={(option) => handleChange('codigoPais', option?.value ?? '')}
+              />
+            </div>
+            <TextField
+              key={`telefono-${resetKey}`}
+              wrapperClassName="crear-op__phone-number"
+              placeholder="Ej: 099 123 456"
+              value={form.telefono}
+              onChange={(value) => handleChange('telefono', value)}
+              icon={MdClear}
+              onIconClick={() => handleChange('telefono', '')}
+              validation={
+                telefonoError(form.telefono, form.codigoPais)
+                  ? { status: 'error' }
+                  : form.telefono
+                    ? { status: 'success' }
+                    : undefined
+              }
+            />
+          </div>
+          {telefonoError(form.telefono, form.codigoPais) && (
+            <span className="crear-op__field-error">{telefonoError(form.telefono, form.codigoPais)}</span>
+          )}
+        </label>
+      </div>
+    </div>
+  )
+}
+
 // Título grande de cada paso (círculo azul numerado + texto, sin subtítulo) — mismo
 // número que ese paso muestra en el Stepper de arriba (ver STEPS), así que el título
 // nunca queda desincronizado del contador si algún día cambia el orden/cantidad de
@@ -845,6 +999,18 @@ export default function CrearOportunidadForm({
   // (pantalla en blanco). Igual que con el Dropdown de ExistingRecordSearch, forzarlos
   // a remontar de cero (key) evita el problema.
   const [textFieldsResetKey, setTextFieldsResetKey] = useState(0)
+  // A pedido: al crear un Lead desde cero, antes de mostrar el formulario a mano se
+  // pregunta si tienen la Cédula de Identidad — "Sí" pide el archivo y lo manda a leer
+  // con IA (ver handleCedulaLeadChange); "No" cae al formulario de siempre. '' (sin
+  // responder) no muestra ninguno de los 2 todavía.
+  const [tieneCedulaLead, setTieneCedulaLead] = useState('')
+  const [cedulaLeadFile, setCedulaLeadFile] = useState(null)
+  const [leyendoCedulaLead, setLeyendoCedulaLead] = useState(false)
+  const [cedulaLeadError, setCedulaLeadError] = useState(null)
+  // true una vez que la IA devolvió algo y ya se aplicó al `form` — gatea si se
+  // muestra el perfil de solo lectura (ver JSX) en vez de solo el campo de archivo.
+  const [leadPerfilListo, setLeadPerfilListo] = useState(false)
+  const [editingLeadPerfil, setEditingLeadPerfil] = useState(false)
 
   const handleChange = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
 
@@ -997,6 +1163,18 @@ export default function CrearOportunidadForm({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchPreview, resultadoSeleccionado])
 
+  // Limpia el gate de "¿Tenés la Cédula de Identidad?" (ver JSX del paso 1) y todo lo
+  // que haya quedado de un intento anterior de leerla con IA — se llama tanto al
+  // arrancar "Crear Lead" de cero como al volver a buscar, para no arrastrar el
+  // archivo/perfil de una persona distinta.
+  const resetCedulaLead = () => {
+    setTieneCedulaLead('')
+    setCedulaLeadFile(null)
+    setLeyendoCedulaLead(false)
+    setCedulaLeadError(null)
+    setLeadPerfilListo(false)
+  }
+
   // "No lo encuentro" — abre el resto del formulario para completarlo a mano, sin ningún
   // resultado elegido (limpia Nombre/Apellido/CI por si venían de una búsqueda anterior).
   const handleSaltearBusqueda = () => {
@@ -1004,6 +1182,7 @@ export default function CrearOportunidadForm({
     setSearchPreview(null)
     setBusquedaResuelta(true)
     setForm((prev) => ({ ...prev, nombre: '', apellido: '', ci: '' }))
+    resetCedulaLead()
   }
 
   // A pedido: desde la pantalla ya con los datos autocompletados, "Cambiar persona"
@@ -1014,6 +1193,7 @@ export default function CrearOportunidadForm({
     handleResultadoSeleccionado(null)
     setSearchPreview(null)
     setBusquedaResuelta(false)
+    resetCedulaLead()
   }
 
   // Bug reportado: "Inicio"/"Buscar Oportunidad" salían del formulario sin pasar por
@@ -1391,6 +1571,60 @@ export default function CrearOportunidadForm({
     setCedulaAutofilled(isAutofill)
   }
 
+  // A pedido: al crear un Lead desde cero, si tienen la Cédula de Identidad a mano se
+  // manda a leer con IA (mismo escenario de Make que ya lee la Carta Automóvil, ver
+  // services/mondayApi.js#leerCedula) en vez de tipear todo a mano — nombre_completo se
+  // parte igual que un Contacto (splitNombreApellido), y Departamento/Localidad (vienen
+  // como nombre, no id) se matchean contra el schema real, mismo criterio que
+  // handleResultadoSeleccionado más abajo para un resultado del buscador. El mismo
+  // archivo se reusa como Cédula Identidad de la Documentación (ver
+  // handleCedulaIdentidadChange arriba) para no pedirlo 2 veces.
+  const handleCedulaLeadChange = async (file) => {
+    setCedulaLeadFile(file)
+    setCedulaLeadError(null)
+    setLeadPerfilListo(false)
+    if (!file) return
+    setLeyendoCedulaLead(true)
+    try {
+      const data = await leerCedula(file)
+      const { nombre, apellido } = splitNombreApellido(data.nombre_completo || '')
+      const departamentoNombre = (data.departametno || data.departamento || '').trim()
+      const departamentoMatch = (schema?.departamentos ?? []).find(
+        (d) => d.name.toLowerCase() === departamentoNombre.toLowerCase()
+      )
+      const localidadNombre = (data.localidad || '').trim()
+      const localidadMatch = (schema?.localidades ?? []).find(
+        (l) => l.name.toLowerCase() === localidadNombre.toLowerCase()
+      )
+      if (!nombre && !data.ci) {
+        // La IA no pudo leer nada útil — se avisa y se deja el archivo puesto para
+        // reintentar (o pasar a "No" y cargar a mano), en vez de mostrar un perfil vacío.
+        setCedulaLeadError('No pudimos leer los datos del documento.')
+        return
+      }
+      setForm((prev) => ({
+        ...prev,
+        nombre: nombre || prev.nombre,
+        apellido: apellido || prev.apellido,
+        ci: data.ci || prev.ci,
+        fechaNacimiento: normalizeFechaIA(data.fecha_nacimineto || data.fecha_nacimiento) || prev.fechaNacimiento,
+        departamentoId: departamentoMatch?.id ?? prev.departamentoId,
+        localidadId: localidadMatch?.id ?? prev.localidadId,
+      }))
+      handleCedulaIdentidadChange(file, true)
+      setLeadPerfilListo(true)
+    } catch (err) {
+      setCedulaLeadError(err.message)
+    } finally {
+      setLeyendoCedulaLead(false)
+    }
+  }
+
+  const handleSaveLeadPerfil = (values) => {
+    setForm((prev) => ({ ...prev, ...values }))
+    setEditingLeadPerfil(false)
+  }
+
   // A pedido: toda Oportunidad nueva queda con el campo Cliente completo, nunca vacío —
   // si se eligió un resultado existente en "Buscar Persona" (Cliente o Lead, da igual:
   // los dos son ítems reales del tablero Clientes) se reusa ese id directo; si no
@@ -1757,168 +1991,239 @@ export default function CrearOportunidadForm({
                   </div>
                 ) : (
                   <>
+                    {/* A pedido: antes de mostrar el formulario a mano para "Crear Lead",
+                        se pregunta si tienen la Cédula de Identidad — mismo criterio que
+                        "¿Tenés la Cédula o Carta del vehículo?" del paso 3 (mismo toggle,
+                        ver .crear-op__toggle). "Sí" manda el archivo a leer con IA
+                        (ver handleCedulaLeadChange) y muestra el resultado como perfil de
+                        solo lectura (mismo lenguaje que la ficha de un Cliente/Lead ya
+                        elegido, ver más arriba) en vez de un formulario — "Editar" abre un
+                        popup para corregir lo que la IA haya leído mal (ver
+                        EditarLeadModal). "No" cae al formulario de siempre. */}
                     <div className="crear-op__section">
                       <h3 className="crear-op__section-title">Datos personales</h3>
-                      <div className="crear-op__fields--grid">
-                        {/* TextField nativo de @vibe/core en vez de <label> + ClearableInput a
-                            mano — ya trae label (title/required), botón de limpiar (icon/
-                            onIconClick/clearOnIconClick) y el borde verde/rojo (validation) de
-                            fábrica. `icon` SIEMPRE en MdClear, nunca condicionado a si hay
-                            valor (`form.x ? MdClear : undefined`) — internamente el
-                            componente ya oculta el ícono solo cuando el campo está vacío, así
-                            que ese condicional era redundante Y además el causante de una
-                            excepción real: si el valor se limpia desde AFUERA (no tipeando,
-                            ver la cruz de "Buscar Persona" más arriba), hay un instante en
-                            que su estado interno de debounce todavía no bajó a vacío mientras
-                            `icon` ya pasó a `undefined` — esa combinación (valor todavía
-                            verdadero + ícono ya indefinido) hace que el componente intente
-                            leer `icon.length` y tira "Cannot read properties of undefined"
-                            (pantalla en blanco). Pasando siempre un ícono definido, esa
-                            combinación imposible de lograr no existe más. */}
-                        <TextField
-                          key={`nombre-${textFieldsResetKey}`}
-                          wrapperClassName="crear-op__field"
-                          title="Nombre"
-                          required
-                          placeholder="Ingresa el nombre"
-                          value={form.nombre}
-                          onChange={(value) => handleChange('nombre', value)}
-                          icon={MdClear}
-                          onIconClick={() => handleChange('nombre', '')}
-                          validation={form.nombre ? { status: 'success' } : undefined}
-                        />
-                        <TextField
-                          key={`apellido-${textFieldsResetKey}`}
-                          wrapperClassName="crear-op__field"
-                          title="Apellido"
-                          required
-                          placeholder="Ingresa el apellido"
-                          value={form.apellido}
-                          onChange={(value) => handleChange('apellido', value)}
-                          icon={MdClear}
-                          onIconClick={() => handleChange('apellido', '')}
-                          validation={form.apellido ? { status: 'success' } : undefined}
-                        />
-                        <TextField
-                          key={`ci-${textFieldsResetKey}`}
-                          wrapperClassName="crear-op__field"
-                          title="CI"
-                          required
-                          placeholder="Ej: 4.123.456-7"
-                          value={form.ci}
-                          onChange={(value) => handleChange('ci', value)}
-                          icon={MdClear}
-                          onIconClick={() => handleChange('ci', '')}
-                          validation={
-                            ciError(form.ci)
-                              ? { status: 'error', text: ciError(form.ci) }
-                              : form.ci
-                                ? { status: 'success' }
-                                : undefined
+                      <p className="crear-op__risk-subtitle">¿Tenés la Cédula de Identidad de la persona?</p>
+                      <div className="crear-op__toggle">
+                        <button
+                          type="button"
+                          className={
+                            tieneCedulaLead === 'Si'
+                              ? 'crear-op__toggle-btn crear-op__toggle-btn--active'
+                              : 'crear-op__toggle-btn'
                           }
-                        />
-                        <label className={`crear-op__field${fieldStateClass(form.fechaNacimiento, fechaError(form.fechaNacimiento))}`}>
-                          <span>Fecha Nacimiento <Required /></span>
-                          <div className="crear-op__date-wrap">
-                            <input
-                              type="date"
-                              value={form.fechaNacimiento}
-                              max={maxFechaNacimiento()}
-                              onChange={(e) => handleChange('fechaNacimiento', e.target.value)}
-                            />
-                            {form.fechaNacimiento && (
-                              <button
-                                type="button"
-                                className="crear-op__date-clear"
-                                onClick={() => handleChange('fechaNacimiento', '')}
-                                aria-label="Borrar campo"
-                              >
-                                <MdClear />
-                              </button>
-                            )}
-                          </div>
-                          {fechaError(form.fechaNacimiento) && (
-                            <span className="crear-op__field-error">{fechaError(form.fechaNacimiento)}</span>
-                          )}
-                        </label>
+                          onClick={() => setTieneCedulaLead('Si')}
+                        >
+                          Sí, tengo el documento
+                        </button>
+                        <button
+                          type="button"
+                          className={
+                            tieneCedulaLead === 'No'
+                              ? 'crear-op__toggle-btn crear-op__toggle-btn--active'
+                              : 'crear-op__toggle-btn'
+                          }
+                          onClick={() => setTieneCedulaLead('No')}
+                        >
+                          No, ingresar manualmente
+                        </button>
                       </div>
                     </div>
 
-                    <div className="crear-op__section">
-                      <h3 className="crear-op__section-title">Contacto</h3>
-                      <div className="crear-op__fields--grid">
-                        <label className="crear-op__field crear-op__field--full">
-                          <span>Teléfono <Required /></span>
-                          <div className="crear-op__phone">
-                            <div className="crear-op__phone-code">
-                              <RequiredDropdown
-                                options={CODIGO_PAIS_OPTIONS}
-                                value={CODIGO_PAIS_OPTIONS.find((o) => o.value === form.codigoPais) ?? null}
-                                onChange={(option) => handleChange('codigoPais', option?.value ?? '')}
-                              />
+                    {tieneCedulaLead === 'Si' && (
+                      <div className="crear-op__section">
+                        {!cedulaLeadFile ? (
+                          <FileUploadField
+                            label="Cédula de Identidad"
+                            file={cedulaLeadFile}
+                            onUpload={handleCedulaLeadChange}
+                            prominent
+                            helperText="Subí una foto o PDF de la Cédula de Identidad para completar los datos automáticamente."
+                            buttonLabel="Adjuntar Cédula de Identidad"
+                          />
+                        ) : (
+                          <FileUploadField
+                            label="Cédula de Identidad"
+                            file={cedulaLeadFile}
+                            uploading={leyendoCedulaLead}
+                            onDelete={() => handleCedulaLeadChange(null)}
+                            deleteLabel="Eliminar archivo y reintentar"
+                            showReplaceButton={false}
+                          />
+                        )}
+                        {cedulaLeadError && (
+                          <AttentionBox type="warning" className="crear-op__lead-error">
+                            No pudimos leer los datos automáticamente. Completá lo que falta con
+                            "Editar", o eliminá el archivo de arriba para probar con otro documento.
+                          </AttentionBox>
+                        )}
+                      </div>
+                    )}
+
+                    {tieneCedulaLead === 'Si' && leadPerfilListo && (
+                      <>
+                        <div className="crear-op__ficha">
+                          <div className="crear-op__ficha-header">
+                            <div className="crear-op__ficha-heading">
+                              <span className="crear-op__source-tag crear-op__source-tag--lead">Lead</span>
+                              <h2 className="crear-op__ficha-name">
+                                {`${form.nombre} ${form.apellido}`.trim() || '—'}
+                              </h2>
+                              <span className="crear-op__ficha-address">
+                                <MdLocationOn />
+                                {[selectedDepartamento?.label, selectedLocalidad?.label].filter(Boolean).join(', ') ||
+                                  'Sin ubicación cargada'}
+                              </span>
                             </div>
-                            {/* Sin title acá — el label de arriba ("Teléfono *") ya cubre a los 2
-                                campos (código de país + número) juntos. */}
+                            <Button kind="tertiary" onClick={() => setEditingLeadPerfil(true)}>
+                              <MdEdit /> Editar
+                            </Button>
+                          </div>
+                          <div className="crear-op__ficha-badges">
+                            <span className="crear-op__ficha-badge">CI: {form.ci || '—'}</span>
+                            <span className="crear-op__ficha-badge">Nacimiento: {form.fechaNacimiento || '—'}</span>
+                          </div>
+                        </div>
+
+                        <TelefonoField form={form} handleChange={handleChange} resetKey={textFieldsResetKey} />
+                      </>
+                    )}
+
+                    {tieneCedulaLead === 'No' && (
+                      <>
+                        <div className="crear-op__section">
+                          <div className="crear-op__fields--grid">
+                            {/* TextField nativo de @vibe/core en vez de <label> + ClearableInput a
+                                mano — ya trae label (title/required), botón de limpiar (icon/
+                                onIconClick/clearOnIconClick) y el borde verde/rojo (validation) de
+                                fábrica. `icon` SIEMPRE en MdClear, nunca condicionado a si hay
+                                valor (`form.x ? MdClear : undefined`) — internamente el
+                                componente ya oculta el ícono solo cuando el campo está vacío, así
+                                que ese condicional era redundante Y además el causante de una
+                                excepción real: si el valor se limpia desde AFUERA (no tipeando,
+                                ver la cruz de "Buscar Persona" más arriba), hay un instante en
+                                que su estado interno de debounce todavía no bajó a vacío mientras
+                                `icon` ya pasó a `undefined` — esa combinación (valor todavía
+                                verdadero + ícono ya indefinido) hace que el componente intente
+                                leer `icon.length` y tira "Cannot read properties of undefined"
+                                (pantalla en blanco). Pasando siempre un ícono definido, esa
+                                combinación imposible de lograr no existe más. */}
                             <TextField
-                              key={`telefono-${textFieldsResetKey}`}
-                              wrapperClassName="crear-op__phone-number"
-                              placeholder="Ej: 099 123 456"
-                              value={form.telefono}
-                              onChange={(value) => handleChange('telefono', value)}
+                              key={`nombre-${textFieldsResetKey}`}
+                              wrapperClassName="crear-op__field"
+                              title="Nombre"
+                              required
+                              placeholder="Ingresa el nombre"
+                              value={form.nombre}
+                              onChange={(value) => handleChange('nombre', value)}
                               icon={MdClear}
-                              onIconClick={() => handleChange('telefono', '')}
+                              onIconClick={() => handleChange('nombre', '')}
+                              validation={form.nombre ? { status: 'success' } : undefined}
+                            />
+                            <TextField
+                              key={`apellido-${textFieldsResetKey}`}
+                              wrapperClassName="crear-op__field"
+                              title="Apellido"
+                              required
+                              placeholder="Ingresa el apellido"
+                              value={form.apellido}
+                              onChange={(value) => handleChange('apellido', value)}
+                              icon={MdClear}
+                              onIconClick={() => handleChange('apellido', '')}
+                              validation={form.apellido ? { status: 'success' } : undefined}
+                            />
+                            <TextField
+                              key={`ci-${textFieldsResetKey}`}
+                              wrapperClassName="crear-op__field"
+                              title="CI"
+                              required
+                              placeholder="Ej: 4.123.456-7"
+                              value={form.ci}
+                              onChange={(value) => handleChange('ci', value)}
+                              icon={MdClear}
+                              onIconClick={() => handleChange('ci', '')}
                               validation={
-                                telefonoError(form.telefono, form.codigoPais)
-                                  ? { status: 'error' }
-                                  : form.telefono
+                                ciError(form.ci)
+                                  ? { status: 'error', text: ciError(form.ci) }
+                                  : form.ci
                                     ? { status: 'success' }
                                     : undefined
                               }
                             />
+                            <label className={`crear-op__field${fieldStateClass(form.fechaNacimiento, fechaError(form.fechaNacimiento))}`}>
+                              <span>Fecha Nacimiento <Required /></span>
+                              <div className="crear-op__date-wrap">
+                                <input
+                                  type="date"
+                                  value={form.fechaNacimiento}
+                                  max={maxFechaNacimiento()}
+                                  onChange={(e) => handleChange('fechaNacimiento', e.target.value)}
+                                />
+                                {form.fechaNacimiento && (
+                                  <button
+                                    type="button"
+                                    className="crear-op__date-clear"
+                                    onClick={() => handleChange('fechaNacimiento', '')}
+                                    aria-label="Borrar campo"
+                                  >
+                                    <MdClear />
+                                  </button>
+                                )}
+                              </div>
+                              {fechaError(form.fechaNacimiento) && (
+                                <span className="crear-op__field-error">{fechaError(form.fechaNacimiento)}</span>
+                              )}
+                            </label>
                           </div>
-                          {telefonoError(form.telefono, form.codigoPais) && (
-                            <span className="crear-op__field-error">
-                              {telefonoError(form.telefono, form.codigoPais)}
-                            </span>
-                          )}
-                        </label>
-                      </div>
-                    </div>
+                        </div>
 
-                    <div className="crear-op__section">
-                      <h3 className="crear-op__section-title">Ubicación</h3>
-                      <div className="crear-op__fields--grid">
-                        <label className="crear-op__field">
-                          <span>Departamento <Required /></span>
-                          <RequiredDropdown
-                            options={departamentoOptions}
-                            value={selectedDepartamento}
-                            placeholder="Escribe para buscar resultados"
-                            searchable
-                            onChange={(option) => {
-                              // Al cambiar el departamento, se limpia la Localidad elegida —
-                              // puede ya no pertenecer al departamento nuevo (el dropdown de
-                              // acá abajo se filtra por esto mismo).
-                              handleChange('departamentoId', option?.value ?? '')
-                              handleChange('localidadId', '')
-                            }}
-                          />
-                        </label>
-                        <label className="crear-op__field">
-                          <span>Localidad <Required /></span>
-                          <RequiredDropdown
-                            options={localidadOptions}
-                            value={selectedLocalidad}
-                            placeholder={
-                              selectedDepartamento ? 'Escribe para buscar resultados' : 'Elegí primero un departamento'
-                            }
-                            disabled={!selectedDepartamento}
-                            searchable
-                            onChange={(option) => handleChange('localidadId', option?.value ?? '')}
-                          />
-                        </label>
-                      </div>
-                    </div>
+                        <TelefonoField form={form} handleChange={handleChange} resetKey={textFieldsResetKey} />
+
+                        <div className="crear-op__section">
+                          <h3 className="crear-op__section-title">Ubicación</h3>
+                          <div className="crear-op__fields--grid">
+                            <label className="crear-op__field">
+                              <span>Departamento <Required /></span>
+                              <RequiredDropdown
+                                options={departamentoOptions}
+                                value={selectedDepartamento}
+                                placeholder="Escribe para buscar resultados"
+                                searchable
+                                onChange={(option) => {
+                                  // Al cambiar el departamento, se limpia la Localidad elegida —
+                                  // puede ya no pertenecer al departamento nuevo (el dropdown de
+                                  // acá abajo se filtra por esto mismo).
+                                  handleChange('departamentoId', option?.value ?? '')
+                                  handleChange('localidadId', '')
+                                }}
+                              />
+                            </label>
+                            <label className="crear-op__field">
+                              <span>Localidad <Required /></span>
+                              <RequiredDropdown
+                                options={localidadOptions}
+                                value={selectedLocalidad}
+                                placeholder={
+                                  selectedDepartamento ? 'Escribe para buscar resultados' : 'Elegí primero un departamento'
+                                }
+                                disabled={!selectedDepartamento}
+                                searchable
+                                onChange={(option) => handleChange('localidadId', option?.value ?? '')}
+                              />
+                            </label>
+                          </div>
+                        </div>
+                      </>
+                    )}
+
+                    {editingLeadPerfil && (
+                      <EditarLeadModal
+                        form={form}
+                        departamentoOptions={departamentoOptions}
+                        localidades={localidades}
+                        onClose={() => setEditingLeadPerfil(false)}
+                        onSave={handleSaveLeadPerfil}
+                      />
+                    )}
                   </>
                 )}
 

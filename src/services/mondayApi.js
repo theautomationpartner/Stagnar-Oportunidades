@@ -638,6 +638,24 @@ export async function leerCartaAutomovil(file) {
   return response.json()
 }
 
+// Escenario de Make que lee la Cédula de Identidad con IA al crear un Lead desde cero
+// (ver handleCedulaLeadChange en CrearOportunidadForm.jsx) — mismo patrón que
+// leerCartaAutomovil de acá arriba: va a nuestro propio proxy (/api/leer-cedula, ver
+// vite.config.js / api/leer-cedula.js), NO directo a la URL de Make (queda solo en
+// MAKE_LEER_CEDULA_WEBHOOK_URL del lado del servidor, ver .env). El escenario responde
+// con { nombre_completo, ci, fecha_nacimineto, departametno, localidad } — esos 2
+// nombres de campo (fecha_nacimineto/departametno) están así, con el typo y todo, en el
+// escenario real de Make; CrearOportunidadForm.jsx los lee tal cual llegan.
+export async function leerCedula(file) {
+  const formData = new FormData()
+  formData.append('file', file, file.name)
+  const response = await fetch('/api/leer-cedula', { method: 'POST', body: formData })
+  if (!response.ok) {
+    throw new Error(`El escenario de Make devolvió un error (${response.status})`)
+  }
+  return response.json()
+}
+
 export async function clearFileColumn(itemId, columnId) {
   const data = await callMondayApi(CLEAR_FILE_COLUMN_MUTATION, {
     boardId: OPPORTUNITIES_BOARD_ID,
