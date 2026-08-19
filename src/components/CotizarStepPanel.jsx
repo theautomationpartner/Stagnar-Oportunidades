@@ -4,7 +4,6 @@ import { Button, Dropdown, AttentionBox, Loader, TextField, NumberField, Modal, 
 import { COTIZAR_FIELDS, getMissingCotizarFields } from '../services/cotizarFields'
 import { fetchAutodataModelosByAnioMarca } from '../services/mondayApi'
 import { matchesSearchQuery } from '../services/format'
-import StatusBadge from './StatusBadge'
 import AutodataModeloPorAnioMarca from './AutodataModeloPorAnioMarca'
 import AlertModal from './AlertModal'
 import ErrorDetailBox from './ErrorDetailBox'
@@ -137,8 +136,6 @@ export default function CotizarStepPanel({
   markError,
   dropdownOptions,
   onSave,
-  estadoCotizacion,
-  estadoCotizacionColor,
   polling,
   errorDetail,
   onGoToComparar,
@@ -322,18 +319,6 @@ export default function CotizarStepPanel({
 
   return (
     <div className="cotizar-step">
-      <div className="cotizar-step__head">
-        <div>
-          <h2 className="cotizar-step__title">Información necesaria para cotizar</h2>
-          {estadoCotizacion && (
-            <div className="cotizar-step__estado">
-              <span>Estado de cotización:</span>
-              <StatusBadge label={estadoCotizacion} color={estadoCotizacionColor} />
-            </div>
-          )}
-        </div>
-      </div>
-
       <div className="cotizar-step__top-grid">
         {/* Ficha del cliente/Lead — componente compartido con OpportunityDetail.jsx
             (ver ClientFicha.jsx), para que se vea igual en todos los pasos de la

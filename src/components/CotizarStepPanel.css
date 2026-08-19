@@ -12,30 +12,6 @@
   }
 }
 
-.cotizar-step__head {
-  display: flex;
-  align-items: flex-start;
-  justify-content: space-between;
-  gap: 16px;
-}
-
-.cotizar-step__title {
-  font-size: 16px;
-  font-weight: 700;
-  color: #323338;
-  margin: 0 0 4px;
-}
-
-.cotizar-step__estado {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  font-size: 12px;
-  font-weight: 600;
-  color: #676879;
-  margin-bottom: 8px;
-}
-
 /* A pedido, estética tipo mockup: ficha del cliente (izquierda) + checklist de datos
    mínimos para cotizar (derecha) — mismo criterio de 2 columnas que ya usa
    CrearOportunidadForm.css (.crear-op__step1-layout) para lo mismo. */
@@ -91,11 +67,14 @@
   }
 }
 
+/* A pedido: más grande y destacado — antes (13px) competía en peso visual con las
+   propias filas del checklist de abajo; ahora se nota de entrada que es el título de
+   toda la sección, no un renglón más. */
 .cotizar-step__checklist-title {
-  font-size: 13px;
+  font-size: 18px;
   font-weight: 700;
   color: #323338;
-  margin: 0;
+  margin: 0 0 4px;
 }
 
 .cotizar-step__checklist-items {
@@ -225,13 +204,6 @@
   font-weight: 700;
   color: #323338;
   margin: 0 0 20px;
-}
-
-@media (max-width: 480px) {
-  .cotizar-step__head {
-    flex-direction: column;
-    align-items: stretch;
-  }
 }
 
 /* A pedido, rediseño: "cotizaciones cargadas" deja de ser un AttentionBox tipo alerta
