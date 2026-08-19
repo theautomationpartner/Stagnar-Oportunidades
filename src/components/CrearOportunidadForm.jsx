@@ -12,6 +12,7 @@ import {
   MdCheck,
   MdLocationOn,
   MdSmartphone,
+  MdDescription,
 } from 'react-icons/md'
 import {
   Button,
@@ -65,7 +66,7 @@ import './CrearOportunidadForm.css'
 // — separado de `label` por si algún paso necesita decir algo distinto en cada lugar.
 const STEPS = [
   { key: 'personales', label: 'Seleccionar Persona', navLabel: 'Seleccionar Persona' },
-  { key: 'tipo-riesgo', label: 'Seleccionar Tipo de Riesgo', navLabel: 'Seleccionar Tipo de Riesgo' },
+  { key: 'tipo-riesgo', label: 'Seleccionar Riesgo', navLabel: 'Seleccionar Riesgo' },
   { key: 'riesgo', label: 'Cargar Datos del Riesgo', navLabel: 'Cargar Datos del Riesgo' },
 ]
 
@@ -504,6 +505,43 @@ function RequiredDropdown({ onChange, onClear, searchable, options, ...props }) 
   )
 }
 
+// A pedido, estética tipo mockup: 2 tarjetas sueltas con ícono (documento/lápiz) en vez
+// del control segmentado unido de antes — mismo componente para las 2 preguntas
+// "¿Tenés la Cédula o Carta del vehículo?" (paso 3) y "¿Tenés la Cédula de Identidad de
+// la persona?" (paso 1, Crear Lead) para que las 2 se vean iguales. Mismos valores reales
+// ("Si"/"No") que ya usaba el toggle viejo, solo cambia el control visual.
+function DocumentChoiceToggle({
+  value,
+  onChange,
+  yesLabel = 'Sí, tengo el documento',
+  noLabel = 'No, ingresar manualmente',
+}) {
+  return (
+    <div className="crear-op__risk-toggle">
+      <button
+        type="button"
+        className={
+          value === 'Si' ? 'crear-op__risk-option crear-op__risk-option--active' : 'crear-op__risk-option'
+        }
+        onClick={() => onChange('Si')}
+      >
+        <MdDescription className="crear-op__risk-option-icon" />
+        {yesLabel}
+      </button>
+      <button
+        type="button"
+        className={
+          value === 'No' ? 'crear-op__risk-option crear-op__risk-option--active' : 'crear-op__risk-option'
+        }
+        onClick={() => onChange('No')}
+      >
+        <MdEdit className="crear-op__risk-option-icon" />
+        {noLabel}
+      </button>
+    </div>
+  )
+}
+
 // Año/Marca/Modelo/Combustible/Tipo/Uso a mano — se usa en dos casos: Posee Vehículo =
 // "No" (nunca hubo archivo que leer) y Posee Vehículo = "Sí" con lectura en "Error" (el
 // robot no pudo terminar; se completa/corrige lo que haga falta a mano en vez de trabar
@@ -673,6 +711,7 @@ function EditarContactoModal({ form, departamentoOptions, localidades, onSave, o
             <div className="crear-op__phone">
               <div className="crear-op__phone-code">
                 <RequiredDropdown
+                  size="medium"
                   options={CODIGO_PAIS_OPTIONS}
                   value={CODIGO_PAIS_OPTIONS.find((o) => o.value === codigoPais) ?? null}
                   onChange={(option) => setCodigoPais(option?.value ?? '')}
@@ -835,6 +874,7 @@ function TelefonoField({ form, handleChange, resetKey }) {
           <div className="crear-op__phone">
             <div className="crear-op__phone-code">
               <RequiredDropdown
+                size="medium"
                 options={CODIGO_PAIS_OPTIONS}
                 value={CODIGO_PAIS_OPTIONS.find((o) => o.value === form.codigoPais) ?? null}
                 onChange={(option) => handleChange('codigoPais', option?.value ?? '')}
@@ -874,14 +914,17 @@ function TelefonoField({ form, handleChange, resetKey }) {
 // sacar el índice ahí. aria-hidden en el círculo: es un adorno visual que repite un
 // número que un lector de pantalla ya anuncia por otro lado (el Stepper es navegable
 // con aria-selected, ver Stepper.jsx), no hace falta leerlo de nuevo acá.
-function StepHeading({ number, title }) {
+function StepHeading({ number, title, subtitle }) {
   return (
-    <span className="crear-op__step-heading">
-      <span className="crear-op__step-badge" aria-hidden="true">
-        {number}
-      </span>
-      <span className="crear-op__step-title">{title}</span>
-    </span>
+    <div className="crear-op__step-heading-wrap">
+      <div className="crear-op__step-heading">
+        <span className="crear-op__step-badge" aria-hidden="true">
+          {number}
+        </span>
+        <span className="crear-op__step-title">{title}</span>
+      </div>
+      {subtitle && <p className="crear-op__step-subtitle">{subtitle}</p>}
+    </div>
   )
 }
 
@@ -1446,6 +1489,18 @@ export default function CrearOportunidadForm({
     return false
   }
 
+  // Para saltar directo a `target` (clickeando el Stepper) hacen falta TODOS los pasos
+  // anteriores completos, no solo el inmediato anterior — antes solo se validaba
+  // isStepValid(target - 1), y como el paso 1 (Tipo de Riesgo) casi siempre es válido de
+  // entrada (arranca con el default de Vehículo, ver más arriba), eso dejaba saltar del
+  // paso 0 directo al 2 aunque el paso 0 (Datos personales) todavía estuviera incompleto.
+  const canReachStep = (target) => {
+    for (let i = 0; i < target; i++) {
+      if (!isStepValid(i)) return false
+    }
+    return true
+  }
+
   const isLastStep = stepIndex === STEPS.length - 1
   const canAdvance = isStepValid(stepIndex)
 
@@ -1770,7 +1825,7 @@ export default function CrearOportunidadForm({
   // continuar", para no saltar a un paso que depende de datos que todavía faltan).
   const handleStepClick = (index) => {
     if (index === stepIndex) return
-    if (index < stepIndex || isStepValid(index - 1)) setStepIndex(index)
+    if (index < stepIndex || canReachStep(index)) setStepIndex(index)
   }
 
   // Mismo componente Stepper.jsx que usa OpportunityDetail (círculos numerados + línea
@@ -1786,7 +1841,7 @@ export default function CrearOportunidadForm({
     key: s.key,
     label: s.label,
     status: index < stepIndex ? 'done' : index === stepIndex ? 'active' : 'pending',
-    clickable: index < stepIndex || (index > stepIndex && isStepValid(index - 1)),
+    clickable: index < stepIndex || (index > stepIndex && canReachStep(index)),
   }))
 
   // A pedido: cuando la persona elegida es un Contacto, el historial se lee de la
@@ -1962,11 +2017,6 @@ export default function CrearOportunidadForm({
                   <div className="crear-op__ficha">
                     <div className="crear-op__ficha-header">
                       <div className="crear-op__ficha-heading">
-                        <span
-                          className={`crear-op__source-tag crear-op__source-tag--${resultadoSeleccionado.source}`}
-                        >
-                          {resultadoSeleccionado.source === 'contacto' ? 'Cliente' : 'Lead'}
-                        </span>
                         <h2 className="crear-op__ficha-name">
                           {`${form.nombre} ${form.apellido}`.trim() || '—'}
                         </h2>
@@ -1988,13 +2038,18 @@ export default function CrearOportunidadForm({
                         {form.telefono ? `${form.codigoPais} ${form.telefono}` : '—'}
                       </span>
                     </div>
+                    <span
+                      className={`crear-op__source-tag crear-op__source-tag--${resultadoSeleccionado.source}`}
+                    >
+                      {resultadoSeleccionado.source === 'contacto' ? 'Cliente' : 'Lead'}
+                    </span>
                   </div>
                 ) : (
                   <>
                     {/* A pedido: antes de mostrar el formulario a mano para "Crear Lead",
                         se pregunta si tienen la Cédula de Identidad — mismo criterio que
                         "¿Tenés la Cédula o Carta del vehículo?" del paso 3 (mismo toggle,
-                        ver .crear-op__toggle). "Sí" manda el archivo a leer con IA
+                        ver DocumentChoiceToggle). "Sí" manda el archivo a leer con IA
                         (ver handleCedulaLeadChange) y muestra el resultado como perfil de
                         solo lectura (mismo lenguaje que la ficha de un Cliente/Lead ya
                         elegido, ver más arriba) en vez de un formulario — "Editar" abre un
@@ -2002,47 +2057,24 @@ export default function CrearOportunidadForm({
                         EditarLeadModal). "No" cae al formulario de siempre. */}
                     <div className="crear-op__section">
                       <h3 className="crear-op__section-title">Datos personales</h3>
-                      <p className="crear-op__risk-subtitle">¿Tenés la Cédula de Identidad de la persona?</p>
-                      <div className="crear-op__toggle">
-                        <button
-                          type="button"
-                          className={
-                            tieneCedulaLead === 'Si'
-                              ? 'crear-op__toggle-btn crear-op__toggle-btn--active'
-                              : 'crear-op__toggle-btn'
-                          }
-                          onClick={() => setTieneCedulaLead('Si')}
-                        >
-                          Sí, tengo el documento
-                        </button>
-                        <button
-                          type="button"
-                          className={
-                            tieneCedulaLead === 'No'
-                              ? 'crear-op__toggle-btn crear-op__toggle-btn--active'
-                              : 'crear-op__toggle-btn'
-                          }
-                          onClick={() => setTieneCedulaLead('No')}
-                        >
-                          No, ingresar manualmente
-                        </button>
-                      </div>
+                      <p className="crear-op__risk-subtitle">¿Tenés el frente de la Cédula de Identidad de la persona?</p>
+                      <DocumentChoiceToggle value={tieneCedulaLead} onChange={setTieneCedulaLead} />
                     </div>
 
                     {tieneCedulaLead === 'Si' && (
                       <div className="crear-op__section">
                         {!cedulaLeadFile ? (
                           <FileUploadField
-                            label="Cédula de Identidad"
+                            label="Cédula de Identidad (frente)"
                             file={cedulaLeadFile}
                             onUpload={handleCedulaLeadChange}
                             prominent
-                            helperText="Subí una foto o PDF de la Cédula de Identidad para completar los datos automáticamente."
-                            buttonLabel="Adjuntar Cédula de Identidad"
+                            helperText="Subí una foto o PDF del FRENTE de la Cédula de Identidad para completar los datos automáticamente."
+                            buttonLabel="Adjuntar frente de la Cédula"
                           />
                         ) : (
                           <FileUploadField
-                            label="Cédula de Identidad"
+                            label="Cédula de Identidad (frente)"
                             file={cedulaLeadFile}
                             uploading={leyendoCedulaLead}
                             onDelete={() => handleCedulaLeadChange(null)}
@@ -2064,7 +2096,6 @@ export default function CrearOportunidadForm({
                         <div className="crear-op__ficha">
                           <div className="crear-op__ficha-header">
                             <div className="crear-op__ficha-heading">
-                              <span className="crear-op__source-tag crear-op__source-tag--lead">Lead</span>
                               <h2 className="crear-op__ficha-name">
                                 {`${form.nombre} ${form.apellido}`.trim() || '—'}
                               </h2>
@@ -2082,6 +2113,7 @@ export default function CrearOportunidadForm({
                             <span className="crear-op__ficha-badge">CI: {form.ci || '—'}</span>
                             <span className="crear-op__ficha-badge">Nacimiento: {form.fechaNacimiento || '—'}</span>
                           </div>
+                          <span className="crear-op__source-tag crear-op__source-tag--lead">Lead</span>
                         </div>
 
                         <TelefonoField form={form} handleChange={handleChange} resetKey={textFieldsResetKey} />
@@ -2227,40 +2259,6 @@ export default function CrearOportunidadForm({
                   </>
                 )}
 
-                {/* A pedido: cuando ya se está pidiendo la Cédula arriba para leerla con
-                    IA (ver tieneCedulaLead), este segundo campo quedaba mostrando el
-                    mismo documento 2 veces en la misma pantalla — se oculta acá; el
-                    archivo elegido arriba ya queda cargado como Cédula Identidad solo
-                    (ver handleCedulaLeadChange, llama a handleCedulaIdentidadChange). */}
-                {tieneCedulaLead !== 'Si' && (
-                  <div className="crear-op__section">
-                    <h3 className="crear-op__section-title">Documentación</h3>
-                    <div className="crear-op__fields--grid">
-                      {/* A pedido: Cédula Identidad se pide acá, en el paso 1, en vez de
-                          repetida en las 2 ramas del paso 2 (Posee Vehículo Sí/No) —
-                          opcional, no bloquea avanzar. El archivo queda en memoria hasta
-                          que exista el ítem (se crea recién en el paso 2 o al guardar);
-                          handleGuardar tiene el fallback que lo sube si todavía no se
-                          subió para entonces. */}
-                      <FileUploadField
-                        label="Cédula Identidad"
-                        required={false}
-                        file={form.cedulaIdentidad}
-                        onUpload={handleCedulaIdentidadChange}
-                        onDelete={() => handleCedulaIdentidadChange(null)}
-                        fullWidth
-                        highlighted={cedulaAutofilled}
-                      />
-                      {cedulaAutofillLoading && (
-                        <p className="crear-op__autofill">
-                          <Loader size={13} className="crear-op__lectura-spinner" /> Buscando Cédula Identidad de una
-                          oportunidad anterior...
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                )}
-
               </div>
 
               {/* A pedido: panel de historial a la derecha del formulario (antes iba
@@ -2273,7 +2271,7 @@ export default function CrearOportunidadForm({
                 <div className="crear-op__historial">
                   <span className="crear-op__historial-title">
                     <MdEventNote /> Oportunidades anteriores de{' '}
-                    {searchPreview.source === 'contacto' ? 'este cliente' : 'esta persona'}
+                    {searchPreview.source === 'contacto' ? 'este Cliente' : 'este Lead'}
                   </span>
 
                   <div className="crear-op__historial-counters">
@@ -2371,11 +2369,15 @@ export default function CrearOportunidadForm({
                 pasos reales del flujo. Llega completado con el default de Vehículo (ver
                 el useEffect que arranca con TIPO_RIESGO_AUTOMOVIL), pero se puede
                 cambiar libremente acá. */}
-            <StepHeading number={2} title="Seleccionar Tipo de Riesgo" />
+            <StepHeading
+              number={2}
+              title="Seleccionar riesgo"
+              subtitle="Seleccioná el tipo de riesgo que querés cotizar."
+            />
             <div className="crear-op__section">
               <div className="crear-op__fields--grid">
                 <label className="crear-op__field crear-op__field--full">
-                  <span>Tipo de Riesgo <Required /></span>
+                  <span>Ramo <Required /></span>
                   <RequiredDropdown
                     options={tipoRiesgoOptions}
                     value={selectedTipoRiesgo}
@@ -2400,30 +2402,10 @@ export default function CrearOportunidadForm({
                     — este paso deja solo la pregunta de abajo, ahora más destacada
                     (ver .crear-op__risk-subtitle). */}
                 <p className="crear-op__risk-subtitle">¿Tenés la Cédula o Carta del vehículo a cotizar?</p>
-                <div className="crear-op__toggle">
-                  <button
-                    type="button"
-                    className={
-                      form.poseeVehiculo === 'Si'
-                        ? 'crear-op__toggle-btn crear-op__toggle-btn--active'
-                        : 'crear-op__toggle-btn'
-                    }
-                    onClick={() => handleChange('poseeVehiculo', 'Si')}
-                  >
-                    Sí, tengo el documento
-                  </button>
-                  <button
-                    type="button"
-                    className={
-                      form.poseeVehiculo === 'No'
-                        ? 'crear-op__toggle-btn crear-op__toggle-btn--active'
-                        : 'crear-op__toggle-btn'
-                    }
-                    onClick={() => handleChange('poseeVehiculo', 'No')}
-                  >
-                    No, ingresar manualmente
-                  </button>
-                </div>
+                <DocumentChoiceToggle
+                  value={form.poseeVehiculo}
+                  onChange={(value) => handleChange('poseeVehiculo', value)}
+                />
               </>
             )}
 
@@ -2608,7 +2590,7 @@ export default function CrearOportunidadForm({
           {stepIndex === 0 ? (
             busquedaResuelta ? (
               <Button kind="secondary" className="crear-op__footer-back" onClick={handleVolverABuscar} disabled={saving}>
-                <MdArrowBack /> Buscar persona
+                <MdArrowBack /> Volver
               </Button>
             ) : (
               <Button kind="secondary" className="crear-op__footer-back" onClick={() => handleExit(onCancel)} disabled={saving}>
@@ -2622,7 +2604,7 @@ export default function CrearOportunidadForm({
               onClick={() => setStepIndex((i) => i - 1)}
               disabled={saving}
             >
-              <MdArrowBack /> Volver a {STEPS[stepIndex - 1].navLabel}
+              <MdArrowBack /> Volver
             </Button>
           )}
           <div className="crear-op__footer-actions">

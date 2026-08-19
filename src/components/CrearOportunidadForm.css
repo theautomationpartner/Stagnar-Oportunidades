@@ -132,15 +132,18 @@
    formulario editable de siempre) — tarjeta con nombre grande, ubicación con ícono y
    badges (CI/Nacimiento/Teléfono) en vez de la grilla plana de label+valor de antes,
    inspirada en la ficha de cliente de LaBatea. "Editar" abre EditarContactoModal en vez
-   de dejar tocar los campos acá mismo. */
+   de dejar tocar los campos acá mismo. A pedido: mismo lenguaje "tarjeta flotante" que
+   .client-ficha (ClientFicha.css) — blanco + sombra suave en vez de fondo gris plano,
+   para que las 2 fichas de la app se vean iguales. */
 .crear-op__ficha {
   display: flex;
   flex-direction: column;
   gap: 14px;
   padding: 20px 22px;
-  background: #f6f7fb;
-  border: 1px solid #e6e9ef;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
   border-radius: 10px;
+  box-shadow: var(--shadow-floating);
 }
 
 .crear-op__ficha-header {
@@ -189,17 +192,16 @@
   align-items: center;
   gap: 5px;
   padding: 5px 12px;
-  background: #fff;
-  border: 1px solid #e6e9ef;
-  border-radius: 20px;
+  background: var(--bg-badge);
+  border-radius: 6px;
   font-size: 12px;
   font-weight: 600;
-  color: #323338;
+  color: var(--text-badge);
 }
 
 .crear-op__ficha-badge svg {
   font-size: 14px;
-  color: #676879;
+  color: var(--text-badge);
 }
 
 @media (max-width: 640px) {
@@ -265,6 +267,22 @@
   font-size: 20px;
   font-weight: 700;
   color: var(--text-dark);
+}
+
+.crear-op__step-heading-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+/* A pedido: subtítulo opcional debajo del título grande de un paso (ver el prop
+   `subtitle` de StepHeading) — a diferencia de .crear-op__risk-subtitle (pregunta
+   destacada, bold, 17px), este es texto descriptivo común, mismo lenguaje que
+   .cotizar-step__subtitle (CotizarStepPanel.css). */
+.crear-op__step-subtitle {
+  font-size: 13px;
+  color: var(--text-gray);
+  margin: 0;
 }
 
 /* A pedido: cuando la persona elegida en "Buscar Persona" tiene oportunidades
@@ -525,6 +543,7 @@
 }
 
 .crear-op__source-tag {
+  align-self: flex-start;
   flex-shrink: 0;
   font-size: 10px;
   font-weight: 700;
@@ -675,48 +694,52 @@
   margin: 0 0 4px;
 }
 
-/* A pedido, estética tipo mockup: toggle de 2 botones (Sí/No) en vez del dropdown de
-   siempre — mismos valores reales ("Si"/"No", ver color_mm51n4j), solo cambia el
-   control visual. */
-/* A pedido: control segmentado unido (un solo borde compartido, divisor fino entre
-   opciones, la activa se rellena sólida) en vez de 2 pills sueltas — mismo patrón que
-   el toggle Sí/No de LaBatea (.cobro-sino). */
-.crear-op__toggle {
+/* A pedido, estética tipo mockup: 2 tarjetas sueltas con ícono (documento/lápiz) en vez
+   del control segmentado unido de antes — mismos valores reales ("Si"/"No", ver
+   color_mm51n4j), solo cambia el control visual. Mismo componente (DocumentChoiceToggle)
+   para las 2 preguntas de la app que usan este patrón. */
+.crear-op__risk-toggle {
   display: flex;
-  border: 1px solid #d0d4e4;
-  border-radius: 8px;
-  overflow: hidden;
+  gap: 16px;
+  flex-wrap: wrap;
 }
 
-.crear-op__toggle-btn {
-  flex: 1;
-  padding: 14px 16px;
+.crear-op__risk-option {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1 1 240px;
+  padding: 18px 20px;
   background: #fff;
-  border: none;
-  font-size: 14px;
+  border: 1px solid #d0d4e4;
+  border-radius: 10px;
+  font-size: 15px;
   font-weight: 600;
   color: #323338;
   cursor: pointer;
-  text-align: center;
-  transition: background-color 0.15s ease, color 0.15s ease;
+  text-align: left;
+  transition: border-color 0.15s ease, background-color 0.15s ease;
 }
 
-.crear-op__toggle-btn + .crear-op__toggle-btn {
-  border-left: 1px solid #d0d4e4;
+.crear-op__risk-option-icon {
+  flex-shrink: 0;
+  font-size: 22px;
+  color: #0073ea;
 }
 
-.crear-op__toggle-btn:hover:not(.crear-op__toggle-btn--active) {
-  background: #f4f5f7;
+.crear-op__risk-option:hover:not(.crear-op__risk-option--active) {
+  border-color: #0073ea;
+  background: #f8fafd;
 }
 
-.crear-op__toggle-btn--active {
-  background: #0073ea;
-  color: #fff;
+.crear-op__risk-option--active {
+  border-color: #0073ea;
+  background: #eef6ff;
 }
 
-.crear-op__toggle-btn:focus-visible {
+.crear-op__risk-option:focus-visible {
   outline: 2px solid #0073ea;
-  outline-offset: -2px;
+  outline-offset: 2px;
 }
 
 /* A pedido, estética tipo mockup: tarjeta verde con spinner mientras se analiza la
