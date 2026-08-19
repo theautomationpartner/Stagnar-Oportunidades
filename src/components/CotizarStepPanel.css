@@ -252,23 +252,6 @@
   color: #676879;
 }
 
-.cotizar-step__quotes-ready-actions {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  flex-shrink: 0;
-}
-
-@media (max-width: 480px) {
-  .cotizar-step__quotes-ready-actions {
-    width: 100%;
-  }
-
-  .cotizar-step__quotes-ready-actions > * {
-    flex: 1;
-  }
-}
-
 /* Loader nativo de @vibe/core (ver JSX) — a pedido, todo loading usa el verde de marca
    (--color-verde, ver index.css). */
 .cotizar-step__spinner {
@@ -286,15 +269,3 @@
   margin-top: 16px;
 }
 
-/* A pedido: "Volver a detalles" se sacó (quedaba duplicado con el breadcrumb) — ahora
-   el footer es solo "Cotizar en aseguradoras", alineado a la derecha, separado del
-   resto por una línea (mismo criterio que el footer de CrearOportunidadForm.css). */
-.cotizar-step__footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  gap: 12px;
-  margin-top: 20px;
-  padding-top: 20px;
-  border-top: 1px solid #e6e9ef;
-}

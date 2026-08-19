@@ -57,6 +57,7 @@ export default function AlertModal({
             </ul>
           </div>
         )}
+        <hr className="alert-modal__divider" />
       </ModalContent>
       <ModalFooter
         secondaryButton={secondaryButton}

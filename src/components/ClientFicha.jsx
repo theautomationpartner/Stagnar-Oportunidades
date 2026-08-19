@@ -9,11 +9,15 @@ import './ClientFicha.css'
 // los dos queden siempre iguales si se retoca el diseño.
 // `tag`: badge chico al lado del nombre (ej. el número corto de la oportunidad, solo lo
 // usa OpportunityDetail). `actions`: nodo extra en el header, al lado de "Editar" (ej.
-// "Recotizar", solo en Comparar/Confirmar). `onEdit` ausente esconde el link "Editar".
-// `children`: contenido extra dentro de la misma tarjeta, debajo del Vehículo (ej. la
-// propuesta elegida en el paso "Emitir", ver EmitirStepPanel.jsx) — para no repetir la
-// info personal/del vehículo en una tarjeta aparte.
-export default function ClientFicha({ opportunity, onEdit, tag, actions, children }) {
+// "Recotizar", solo en Comparar/Confirmar). `onEdit` ausente esconde el link "Editar"
+// del header (datos personales). `onEditVehiculo` (a pedido: "Editar" separado para
+// Datos personales y para Vehículo, cada uno abre su propio popup con solo esos
+// campos, ver CotizarStepPanel.jsx) — ausente esconde el link "Editar" de la sección
+// Vehículo; los demás usos de ClientFicha (que no lo pasan) quedan sin ese botón, sin
+// cambios. `children`: contenido extra dentro de la misma tarjeta, debajo del Vehículo
+// (ej. la propuesta elegida en el paso "Emitir", ver EmitirStepPanel.jsx) — para no
+// repetir la info personal/del vehículo en una tarjeta aparte.
+export default function ClientFicha({ opportunity, onEdit, onEditVehiculo, tag, actions, children }) {
   const ubicacion = [opportunity.departamento, opportunity.zonaCirculacion].filter(Boolean).join(' — ')
 
   return (
@@ -56,7 +60,14 @@ export default function ClientFicha({ opportunity, onEdit, tag, actions, childre
       </div>
 
       <div className="client-ficha__vehiculo">
-        <span className="client-ficha__vehiculo-label">Vehículo</span>
+        <div className="client-ficha__vehiculo-head">
+          <span className="client-ficha__vehiculo-label">Vehículo</span>
+          {onEditVehiculo && (
+            <Button kind="tertiary" className="client-ficha__edit-link" onClick={onEditVehiculo}>
+              <MdEdit /> Editar
+            </Button>
+          )}
+        </div>
         <strong className="client-ficha__vehiculo-title">
           {[opportunity.marca, opportunity.modelo].filter(Boolean).join(' ') || 'Sin vehículo cargado'}
           {opportunity.anio && ` (${opportunity.anio})`}

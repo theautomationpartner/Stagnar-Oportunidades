@@ -39,19 +39,24 @@ export default function CotizandoModal({ show, recotizando, progress, onClose })
   //    todavía está consultando precios, ningún subitem devuelto todavía.
   // 3. "Creando los subitems..." — ya empezaron a aparecer subitems (>0): está
   //    escribiendo los resultados de vuelta en el tablero.
+  // A pedido: el título de acá abajo ya dice "Cotizando/Recotizando en las
+  // aseguradoras" — este subtítulo repetía básicamente lo mismo ("Cotizando con las
+  // aseguradoras...") mientras totalDone seguía en cero. En ese tramo (el más largo,
+  // antes de que aparezca el primer subitem) ahora avisa que puede demorar en vez de
+  // repetir el título con otras palabras.
   const subtitle = allDone
     ? '¡Cotizaciones obtenidas con éxito!'
     : recotizando && totalDone === 0
       ? 'Eliminando cotizaciones anteriores...'
       : totalDone === 0
-        ? 'Cotizando con las aseguradoras...'
+        ? 'Esto puede tardar unos minutos.'
         : 'Creando los subitems...'
 
   return (
     <Modal id="cotizando-modal" show={show} onClose={onClose} size="small">
       <ModalContent className="cotizando-modal__content">
         <GradientSpinner size={48} />
-        <h2 className="cotizando-modal__title">{recotizando ? 'Recotizando' : 'Cotizando'} en aseguradoras...</h2>
+        <h2 className="cotizando-modal__title">{recotizando ? 'Recotizando' : 'Cotizando'} en las aseguradoras.</h2>
         <p className="cotizando-modal__subtitle">{subtitle}</p>
 
         <ProgressBar percent={percent} className="cotizando-modal__progress-spacing" />

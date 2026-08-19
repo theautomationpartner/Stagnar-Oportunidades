@@ -1,23 +1,26 @@
 /* Mismo layout que el popup de "Cédula duplicada" (CrearOportunidadForm.css,
    .confirm-modal__*) — ícono en círculo, título, descripción, todo centrado. */
 .alert-modal__content {
-  padding: 32px 32px 24px;
+  padding: 36px 32px 20px;
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  gap: 8px;
+  gap: 12px;
 }
 
+/* A pedido: ícono/círculo, título y descripción bastante más grandes y con más aire —
+   antes (44px/17px/13px) quedaba chico y apretado comparado contra el mockup de
+   referencia. */
 .alert-modal__icon {
-  width: 44px;
-  height: 44px;
+  width: 84px;
+  height: 84px;
   border-radius: 50%;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 22px;
-  margin-bottom: 4px;
+  font-size: 40px;
+  margin-bottom: 8px;
 }
 
 .alert-modal__content--info .alert-modal__icon {
@@ -36,16 +39,30 @@
 }
 
 .alert-modal__title {
-  font-size: 17px;
-  font-weight: 700;
+  font-size: 24px;
+  font-weight: 800;
   color: #323338;
   margin: 0;
 }
 
 .alert-modal__desc {
-  font-size: 13px;
+  font-size: 15px;
   color: #676879;
+  line-height: 1.5;
   margin: 0;
+  max-width: 380px;
+}
+
+/* A pedido: línea separadora antes del botón (mismo criterio que el mockup de
+   referencia) — el padding propio de ModalFooter (@vibe/core) ya da el espacio de
+   arriba, esta línea vive pegada al final de ModalContent en vez de un borde en el
+   footer para no depender de poder pasarle una clase a ese componente. */
+.alert-modal__divider {
+  width: 100%;
+  height: 1px;
+  border: none;
+  background: #e6e9ef;
+  margin: 12px 0 0;
 }
 
 /* Lista de detalles opcional (ej. "Campos pendientes") — caja gris clara, texto en

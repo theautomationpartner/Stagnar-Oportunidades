@@ -8,18 +8,22 @@ import AutodataModeloPorAnioMarca from './AutodataModeloPorAnioMarca'
 import AlertModal from './AlertModal'
 import ErrorDetailBox from './ErrorDetailBox'
 import ClientFicha from './ClientFicha'
+import StepFooter from './StepFooter'
 import './CotizarStepPanel.css'
 
-// A pedido: orden propio del popup "Editar información" — de a 2 por renglón cuando
-// tiene sentido (CI/Fecha, Departamento/Localidad, Año/Marca), Modelo solo a lo ancho
-// completo (nombres largos de Autodata), Combustible/Tipo/Uso los 3 juntos al final.
-// `span` es sobre una grilla de 6 columnas (ver .cotizar-step__grid en
+// A pedido: "Editar" se partió en 2 popups separados (Datos personales / Vehículo, ver
+// ClientFicha onEdit/onEditVehiculo más abajo) — cada uno con su propio layout de
+// campos, en vez del popup único "Editar información" de antes con las 2 cosas
+// mezcladas. `span` es sobre una grilla de 6 columnas (ver .cotizar-step__grid en
 // CotizarStepPanel.css): 3+3 = 2 por renglón, 6 = ancho completo, 2+2+2 = 3 por renglón.
-const EDIT_FIELD_LAYOUT = [
+const PERSONAL_FIELD_LAYOUT = [
   { key: 'ci', span: 3 },
   { key: 'fechaNacimiento', span: 3 },
   { key: 'departamento', span: 3 },
   { key: 'zonaCirculacion', span: 3 },
+]
+
+const VEHICULO_FIELD_LAYOUT = [
   { key: 'anio', span: 3 },
   { key: 'marca', span: 3 },
   { key: 'modelo', span: 6 },
@@ -139,8 +143,12 @@ export default function CotizarStepPanel({
   polling,
   errorDetail,
   onGoToComparar,
+  onBack,
 }) {
-  const [editing, setEditing] = useState(false)
+  // null | 'personales' | 'vehiculo' — qué popup de "Editar" está abierto (ver
+  // startEditing/ClientFicha onEdit/onEditVehiculo más abajo). Antes era un solo
+  // booleano para un único popup con las 2 secciones juntas.
+  const [editingSection, setEditingSection] = useState(null)
   const [form, setForm] = useState(() => buildInitialForm(opportunity, dropdownOptions))
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
@@ -233,10 +241,10 @@ export default function CotizarStepPanel({
     onMarcarParaCotizar()
   }
 
-  const startEditing = () => {
+  const startEditing = (section) => {
     setForm(buildInitialForm(opportunity, dropdownOptions))
     setSaveError(null)
-    setEditing(true)
+    setEditingSection(section)
   }
 
   // A pedido: se limpia el error de "faltan campos" apenas se toca cualquier campo, no
@@ -250,7 +258,15 @@ export default function CotizarStepPanel({
 
   const handleSave = async () => {
     setSaveError(null)
-    const missing = getMissingCotizarFields(form)
+    // A pedido: con "Editar" partido en 2 popups (Datos personales / Vehículo), solo se
+    // exige completo lo que ESTE popup puntual pide — antes, con las 2 secciones
+    // mezcladas en un solo popup, esto ya validaba todo COTIZAR_FIELDS de una. Si
+    // editás Vehículo y falta un dato personal (que acá ni se ve), no tiene sentido
+    // bloquear el guardado por eso.
+    const sectionKeys = new Set(
+      (editingSection === 'vehiculo' ? VEHICULO_FIELD_LAYOUT : PERSONAL_FIELD_LAYOUT).map((f) => f.key)
+    )
+    const missing = getMissingCotizarFields(form).filter((f) => sectionKeys.has(f.key))
     if (missing.length > 0) {
       setSaveError(
         `Completá estos campos antes de guardar: ${missing.map((f) => f.label).join(', ')}.`
@@ -260,7 +276,7 @@ export default function CotizarStepPanel({
     setSaving(true)
     try {
       await onSave(form)
-      setEditing(false)
+      setEditingSection(null)
     } catch (err) {
       setSaveError(err.message)
     } finally {
@@ -323,10 +339,14 @@ export default function CotizarStepPanel({
         {/* Ficha del cliente/Lead — componente compartido con OpportunityDetail.jsx
             (ver ClientFicha.jsx), para que se vea igual en todos los pasos de la
             oportunidad, no solo acá. */}
-        <ClientFicha opportunity={opportunity} onEdit={startEditing} />
+        <ClientFicha
+          opportunity={opportunity}
+          onEdit={() => startEditing('personales')}
+          onEditVehiculo={() => startEditing('vehiculo')}
+        />
 
         <div className="cotizar-step__checklist">
-          <h3 className="cotizar-step__checklist-title">Datos mínimos para cotizar</h3>
+          <h3 className="cotizar-step__checklist-title">Datos obligatorios para cotizar</h3>
           <div className="cotizar-step__checklist-items">
             {checklistItems.map((item) => (
               <div
@@ -348,7 +368,7 @@ export default function CotizarStepPanel({
               vivía bien abajo, después de varios otros banners) — "como mucho" un
               aviso chico acá, no un cartel grande aparte compitiendo con el resto de
               la pantalla. */}
-          {!editing && !polling && canCotizar && !hasQuotes && (
+          {!editingSection && !polling && canCotizar && !hasQuotes && (
             <AttentionBox type="primary" className="cotizar-step__checklist-attention">
               Todos los datos necesarios están completos. Al hacer clic en <strong>Cotizar</strong> se
               consultarán las primas en tiempo real.
@@ -362,10 +382,12 @@ export default function CotizarStepPanel({
           ModalFooter) en vez de reemplazar toda la sección de arriba por una grilla de
           edición — la ficha y el checklist quedan visibles de fondo, no hace falta
           "volver" a ninguna pantalla vieja para salir de editar. */}
-      {editing && (
-        <Modal id="cotizar-editar-modal" show onClose={() => setEditing(false)} size="large">
+      {editingSection && (
+        <Modal id="cotizar-editar-modal" show onClose={() => setEditingSection(null)} size="large">
           <ModalContent className="cotizar-step__editar-content">
-            <h2 className="cotizar-step__editar-title">Editar información</h2>
+            <h2 className="cotizar-step__editar-title">
+              {editingSection === 'vehiculo' ? 'Editar vehículo' : 'Editar datos personales'}
+            </h2>
             <div className="cotizar-step__grid">
               {/* A pedido: orden propio (no el de COTIZAR_FIELDS) — de a 2 por
                   renglón cuando tiene sentido agruparlos (CI/Fecha, Departamento/
@@ -373,7 +395,7 @@ export default function CotizarStepPanel({
                   completo (con nombres largos de Autodata se quedaba sin lugar y
                   desbordaba la columna angosta de antes), y Combustible/Tipo/Uso los
                   3 juntos al final. */}
-              {EDIT_FIELD_LAYOUT.map(({ key, span }) => {
+              {(editingSection === 'vehiculo' ? VEHICULO_FIELD_LAYOUT : PERSONAL_FIELD_LAYOUT).map(({ key, span }) => {
                 const f = COTIZAR_FIELDS.find((field) => field.key === key)
                 return (
                   <label
@@ -426,7 +448,7 @@ export default function CotizarStepPanel({
             {saveError && <p className="cotizar-step__error">Error: {saveError}</p>}
           </ModalContent>
           <ModalFooter
-            secondaryButton={{ text: 'Cancelar', onClick: () => setEditing(false), disabled: saving }}
+            secondaryButton={{ text: 'Cancelar', onClick: () => setEditingSection(null), disabled: saving }}
             primaryButton={{
               text: saving ? 'Guardando...' : 'Guardar cambios',
               onClick: handleSave,
@@ -438,14 +460,14 @@ export default function CotizarStepPanel({
 
       {/* Sin ícono manual — AttentionBox ya pone el suyo propio según "type" (acá
           duplicaba el de advertencia). */}
-      {!editing && !polling && !canCotizar && (
+      {!editingSection && !polling && !canCotizar && (
         <AttentionBox type="negative">
           Completá estos campos antes de {hasQuotes ? 'recotizar' : 'cotizar'}:{' '}
           <strong>{missingFields.map((f) => f.label).join(', ')}</strong>.
         </AttentionBox>
       )}
 
-      {!editing && polling && (
+      {!editingSection && polling && (
         <AttentionBox type="warning" icon={false}>
           <Loader size={13} className="cotizar-step__spinner" />
           {hasQuotes ? 'Recotizando' : 'Cotizando'} con las compañías... esto puede tardar unos
@@ -458,12 +480,11 @@ export default function CotizarStepPanel({
           aviso/alerta (nada anda mal, es un estado normal y esperable), así que se
           saca del lenguaje visual de alertas: tarjeta blanca con acento verde a la
           izquierda (mismo patrón que .crear-op__lectura-summary en
-          CrearOportunidadForm.css para el mismo tipo de "esto ya está resuelto, con
-          una acción al lado"). "Ir a Comparar y enviar" ahora es un botón real (antes
-          el texto solo lo MENCIONABA, había que ir a buscar la pestaña del Stepper a
-          mano) — jerarquía clara: avanzar es la acción primaria, Recotizar (destruye
-          las cotizaciones actuales) queda como secundaria, más chica. */}
-      {!editing && !polling && hasQuotes && !confirmingRecotizar && (
+          CrearOportunidadForm.css para el mismo tipo de "esto ya está resuelto"). Los
+          botones (Recotizar/Ir a Comparar) se sacaron de acá — ahora viven en el
+          footer de abajo, mismo lugar en los 4 pasos de la Oportunidad (ver
+          StepFooter). */}
+      {!editingSection && !polling && hasQuotes && !confirmingRecotizar && (
         <div className="cotizar-step__quotes-ready">
           <div className="cotizar-step__quotes-ready-info">
             <MdCheckCircle className="cotizar-step__quotes-ready-icon" />
@@ -472,18 +493,6 @@ export default function CotizarStepPanel({
               <span>Revisalas y enviaselas al cliente desde el siguiente paso.</span>
             </div>
           </div>
-          <div className="cotizar-step__quotes-ready-actions">
-            <Button
-              kind="secondary"
-              onClick={() => setConfirmingRecotizar(true)}
-              disabled={marking || !canCotizar}
-            >
-              <MdAutorenew /> Recotizar
-            </Button>
-            <Button kind="primary" onClick={onGoToComparar}>
-              Ir a Comparar y enviar <MdArrowForward />
-            </Button>
-          </div>
         </div>
       )}
 
@@ -491,7 +500,7 @@ export default function CotizarStepPanel({
           AttentionBox inline) — "Sí, recotizar" en rojo (danger) porque es la acción
           destructiva acá (borra todas las cotizaciones cargadas), no una simple
           confirmación. */}
-      {!editing && !polling && hasQuotes && confirmingRecotizar && (
+      {!editingSection && !polling && hasQuotes && confirmingRecotizar && (
         <AlertModal
           id="cotizar-recotizar-modal"
           type="warning"
@@ -513,24 +522,43 @@ export default function CotizarStepPanel({
         />
       )}
 
-      {!editing && !polling && (
+      {!editingSection && !polling && (
         <ErrorDetailBox detail={errorDetail} className="cotizar-step__error-detail-spacing" />
       )}
 
-      {/* A pedido: "Volver a detalles" se sacó del paso 1 (ya está el botón "Volver" del
-          breadcrumb, arriba de todo en OpportunityDetail.jsx — quedaba duplicado). Con
-          cotizaciones ya cargadas no queda nada que mostrar acá ("Recotizar" vive en el
-          banner de arriba), así que directamente no se renderiza el footer. */}
-      {!editing && !hasQuotes && (
-        <div className="cotizar-step__footer">
-          <Button
-            kind="primary"
-            onClick={() => runCotizarChecks(onMarcarParaCotizar)}
-            disabled={marking || polling || checkingConsistencia}
-          >
-            {checkingConsistencia ? 'Verificando...' : marking ? 'Marcando...' : 'Cotizar'}
-          </Button>
-        </div>
+      {/* A pedido: footer pegado abajo del todo, mismo componente que usan los otros 3
+          pasos de la Oportunidad (ver StepFooter) — "Volver" siempre a la izquierda
+          (acá es el paso 1, no hay paso anterior dentro de la Oportunidad: sale a la
+          Persona seleccionada en el buscador, de ahí el texto distinto al de los otros
+          3 pasos, que dicen "Volver" a secas porque retroceden un paso adentro de la
+          misma Oportunidad). A la derecha, según haya o no cotizaciones cargadas:
+          "Cotizar" solo, o "Recotizar" (gris, secundaria) + "Ir a Comparar y enviar"
+          (primaria, para avanzar). */}
+      {!editingSection && (
+        <StepFooter onBack={onBack} backLabel="Volver a Persona Seleccionada">
+          {hasQuotes ? (
+            <>
+              <Button
+                kind="secondary"
+                onClick={() => setConfirmingRecotizar(true)}
+                disabled={marking || !canCotizar || polling}
+              >
+                <MdAutorenew /> Recotizar
+              </Button>
+              <Button kind="primary" onClick={onGoToComparar} disabled={polling}>
+                Ir a Comparar y enviar <MdArrowForward />
+              </Button>
+            </>
+          ) : (
+            <Button
+              kind="primary"
+              onClick={() => runCotizarChecks(onMarcarParaCotizar)}
+              disabled={marking || polling || checkingConsistencia}
+            >
+              {checkingConsistencia ? 'Verificando...' : marking ? 'Marcando...' : 'Cotizar'}
+            </Button>
+          )}
+        </StepFooter>
       )}
 
       {(markError || errorDetail) && !errorModalDismissed && (
@@ -558,7 +586,13 @@ export default function CotizarStepPanel({
             text: 'Completar datos faltantes',
             onClick: () => {
               setShowMissingFieldsModal(false)
-              startEditing()
+              // A pedido: "Editar" ahora son 2 popups separados — si lo que falta
+              // incluye algún dato personal, se abre ese primero (si después sigue
+              // faltando algo del vehículo, este mismo popup vuelve a aparecer al
+              // tocar "Cotizar" de nuevo). Si lo único que falta es del vehículo, va
+              // directo a ese popup.
+              const personalKeys = new Set(PERSONAL_FIELD_LAYOUT.map((f) => f.key))
+              startEditing(missingFields.some((f) => personalKeys.has(f.key)) ? 'personales' : 'vehiculo')
             },
           }}
         />
