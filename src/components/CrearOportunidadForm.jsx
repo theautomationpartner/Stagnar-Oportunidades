@@ -2642,8 +2642,9 @@ export default function CrearOportunidadForm({
             genéricos (ver STEPS más arriba, navLabel de cada paso). En el paso 1, con
             una persona ya elegida (busquedaResuelta), este botón reemplaza al viejo
             "Cambiar persona" (mismo handleVolverABuscar) — mientras se está buscando
-            todavía (nada elegido) sigue siendo "Cancelar" (sale del formulario entero,
-            no hay a dónde "volver" adentro del propio paso 1). */}
+            todavía (nada elegido) sigue diciendo "Volver" pero sale del formulario
+            entero (mismo handleExit/onCancel de siempre, no hay a dónde volver
+            adentro del propio paso 1). */}
         <div className="crear-op__footer">
           {stepIndex === 0 ? (
             busquedaResuelta ? (
@@ -2652,7 +2653,7 @@ export default function CrearOportunidadForm({
               </Button>
             ) : (
               <Button kind="secondary" className="crear-op__footer-back" onClick={() => handleExit(onCancel)} disabled={saving}>
-                <MdArrowBack /> Cancelar
+                <MdArrowBack /> Volver
               </Button>
             )
           ) : (
