@@ -65,6 +65,14 @@
   margin: 12px 0 0;
 }
 
+/* A pedido: se veían los botones pegados al borde de abajo del modal, sin separación
+   — el padding propio de ModalFooter (20px) no se estaba viendo (algún token interno
+   de @vibe/core sin resolver), así que se refuerza acá explícito en vez de depender
+   de ese padding. */
+.alert-modal__footer {
+  padding: 20px 24px 32px !important;
+}
+
 /* Lista de detalles opcional (ej. "Campos pendientes") — caja gris clara, texto en
    rojo (son ítems que faltan/fallan, mismo criterio de color que .alert-modal__content
    --error) para que salten a la vista dentro de la caja neutra. */

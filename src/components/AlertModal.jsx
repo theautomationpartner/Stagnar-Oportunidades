@@ -40,7 +40,7 @@ export default function AlertModal({
     .join(' ')
 
   return (
-    <Modal id={id} show onClose={onClose} size="small">
+    <Modal id={id} show onClose={onClose} size="medium">
       <ModalContent className={`alert-modal__content alert-modal__content--${type}`}>
         <span className="alert-modal__icon">
           <Icon />
@@ -60,6 +60,7 @@ export default function AlertModal({
         <hr className="alert-modal__divider" />
       </ModalContent>
       <ModalFooter
+        className="alert-modal__footer"
         secondaryButton={secondaryButton}
         primaryButton={primaryButton && { ...primaryButton, className: primaryClassName || undefined }}
       />
