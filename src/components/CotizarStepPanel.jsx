@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { MdAutorenew, MdArrowForward, MdCheckCircle, MdWarningAmber } from 'react-icons/md'
-import { Button, Dropdown, AttentionBox, Loader, TextField, NumberField, Modal, ModalContent, ModalFooter } from '@vibe/core'
+import { Button, Dropdown, AttentionBox, TextField, NumberField, Modal, ModalContent, ModalFooter } from '@vibe/core'
 import { COTIZAR_FIELDS, getMissingCotizarFields } from '../services/cotizarFields'
 import { fetchAutodataModelosByAnioMarca } from '../services/mondayApi'
 import { matchesSearchQuery } from '../services/format'
@@ -477,22 +477,6 @@ export default function CotizarStepPanel({
         </AttentionBox>
       )}
 
-      {!editingSection && polling && (
-        <AttentionBox type="warning" icon={false}>
-          {/* A pedido: se veía roto (mucho espacio vacío debajo del texto) — el Loader
-              suelto como hijo de AttentionBox (icon={false} le saca el slot de ícono
-              propio, ver AttentionBoxDefault) terminaba adentro del <Text> interno que
-              arma el texto, no en un layout pensado para ícono+texto. Envueltos los 2
-              en un span propio con flex, quedan alineados sin importar cómo el <Text>
-              de adentro renderice ese único hijo. */}
-          <span className="cotizar-step__polling-text">
-            <Loader size={13} className="cotizar-step__spinner" />
-            {hasQuotes ? 'Recotizando' : 'Cotizando'} con las compañías... esto puede tardar unos
-            segundos. La pantalla se va a actualizar sola apenas esté lista.
-          </span>
-        </AttentionBox>
-      )}
-
       {/* A pedido: rediseñado — antes era un AttentionBox "positive" (fondo verde
           grande) con el texto y "Recotizar" apretados en una fila. Este ya no es un
           aviso/alerta (nada anda mal, es un estado normal y esperable), así que se
@@ -553,7 +537,7 @@ export default function CotizarStepPanel({
           "Cotizar" solo, o "Recotizar" (gris, secundaria) + "Ir a Comparar y enviar"
           (primaria, para avanzar). */}
       {!editingSection && (
-        <StepFooter onBack={onBack} backLabel="Volver a Persona Seleccionada">
+        <StepFooter onBack={onBack} backLabel="Volver">
           {hasQuotes ? (
             <>
               <Button

@@ -252,20 +252,6 @@
   color: #676879;
 }
 
-/* Loader nativo de @vibe/core (ver JSX) — a pedido, todo loading usa el verde de marca
-   (--color-verde, ver index.css). */
-.cotizar-step__spinner {
-  color: var(--color-verde);
-  flex-shrink: 0;
-}
-
-/* A pedido: el AttentionBox de "Cotizando/Recotizando..." se veía roto (Loader + texto
-   sin alinear, mucho espacio vacío debajo) — ver comentario en el JSX. */
-.cotizar-step__polling-text {
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-}
 
 .cotizar-step__error {
   margin: 0;

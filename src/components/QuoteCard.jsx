@@ -112,7 +112,11 @@ function hasTagValue(field, raw, overrides) {
 
 function tagValueDisplay(field, raw, overrides) {
   const display = displayValue(field, raw, overrides)
-  return field.kind === 'percent' || field.kind === 'percent-only' ? `${display}%` : display
+  // A pedido: a "bonif" (kind 'number', no 'percent'/'percent-only' — se edita como
+  // número entero de toda la vida, ver fieldsForRaw) le faltaba el "%" en esta
+  // etiqueta, aunque su propio label ya dice "Bonificación (%)". `deducibleSancorUsd`
+  // es el otro campo con kind 'number' — ese sí es un monto en USD, no un porcentaje.
+  return field.kind === 'percent' || field.kind === 'percent-only' || field.key === 'bonif' ? `${display}%` : display
 }
 
 // Adaptador Dropdown <-> string plano, mismo patrón que en FilterPanel.jsx/
@@ -155,6 +159,14 @@ export default function QuoteCard({
   const [form, setForm] = useState(() => buildInitialForm(raw, overrides, fields))
   const [savingOpcional, setSavingOpcional] = useState(null)
   const [opcionalError, setOpcionalError] = useState(null)
+  // A pedido: bug reportado — "Restablecer" no volvía a mostrar el Deducible (BSE/SURA,
+  // kind 'select') en el campo, aunque el override sí se borraba de verdad (el propio
+  // botón "Restablecer" quedaba deshabilitado después, y el "Deduc.:" de arriba sí
+  // volvía al real). El Dropdown de @vibe/core no resincroniza solo con un cambio de
+  // prop `value` — mismo problema ya visto con TextField en otro lado de la app
+  // (CrearOportunidadForm.jsx#textFieldsResetKey), mismo arreglo: forzar un remount
+  // real del control cambiándole el `key` cuando se resetea.
+  const [paramsResetKey, setParamsResetKey] = useState(0)
 
   const hasCustomOverrides = Object.keys(overrides).length > 0
   const accent = accentForCompania(raw.compania)
@@ -212,8 +224,21 @@ export default function QuoteCard({
   }
 
   const handleReset = () => {
-    setForm(buildInitialForm(raw, {}, fields))
-    onResetOverrides()
+    // A pedido: el Deducible (BSE/SURA) vuelve a "Sin definir" al restablecer, no al
+    // valor real del subitem — a diferencia de Bonificación/Descuento/RC (palancas
+    // comerciales con un valor real que sí tiene sentido recuperar), acá el dato "real"
+    // suele ser un default de monday sin significado (ej. "1"), así que restablecer
+    // debe dejarlo en blanco para elegirlo de nuevo, no reaparecer solo. Por eso NO se
+    // usa onResetOverrides (borra TODO, cae de vuelta al real) — se deja un override
+    // explícito vacío solo para estas 2 claves (ver EXPLICITLY_CLEARABLE_KEYS en
+    // pricingEngine.js, es lo único que respeta un override "" en vez de ignorarlo).
+    const blankedOverrides = {}
+    for (const field of fields) {
+      if (field.key.startsWith('deducible')) blankedOverrides[field.key] = ''
+    }
+    setForm(buildInitialForm(raw, blankedOverrides, fields))
+    setParamsResetKey((k) => k + 1)
+    onApplyOverrides(blankedOverrides)
   }
 
   if (quote.blocked) {
@@ -406,6 +431,7 @@ export default function QuoteCard({
                   <span>{field.label}</span>
                   {field.kind === 'select' ? (
                     <FieldSelect
+                      key={`${field.key}-${paramsResetKey}`}
                       value={form[field.key]}
                       options={field.options}
                       onChange={(value) => handleFieldChange(field.key, value)}
@@ -415,6 +441,7 @@ export default function QuoteCard({
                     // sigue en string (mismo criterio que el resto de los campos), así
                     // que el ida y vuelta se adapta acá mismo.
                     <NumberField
+                      key={`${field.key}-${paramsResetKey}`}
                       size="small"
                       value={form[field.key] === '' ? null : Number(form[field.key])}
                       onChange={(value) => handleFieldChange(field.key, value == null ? '' : String(value))}

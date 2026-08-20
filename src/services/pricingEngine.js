@@ -174,14 +174,22 @@ function roundUpCents(value) {
   return Math.ceil(value)
 }
 
+// Deducible BSE/SURA (ver QuoteCard.jsx#handleReset): a diferencia del resto de los
+// campos (Bonificación, Descuento, RC...), acá el dato real del subitem no es un valor
+// comercial que tenga sentido recuperar — "Restablecer" debe dejarlo sin definir en vez
+// de reaparecer solo con lo que sea que traiga monday. Por eso, para estas 2 claves
+// puntuales, un override vacío SÍ pisa el valor real (a propósito distinto del resto).
+const EXPLICITLY_CLEARABLE_KEYS = ['deducibleBSE', 'deducibleSURA']
+
 // Combina el subitem real con los overrides del usuario: un override solo pisa el
 // valor real cuando no está vacío — un campo vaciado por el usuario vuelve a usar el
-// dato real de monday en vez de calcular con "0" o "undefined".
+// dato real de monday en vez de calcular con "0" o "undefined" (salvo
+// EXPLICITLY_CLEARABLE_KEYS, ver arriba).
 function mergeRawWithOverrides(raw, overrides) {
   const effective = { ...raw }
   for (const [key, value] of Object.entries(overrides)) {
-    if (value === '' || value == null) continue
-    effective[key] = value
+    if ((value === '' || value == null) && !EXPLICITLY_CLEARABLE_KEYS.includes(key)) continue
+    effective[key] = value ?? ''
   }
   return effective
 }
