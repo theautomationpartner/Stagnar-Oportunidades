@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MdCheckCircle } from 'react-icons/md'
+import { MdCheckCircle, MdHome } from 'react-icons/md'
 import { AttentionBox, Button, Modal, ModalContent } from '@vibe/core'
 import { formatMoney } from '../services/format'
 import { accentForCompania } from '../services/companyColors'
@@ -71,6 +71,7 @@ export default function EmitirStepPanel({
   confirmandoEmision,
   confirmarEmisionError,
   onBack,
+  onGoHome,
 }) {
   const elegida = groups.flatMap((g) => g.entries).find((e) => e.raw.propuestaElegida)
   const accent = elegida ? accentForCompania(elegida.raw.compania) : null
@@ -233,11 +234,11 @@ export default function EmitirStepPanel({
       </div>
 
       {/* A pedido: mismo footer pegado abajo del todo que los otros 3 pasos de la
-          Oportunidad (ver StepFooter) — "Volver" vuelve a Confirmar. "Concretar
-          Oportunidad" (a la derecha, el "siguiente paso"/acción final acá) solo
-          mientras corresponde — mismo gate que antes (showConfirmarAction: subida y
-          todavía no "Creada"); una vez creada, ni eliminar ni confirmar tienen
-          sentido, el footer queda solo con "Volver". */}
+          Oportunidad (ver StepFooter) — "Volver" vuelve a Confirmar. A la derecha,
+          "Concretar Oportunidad" mientras corresponde (showConfirmarAction: subida y
+          todavía no "Creada"); una vez que ya está "Creada" (concretada), ese mismo
+          lugar pasa a tener "Inicio" — a pedido, en vez de un redirect automático al
+          Inicio (se sacó), queda a mano de la persona cuándo salir. */}
       <StepFooter onBack={onBack}>
         {showConfirmarAction && (
           <Button
@@ -247,6 +248,11 @@ export default function EmitirStepPanel({
             disabled={confirmandoEmision || polling}
           >
             <MdCheckCircle /> {confirmandoEmision ? 'Confirmando...' : 'Concretar Oportunidad'}
+          </Button>
+        )}
+        {!showConfirmarAction && concretada && (
+          <Button kind="primary" onClick={onGoHome}>
+            <MdHome /> Inicio
           </Button>
         )}
       </StepFooter>
