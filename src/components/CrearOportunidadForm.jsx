@@ -67,9 +67,9 @@ import './CrearOportunidadForm.css'
 // el texto que usan los botones "Volver a.../Continuar a..." del footer (ver más abajo)
 // — separado de `label` por si algún paso necesita decir algo distinto en cada lugar.
 const STEPS = [
-  { key: 'personales', label: 'Seleccionar Persona', navLabel: 'Seleccionar Persona' },
+  { key: 'personales', label: 'Seleccionar Cliente', navLabel: 'Seleccionar Cliente' },
   { key: 'tipo-riesgo', label: 'Seleccionar Riesgo', navLabel: 'Seleccionar Riesgo' },
-  { key: 'riesgo', label: 'Cargar Datos del Riesgo', navLabel: 'Cargar Datos del Riesgo' },
+  { key: 'riesgo', label: 'Ingresar datos del bien', navLabel: 'Ingresar datos del bien' },
 ]
 
 // Único label real (con emoji, tal cual está configurado en monday) que muestra el resto
@@ -1997,7 +1997,7 @@ export default function CrearOportunidadForm({
             {!busquedaResuelta ? (
               <div className="crear-op__search-screen" key="search-screen">
                 <label className="crear-op__field crear-op__field--full">
-                  <StepHeading number={1} title="Seleccionar Persona" />
+                  <StepHeading number={1} title="Seleccionar Cliente" />
                   <ExistingRecordSearch value={searchPreview} onChange={handleSearchPreview} />
                   <Button kind="tertiary" className="crear-op__skip-btn" onClick={handleSaltearBusqueda}>
                     Crear Lead
@@ -2068,6 +2068,7 @@ export default function CrearOportunidadForm({
                   // abajo), no solo el form de esta Oportunidad. Solo se vuelve al
                   // formulario editable de siempre cuando no hay ningún resultado
                   // elegido ("Crear Lead" desde cero, ver handleSaltearBusqueda).
+                  <>
                   <div className="crear-op__ficha">
                     <div className="crear-op__ficha-header">
                       <div className="crear-op__ficha-heading">
@@ -2097,7 +2098,38 @@ export default function CrearOportunidadForm({
                     >
                       {resultadoSeleccionado.source === 'contacto' ? 'Cliente' : 'Lead'}
                     </span>
+
+                    {/* A pedido: la Cédula de Identidad ya se auto-completaba en
+                        silencio acá atrás (ver handleAutofillCedula más arriba, reusa
+                        la que ya tenía cargada este Cliente/Lead) pero no se mostraba
+                        en ningún lado de este paso — quedaba invisible hasta el
+                        resumen del paso 3. Mismo componente de archivo que el resto de
+                        la app (FileUploadField): si ya tiene una (autocompletada, o
+                        cargada en una edición anterior de esta misma Oportunidad
+                        todavía sin guardar) la muestra con su preview; si no, deja
+                        subir una nueva acá mismo. */}
+                    <FileUploadField
+                      label="Cédula de Identidad (frente)"
+                      file={form.cedulaIdentidad}
+                      uploading={cedulaAutofillLoading}
+                      required={false}
+                      onUpload={handleCedulaIdentidadChange}
+                      onDelete={() => handleCedulaIdentidadChange(null)}
+                    />
                   </div>
+
+                  {/* A pedido: la ficha de acá arriba es de solo lectura — sin esto,
+                      si el Cliente/Lead elegido tiene algún dato obligatorio sin
+                      cargar (ej. Ubicación), el botón "Continuar" de abajo quedaba
+                      gris sin ninguna pista de por qué (isStepValid ya lo bloqueaba,
+                      pero en silencio). Se apaga sola apenas se completa lo que
+                      falte (por "Editar", ver EditarContactoModal). */}
+                  {!isStepValid(0) && (
+                    <AttentionBox type="warning">
+                      Completá los datos del cliente para continuar con la selección del riesgo.
+                    </AttentionBox>
+                  )}
+                  </>
                 ) : (
                   <div className="crear-op__form-card">
                     {/* A pedido: antes de mostrar el formulario a mano para "Crear Lead",
@@ -2114,7 +2146,11 @@ export default function CrearOportunidadForm({
                         eran 2 .crear-op__section separadas, con un salto/gap en el medio
                         de lo que es conceptualmente un solo bloque ("Datos personales"). */}
                     <div className="crear-op__section">
-                      <SectionTitle icon={MdPerson}>Datos personales</SectionTitle>
+                      {/* A pedido: "Datos personales" (título + ícono) ya no va acá arriba de
+                          la pregunta — solo aparece más abajo, adentro de la respuesta "No"
+                          (los campos Nombre/Apellido/CI/Fecha son los "datos personales"
+                          en sí; la pregunta de la Cédula es un paso previo, no forma parte
+                          de esa sección). */}
                       <p className="crear-op__risk-subtitle">¿Tenés el frente de la Cédula de Identidad de la persona?</p>
                       <DocumentChoiceToggle value={tieneCedulaLead} onChange={setTieneCedulaLead} />
 
@@ -2149,7 +2185,9 @@ export default function CrearOportunidadForm({
                       )}
 
                       {tieneCedulaLead === 'No' && (
-                        <div className="crear-op__fields--grid crear-op__section-subblock">
+                        <div className="crear-op__section-subblock">
+                          <SectionTitle icon={MdPerson}>Datos personales</SectionTitle>
+                          <div className="crear-op__fields--grid">
                           {/* TextField nativo de @vibe/core en vez de <label> + ClearableInput a
                               mano — ya trae label (title/required), botón de limpiar (icon/
                               onIconClick/clearOnIconClick) y el borde verde/rojo (validation) de
@@ -2231,6 +2269,7 @@ export default function CrearOportunidadForm({
                               <span className="crear-op__field-error">{fechaError(form.fechaNacimiento)}</span>
                             )}
                           </label>
+                          </div>
                         </div>
                       )}
                     </div>
@@ -2258,9 +2297,33 @@ export default function CrearOportunidadForm({
                             <span className="crear-op__ficha-badge">Nacimiento: {form.fechaNacimiento || '—'}</span>
                           </div>
                           <span className="crear-op__source-tag crear-op__source-tag--lead">Lead</span>
+
+                          {/* A pedido: mismo campo de Cédula que la ficha de un
+                              Cliente/Lead ya existente de más arriba — acá casi
+                              siempre ya viene cargada (es la misma que se acaba de
+                              leer con IA para armar este perfil), pero igual se deja
+                              ver/reemplazar en vez de quedar oculta hasta el paso 3. */}
+                          <FileUploadField
+                            label="Cédula de Identidad (frente)"
+                            file={form.cedulaIdentidad}
+                            required={false}
+                            onUpload={handleCedulaIdentidadChange}
+                            onDelete={() => handleCedulaIdentidadChange(null)}
+                          />
                         </div>
 
                         <TelefonoField form={form} handleChange={handleChange} resetKey={textFieldsResetKey} />
+
+                        {/* A pedido: mismo aviso que la ficha de un Cliente/Lead ya
+                            existente de más arriba — acá la lectura con IA puede haber
+                            dejado algún dato obligatorio sin completar (ej. no
+                            reconoció la Ubicación), y sin esto no había ninguna pista
+                            de por qué "Continuar" seguía gris. */}
+                        {!isStepValid(0) && (
+                          <AttentionBox type="warning">
+                            Completá los datos del cliente para continuar con la selección del riesgo.
+                          </AttentionBox>
+                        )}
                       </>
                     )}
 
@@ -2435,7 +2498,7 @@ export default function CrearOportunidadForm({
             <div className="crear-op__section">
               <div className="crear-op__fields--grid">
                 <label className="crear-op__field crear-op__field--full">
-                  <span>Ramo <Required /></span>
+                  <span>Tipo de Riesgo <Required /></span>
                   <RequiredDropdown
                     options={tipoRiesgoOptions}
                     value={selectedTipoRiesgo}
@@ -2450,7 +2513,7 @@ export default function CrearOportunidadForm({
 
         {stepIndex === 2 && (
           <div className="crear-op__fields">
-            <StepHeading number={3} title="Cargar Datos del Riesgo" />
+            <StepHeading number={3} title="Ingresar datos del bien" />
             {esAutomovil && (
               <>
                 {/* A pedido, estética tipo mockup: subtítulo propio del paso, y el
