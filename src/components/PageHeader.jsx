@@ -1,13 +1,14 @@
-import { MdAdd } from 'react-icons/md'
+import { MdAdd, MdHome } from 'react-icons/md'
 import { Button } from '@vibe/core'
 import './PageHeader.css'
 
 // A pedido: la barra lateral (Sidebar.jsx) reemplazó al TopBar horizontal en esta
 // vista (mismo patrón que landing/create/detalle) — "Nueva oportunidad" (antes en el
 // nav de arriba) se muda acá, al lado del título. Sin avatar acá: el Sidebar ya tiene
-// el suyo propio abajo del todo, no hace falta duplicarlo. "Inicio" se sacó de acá (A
-// pedido) — ahora vive solo en el Sidebar, quedaba duplicado.
-export default function PageHeader({ onCreateNew }) {
+// el suyo propio abajo del todo, no hace falta duplicarlo. "Inicio" volvió a vivir acá
+// (A pedido) — se había sacado un tiempo al nav del Sidebar, pero se saca de ahí y
+// vuelve a este mismo lugar.
+export default function PageHeader({ onCreateNew, onHome }) {
   return (
     <div className="page-header">
       <div>
@@ -20,6 +21,11 @@ export default function PageHeader({ onCreateNew }) {
         {onCreateNew && (
           <Button kind="primary" onClick={onCreateNew}>
             <MdAdd /> Nueva oportunidad
+          </Button>
+        )}
+        {onHome && (
+          <Button kind="secondary" onClick={onHome}>
+            <MdHome /> Inicio
           </Button>
         )}
       </div>
