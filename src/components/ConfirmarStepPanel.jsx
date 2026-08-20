@@ -159,7 +159,7 @@ function ChosenProposal({ elegida }) {
 
   return (
     <div className="confirmar-step__section">
-      <h2 className="confirmar-step__title">Propuesta elegida</h2>
+      <h2 className="confirmar-step__title">Cotización elegida</h2>
       <div
         className={
           transitioning ? 'confirmar-step__chosen confirmar-step__chosen--updating' : 'confirmar-step__chosen'
@@ -248,7 +248,22 @@ export default function ConfirmarStepPanel({
     const missingFields = CHECKLIST_FIELDS.filter((f) => !opportunity[f.key])
     const missingDocs = documentos.filter((d) => !d.fileName)
     const missingLabels = [...missingFields.map((f) => f.label), ...missingDocs.map((d) => d.label)]
-    if (!elegida) missingLabels.push('Propuesta elegida')
+    if (!elegida) {
+      missingLabels.push('Cotización elegida')
+    } else if (elegida.quote.blocked) {
+      // Sin fórmula de precio para esta combinación compañía/cobertura (ver
+      // computeQuote en pricingEngine.js) — ni Contado/Deducible/RC individuales
+      // tienen sentido de chequear acá, la cotización entera está sin calcular.
+      missingLabels.push('Cotización elegida (sin fórmula de precio)')
+    } else {
+      // A pedido: además de los datos del cliente/documentación, se avisa si a la
+      // cotización elegida le falta algún dato propio de la propuesta — mismos campos
+      // que se editan en "Parámetros ajustables" del paso "Comparar y enviar" (ver
+      // QuoteCard.jsx), acá solo se chequea que no hayan quedado vacíos.
+      if (!Number(elegida.raw.contado)) missingLabels.push('Contado')
+      if (elegida.quote.deducibleDisplay === '—') missingLabels.push('Deducible')
+      if (!elegida.quote.rc) missingLabels.push('RC')
+    }
     if (missingLabels.length > 0) {
       setValidationError(missingLabels)
       return
@@ -257,46 +272,26 @@ export default function ConfirmarStepPanel({
     onConfirmar()
   }
 
-  // A pedido: la Cédula de Identidad se pide aparte, fuera de la sección "Documentación"
-  // — es un dato de la persona (el frente nomás, no ambos lados), no un documento del
-  // trámite como Libreta de Conducir/Carta Automóvil, así que no tiene sentido agruparla
-  // con esos. El resto de `documentos` (lo que venga de OpportunityDetail.jsx además de
-  // "cedula") sigue en "Documentación" de siempre.
+  // A pedido: Cédula de Identidad y Libreta de Conducir/Carta Automóvil van juntas, una
+  // al lado de la otra (mismo .confirmar-step__docs, ya es una grilla de 2 columnas) en
+  // vez de en 2 secciones separadas — antes la Cédula tenía su propia sección arriba,
+  // antes todavía de que hubiera un motivo real para separarla (antes hoy solo repetía
+  // "Solo hace falta el frente", ya redundante con el label del propio campo, que ya
+  // dice "(frente)"). Título genérico ("Documentos"), no "Documentación" — a pedido.
   const cedulaDoc = documentos.find((d) => d.key === 'cedula')
   const otrosDocumentos = documentos.filter((d) => d.key !== 'cedula')
+  const docsOrdenados = [cedulaDoc, ...otrosDocumentos].filter(Boolean)
 
   return (
     <div className="confirmar-step">
-      {cedulaDoc && (
-        <div className="confirmar-step__section">
-          <h2 className="confirmar-step__title">Cédula de Identidad</h2>
-          <p className="confirmar-step__subtitle">Solo hace falta el frente.</p>
-          <div className="confirmar-step__docs">
-            <FileUploadField
-              label={cedulaDoc.label}
-              required={false}
-              fileName={cedulaDoc.fileName}
-              onFetchFile={() => fetchFileColumnAsFile(opportunity.id, cedulaDoc.columnId)}
-              uploading={Boolean(uploadingDoc[cedulaDoc.columnId])}
-              deleting={Boolean(deletingDoc[cedulaDoc.columnId])}
-              error={docUploadError[cedulaDoc.columnId]}
-              onUpload={(file) => onUploadDocument(cedulaDoc.columnId, file)}
-              onDelete={() => onDeleteDocument(cedulaDoc.columnId)}
-              showReplaceButton={false}
-              compactDelete
-            />
-          </div>
-        </div>
-      )}
-
       <div className="confirmar-step__section">
-        <h2 className="confirmar-step__title">Documentación</h2>
+        <h2 className="confirmar-step__title">Documentos</h2>
         <p className="confirmar-step__subtitle">
           Verificá que estén cargados los documentos del asegurado. Si falta alguno, se puede
           subir directo desde acá.
         </p>
         <div className="confirmar-step__docs">
-          {otrosDocumentos.map((doc) => (
+          {docsOrdenados.map((doc) => (
             <FileUploadField
               key={doc.key}
               label={doc.label}
@@ -322,9 +317,9 @@ export default function ConfirmarStepPanel({
       <div className="confirmar-step__section">
         <div className="confirmar-step__props-head">
           <div>
-            <h2 className="confirmar-step__title">Propuestas</h2>
+            <h2 className="confirmar-step__title">Cotizaciones</h2>
             <p className="confirmar-step__subtitle">
-              Marcá cuál es la propuesta elegida por el cliente. El color identifica la compañía y
+              Marcá cuál es la cotización elegida por el cliente. El color identifica la compañía y
               el ícono de WhatsApp indica cuáles ya se enviaron.
             </p>
           </div>
@@ -361,7 +356,7 @@ export default function ConfirmarStepPanel({
         {visibleEntries.length === 0 ? (
           <p className="confirmar-step__empty">
             {filterTab === 'sent'
-              ? 'Todavía no se envió ninguna propuesta por WhatsApp.'
+              ? 'Todavía no se envió ninguna cotización por WhatsApp.'
               : 'No hay cotizaciones cargadas.'}
           </p>
         ) : (
@@ -381,14 +376,15 @@ export default function ConfirmarStepPanel({
 
       <ChosenProposal elegida={elegida} />
 
-      <div className="confirmar-step__section">
-        <h2 className="confirmar-step__title">Confirmar</h2>
-        <p className="confirmar-step__subtitle">
-          Verifica que los datos del cliente y la documentación estén completos, que haya una
-          propuesta elegida, y pasa al paso 4 (Emitir).
-        </p>
-        {confirmError && <p className="confirmar-step__error">Error: {confirmError}</p>}
-      </div>
+      {/* A pedido: se saca el texto fijo de acá (se repetía siempre, complete o no) —
+          ahora esa misma explicación solo aparece como advertencia puntual, si falta
+          algo al tocar "Confirmar" (ver el AlertModal más abajo). */}
+      {confirmError && (
+        <div className="confirmar-step__section">
+          <h2 className="confirmar-step__title">Confirmar</h2>
+          <p className="confirmar-step__error">Error: {confirmError}</p>
+        </div>
+      )}
 
       {/* A pedido: mismo footer pegado abajo del todo que los otros 3 pasos de la
           Oportunidad (ver StepFooter) — antes era una tarjeta flotante con esquinas
@@ -400,16 +396,27 @@ export default function ConfirmarStepPanel({
         </Button>
       </StepFooter>
 
+      {/* A pedido: ya no bloquea el avance — advierte lo que falta y deja elegir. Antes
+          un solo botón ("Completar datos faltantes") solo cerraba el popup, sin forma
+          de seguir igual. "Continuar" (primario, azul) fuerza el paso a Emitir aunque
+          falte algo; "Cancelar" (secundario, gris) se queda acá para completarlo. */}
       {validationError && (
         <AlertModal
           id="confirmar-faltan-datos-modal"
           type="warning"
           title="Faltan datos requeridos"
-          description='No podés avanzar al siguiente paso porque hay información obligatoria que no ha sido completada.'
+          description="Verificá que los datos del cliente y la documentación estén completos, que haya una cotización elegida. ¿Querés pasar al siguiente paso de todas formas?"
           detailsTitle="Campos pendientes:"
           detailsList={validationError}
           onClose={() => setValidationError(null)}
-          primaryButton={{ text: 'Completar datos faltantes', onClick: () => setValidationError(null) }}
+          secondaryButton={{ text: 'Cancelar', onClick: () => setValidationError(null) }}
+          primaryButton={{
+            text: 'Continuar',
+            onClick: () => {
+              setValidationError(null)
+              onConfirmar()
+            },
+          }}
         />
       )}
     </div>
