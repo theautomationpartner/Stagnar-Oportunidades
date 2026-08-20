@@ -1,5 +1,5 @@
 import { MdChevronLeft, MdChevronRight } from 'react-icons/md'
-import { Table, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell, EmptyState, Button } from '@vibe/core'
+import { Table, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell, EmptyState, Dropdown } from '@vibe/core'
 import Avatar from './Avatar'
 import StatusBadge from './StatusBadge'
 import './OpportunitiesTable.css'
@@ -9,10 +9,6 @@ import './OpportunitiesTable.css'
 // (se veían cortadas); "Última cotización" ahora es una fecha corta (dd/mm/aa, ver
 // formatShortDate) y "Asignado a" solo un avatar, así que les alcanza con bastante
 // menos.
-// Mismo tamaño de página que usa App.jsx para cortar `opportunities` — acá solo hace
-// falta para calcular el rango "mostrando X-Y" del encabezado (ver más abajo).
-const PAGE_SIZE = 20
-
 const COLUMNS = [
   { id: 'oportunidad', title: 'Oportunidad', width: '13%' },
   { id: 'cliente', title: 'Cliente', width: '21%' },
@@ -28,6 +24,22 @@ function handleRowKeyDown(event, onOpen) {
     event.preventDefault()
     onOpen()
   }
+}
+
+// A pedido: números de página clickeables (1, 2, 3...) en vez de solo "Página X de Y"
+// — siempre se ven la 1ra, la última, y la actual con una de margen a cada lado;
+// el resto se resume con "…" para no listar las 50 páginas que puede llegar a haber
+// (500 oportunidades / 10 por página). `null` en el array marca dónde va cada "…".
+function getPageNumbers(current, total) {
+  if (total <= 7) return Array.from({ length: total }, (_, i) => i + 1)
+  const pages = new Set([1, total, current, current - 1, current + 1])
+  const sorted = [...pages].filter((p) => p >= 1 && p <= total).sort((a, b) => a - b)
+  const withGaps = []
+  sorted.forEach((p, i) => {
+    if (i > 0 && p - sorted[i - 1] > 1) withGaps.push(null)
+    withGaps.push(p)
+  })
+  return withGaps
 }
 
 // Envuelve el contenido de cada celda con el mismo click handler — así toda
@@ -50,6 +62,8 @@ function ClickableCell({ children, onOpen, focusable, ariaLabel, className }) {
   )
 }
 
+const PAGE_SIZE_DROPDOWN_OPTIONS_DEFAULT = [10, 25, 50, 100]
+
 export default function OpportunitiesTable({
   opportunities,
   totalFiltered,
@@ -60,26 +74,33 @@ export default function OpportunitiesTable({
   page,
   totalPages,
   onPageChange,
+  pageSize,
+  pageSizeOptions = PAGE_SIZE_DROPDOWN_OPTIONS_DEFAULT,
+  onPageSizeChange,
   onOpenOpportunity,
 }) {
-  // `opportunities` acá es solo la página actual (20, ver PAGE_SIZE en App.jsx) —
-  // `totalFiltered` es el total de resultados de la búsqueda/filtros (sobre TODO lo
-  // cargado, no solo esta página) y `totalLoaded` cuántas oportunidades se trajeron del
-  // tablero antes de filtrar. boardTotalCount es el total REAL del tablero (items_count,
-  // sin el límite de la consulta) — si es mayor a totalLoaded, se llegó al techo de la
-  // consulta (500) y hay que avisar en vez de dejar creer que se buscó sobre todo.
+  // `opportunities` acá es solo la página actual (ver `pageSize`, elegible desde el pie
+  // de la tabla) — `totalFiltered` es el total de resultados de la búsqueda/filtros
+  // (sobre TODO lo cargado, no solo esta página) y `totalLoaded` cuántas oportunidades
+  // se trajeron del tablero antes de filtrar. boardTotalCount es el total REAL del
+  // tablero (items_count, sin el límite de la consulta) — si es mayor a totalLoaded, se
+  // llegó al techo de la consulta (500) y hay que avisar en vez de dejar creer que se
+  // buscó sobre todo.
   const isFiltered = totalFiltered !== totalLoaded
   const hitFetchCap = boardTotalCount > totalLoaded
-  const firstShown = totalFiltered === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const firstShown = totalFiltered === 0 ? 0 : (page - 1) * pageSize + 1
   const lastShown = totalFiltered === 0 ? 0 : firstShown + opportunities.length - 1
+  const pageSizeSelected = pageSizeOptions.map((n) => ({ value: String(n), label: String(n) })).find(
+    (o) => Number(o.value) === pageSize
+  )
 
   return (
     <section className="opps-table-wrap">
       <div className="opps-table-wrap__head">
         <span>
           {isFiltered
-            ? `${totalFiltered} resultado${totalFiltered === 1 ? '' : 's'} de ${totalLoaded} oportunidades — mostrando ${firstShown}-${lastShown}`
-            : `Oportunidades encontradas (${totalFiltered}) — mostrando ${firstShown}-${lastShown}`}
+            ? `${totalFiltered} resultado${totalFiltered === 1 ? '' : 's'} de ${totalLoaded} oportunidades`
+            : `Oportunidades encontradas (${totalFiltered})`}
         </span>
         {hitFetchCap && (
           <span className="opps-table-wrap__cap-warning">
@@ -166,21 +187,73 @@ export default function OpportunitiesTable({
       </Table>
       </div>
 
-      {/* A pedido: paginado de a 20 (ver PAGE_SIZE, App.jsx) — solo Anterior/Siguiente +
-          "Página X de Y", nada de números de página sueltos (con 500 oportunidades como
-          techo, la lista de páginas sería larguísima). Se esconde con 1 sola página, no
-          tiene sentido mostrar controles que no hacen nada. */}
-      {totalPages > 1 && (
+      {/* A pedido, estética tipo mockup: 3 zonas — "Mostrando X a Y de Z" a la
+          izquierda, números de página clickeables en el medio (ver getPageNumbers,
+          con "…" para no listar las 50 páginas que puede haber con 500 oportunidades
+          como techo), y a la derecha el selector de cuántas mostrar por página
+          (10/25/50/100). Antes era "Anterior/Siguiente" + "Página X de Y" nomás. Se
+          esconde solo si no hay ningún resultado (ahí ya se ve el emptyState de la
+          tabla, no hace falta paginado de nada). */}
+      {totalFiltered > 0 && (
         <div className="opps-table-wrap__pagination">
-          <Button kind="tertiary" onClick={() => onPageChange(page - 1)} disabled={page <= 1}>
-            <MdChevronLeft /> Anterior
-          </Button>
-          <span className="opps-table-wrap__pagination-label">
-            Página {page} de {totalPages}
+          <span className="opps-table-wrap__pagination-summary">
+            Mostrando {firstShown} a {lastShown} de {totalFiltered} oportunidad{totalFiltered === 1 ? '' : 'es'}
           </span>
-          <Button kind="tertiary" onClick={() => onPageChange(page + 1)} disabled={page >= totalPages}>
-            Siguiente <MdChevronRight />
-          </Button>
+
+          <div className="opps-table-wrap__pagination-pages">
+            <button
+              type="button"
+              className="opps-table-wrap__page-btn"
+              onClick={() => onPageChange(page - 1)}
+              disabled={page <= 1}
+              aria-label="Página anterior"
+            >
+              <MdChevronLeft />
+            </button>
+            {getPageNumbers(page, totalPages).map((p, i) =>
+              p === null ? (
+                <span key={`gap-${i}`} className="opps-table-wrap__page-gap">
+                  …
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  key={p}
+                  className={
+                    p === page
+                      ? 'opps-table-wrap__page-btn opps-table-wrap__page-btn--active'
+                      : 'opps-table-wrap__page-btn'
+                  }
+                  onClick={() => onPageChange(p)}
+                  aria-current={p === page ? 'page' : undefined}
+                >
+                  {p}
+                </button>
+              )
+            )}
+            <button
+              type="button"
+              className="opps-table-wrap__page-btn"
+              onClick={() => onPageChange(page + 1)}
+              disabled={page >= totalPages}
+              aria-label="Página siguiente"
+            >
+              <MdChevronRight />
+            </button>
+          </div>
+
+          <div className="opps-table-wrap__page-size">
+            <span>Mostrar</span>
+            <Dropdown
+              size="small"
+              className="opps-table-wrap__page-size-dropdown"
+              options={pageSizeOptions.map((n) => ({ value: String(n), label: String(n) }))}
+              value={pageSizeSelected}
+              searchable={false}
+              clearable={false}
+              onChange={(option) => onPageSizeChange(Number(option.value))}
+            />
+          </div>
         </div>
       )}
     </section>

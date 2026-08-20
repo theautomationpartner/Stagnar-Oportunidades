@@ -49,19 +49,102 @@
   color: #a26718;
 }
 
+/* A pedido, estética tipo mockup: 3 zonas repartidas con space-between — "Mostrando
+   X a Y de Z" a la izquierda, números de página al medio, selector de "Mostrar N" a la
+   derecha. En mobile se apilan (ver media query) en vez de amontonarse en un renglón
+   angosto. */
 .opps-table-wrap__pagination {
   display: flex;
   align-items: center;
-  justify-content: center;
+  justify-content: space-between;
   gap: 16px;
   padding: 14px 20px;
   border-top: 1px solid #e6e9ef;
+  flex-wrap: wrap;
 }
 
-.opps-table-wrap__pagination-label {
+.opps-table-wrap__pagination-summary {
+  font-size: 13px;
+  color: #676879;
+  white-space: nowrap;
+}
+
+.opps-table-wrap__pagination-pages {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-inline: auto;
+}
+
+/* Mismo look para los números de página y las flechas Anterior/Siguiente (cuadraditos
+   redondeados) — la flecha es un caso más de este mismo botón, con un ícono en vez de
+   un número adentro. */
+.opps-table-wrap__page-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 32px;
+  height: 32px;
+  padding: 0 6px;
+  border: 1px solid #d0d4e4;
+  border-radius: 8px;
+  background: #fff;
+  color: #323338;
   font-size: 13px;
   font-weight: 600;
-  color: #323338;
+  cursor: pointer;
+}
+
+.opps-table-wrap__page-btn:hover:not(:disabled):not(.opps-table-wrap__page-btn--active) {
+  background: #f5f6f8;
+  border-color: #c1c7d0;
+}
+
+.opps-table-wrap__page-btn:disabled {
+  color: #c5c7d0;
+  cursor: not-allowed;
+}
+
+.opps-table-wrap__page-btn--active {
+  background: #eef6ff;
+  border-color: #0073ea;
+  color: #0073ea;
+}
+
+.opps-table-wrap__page-gap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 20px;
+  color: #9699a6;
+  font-size: 13px;
+}
+
+.opps-table-wrap__page-size {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  color: #676879;
+  flex-shrink: 0;
+}
+
+.opps-table-wrap__page-size-dropdown {
+  width: 76px;
+}
+
+@media (max-width: 640px) {
+  .opps-table-wrap__pagination {
+    justify-content: center;
+  }
+
+  .opps-table-wrap__pagination-summary,
+  .opps-table-wrap__pagination-pages,
+  .opps-table-wrap__page-size {
+    width: 100%;
+    justify-content: center;
+    margin-inline: 0;
+  }
 }
 
 /* Table/TableRow/TableCell de @vibe/core renderizan <div>, no <table>/<tr>/

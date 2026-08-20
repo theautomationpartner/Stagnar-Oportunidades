@@ -18,12 +18,14 @@ import './App.css'
 // sobre lo ya cargado, así que si no está cargado no aparece por más que matchee).
 const ITEMS_FETCH_LIMIT = 500
 
-// A pedido: la tabla de Oportunidades pagina de a 20 en vez de mostrar las 500
-// cargadas de una — el fetch de arriba (ITEMS_FETCH_LIMIT) sigue trayendo TODO el
-// tablero igual, esto es solo paginación de la vista/tabla (client-side, ver
+// A pedido: la tabla de Oportunidades pagina (10 por defecto, elegible entre estas 4
+// opciones desde el propio pie de la tabla) en vez de mostrar las 500 cargadas de una
+// — el fetch de arriba (ITEMS_FETCH_LIMIT) sigue trayendo TODO el tablero igual, esto
+// es solo paginación de la vista/tabla (client-side, ver
 // filteredOpportunities/pagedOpportunities más abajo), así que la búsqueda y los
 // filtros siguen actuando sobre el universo completo, no solo sobre la página visible.
-const PAGE_SIZE = 20
+const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
+const DEFAULT_PAGE_SIZE = 10
 
 // A pedido: Marca/Año/Nombre/CI/Teléfono ya no tienen filtro propio (ver
 // FilterPanel.jsx) — quedan cubiertos por la única barra de búsqueda de texto libre
@@ -44,6 +46,7 @@ export default function App() {
   const [searchTerm, setSearchTerm] = useState('')
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [page, setPage] = useState(1)
+  const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
   const [openOpportunityId, setOpenOpportunityId] = useState(null)
   // A pedido: el botón "Volver a Persona Seleccionada" de arriba de la Oportunidad (ver
   // OpportunityDetail.jsx) solo aparece cuando se llegó ahí apretando "Ir a esta
@@ -152,17 +155,17 @@ export default function App() {
     })
   }, [opportunities, searchTerm, filters])
 
-  // A pedido: vuelve a la página 1 en cuanto cambia la búsqueda o algún filtro — si no,
-  // se podía quedar en una página que ya no existe (ej. estabas en la página 5 y el
-  // nuevo resultado filtrado solo tiene 2 páginas).
+  // A pedido: vuelve a la página 1 en cuanto cambia la búsqueda, algún filtro, o la
+  // cantidad por página — si no, se podía quedar en una página que ya no existe (ej.
+  // estabas en la página 5 y el nuevo resultado filtrado solo tiene 2 páginas).
   useEffect(() => {
     setPage(1)
-  }, [searchTerm, filters])
+  }, [searchTerm, filters, pageSize])
 
-  const totalPages = Math.max(1, Math.ceil(filteredOpportunities.length / PAGE_SIZE))
+  const totalPages = Math.max(1, Math.ceil(filteredOpportunities.length / pageSize))
   const pagedOpportunities = useMemo(
-    () => filteredOpportunities.slice((page - 1) * PAGE_SIZE, page * PAGE_SIZE),
-    [filteredOpportunities, page]
+    () => filteredOpportunities.slice((page - 1) * pageSize, page * pageSize),
+    [filteredOpportunities, page, pageSize]
   )
 
   if (openOpportunityId) {
@@ -175,11 +178,6 @@ export default function App() {
             setOpenedFromCrearFlow(false)
             setView('table')
           }}
-          onNavigateHome={() => {
-            setOpenOpportunityId(null)
-            setOpenedFromCrearFlow(false)
-            setView('landing')
-          }}
         />
         <div className="app-shell__main">
           <OpportunityDetail
@@ -190,6 +188,11 @@ export default function App() {
             }}
             showReturnToCrearFlow={openedFromCrearFlow}
             onOpportunityAction={() => setOpenedFromCrearFlow(false)}
+            onGoHome={() => {
+              setOpenOpportunityId(null)
+              setOpenedFromCrearFlow(false)
+              setView('landing')
+            }}
             schema={schema}
           />
         </div>
@@ -202,17 +205,11 @@ export default function App() {
       <div className="app-shell">
         <Sidebar
           defaultExpanded
-          activeSection="inicio"
           user={mondayUser}
           onNavigateOportunidades={() => {
             setOpenOpportunityId(null)
             setOpenedFromCrearFlow(false)
             setView('table')
-          }}
-          onNavigateHome={() => {
-            setOpenOpportunityId(null)
-            setOpenedFromCrearFlow(false)
-            setView('landing')
           }}
         />
         <div className="app-shell__main">
@@ -231,11 +228,6 @@ export default function App() {
             setOpenOpportunityId(null)
             setOpenedFromCrearFlow(false)
             setView('table')
-          }}
-          onNavigateHome={() => {
-            setOpenOpportunityId(null)
-            setOpenedFromCrearFlow(false)
-            setView('landing')
           }}
         />
         <div className="app-shell__main">
@@ -262,10 +254,10 @@ export default function App() {
 
   return (
     <div className="app-shell">
-      <Sidebar user={mondayUser} onNavigateHome={() => setView('landing')} />
+      <Sidebar user={mondayUser} />
       <div className="app-shell__main">
         <div className="app">
-          <PageHeader onCreateNew={() => setView('create')} />
+          <PageHeader onCreateNew={() => setView('create')} onHome={() => setView('landing')} />
           <FilterPanel
             searchTerm={searchTerm}
             onSearchTermChange={setSearchTerm}
@@ -287,6 +279,9 @@ export default function App() {
             page={page}
             totalPages={totalPages}
             onPageChange={setPage}
+            pageSize={pageSize}
+            pageSizeOptions={PAGE_SIZE_OPTIONS}
+            onPageSizeChange={setPageSize}
             onOpenOpportunity={(id) => {
               setOpenedFromCrearFlow(false)
               setOpenOpportunityId(id)
