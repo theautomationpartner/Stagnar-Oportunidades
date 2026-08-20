@@ -65,6 +65,7 @@ export default function OpportunityDetail({
   schema,
   showReturnToCrearFlow = false,
   onOpportunityAction,
+  onGoHome,
 }) {
   const [item, setItem] = useState(null)
   const [rawQuotes, setRawQuotes] = useState([])
@@ -864,15 +865,17 @@ export default function OpportunityDetail({
     }))
   }
 
-  const handleOpenWhatsAppModal = () => {
+  const handleOpenWhatsAppModal = async () => {
     const selectedEntries = groups
       .flatMap((g) => g.entries)
       .filter((e) => selectedIds.has(e.raw.id))
-    const images = selectedEntries.map((e) => ({
-      raw: e.raw,
-      quote: e.quote,
-      imageDataUrl: renderQuoteImageDataUrl(opportunity, e.raw, e.quote),
-    }))
+    const images = await Promise.all(
+      selectedEntries.map(async (e) => ({
+        raw: e.raw,
+        quote: e.quote,
+        imageDataUrl: await renderQuoteImageDataUrl(opportunity, e.raw, e.quote),
+      }))
+    )
     setWaModalImages(images)
   }
 
@@ -920,7 +923,7 @@ export default function OpportunityDetail({
     {
       key: 'comparar',
       label: 'Comparar y enviar',
-      subtitle: 'Compará las cotizaciones disponibles y enviá las seleccionadas por WhatsApp al cliente.',
+      subtitle: 'Compará las cotizaciones disponibles y enviá las seleccionadas al cliente por WhatsApp.',
       status: compararDone ? 'done' : hasQuotes ? 'active' : 'pending',
       clickable: !lecturaGateActive,
     },
@@ -954,7 +957,7 @@ export default function OpportunityDetail({
             CotizarStepPanel.jsx), acá visible arriba en cualquiera de los 4 pasos. */}
         {showReturnToCrearFlow && (
           <Button kind="tertiary" className="opp-detail__back-btn" onClick={onBack}>
-            <MdArrowBack /> Volver a Persona Seleccionada
+            <MdArrowBack /> Volver
           </Button>
         )}
         {!loading && !error && opportunity && (
@@ -1248,6 +1251,7 @@ export default function OpportunityDetail({
               confirmandoEmision={confirmandoEmision}
               confirmarEmisionError={confirmarEmisionError}
               onBack={() => setActiveStep('confirmar')}
+              onGoHome={onGoHome}
             />
           )}
             </>
