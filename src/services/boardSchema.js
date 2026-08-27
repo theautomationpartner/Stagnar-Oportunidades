@@ -1,14 +1,20 @@
 // Lee en el momento (sin hardcodear) las opciones y colores reales de las columnas
 // de status/dropdown del tablero Oportunidades, para que los filtros y los badges de
 // estado siempre reflejen la configuración actual de monday. Ver /logica-monday-vibe.md.
-import { fetchColumnsSettings, SUBITEMS_BOARD_ID } from './mondayApi'
+import {
+  fetchColumnsSettings,
+  SUBITEMS_BOARD_ID,
+  CLIENTES_BOARD_ID,
+  CONTACTO_ESTADO_COLUMN_ID,
+} from './mondayApi'
 
 const DEFAULT_COLOR = { bg: '#c4c4c4', border: '#b0b0b0' }
 
+// tipoSujeto (Cliente | Lead) no está acá: vive en el tablero Clientes ("Situación",
+// CONTACTO_ESTADO_COLUMN_ID) — la color_mm51mm5v de Oportunidades quedó obsoleta.
 const STATUS_COLUMNS = {
   estadoOportunidad: 'deal_stage',
   estadoCotizacion: 'color_mm51n7aa',
-  tipoSujeto: 'color_mm51mm5v',
   estadoEnvio: 'color_mm4wr1t4',
   estadoCreacion: 'color_mm5ejysv',
   estadoLectura: 'color_mm5rzrhk',
@@ -64,9 +70,10 @@ function parseDropdownColumn(column) {
 
 export async function fetchFilterAndStatusSchema() {
   const allColumnIds = [...Object.values(STATUS_COLUMNS), ...Object.values(DROPDOWN_COLUMNS)]
-  const [columns, subitemColumns] = await Promise.all([
+  const [columns, subitemColumns, clienteColumns] = await Promise.all([
     fetchColumnsSettings(allColumnIds),
     fetchColumnsSettings(Object.values(SUBITEM_DROPDOWN_COLUMNS), SUBITEMS_BOARD_ID),
+    fetchColumnsSettings([CONTACTO_ESTADO_COLUMN_ID], CLIENTES_BOARD_ID),
   ])
   const byId = Object.fromEntries(columns.map((c) => [c.id, c]))
   const subitemById = Object.fromEntries(subitemColumns.map((c) => [c.id, c]))
@@ -77,6 +84,7 @@ export async function fetchFilterAndStatusSchema() {
 
   return {
     ...statuses,
+    tipoSujeto: parseStatusColumn(clienteColumns[0]),
     marcas: parseDropdownColumn(byId[DROPDOWN_COLUMNS.marcas]).sort((a, b) => a.localeCompare(b)),
     anios: parseDropdownColumn(byId[DROPDOWN_COLUMNS.anios]).sort((a, b) => Number(b) - Number(a)),
     combustibles: parseDropdownColumn(byId[DROPDOWN_COLUMNS.combustibles]),

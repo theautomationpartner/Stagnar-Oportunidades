@@ -63,7 +63,10 @@ export function mapOpportunityItem(item, statusColors = {}) {
 
   const estadoCotizacion = textOf(cv, 'color_mm51n7aa')
   const estadoCotizacionColor = statusColors.estadoCotizacion?.[estadoCotizacion] ?? DEFAULT_COLOR
-  const tipoSujeto = textOf(cv, 'color_mm51mm5v')
+  // Mirror (lookup) de la "Situación" del Cliente vinculado — la color_mm51mm5v propia
+  // de Oportunidades quedó obsoleta. En columnas mirror `text` puede venir null: se usa
+  // display_value (pedido en ITEMS_QUERY con `... on MirrorValue`).
+  const tipoSujeto = boardRelationDisplayOf(cv, 'lookup_mm6m64w7') || textOf(cv, 'lookup_mm6m64w7')
   const estadoEnvio = textOf(cv, 'color_mm4wr1t4')
   const estadoEnvioColor = statusColors.estadoEnvio?.[estadoEnvio] ?? DEFAULT_COLOR
   const estadoCreacion = textOf(cv, 'color_mm5ejysv')

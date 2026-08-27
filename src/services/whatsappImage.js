@@ -6,8 +6,28 @@
 // Ver /logica-monday-vibe.md.
 import { formatMoney } from './format'
 import { BRAND_COLORS, brandMarkerForCompania } from './companyColors'
+import stagnariLogo from '../assets/stagnari-logo.png'
 
 const WIDTH = 900
+const HEADER_HEIGHT = 100
+// Alto fijo del logo dentro del header (el ancho sale solo, respetando el aspect ratio
+// real del PNG — ver cómo se usa naturalWidth/naturalHeight más abajo).
+const LOGO_HEIGHT = 64
+
+// Cacheado a nivel módulo: el logo es el mismo en todas las cotizaciones, no hace falta
+// recargarlo (ni volver a esperar el onload) en cada imagen que se genera.
+let logoImagePromise = null
+function loadLogoImage() {
+  if (!logoImagePromise) {
+    logoImagePromise = new Promise((resolve, reject) => {
+      const img = new Image()
+      img.onload = () => resolve(img)
+      img.onerror = reject
+      img.src = stagnariLogo
+    })
+  }
+  return logoImagePromise
+}
 const CUOTA_COUNTS = [3, 6, 8, 10]
 const INCLUYE_FONT = '16px Arial'
 const INCLUYE_LINE_HEIGHT = 22
@@ -85,7 +105,7 @@ const MEASURE_CANVAS_HEIGHT = 3000
 // caía ARRIBA del contenido real y lo tapaba). En cambio, `renderQuoteImageDataUrl` llama
 // a esto una vez sobre un canvas descartable bien alto para medir hasta dónde llega el
 // contenido, y una segunda vez sobre el canvas real con el alto ya ajustado.
-function drawContent(ctx, opportunity, raw, quote, canvasHeight) {
+function drawContent(ctx, opportunity, raw, quote, canvasHeight, logoImage) {
   // A pedido: la imagen usa 100% los colores del manual de marca (ver BRAND_COLORS) en
   // vez de un color libre por compañía — el verde es siempre el de encabezado/acento
   // principal; la compañía se marca con un detalle sutil (ver "pill" más abajo), no
@@ -97,13 +117,19 @@ function drawContent(ctx, opportunity, raw, quote, canvasHeight) {
   ctx.fillStyle = BRAND_COLORS.blanco
   ctx.fillRect(0, 0, WIDTH, canvasHeight)
 
-  // Header de marca
-  ctx.fillStyle = BRAND_COLORS.verde
-  ctx.fillRect(0, 0, WIDTH, 100)
+  // Header: logo en vez de texto (a pedido) — el logo completo (isotipo + "STAGNARI
+  // SEGUROS", stagnari-logo.png, mismo archivo que el Sidebar expandido) trae su propio
+  // texto en gris, así que necesita fondo claro para leerse (sobre el verde de marca el
+  // gris queda invisible) — de ahí el header blanco con una línea de acento abajo en vez
+  // del bloque verde sólido que había antes.
   ctx.fillStyle = BRAND_COLORS.blanco
-  ctx.font = 'bold 34px Arial'
-  ctx.textAlign = 'center'
-  ctx.fillText('STAGNARI SEGUROS', WIDTH / 2, 62)
+  ctx.fillRect(0, 0, WIDTH, HEADER_HEIGHT)
+  if (logoImage) {
+    const logoWidth = (logoImage.naturalWidth / logoImage.naturalHeight) * LOGO_HEIGHT
+    ctx.drawImage(logoImage, (WIDTH - logoWidth) / 2, (HEADER_HEIGHT - LOGO_HEIGHT) / 2, logoWidth, LOGO_HEIGHT)
+  }
+  ctx.fillStyle = BRAND_COLORS.verde
+  ctx.fillRect(0, HEADER_HEIGHT - 4, WIDTH, 4)
 
   let y = 150
   ctx.textAlign = 'left'
@@ -240,19 +266,21 @@ function drawContent(ctx, opportunity, raw, quote, canvasHeight) {
 // dibuja de nuevo, ya sobre el canvas del tamaño justo, con el pie de página pegado
 // después del último contenido — así nunca se superponen, sea cual sea el largo del
 // nombre del vehículo o la cantidad de viñetas de INCLUYE.
-export function renderQuoteImageDataUrl(opportunity, raw, quote) {
+export async function renderQuoteImageDataUrl(opportunity, raw, quote) {
+  const logoImage = await loadLogoImage()
+
   const measureCanvas = document.createElement('canvas')
   measureCanvas.width = WIDTH
   measureCanvas.height = MEASURE_CANVAS_HEIGHT
   const measureCtx = measureCanvas.getContext('2d')
-  const contentBottom = drawContent(measureCtx, opportunity, raw, quote, MEASURE_CANVAS_HEIGHT)
+  const contentBottom = drawContent(measureCtx, opportunity, raw, quote, MEASURE_CANVAS_HEIGHT, logoImage)
 
   const height = Math.ceil(contentBottom) + FOOTER_HEIGHT
   const canvas = document.createElement('canvas')
   canvas.width = WIDTH
   canvas.height = height
   const ctx = canvas.getContext('2d')
-  drawContent(ctx, opportunity, raw, quote, height)
+  drawContent(ctx, opportunity, raw, quote, height, logoImage)
 
   ctx.textAlign = 'center'
   ctx.fillStyle = BRAND_COLORS.gris

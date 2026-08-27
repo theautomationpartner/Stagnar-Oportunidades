@@ -32,7 +32,9 @@ const OPPORTUNITY_COLUMN_IDS = [
   'date__1', // Ultima Interaccion
   'numeric_mm658a9j', // Recotizaciones
   'color_mm51n7aa', // Estado Cotizacion
-  'color_mm51mm5v', // Tipo de Sujeto
+  // Tipo de Sujeto (Cliente/Lead): columna Mirror de la "Situación" del Cliente vinculado
+  // (la color_mm51mm5v propia de Oportunidades quedó obsoleta, la automatización ya no la escribe).
+  'lookup_mm6m64w7', // Tipo de Sujeto (mirror desde Clientes)
   'color_mm4wr1t4', // Estado Envio
   'numeric_mm527wpm', // Edad
   'dropdown_mm5jqdk', // Tipo
@@ -59,6 +61,9 @@ const ITEMS_QUERY = `
             id
             text
             ... on BoardRelationValue {
+              display_value
+            }
+            ... on MirrorValue {
               display_value
             }
           }
@@ -950,6 +955,7 @@ export async function createContactoItem(itemName, columnValues) {
 }
 
 export {
+  CLIENTES_BOARD_ID,
   OPORTUNIDAD_CONTACTO_COLUMN_ID,
   CONTACTO_CI_COLUMN_ID,
   CONTACTO_TELEFONO_COLUMN_ID,

@@ -201,8 +201,8 @@ export default function EmitirStepPanel({
           <div>
             <h2 className="emitir-step__title">Póliza</h2>
             <p className="emitir-step__subtitle">
-              Subí el PDF (u otro archivo) de la póliza emitida por la compañía. Al cargarla, la
-              oportunidad pasa automáticamente a "Concretada".
+              Subí el PDF (u otro archivo) de la póliza emitida por la compañía y apretá
+              "Concretar Oportunidad": la automatización crea la póliza y la marca como "Concretada".
             </p>
           </div>
           {estadoCreacion && <StatusBadge label={estadoCreacion} color={estadoCreacionColor} />}
