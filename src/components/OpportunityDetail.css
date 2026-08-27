@@ -30,6 +30,28 @@
   margin-left: -6px;
 }
 
+/* Contenedor de los botones de salida del breadcrumb (auditoría: "Oportunidades"
+   siempre visible + "Volver a Crear Oportunidad" solo cuando corresponde). Ocupa la
+   1ra columna del grid para que el Stepper siga centrado en la 2da. */
+.opp-detail__breadcrumb-actions {
+  grid-column: 1;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  min-height: 32px;
+}
+
+.opp-detail__poll-stalled {
+  padding: 16px var(--page-gutter) 0;
+}
+
+.opp-detail__poll-stalled-actions {
+  display: inline-flex;
+  gap: 8px;
+  flex-shrink: 0;
+}
+
 /* El botón de acá arriba es condicional (ver `showReturnToCrearFlow`, JSX) — sin este
    grid-column fijo, cuando no está presente el Stepper (único hijo) cae solo en la 1ra
    columna del grid (auto-placement) y queda pegado a la izquierda en vez de centrado. */

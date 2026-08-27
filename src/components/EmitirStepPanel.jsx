@@ -112,13 +112,21 @@ export default function EmitirStepPanel({
     onUploadPoliza(file)
   }
 
+  // Auditoría (Nielsen N5, prevención de errores): "Concretar Oportunidad" dispara la
+  // automatización de emisión y "Eliminar" borra la póliza en monday — las dos son
+  // irreversibles desde la app, así que piden confirmación explícita antes de escribir
+  // (antes se ejecutaban al primer click). La lógica de negocio no cambia: el
+  // onConfirmarEmision/onDeletePoliza que se llama es exactamente el mismo.
+  const [confirmConcretar, setConfirmConcretar] = useState(false)
+  const [confirmDeletePoliza, setConfirmDeletePoliza] = useState(false)
+
   const handleConcretarAttempt = () => {
     const missing = getMissingLabels(opportunity)
     if (missing.length > 0) {
       setValidationError(missing)
       return
     }
-    onConfirmarEmision()
+    setConfirmConcretar(true)
   }
 
   return (
@@ -229,7 +237,7 @@ export default function EmitirStepPanel({
           error={error}
           missingMessage="Póliza pendiente de adjuntar"
           onUpload={handleUploadAttempt}
-          onDelete={showConfirmarAction ? onDeletePoliza : undefined}
+          onDelete={showConfirmarAction ? () => setConfirmDeletePoliza(true) : undefined}
           showReplaceButton={false}
           compactDelete
         />
@@ -260,6 +268,43 @@ export default function EmitirStepPanel({
           </Button>
         )}
       </StepFooter>
+
+      {confirmConcretar && (
+        <AlertModal
+          id="emitir-confirmar-concretar-modal"
+          type="warning"
+          title="¿Concretar la oportunidad?"
+          description={`Se va a crear la póliza "${polizaFileName}" en monday y la oportunidad pasará a Concretada. Esta acción no se puede deshacer desde la app.`}
+          onClose={() => setConfirmConcretar(false)}
+          secondaryButton={{ text: 'Cancelar', onClick: () => setConfirmConcretar(false) }}
+          primaryButton={{
+            text: 'Concretar Oportunidad',
+            onClick: () => {
+              setConfirmConcretar(false)
+              onConfirmarEmision()
+            },
+          }}
+        />
+      )}
+
+      {confirmDeletePoliza && (
+        <AlertModal
+          id="emitir-confirmar-eliminar-poliza-modal"
+          type="warning"
+          title="¿Eliminar la póliza?"
+          description={`Se va a quitar "${polizaFileName}" de la oportunidad en monday. Vas a tener que volver a subir el archivo.`}
+          onClose={() => setConfirmDeletePoliza(false)}
+          secondaryButton={{ text: 'Cancelar', onClick: () => setConfirmDeletePoliza(false) }}
+          primaryButton={{
+            text: 'Eliminar póliza',
+            danger: true,
+            onClick: () => {
+              setConfirmDeletePoliza(false)
+              onDeletePoliza?.()
+            },
+          }}
+        />
+      )}
 
       {validationError && (
         <AlertModal

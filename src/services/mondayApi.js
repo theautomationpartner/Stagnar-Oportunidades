@@ -1,3 +1,4 @@
+import { memoAsync, invalidate as invalidateCache } from './cache'
 import mondaySdk from 'monday-sdk-js'
 
 // SDK cliente de monday (no confundir con `callMondayApi` de acá abajo, que pega
@@ -372,7 +373,13 @@ function mapAutodataItem(item, board) {
   }
 }
 
+// Cacheado por (tableros × reglas × operador × límite) — ver services/cache.js.
 async function queryAutodataBoards(buildRules, operator, limit) {
+  const cacheKey = `autodata:${operator}:${limit}:${JSON.stringify(AUTODATA_BOARDS.map(buildRules))}`
+  return memoAsync(cacheKey, () => queryAutodataBoardsUncached(buildRules, operator, limit), 30 * 60 * 1000)
+}
+
+async function queryAutodataBoardsUncached(buildRules, operator, limit) {
   const results = await Promise.all(
     AUTODATA_BOARDS.map(async (board) => {
       const data = await callMondayApi(SEARCH_AUTODATA_QUERY, {
@@ -621,6 +628,7 @@ export async function setSubitemCheckboxValue(subitemId, columnId, checked) {
 // necesita serlo; itemId es siempre numérico y columnId siempre una de nuestras propias
 // constantes, así que no hay riesgo de inyección.
 export async function uploadFileToColumn(itemId, columnId, file) {
+  invalidateCache(`files:${itemId}:${columnId}`)
   const formData = new FormData()
   formData.append(
     'query',
@@ -682,6 +690,7 @@ export async function leerCedula(file) {
 }
 
 export async function clearFileColumn(itemId, columnId, boardId = OPPORTUNITIES_BOARD_ID) {
+  invalidateCache(`files:${itemId}:${columnId}`)
   const data = await callMondayApi(CLEAR_FILE_COLUMN_MUTATION, {
     boardId,
     itemId,
@@ -693,7 +702,13 @@ export async function clearFileColumn(itemId, columnId, boardId = OPPORTUNITIES_
 // Columna "file" con VARIOS archivos (a pedido: "Archivos" genéricos del Cliente, ver
 // CONTACTO_ARCHIVOS_COLUMN_ID) — a diferencia de fetchFileColumnAsset (que devuelve solo
 // el primero, para columnas de un único archivo), acá se listan todos.
+// Cacheado por ítem+columna; lo invalidan uploadFileToColumn / clearFileColumn /
+// removeFileFromColumn (ver services/cache.js).
 export async function fetchFileColumnAssets(itemId, columnId) {
+  return memoAsync(`files:${itemId}:${columnId}`, () => fetchFileColumnAssetsUncached(itemId, columnId))
+}
+
+async function fetchFileColumnAssetsUncached(itemId, columnId) {
   const data = await callMondayApi(FILE_COLUMN_VALUE_QUERY, { itemId, columnId: [columnId] })
   const raw = data.items?.[0]?.column_values?.[0]?.value
   if (!raw) return []
@@ -715,6 +730,7 @@ const SET_FILE_COLUMN_ASSETS_MUTATION = `
 `
 
 export async function removeFileFromColumn(itemId, columnId, boardId, keepFiles) {
+  invalidateCache(`files:${itemId}:${columnId}`)
   const data = await callMondayApi(SET_FILE_COLUMN_ASSETS_MUTATION, {
     boardId,
     itemId,

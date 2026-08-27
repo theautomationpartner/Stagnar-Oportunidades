@@ -28,7 +28,6 @@ import { mapSubitemToRawQuote, groupQuotesByCompania } from '../services/quoteMa
 import { computeQuote } from '../services/pricingEngine'
 import { applyRecargoLookup } from '../services/recargoPanel'
 import { COTIZAR_FIELDS, getMissingCotizarFields } from '../services/cotizarFields'
-import { renderQuoteImageDataUrl } from '../services/whatsappImage'
 import { COBERTURA_TABS, coberturaGroupOf } from '../services/coberturaGroups'
 import './OpportunityDetail.css'
 
@@ -51,6 +50,9 @@ const OPCIONAL_PORTO_COLUMN_IDS = {
   cocheCortesia: 'boolean_mm5fxd9x',
 }
 const POLL_INTERVAL_MS = 4000
+// Auditoría: cantidad de ticks seguidos fallidos tras la cual el polling se corta y
+// avisa (antes giraba para siempre si la API de monday no respondía).
+const POLL_MAX_FAILS = 3
 // Prefijo que cada automatización debe agregar al principio del texto del Update que
 // postea sobre el ítem cuando falla (configurar así del lado del robot de cotización y
 // del escenario de Make.com de envío por WhatsApp) — ver fetchLatestUpdate en mondayApi.js.
@@ -62,6 +64,9 @@ const ERROR_UPDATE_TAG_LEER = '[LEER]'
 export default function OpportunityDetail({
   opportunityId,
   onBack,
+  // Auditoría: salida SIEMPRE visible a la tabla de Oportunidades (antes, entrando desde
+  // la tabla no había ningún botón de salida en pantalla — solo el ícono del Sidebar).
+  onGoToList,
   schema,
   showReturnToCrearFlow = false,
   onOpportunityAction,
@@ -245,38 +250,77 @@ export default function OpportunityDetail({
     }
   }, [opportunityId])
 
-  // Refleja en vivo los cambios de color_mm51n7aa (Estado Cotización) mientras monday
-  // procesa la cotización automática: reconsulta cada POLL_INTERVAL_MS y, apenas
-  // "Estado Cotización" === "Cotizado (Subitems)" Y "Estado Oportunidad" (deal_stage)
-  // === "Cotizacion Emitida" (las dos, no alcanza con una sola — el robot las setea
-  // juntas al terminar), corta el polling y avanza a "Comparar y enviar".
+  // Auditoría: antes había 4 useEffect de polling independientes (cotización, envío,
+  // póliza, lectura), cada uno con su propio setInterval, su propio
+  // fetchOpportunityDetail COMPLETO cada POLL_INTERVAL_MS y su propio par de listeners
+  // de foco — con 2 o más activos a la vez (ej. envío + póliza al reabrir) se pedía el
+  // mismo ítem 2-4 veces por ciclo y se hacía setItem (re-render de todas las
+  // QuoteCards) otras tantas. Ahora hay UN solo ciclo mientras cualquiera de los 4
+  // flags esté prendido: un fetch por tick, y cada rama aplica exactamente la misma
+  // lógica de corte/avance que tenía antes (los flags polling/sendPolling/
+  // polizaPolling/lecturaPolling se mantienen tal cual, el resto del componente no
+  // cambia). Además:
+  // - setItem solo si el ítem realmente cambió (firma de column_values + subitems), así
+  //   un tick "sin novedades" no re-renderiza nada.
+  // - contador de fallos consecutivos: a los POLL_MAX_FAILS se corta y se avisa
+  //   (pollStalled, ver AttentionBox arriba del todo) con "Reintentar", en vez de girar
+  //   para siempre si la API de monday dejó de responder.
+  const anyPolling = polling || sendPolling || polizaPolling || lecturaPolling
+  const pollFailsRef = useRef(0)
+  const lastItemSigRef = useRef('')
+  const stalledFlagsRef = useRef(null)
+  const [pollStalled, setPollStalled] = useState(false)
+
   useEffect(() => {
-    if (!polling) return undefined
+    if (!anyPolling) return undefined
     let cancelled = false
+    pollFailsRef.current = 0
+
+    const textOf = (data, id) => data.column_values.find((cv) => cv.id === id)?.text?.trim()
 
     const tick = async () => {
+      let data
       try {
-        const data = await fetchOpportunityDetail(opportunityId)
-        if (cancelled || !data) return
-        setItem(data)
+        data = await fetchOpportunityDetail(opportunityId)
+      } catch {
+        // hiccup de red puntual: seguimos intentando en el próximo tick — salvo que ya
+        // sean POLL_MAX_FAILS seguidos, ahí cortamos y avisamos.
+        pollFailsRef.current += 1
+        if (!cancelled && pollFailsRef.current >= POLL_MAX_FAILS) {
+          stalledFlagsRef.current = { polling, sendPolling, polizaPolling, lecturaPolling }
+          setPolling(false)
+          setSendPolling(false)
+          setPolizaPolling(false)
+          setLecturaPolling(false)
+          setPollStalled(true)
+        }
+        return
+      }
+      if (cancelled || !data) return
+      pollFailsRef.current = 0
 
-        const estadoCotizacion = data.column_values.find(
-          (cv) => cv.id === ESTADO_COTIZACION_COLUMN_ID
-        )?.text?.trim()
-        const estadoOportunidad = data.column_values.find(
-          (cv) => cv.id === ESTADO_OPORTUNIDAD_COLUMN_ID
-        )?.text?.trim()
+      const sig =
+        JSON.stringify(data.column_values) +
+        JSON.stringify((data.subitems ?? []).map((sub) => sub.column_values))
+      if (sig !== lastItemSigRef.current) {
+        lastItemSigRef.current = sig
+        setItem(data)
+      }
+
+      // --- Estado Cotización (color_mm51n7aa): apenas "Cotizado (Subitems)" Y
+      // "Estado Oportunidad" (deal_stage) === "Cotizacion Emitida" (las dos, no
+      // alcanza con una sola — el robot las setea juntas al terminar), corta y avanza
+      // a "Comparar y enviar".
+      if (polling) {
+        const estadoCotizacion = textOf(data, ESTADO_COTIZACION_COLUMN_ID)
+        const estadoOportunidad = textOf(data, ESTADO_OPORTUNIDAD_COLUMN_ID)
         const mapped = (data.subitems ?? []).map(mapSubitemToRawQuote)
         const raws = applyRecargoLookup(mapped, schema?.recargoLookup ?? {})
 
-        // A pedido: progreso en vivo por compañía (ver CotizandoModal) — a diferencia
-        // de raws/estadoCotizacion (que solo se usan una vez llegado al estado
-        // terminal), esto se actualiza en CADA tick para reflejar los subitems que ya
-        // se fueron creando mientras la automatización sigue corriendo. Se excluyen los
-        // subitems que YA existían antes de arrancar (oldSubitemIdsRef) — en un
-        // recotizar la automatización primero borra todo lo viejo y recién después crea
-        // lo nuevo; sin este filtro, mientras lo viejo todavía no se borró se contaría
-        // como si ya fuera progreso de la tanda nueva.
+        // Progreso en vivo por compañía (ver CotizandoModal) — se actualiza en CADA
+        // tick. Se excluyen los subitems que YA existían antes de arrancar
+        // (oldSubitemIdsRef): en un recotizar la automatización primero borra todo lo
+        // viejo y recién después crea lo nuevo.
         const newRaws = raws.filter((r) => !oldSubitemIdsRef.current.has(r.id))
         const progressByCompania = {}
         for (const { compania, quotes } of groupQuotesByCompania(newRaws)) {
@@ -296,51 +340,12 @@ export default function OpportunityDetail({
           )
           setCotizarErrorDetail(await loadErrorUpdate(ERROR_UPDATE_TAG_COTIZAR))
         }
-      } catch {
-        // hiccup de red puntual: seguimos intentando en el próximo tick
       }
-    }
 
-    // Los navegadores frenan drásticamente los setInterval de una pestaña en segundo
-    // plano (o minimizada) — si el usuario cambia de pestaña mientras espera, el
-    // polling puede tardar mucho más de POLL_INTERVAL_MS en volver a correr. Al
-    // recuperar el foco/visibilidad forzamos un tick inmediato para no depender de
-    // que el navegador decida retomar el intervalo por su cuenta.
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') tick()
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
-    window.addEventListener('focus', handleVisibility)
-
-    const id = setInterval(tick, POLL_INTERVAL_MS)
-    return () => {
-      cancelled = true
-      clearInterval(id)
-      document.removeEventListener('visibilitychange', handleVisibility)
-      window.removeEventListener('focus', handleVisibility)
-    }
-  }, [polling, opportunityId, schema])
-
-  // Refleja en vivo los cambios de color_mm4wr1t4 (Estado Envio) mientras Make.com
-  // procesa el envío por WhatsApp: reconsulta cada POLL_INTERVAL_MS y corta el polling
-  // apenas llega a un estado terminal ("Enviado" o "Error"). El paso activo pasa a
-  // "Confirmar" recién acá, cuando "Enviado" se confirma de verdad — no al aceptar el
-  // envío (que solo deja "Enviando") — para que no dependa de la sincronización con el
-  // auto-cierre del modal de WhatsApp.
-  useEffect(() => {
-    if (!sendPolling) return undefined
-    let cancelled = false
-
-    const tick = async () => {
-      try {
-        const data = await fetchOpportunityDetail(opportunityId)
-        if (cancelled || !data) return
-        setItem(data)
-
-        const estadoEnvio = data.column_values.find(
-          (cv) => cv.id === ESTADO_ENVIO_COLUMN_ID
-        )?.text?.trim()
-
+      // --- Estado Envio (color_mm4wr1t4): corta en "Enviado" o "Error". El paso activo
+      // pasa a "Confirmar" recién acá, cuando "Enviado" se confirma de verdad.
+      if (sendPolling) {
+        const estadoEnvio = textOf(data, ESTADO_ENVIO_COLUMN_ID)
         if (estadoEnvio === 'Enviado' || estadoEnvio === 'Error') {
           setSendPolling(false)
           if (estadoEnvio === 'Error') {
@@ -349,107 +354,34 @@ export default function OpportunityDetail({
             setActiveStep('confirmar')
           }
         }
-      } catch {
-        // hiccup de red puntual: seguimos intentando en el próximo tick
       }
-    }
 
-    // Mismo fix que en el polling de "Estado Cotización": recuperar foco/visibilidad
-    // fuerza un tick inmediato en vez de esperar a que el navegador retome el
-    // setInterval frenado por estar la pestaña en segundo plano.
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') tick()
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
-    window.addEventListener('focus', handleVisibility)
-
-    const id = setInterval(tick, POLL_INTERVAL_MS)
-    return () => {
-      cancelled = true
-      clearInterval(id)
-      document.removeEventListener('visibilitychange', handleVisibility)
-      window.removeEventListener('focus', handleVisibility)
-    }
-  }, [sendPolling, opportunityId])
-
-  // Refleja en vivo los cambios de color_mm5ejysv (Crear Poliza) mientras se procesa la
-  // emisión de la póliza tras confirmarla: reconsulta cada POLL_INTERVAL_MS y corta el
-  // polling apenas llega a un estado terminal ("Creada" o "Error").
-  useEffect(() => {
-    if (!polizaPolling) return undefined
-    let cancelled = false
-
-    const tick = async () => {
-      try {
-        const data = await fetchOpportunityDetail(opportunityId)
-        if (cancelled || !data) return
-        setItem(data)
-
-        const estadoCreacion = data.column_values.find(
-          (cv) => cv.id === ESTADO_CREACION_COLUMN_ID
-        )?.text?.trim()
-
+      // --- Crear Poliza (color_mm5ejysv): corta en "Creada" o "Error".
+      if (polizaPolling) {
+        const estadoCreacion = textOf(data, ESTADO_CREACION_COLUMN_ID)
         if (estadoCreacion === 'Creada' || estadoCreacion === 'Error') {
           setPolizaPolling(false)
           if (estadoCreacion === 'Error') {
             setPolizaErrorDetail(await loadErrorUpdate(ERROR_UPDATE_TAG_CREAR_POLIZA))
           }
         }
-      } catch {
-        // hiccup de red puntual: seguimos intentando en el próximo tick
       }
-    }
 
-    // Mismo fix que en los otros dos polling: recuperar foco/visibilidad fuerza un tick
-    // inmediato en vez de esperar a que el navegador retome el setInterval frenado por
-    // estar la pestaña en segundo plano.
-    const handleVisibility = () => {
-      if (document.visibilityState === 'visible') tick()
-    }
-    document.addEventListener('visibilitychange', handleVisibility)
-    window.addEventListener('focus', handleVisibility)
-
-    const id = setInterval(tick, POLL_INTERVAL_MS)
-    return () => {
-      cancelled = true
-      clearInterval(id)
-      document.removeEventListener('visibilitychange', handleVisibility)
-      window.removeEventListener('focus', handleVisibility)
-    }
-  }, [polizaPolling, opportunityId])
-
-  // Refleja en vivo los cambios de color_mm5rzrhk (Leer Cédula y Archivo Automóvil)
-  // mientras se procesa la lectura automática de esos documentos: reconsulta cada
-  // POLL_INTERVAL_MS y corta el polling apenas llega a un estado terminal ("Leidos" o
-  // "Error"). Solo se prende cuando aplica (ver mount effect — Posee Vehículo === "Si").
-  useEffect(() => {
-    if (!lecturaPolling) return undefined
-    let cancelled = false
-
-    const tick = async () => {
-      try {
-        const data = await fetchOpportunityDetail(opportunityId)
-        if (cancelled || !data) return
-        setItem(data)
-
-        const estadoLectura = data.column_values.find(
-          (cv) => cv.id === ESTADO_LECTURA_COLUMN_ID
-        )?.text?.trim()
-
+      // --- Leer Cédula y Archivo Automóvil (color_mm5rzrhk): corta en "Leidos" o
+      // "Error". Solo se prende cuando aplica (ver mount effect — Posee Vehículo === "Si").
+      if (lecturaPolling) {
+        const estadoLectura = textOf(data, ESTADO_LECTURA_COLUMN_ID)
         if (estadoLectura === 'Leidos' || estadoLectura === 'Error') {
           setLecturaPolling(false)
           if (estadoLectura === 'Error') {
             setLecturaErrorDetail(await loadErrorUpdate(ERROR_UPDATE_TAG_LEER))
           }
         }
-      } catch {
-        // hiccup de red puntual: seguimos intentando en el próximo tick
       }
     }
 
-    // Mismo fix que en los otros polling: recuperar foco/visibilidad fuerza un tick
-    // inmediato en vez de esperar a que el navegador retome el setInterval frenado por
-    // estar la pestaña en segundo plano.
+    // Los navegadores frenan drásticamente los setInterval de una pestaña en segundo
+    // plano — al recuperar foco/visibilidad forzamos un tick inmediato.
     const handleVisibility = () => {
       if (document.visibilityState === 'visible') tick()
     }
@@ -463,7 +395,18 @@ export default function OpportunityDetail({
       document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('focus', handleVisibility)
     }
-  }, [lecturaPolling, opportunityId])
+  }, [anyPolling, polling, sendPolling, polizaPolling, lecturaPolling, opportunityId, schema])
+
+  // "Reintentar" del aviso de polling cortado: vuelve a prender exactamente los flags
+  // que estaban activos cuando se cortó.
+  const handleRetryPolling = () => {
+    const flags = stalledFlagsRef.current ?? {}
+    setPollStalled(false)
+    if (flags.polling) setPolling(true)
+    if (flags.sendPolling) setSendPolling(true)
+    if (flags.polizaPolling) setPolizaPolling(true)
+    if (flags.lecturaPolling) setLecturaPolling(true)
+  }
 
   const statusColors = useMemo(
     () => ({
@@ -567,8 +510,15 @@ export default function OpportunityDetail({
   // escribe directo en monday al tildar/destildar, igual que "Propuesta elegida".
   const handleToggleOpcional = async (rawId, field, checked) => {
     onOpportunityAction?.()
-    await setSubitemCheckboxValue(rawId, OPCIONAL_PORTO_COLUMN_IDS[field], checked)
+    // Optimista + rollback (auditoría): antes un fallo de red dejaba el checkbox
+    // desincronizado en silencio (promesa rechazada sin capturar).
     setRawQuotes((prev) => prev.map((r) => (r.id === rawId ? { ...r, [field]: checked } : r)))
+    try {
+      await setSubitemCheckboxValue(rawId, OPCIONAL_PORTO_COLUMN_IDS[field], checked)
+    } catch (err) {
+      setRawQuotes((prev) => prev.map((r) => (r.id === rawId ? { ...r, [field]: !checked } : r)))
+      setElegidaError(err.message)
+    }
   }
 
   const handleMarcarParaCotizar = async () => {
@@ -719,10 +669,31 @@ export default function OpportunityDetail({
       // (uploadFileToColumn) SUMA el archivo a la columna en vez de reemplazar el que ya
       // hubiera, así que si ya había uno se limpia primero (mismo helper que usa
       // "Eliminar", clearFileColumn) antes de subir el nuevo.
+      // La API no permite "subir y después borrar la vieja" de forma atómica (clear
+      // borra la columna entera), así que si el clear salió bien pero la subida falla,
+      // la póliza anterior YA no está: se refleja en pantalla (antes seguía mostrando
+      // el nombre del archivo viejo como si existiera) y el error lo dice claro.
+      let previousCleared = false
       if (opportunity.poliza) {
         await clearFileColumn(opportunityId, POLIZA_COLUMN_ID)
+        previousCleared = true
       }
-      await uploadFileToColumn(opportunityId, POLIZA_COLUMN_ID, file)
+      try {
+        await uploadFileToColumn(opportunityId, POLIZA_COLUMN_ID, file)
+      } catch (err) {
+        if (previousCleared) {
+          setItem((prev) => ({
+            ...prev,
+            column_values: prev.column_values.map((cv) =>
+              cv.id === POLIZA_COLUMN_ID ? { ...cv, text: '' } : cv
+            ),
+          }))
+          throw new Error(
+            `Se quitó la póliza anterior pero no se pudo subir la nueva (${err.message}). Volvé a subirla.`
+          )
+        }
+        throw err
+      }
       setItem((prev) => ({
         ...prev,
         column_values: prev.column_values.map((cv) =>
@@ -865,7 +836,20 @@ export default function OpportunityDetail({
     }))
   }
 
+  const [preparingWaImages, setPreparingWaImages] = useState(false)
   const handleOpenWhatsAppModal = async () => {
+    // Auditoría: antes el botón quedaba "muerto" (sin spinner ni disabled) mientras se
+    // renderizaban N imágenes a canvas en serie. whatsappImage.js se importa recién acá
+    // (import dinámico) — es el único uso y no tiene sentido cargarlo con la app entera.
+    setPreparingWaImages(true)
+    try {
+      const { renderQuoteImageDataUrl } = await import('../services/whatsappImage')
+      await openWhatsAppModalWith(renderQuoteImageDataUrl)
+    } finally {
+      setPreparingWaImages(false)
+    }
+  }
+  const openWhatsAppModalWith = async (renderQuoteImageDataUrl) => {
     const selectedEntries = groups
       .flatMap((g) => g.entries)
       .filter((e) => selectedIds.has(e.raw.id))
@@ -955,15 +939,43 @@ export default function OpportunityDetail({
             de la Oportunidad — ya no tendría sentido "volver" a terminar de cargarla,
             quedó en curso. Mismo `onBack` que ya usa el footer de Cotizar (ver
             CotizarStepPanel.jsx), acá visible arriba en cualquiera de los 4 pasos. */}
-        {showReturnToCrearFlow && (
-          <Button kind="tertiary" className="opp-detail__back-btn" onClick={onBack}>
-            <MdArrowBack /> Volver
-          </Button>
-        )}
+        <div className="opp-detail__breadcrumb-actions">
+          {onGoToList && (
+            <Button kind="tertiary" className="opp-detail__back-btn" onClick={onGoToList}>
+              <MdArrowBack /> Oportunidades
+            </Button>
+          )}
+          {showReturnToCrearFlow && (
+            <Button kind="tertiary" className="opp-detail__back-btn" onClick={onBack}>
+              <MdArrowBack /> Volver a Crear Oportunidad
+            </Button>
+          )}
+        </div>
         {!loading && !error && opportunity && (
           <Stepper steps={steps} activeKey={activeStep} onSelect={setActiveStep} />
         )}
       </div>
+
+      {pollStalled && (
+        <div className="opp-detail__poll-stalled" role="alert">
+          <AttentionBox type="warning">
+            <div className="opp-detail__lectura-gate-row">
+              <span>
+                No pudimos actualizar el estado de la oportunidad (monday no responde). Lo que
+                estaba en curso sigue corriendo del lado de monday.
+              </span>
+              <span className="opp-detail__poll-stalled-actions">
+                <Button kind="secondary" onClick={() => setPollStalled(false)}>
+                  Cerrar
+                </Button>
+                <Button kind="primary" onClick={handleRetryPolling}>
+                  Reintentar
+                </Button>
+              </span>
+            </div>
+          </AttentionBox>
+        </div>
+      )}
 
       {loading && (
         <div className="opp-detail__status">
@@ -1171,9 +1183,10 @@ export default function OpportunityDetail({
                   kind="primary"
                   color="positive"
                   onClick={handleOpenWhatsAppModal}
-                  disabled={selectedIds.size === 0}
+                  disabled={selectedIds.size === 0 || preparingWaImages}
+                  loading={preparingWaImages}
                 >
-                  <MdSend /> Enviar seleccionadas por WhatsApp
+                  <MdSend /> {preparingWaImages ? 'Preparando imágenes...' : 'Enviar seleccionadas por WhatsApp'}
                 </Button>
               </StepFooter>
             </>

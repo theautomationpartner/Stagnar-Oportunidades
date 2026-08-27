@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, memo } from 'react'
 import {
   MdWarningAmber,
   MdRadioButtonChecked,
@@ -139,7 +139,7 @@ function FieldSelect({ value, options, onChange }) {
   )
 }
 
-export default function QuoteCard({
+function QuoteCard({
   raw,
   quote,
   selected,
@@ -512,3 +512,7 @@ export default function QuoteCard({
     </div>
   )
 }
+
+// Auditoría: memoizada — el polling del detalle refresca el ítem cada 4s y sin esto
+// se re-renderizaban hasta 19 tarjetas por tick aunque no cambiara nada.
+export default memo(QuoteCard)

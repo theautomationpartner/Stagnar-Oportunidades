@@ -1351,7 +1351,25 @@ export default function CrearOportunidadForm({
   // esa selección vieja (todavía dentro del TTL de 10 minutos) se restauraba sola.
   // Salir del formulario por cualquier camino (no solo "Buscar persona") tiene que
   // descartar la selección sin confirmar, igual que la cruz de "Buscar Persona".
+  // Auditoría (Nielsen N5/N9): si ya hay algo cargado (persona elegida, datos a mano
+  // o un paso avanzado), salir descartaba todo sin aviso — ahora pide confirmación.
+  // Los archivos elegidos (Carta Automóvil/Cédula) no se pueden recuperar al volver
+  // (un File no es serializable), por eso el aviso lo dice explícito.
+  const [pendingExit, setPendingExit] = useState(null)
+  const hasUnsavedWork = Boolean(
+    searchPreview || stepIndex > 0 || form.nombre || form.apellido || form.ci || form.tipoRiesgo
+  )
   const handleExit = (destino) => {
+    if (hasUnsavedWork && !saving && !createdItemId) {
+      setPendingExit(() => destino)
+      return
+    }
+    clearPersistedSearch()
+    destino?.()
+  }
+  const confirmExit = () => {
+    const destino = pendingExit
+    setPendingExit(null)
     clearPersistedSearch()
     destino?.()
   }
@@ -2903,6 +2921,18 @@ export default function CrearOportunidadForm({
           resto de la app), no un texto suelto abajo del todo — "Reintentar" vuelve a
           correr handleGuardar tal cual (el rollback de arriba ya se encargó de que no
           quede nada a medio cargar de la corrida anterior). */}
+      {pendingExit && (
+        <AlertModal
+          id="crear-op-salir-modal"
+          type="warning"
+          title="¿Salir sin crear la oportunidad?"
+          description="Se va a descartar lo cargado hasta ahora. Los archivos adjuntos (Carta Automóvil, Cédula) no se pueden recuperar al volver."
+          onClose={() => setPendingExit(null)}
+          secondaryButton={{ text: 'Seguir cargando', onClick: () => setPendingExit(null) }}
+          primaryButton={{ text: 'Salir y descartar', danger: true, onClick: confirmExit }}
+        />
+      )}
+
       {saveError && (
         <AlertModal
           id="guardar-error-modal"

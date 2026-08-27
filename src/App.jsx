@@ -1,11 +1,15 @@
-import { useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
+import { Loader } from '@vibe/core'
 import Sidebar from './components/Sidebar'
 import PageHeader from './components/PageHeader'
 import FilterPanel from './components/FilterPanel'
 import OpportunitiesTable from './components/OpportunitiesTable'
-import OpportunityDetail from './components/OpportunityDetail'
+// Auditoría: las 2 pantallas más pesadas (detalle ~1.300 líneas + sus 4 paneles, y el
+// wizard de creación ~2.900 líneas) se cargan recién cuando se entra a ellas — el
+// chunk inicial queda con landing + tabla + filtros.
+const OpportunityDetail = lazy(() => import('./components/OpportunityDetail'))
 import LandingScreen from './components/LandingScreen'
-import CrearOportunidadForm from './components/CrearOportunidadForm'
+const CrearOportunidadForm = lazy(() => import('./components/CrearOportunidadForm'))
 import { fetchOpportunities, fetchDepartamentos, fetchLocalidades, fetchCurrentMondayUser } from './services/mondayApi'
 import { mapOpportunities } from './services/opportunityMapper'
 import { fetchFilterAndStatusSchema } from './services/boardSchema'
@@ -179,12 +183,17 @@ export default function App() {
             setView('table')
           }}
         />
-        <div className="app-shell__main">
+        <div className="app-shell__main"><Suspense fallback={<div className="app" style={{ padding: 40, textAlign: 'center' }}><Loader size={48} /></div>}>
           <OpportunityDetail
             opportunityId={openOpportunityId}
             onBack={() => {
               setOpenOpportunityId(null)
               setOpenedFromCrearFlow(false)
+            }}
+            onGoToList={() => {
+              setOpenOpportunityId(null)
+              setOpenedFromCrearFlow(false)
+              setView('table')
             }}
             showReturnToCrearFlow={openedFromCrearFlow}
             onOpportunityAction={() => setOpenedFromCrearFlow(false)}
@@ -195,7 +204,7 @@ export default function App() {
             }}
             schema={schema}
           />
-        </div>
+        </Suspense></div>
       </div>
     )
   }
@@ -230,7 +239,7 @@ export default function App() {
             setView('table')
           }}
         />
-        <div className="app-shell__main">
+        <div className="app-shell__main"><Suspense fallback={<div className="app" style={{ padding: 40, textAlign: 'center' }}><Loader size={48} /></div>}>
           <CrearOportunidadForm
             schema={schema}
             opportunities={opportunities}
@@ -247,7 +256,7 @@ export default function App() {
               setOpenOpportunityId(newItemId)
             }}
           />
-        </div>
+        </Suspense></div>
       </div>
     )
   }
