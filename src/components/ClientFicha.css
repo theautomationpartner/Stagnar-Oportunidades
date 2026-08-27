@@ -61,7 +61,7 @@
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background: #0073ea;
+  background: var(--primary-blue);
   color: #fff;
   font-weight: 700;
   display: flex;
@@ -86,7 +86,7 @@
 .client-ficha__name {
   font-size: 18px;
   font-weight: 700;
-  color: #323338;
+  color: var(--text-dark);
   margin: 0;
 }
 
@@ -96,8 +96,8 @@
   flex-shrink: 0;
   font-size: 11px;
   font-weight: 700;
-  color: #0073ea;
-  background: #eef6ff;
+  color: var(--tint-info-text);
+  background: var(--tint-info);
   padding: 2px 8px;
   border-radius: 10px;
 }
@@ -107,13 +107,13 @@
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: #676879;
+  color: var(--text-gray);
 }
 
 .client-ficha__address svg {
   flex-shrink: 0;
   font-size: 16px;
-  color: #0073ea;
+  color: var(--primary-blue);
 }
 
 .client-ficha__badges {
@@ -150,7 +150,7 @@
   flex-direction: column;
   gap: 2px;
   padding-top: 12px;
-  border-top: 1px solid #e6e9ef;
+  border-top: 1px solid var(--border);
 }
 
 /* A pedido: "Editar" propio del Vehículo (ver onEditVehiculo en ClientFicha.jsx) al
@@ -166,7 +166,7 @@
 .client-ficha__vehiculo-label {
   font-size: 11px;
   font-weight: 700;
-  color: #9699a6;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
@@ -174,18 +174,18 @@
 .client-ficha__vehiculo-title {
   font-size: 15px;
   font-weight: 700;
-  color: #323338;
+  color: var(--text-dark);
 }
 
 .client-ficha__vehiculo-meta {
   font-size: 12px;
-  color: #676879;
+  color: var(--text-gray);
 }
 
 /* A pedido, estética tipo mockup: link celeste chico en vez de un Button "Editar" de
    siempre — pega mejor al lado del nombre en vez de competir en peso visual con él. */
 .client-ficha__edit-link {
-  color: #0073ea !important;
+  color: var(--primary-blue) !important;
   font-size: 13px;
   font-weight: 600;
   padding: 0 !important;

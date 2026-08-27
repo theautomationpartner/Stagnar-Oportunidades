@@ -1,7 +1,7 @@
 .filter-panel {
   margin: 20px var(--page-gutter) 0;
   padding: 14px 20px;
-  border: 1px solid #e6e9ef;
+  border: 1px solid var(--border);
   border-radius: 10px;
   background: #fff;
 }
@@ -31,7 +31,7 @@
   font: inherit;
   font-size: 13px;
   font-weight: 600;
-  color: #0073ea;
+  color: var(--primary-blue);
   cursor: pointer;
 }
 
@@ -57,7 +57,7 @@
   flex-direction: column;
   gap: 4px;
   font-size: 11px;
-  color: #676879;
+  color: var(--text-gray);
   font-weight: 600;
 }
 

@@ -73,7 +73,7 @@
 .cotizar-step__checklist-title {
   font-size: 18px;
   font-weight: 700;
-  color: #323338;
+  color: var(--text-dark);
   margin: 0 0 4px;
 }
 
@@ -106,15 +106,15 @@
 }
 
 .cotizar-step__checklist-item--missing svg {
-  color: #a15c00;
+  color: var(--text-warning);
 }
 
 .cotizar-step__checklist-item--missing {
-  color: #a15c00;
+  color: var(--text-warning);
 }
 
 .cotizar-step__checklist-label {
-  color: #676879;
+  color: var(--text-gray);
   flex-shrink: 0;
 }
 
@@ -125,7 +125,7 @@
 .cotizar-step__checklist-value {
   margin-left: auto;
   font-weight: 700;
-  color: #323338;
+  color: var(--text-dark);
   text-align: right;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -177,18 +177,18 @@
 .cotizar-step__field-label {
   font-size: 11px;
   font-weight: 600;
-  color: #676879;
+  color: var(--text-gray);
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
 
 .cotizar-step__field--edit input {
   width: 100%;
-  border: 1px solid #d0d4e4;
+  border: 1px solid var(--border-input);
   border-radius: 8px;
   padding: 10px 12px;
   font-size: 14px;
-  color: #323338;
+  color: var(--text-dark);
   background: #fff;
 }
 
@@ -202,7 +202,7 @@
 .cotizar-step__editar-title {
   font-size: 17px;
   font-weight: 700;
-  color: #323338;
+  color: var(--text-dark);
   margin: 0 0 20px;
 }
 
@@ -218,8 +218,8 @@
   gap: 16px;
   padding: 16px 20px;
   background: #fff;
-  border: 1px solid #e6e9ef;
-  border-left: 3px solid #00c875;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--green);
   border-radius: 8px;
 }
 
@@ -233,7 +233,7 @@
 .cotizar-step__quotes-ready-icon {
   flex-shrink: 0;
   font-size: 22px;
-  color: #00c875;
+  color: var(--green);
 }
 
 .cotizar-step__quotes-ready-text {
@@ -244,18 +244,18 @@
 
 .cotizar-step__quotes-ready-text strong {
   font-size: 14px;
-  color: #323338;
+  color: var(--text-dark);
 }
 
 .cotizar-step__quotes-ready-text span {
   font-size: 13px;
-  color: #676879;
+  color: var(--text-gray);
 }
 
 
 .cotizar-step__error {
   margin: 0;
-  color: #e2445c;
+  color: var(--tint-danger-text);
   font-size: 12px;
 }
 

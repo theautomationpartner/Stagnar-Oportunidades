@@ -1,6 +1,6 @@
 .opps-table-wrap {
   margin: 20px var(--page-gutter) 32px;
-  border: 1px solid #e6e9ef;
+  border: 1px solid var(--border);
   border-radius: 10px;
   background: #fff;
   overflow: hidden;
@@ -39,8 +39,8 @@
   padding: 16px 20px;
   font-size: 13px;
   font-weight: 600;
-  color: #323338;
-  border-bottom: 1px solid #e6e9ef;
+  color: var(--text-dark);
+  border-bottom: 1px solid var(--border);
 }
 
 .opps-table-wrap__cap-warning {
@@ -59,13 +59,13 @@
   justify-content: space-between;
   gap: 16px;
   padding: 14px 20px;
-  border-top: 1px solid #e6e9ef;
+  border-top: 1px solid var(--border);
   flex-wrap: wrap;
 }
 
 .opps-table-wrap__pagination-summary {
   font-size: 13px;
-  color: #676879;
+  color: var(--text-gray);
   white-space: nowrap;
 }
 
@@ -86,10 +86,10 @@
   min-width: 32px;
   height: 32px;
   padding: 0 6px;
-  border: 1px solid #d0d4e4;
+  border: 1px solid var(--border-input);
   border-radius: 8px;
   background: #fff;
-  color: #323338;
+  color: var(--text-dark);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -106,9 +106,9 @@
 }
 
 .opps-table-wrap__page-btn--active {
-  background: #eef6ff;
-  border-color: #0073ea;
-  color: #0073ea;
+  background: var(--tint-info);
+  border-color: var(--primary-blue);
+  color: var(--primary-blue);
 }
 
 .opps-table-wrap__page-gap {
@@ -116,7 +116,7 @@
   align-items: center;
   justify-content: center;
   min-width: 20px;
-  color: #9699a6;
+  color: var(--text-muted);
   font-size: 13px;
 }
 
@@ -125,7 +125,7 @@
   align-items: center;
   gap: 8px;
   font-size: 13px;
-  color: #676879;
+  color: var(--text-gray);
   flex-shrink: 0;
 }
 
@@ -165,7 +165,7 @@
 }
 
 .opps-table__row:focus-within {
-  outline: 2px solid #0073ea;
+  outline: 2px solid var(--primary-blue);
   outline-offset: -2px;
 }
 
@@ -181,7 +181,7 @@
    columna "Cliente" al lado, ver JSX) — la columna "Oportunidad" ahora es solo el ID. */
 .opps-table__opp-id {
   font-weight: 700;
-  color: #0073ea;
+  color: var(--primary-blue);
   font-size: 13px;
 }
 
@@ -198,7 +198,7 @@
 .opps-table__cliente-meta {
   display: flex;
   gap: 10px;
-  color: #676879;
+  color: var(--text-gray);
   font-size: 12px;
 }
 
@@ -212,7 +212,7 @@
 }
 
 .opps-table__bien-meta {
-  color: #676879;
+  color: var(--text-gray);
   font-size: 12px;
   margin-top: 2px;
 }

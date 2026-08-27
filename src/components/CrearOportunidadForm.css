@@ -15,7 +15,7 @@
   max-width: 1100px;
   transition: max-width 0.2s ease;
   background: #fff;
-  border: 1px solid #e6e9ef;
+  border: 1px solid var(--border);
   border-radius: 10px;
   padding: 28px 36px 32px;
 }
@@ -169,15 +169,15 @@
   width: 32px;
   height: 32px;
   border-radius: 9px;
-  background: #eef6ff;
-  color: #0073ea;
+  background: var(--tint-info);
+  color: var(--primary-blue);
   font-size: 17px;
 }
 
 .crear-op__section-title {
   font-size: 16px;
   font-weight: 700;
-  color: #323338;
+  color: var(--text-dark);
   margin: 0;
 }
 
@@ -216,7 +216,7 @@
 .crear-op__ficha-name {
   font-size: 20px;
   font-weight: 700;
-  color: #323338;
+  color: var(--text-dark);
   margin: 0;
 }
 
@@ -225,13 +225,13 @@
   align-items: center;
   gap: 6px;
   font-size: 13px;
-  color: #676879;
+  color: var(--text-gray);
 }
 
 .crear-op__ficha-address svg {
   flex-shrink: 0;
   font-size: 16px;
-  color: #0073ea;
+  color: var(--primary-blue);
 }
 
 .crear-op__ficha-badges {
@@ -272,7 +272,7 @@
 .crear-op__editar-contacto-title {
   font-size: 17px;
   font-weight: 700;
-  color: #323338;
+  color: var(--text-dark);
   margin: 0 0 20px;
 }
 
@@ -369,7 +369,7 @@
 }
 
 .crear-op__field-error {
-  color: #e2445c;
+  color: var(--tint-danger-text);
   font-size: 12px;
   font-weight: 400;
 }
@@ -378,14 +378,14 @@
   margin: -8px 0 0;
   font-size: 12px;
   font-weight: 400;
-  color: #676879;
-  background: #f6f7fb;
+  color: var(--text-gray);
+  background: var(--bg-subtle);
   border-radius: 6px;
   padding: 8px 12px;
 }
 
 .crear-op__autofill-note {
-  color: #a15c00;
+  color: var(--text-warning);
   font-size: 12px;
   font-weight: 400;
 }
@@ -397,7 +397,7 @@
   display: flex;
   flex-direction: column;
   gap: 2px;
-  border: 1px solid #e6e9ef;
+  border: 1px solid var(--border);
   border-radius: 8px;
   overflow: hidden;
 }
@@ -409,8 +409,8 @@
   padding: 10px 12px;
   font-size: 12px;
   font-weight: 700;
-  color: #676879;
-  background: #f6f7fb;
+  color: var(--text-gray);
+  background: var(--bg-subtle);
 }
 
 .crear-op__historial-title svg {
@@ -465,7 +465,7 @@
 }
 
 .crear-op__historial-item {
-  border-top: 1px solid #e6e9ef;
+  border-top: 1px solid var(--border);
 }
 
 .crear-op__historial-row {
@@ -479,7 +479,7 @@
 
 .crear-op__historial-desc {
   min-width: 0;
-  color: #323338;
+  color: var(--text-dark);
   font-weight: 600;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -491,7 +491,7 @@
    secundarios de la app. */
 .crear-op__historial-meta {
   flex-shrink: 0;
-  color: #676879;
+  color: var(--text-gray);
   white-space: nowrap;
 }
 
@@ -506,7 +506,7 @@
   margin-left: auto;
   border: none;
   background: none;
-  color: #0073ea;
+  color: var(--primary-blue);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -529,23 +529,23 @@
   margin-bottom: 12px;
   padding: 10px 12px;
   background: #fff;
-  border: 1px solid #e6e9ef;
+  border: 1px solid var(--border);
   border-radius: 6px;
   font-size: 12px;
-  color: #676879;
+  color: var(--text-gray);
 }
 
 .crear-op__historial-detail-label {
   font-size: 10px;
   font-weight: 700;
-  color: #9699a6;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
 
 .crear-op__historial-detail-box strong {
   font-size: 13px;
-  color: #323338;
+  color: var(--text-dark);
 }
 
 /* A pedido, estética tipo mockup: "Ir a esta oportunidad" a lo ancho completo, en verde
@@ -555,8 +555,8 @@
 .crear-op__historial-detail-btn {
   width: 100%;
   justify-content: center;
-  background-color: var(--color-verde) !important;
-  border-color: var(--color-verde) !important;
+  background-color: var(--color-verde-cta) !important;
+  border-color: var(--color-verde-cta) !important;
 }
 
 .crear-op__historial-detail-btn:hover {
@@ -584,7 +584,7 @@
 
 .crear-op__cliente-option-modelo {
   font-size: 11px;
-  color: #9699a6;
+  color: var(--text-muted);
   padding-left: 2px;
 }
 
@@ -607,8 +607,8 @@
 }
 
 .crear-op__source-tag--contacto {
-  color: #0073ea;
-  background: #eef6ff;
+  color: var(--tint-info-text);
+  background: var(--tint-info);
 }
 
 .crear-op__source-tag--lead {
@@ -617,7 +617,7 @@
 }
 
 .crear-op__cliente-option-ci {
-  color: #0073ea;
+  color: var(--primary-blue);
   font-weight: 600;
   font-size: 13px;
   flex-shrink: 0;
@@ -639,13 +639,13 @@
 
 .crear-op__search-btn {
   flex-shrink: 0;
-  background-color: #0073ea !important;
-  border-color: #0073ea !important;
+  background-color: var(--primary-blue) !important;
+  border-color: var(--primary-blue) !important;
   color: #fff !important;
 }
 
 .crear-op__search-btn:hover:not(:disabled) {
-  background-color: #0060c2 !important;
+  background-color: var(--primary-blue-hover) !important;
 }
 
 .crear-op__search-btn svg {
@@ -665,14 +665,14 @@
   justify-content: center;
   border: none;
   background: none;
-  color: #9699a6;
+  color: var(--text-muted);
   cursor: pointer;
   padding: 4px;
   z-index: 1;
 }
 
 .crear-op__search-clear:hover {
-  color: #e2445c;
+  color: var(--red);
 }
 
 /* "Saltear" el buscador — Button kind="tertiary" (@vibe/core) de fábrica queda
@@ -682,8 +682,8 @@
 .crear-op__skip-btn {
   align-self: flex-start;
   margin-top: 2px;
-  background: #eef6ff !important;
-  color: #0073ea !important;
+  background: var(--tint-info) !important;
+  color: var(--primary-blue) !important;
   border-radius: 20px;
   font-size: 13px;
   font-weight: 600;
@@ -708,7 +708,7 @@
   gap: 6px;
   font-size: 13px;
   font-weight: 600;
-  color: #323338;
+  color: var(--text-dark);
 }
 
 /* El TextField nativo de @vibe/core (Nombre/Apellido/CI) trae su propia tipografía
@@ -720,13 +720,13 @@
 .crear-op__field label {
   font-size: 13px;
   font-weight: 600;
-  color: #323338;
+  color: var(--text-dark);
 }
 
 /* Asterisco de obligatorio en rojo en todo el form (ver componente Required en el JSX)
    — mismo rojo que ya usa el resto de la app para errores/obligatorio. */
 .crear-op__required {
-  color: var(--red);
+  color: var(--tint-danger-text);
 }
 
 /* A pedido, estética tipo mockup: campos que la lectura automática no pudo completar,
@@ -746,7 +746,7 @@
 .crear-op__risk-subtitle {
   font-size: 17px;
   font-weight: 600;
-  color: #323338;
+  color: var(--text-dark);
   margin: 0 0 4px;
 }
 
@@ -767,11 +767,11 @@
   flex: 1 1 240px;
   padding: 18px 20px;
   background: #fff;
-  border: 1px solid #d0d4e4;
+  border: 1px solid var(--border-input);
   border-radius: 10px;
   font-size: 15px;
   font-weight: 600;
-  color: #323338;
+  color: var(--text-dark);
   cursor: pointer;
   text-align: left;
   transition: border-color 0.15s ease, background-color 0.15s ease;
@@ -780,21 +780,21 @@
 .crear-op__risk-option-icon {
   flex-shrink: 0;
   font-size: 22px;
-  color: #0073ea;
+  color: var(--primary-blue);
 }
 
 .crear-op__risk-option:hover:not(.crear-op__risk-option--active) {
-  border-color: #0073ea;
+  border-color: var(--primary-blue);
   background: #f8fafd;
 }
 
 .crear-op__risk-option--active {
-  border-color: #0073ea;
-  background: #eef6ff;
+  border-color: var(--primary-blue);
+  background: var(--tint-info);
 }
 
 .crear-op__risk-option:focus-visible {
-  outline: 2px solid #0073ea;
+  outline: 2px solid var(--primary-blue);
   outline-offset: 2px;
 }
 
@@ -818,12 +818,12 @@
 .crear-op__lectura-analyzing strong {
   display: block;
   font-size: 14px;
-  color: #00854d;
+  color: var(--green-dark);
 }
 
 .crear-op__lectura-analyzing span {
   font-size: 12px;
-  color: #676879;
+  color: var(--text-gray);
 }
 
 /* A pedido: tarjeta propia (mismo lenguaje visual que crear-op__lectura-analyzing/
@@ -839,8 +839,8 @@
   gap: 12px;
   padding: 14px 16px;
   background: #fff;
-  border: 1px solid #e6e9ef;
-  border-left: 3px solid #00c875;
+  border: 1px solid var(--border);
+  border-left: 3px solid var(--green);
   border-radius: 8px;
 }
 
@@ -853,12 +853,12 @@
 
 .crear-op__lectura-summary-info strong {
   font-size: 14px;
-  color: #323338;
+  color: var(--text-dark);
 }
 
 .crear-op__lectura-summary-info span {
   font-size: 12px;
-  color: #676879;
+  color: var(--text-gray);
 }
 
 .crear-op__lectura-summary-edit {
@@ -868,7 +868,7 @@
   flex-shrink: 0;
   border: none;
   background: none;
-  color: #00854d;
+  color: var(--green-dark);
   font-size: 13px;
   font-weight: 600;
   cursor: pointer;
@@ -885,15 +885,15 @@
 .crear-op__lectura-incompleto-hint {
   margin: 0;
   font-size: 12px;
-  color: #a15c00;
+  color: var(--text-warning);
 }
 
 .crear-op__field input {
   padding: 11px 14px;
-  border: 1px solid #d0d4e4;
+  border: 1px solid var(--border-input);
   border-radius: 8px;
   font-size: 15px;
-  color: #323338;
+  color: var(--text-dark);
   font-weight: 400;
   width: 100%;
   transition: border-color 0.15s ease;
@@ -918,7 +918,7 @@
    incluso si el campo ya tiene marca verde/roja (que vuelve a verse apenas se sale). */
 .crear-op__field input:focus {
   outline: none;
-  border-color: #0073ea;
+  border-color: var(--primary-blue);
   box-shadow: 0 0 0 3px rgba(0, 115, 234, 0.15);
 }
 
@@ -946,14 +946,14 @@
   justify-content: center;
   border: none;
   background: none;
-  color: #9699a6;
+  color: var(--text-muted);
   cursor: pointer;
   padding: 4px;
   font-size: 15px;
 }
 
 .crear-op__date-clear:hover {
-  color: #e2445c;
+  color: var(--tint-danger-text);
 }
 
 .crear-op__phone {
@@ -992,8 +992,8 @@
 .crear-op__empty {
   padding: 32px;
   text-align: center;
-  color: #676879;
-  background: #f6f7fb;
+  color: var(--text-gray);
+  background: var(--bg-subtle);
   border-radius: 8px;
   font-size: 13px;
   margin: 0;
@@ -1007,7 +1007,7 @@
 
 .crear-op__error {
   margin: 16px 0 0;
-  color: #e2445c;
+  color: var(--tint-danger-text);
   font-size: 13px;
 }
 

@@ -41,7 +41,7 @@
    mostrar. */
 .file-field--ok {
   background: #e6f9f1;
-  color: #037f4c;
+  color: var(--green-dark);
   /* A pedido: borde sólido verde una vez que hay archivo (antes transparente, se notaba
      menos la diferencia con "falta") — mismo criterio que la zona de arrastrar y soltar
      una vez que acepta el archivo. */
@@ -49,9 +49,9 @@
 }
 
 .file-field--drag-over {
-  background: #eef6ff;
-  border-color: #0073ea;
-  color: #0073ea;
+  background: var(--tint-info);
+  border-color: var(--primary-blue);
+  color: var(--primary-blue);
 }
 
 /* Archivo que llegó solo (autocompletado de una Oportunidad/Contacto anterior, no
@@ -59,7 +59,7 @@
    ("· autocompletado") en vez de un color totalmente distinto, para no inventar un
    tercer lenguaje de color. */
 .file-field--highlighted {
-  border: 1px solid #0073ea;
+  border: 1px solid var(--primary-blue);
 }
 
 /* A pedido: título del campo + estado ("Autocompletado") en la misma fila, arriba de la
@@ -75,7 +75,7 @@
    depender de que ese CSS esté cargado en esta página (Emitir/Confirmar usan este
    campo sin CrearOportunidadForm.css). */
 .file-field__required {
-  color: var(--red);
+  color: var(--tint-danger-text);
 }
 
 .file-field__status-tag {
@@ -83,8 +83,8 @@
   font-weight: 700;
   text-transform: uppercase;
   letter-spacing: 0.02em;
-  color: #0073ea;
-  background: #eef6ff;
+  color: var(--tint-info-text);
+  background: var(--tint-info);
   padding: 2px 8px;
   border-radius: 10px;
 }
@@ -220,7 +220,7 @@
   border-radius: 6px;
   border: 1px solid rgba(0, 0, 0, 0.12);
   background: #fff;
-  color: #037f4c;
+  color: var(--green-dark);
   font-size: 9px;
   font-weight: 700;
   overflow: hidden;
@@ -256,7 +256,7 @@
   border: none;
   background: none;
   padding: 4px 6px;
-  color: #0073ea;
+  color: var(--primary-blue);
   font-size: 12px;
   font-weight: 600;
   cursor: pointer;
@@ -267,7 +267,7 @@
 }
 
 .file-field__mini-remove {
-  color: #e2445c !important;
+  color: var(--red) !important;
   flex-shrink: 0;
 }
 
@@ -388,20 +388,20 @@
 }
 
 .file-field__delete-btn {
-  color: #e2445c;
+  color: var(--tint-danger-text);
   border-color: #f3c1cb;
 }
 
 .file-field__delete-btn:hover {
   background: #fdf1f2 !important;
-  border-color: #e2445c;
+  border-color: var(--red);
 }
 
 /* Variante compacta (compactDelete): solo la cruz roja, sin texto "Eliminar" — para
    cuando 2 campos van uno al lado del otro y no hay tanto ancho para un botón con
    label. */
 .file-field__delete-icon-btn {
-  color: #e2445c !important;
+  color: var(--red) !important;
   flex-shrink: 0;
 }
 
@@ -416,7 +416,7 @@
 
 .file-field__error {
   margin: 4px 0 0;
-  color: #e2445c;
+  color: var(--tint-danger-text);
   font-size: 12px;
 }
 
@@ -425,7 +425,7 @@
 .file-field__lightbox {
   position: fixed;
   inset: 0;
-  z-index: 10001;
+  z-index: var(--z-lightbox);
   display: flex;
   align-items: center;
   justify-content: center;

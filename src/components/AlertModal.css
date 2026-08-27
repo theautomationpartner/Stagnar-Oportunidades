@@ -24,30 +24,30 @@
 }
 
 .alert-modal__content--info .alert-modal__icon {
-  background: #eef6ff;
-  color: #0073ea;
+  background: var(--tint-info);
+  color: var(--primary-blue);
 }
 
 .alert-modal__content--error .alert-modal__icon {
   background: #fdf1f2;
-  color: #e2445c;
+  color: var(--red);
 }
 
 .alert-modal__content--warning .alert-modal__icon {
   background: #fff7e6;
-  color: #fdab3d;
+  color: var(--yellow);
 }
 
 .alert-modal__title {
   font-size: 24px;
   font-weight: 800;
-  color: #323338;
+  color: var(--text-dark);
   margin: 0;
 }
 
 .alert-modal__desc {
   font-size: 15px;
-  color: #676879;
+  color: var(--text-gray);
   line-height: 1.5;
   margin: 0;
   max-width: 380px;
@@ -61,7 +61,7 @@
   width: 100%;
   height: 1px;
   border: none;
-  background: #e6e9ef;
+  background: var(--border);
   margin: 12px 0 0;
 }
 
@@ -80,7 +80,7 @@
   width: 100%;
   margin-top: 6px;
   padding: 12px 16px;
-  background: #f6f7fb;
+  background: var(--bg-subtle);
   border-radius: 8px;
   text-align: left;
 }
@@ -89,7 +89,7 @@
   display: block;
   font-size: 12px;
   font-weight: 700;
-  color: #676879;
+  color: var(--text-gray);
   margin-bottom: 6px;
 }
 
@@ -105,13 +105,13 @@
 }
 
 .alert-modal__details--negative li {
-  color: #e2445c;
+  color: var(--red);
 }
 
 /* Lista de opciones válidas (ej. "Modelos disponibles") — texto normal, no rojo: no son
    errores, son alternativas que sí se pueden elegir. */
 .alert-modal__details--neutral li {
-  color: #323338;
+  color: var(--text-dark);
   font-weight: 500;
 }
 
@@ -125,8 +125,8 @@
 /* Para acciones tipo "Reintentar" sobre un error real (no una simple confirmación) —
    rojo en vez del azul/verde de "primary" por defecto. */
 .alert-modal__btn--danger {
-  background-color: #e2445c !important;
-  border-color: #e2445c !important;
+  background-color: var(--red) !important;
+  border-color: var(--red) !important;
 }
 
 .alert-modal__btn--danger:hover {

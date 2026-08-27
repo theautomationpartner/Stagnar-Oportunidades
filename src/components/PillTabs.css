@@ -41,10 +41,10 @@
 
 .pill-tabs__tab--active {
   background: var(--bg);
-  color: var(--primary-blue);
+  color: var(--tint-info-text);
   border-color: var(--primary-blue);
 }
 
 .pill-tabs__tab--active:hover {
-  color: var(--primary-blue);
+  color: var(--tint-info-text);
 }

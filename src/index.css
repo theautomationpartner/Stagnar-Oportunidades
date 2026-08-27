@@ -46,7 +46,21 @@
 
   --text-dark: #323338;
   --text-gray: #676879;
-  --text-muted: #9699a6;
+  /* Auditoría WCAG: antes #9699a6 (2.6:1 sobre blanco, falla AA incluso en texto grande)
+     — se usa en labels de 10-13px, así que necesita >= 4.5:1. #6f7486 da 4.6:1 y sigue
+     leyéndose como "atenuado" al lado de --text-gray. */
+  --text-muted: #6f7486;
+  /* Texto azul sobre --tint-info (pills, tab/ítem activo): --primary-blue daba 4.15:1
+     sobre #eef6ff, este da 5.9:1. */
+  --tint-info-text: #0b5cad;
+  /* Texto de advertencia (antes literal #a15c00 en 8 lugares) — 5.2:1 sobre blanco. */
+  --text-warning: #a15c00;
+  /* Borde de input (antes literal #d0d4e4 en 7 lugares). */
+  --border-input: #d0d4e4;
+  /* CTA verde de cierre de flujo: --color-verde con texto blanco daba 4.49:1 (falla AA
+     por 0.01). Este tono apenas más oscuro da 5.3:1 y conserva el acento de marca; el
+     verde de marca puro sigue usándose en íconos/títulos donde no es texto de botón. */
+  --color-verde-cta: #00706d;
   --border: #e6e9ef;
   --bg: #ffffff;
   --bg-subtle: #f6f7fb;
@@ -70,6 +84,14 @@
   --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.05);
   --shadow-md: 0 2px 8px rgba(0, 0, 0, 0.06);
   --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.18);
+
+  /* Escala de capas (auditoría): antes cada archivo elegía su z-index a mano (1, 2, 5,
+     9999, 10001). Modal de @vibe/core usa 10000; los popups portaleados de vibe van a
+     --z-dropdown; nada propio de la app debería superar --z-modal. */
+  --z-sticky: 10;
+  --z-dropdown: 9999;
+  --z-modal: 10000;
+  --z-lightbox: 10001;
 }
 
 /* Tokens de "canvas vs. superficie elevada" — a pedido (auditoría UI/UX), la página
@@ -119,7 +141,29 @@ body {
    Dropdown/tooltip de la app, no solo uno puntual. Por debajo del z-index de Modal
    (10000) a propósito, para que un modal siga ganando si algún día coexisten. */
 .monday-style-dialog-content-wrapper {
-  z-index: 9999;
+  z-index: var(--z-dropdown);
+}
+
+/* Foco visible global (WCAG 2.4.7 / 1.4.11): la mayoría de los <button>/<input> de la
+   app no tenían regla de foco y dependían del outline del navegador, casi invisible
+   sobre fondos tintados. :focus-visible (no :focus) para que no aparezca al clickear
+   con mouse. Los componentes que ya tenían su propio foco lo mantienen por
+   especificidad si lo necesitan; este es el piso mínimo. */
+:where(button, a, input, select, textarea, [tabindex]):focus-visible {
+  outline: 2px solid var(--primary-blue);
+  outline-offset: 2px;
+}
+
+/* WCAG 2.3.3: un solo bloque global en vez de uno por archivo (varios componentes con
+   animation/transition no tenían el suyo: GradientSpinner, Sidebar, PillTabs, etc.). */
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 /* AttentionBox (@vibe/core) alinea su ícono ARRIBA (align-self:start) cuando no tiene

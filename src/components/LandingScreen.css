@@ -1,5 +1,6 @@
 .landing {
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -70,12 +71,12 @@
 
 .landing__card-icon--primary {
   background: #e3edff;
-  color: #0073ea;
+  color: var(--primary-blue);
 }
 
 .landing__card-icon--secondary {
   background: #dff5ea;
-  color: #037f4c;
+  color: var(--green-dark);
 }
 
 .landing__card-body {
@@ -89,12 +90,12 @@
 .landing__card-title {
   font-size: 18px;
   font-weight: 700;
-  color: #323338;
+  color: var(--text-dark);
 }
 
 .landing__card-desc {
   font-size: 14px;
-  color: #676879;
+  color: var(--text-gray);
 }
 
 .landing__card-chevron {
@@ -103,9 +104,9 @@
 }
 
 .landing__card-chevron--primary {
-  color: #0073ea;
+  color: var(--primary-blue);
 }
 
 .landing__card-chevron--secondary {
-  color: #037f4c;
+  color: var(--green-dark);
 }

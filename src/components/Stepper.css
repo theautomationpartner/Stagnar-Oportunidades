@@ -115,8 +115,8 @@ button.stepper__step:hover .stepper__label {
 }
 
 button.stepper__step:hover .stepper__circle--pending {
-  border-color: #0073ea;
-  color: #0073ea;
+  border-color: var(--primary-blue);
+  color: var(--primary-blue);
 }
 
 button.stepper__step:active {
@@ -148,7 +148,7 @@ button.stepper__step:focus-visible .stepper__circle {
 }
 
 .stepper__circle--done {
-  background: #00c875;
+  background: var(--green);
   color: #fff;
 }
 
@@ -166,7 +166,7 @@ button.stepper__step:focus-visible .stepper__circle {
 }
 
 .stepper__circle--active {
-  background: #0073ea;
+  background: var(--primary-blue);
   color: #fff;
   /* A pedido: el círculo del paso actual "respira" (glow pulsante) para que salte a la
      vista de un vistazo cuál es el paso en curso, no solo por el color — mismo patrón
@@ -192,14 +192,14 @@ button.stepper__step:focus-visible .stepper__circle {
 
 .stepper__circle--pending {
   background: #fff;
-  color: #9699a6;
-  border: 2px solid #d0d4e4;
+  color: var(--text-muted);
+  border: 2px solid var(--border-input);
 }
 
 .stepper__label {
   font-size: 13px;
   font-weight: 600;
-  color: #9699a6;
+  color: var(--text-muted);
   text-align: center;
   line-height: 1.25;
   /* A pedido: que no salte de línea — el ancho de sobra de .stepper__step (140px, ver
@@ -209,11 +209,11 @@ button.stepper__step:focus-visible .stepper__circle {
 }
 
 .stepper__label--done {
-  color: #00c875;
+  color: var(--green);
 }
 
 .stepper__label--active {
-  color: #0073ea;
+  color: var(--primary-blue);
 }
 
 .stepper__label--viewing {
@@ -236,10 +236,10 @@ button.stepper__step:focus-visible .stepper__circle {
   flex: 0 0 auto;
   width: 72px;
   height: 2px;
-  background: #e6e9ef;
+  background: var(--border);
   margin: 11px 6px 0;
 }
 
 .stepper__line--done {
-  background: #00c875;
+  background: var(--green);
 }

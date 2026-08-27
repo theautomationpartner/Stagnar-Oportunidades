@@ -2,11 +2,12 @@
   width: 64px;
   flex-shrink: 0;
   min-height: 100vh;
+  min-height: 100dvh;
   display: flex;
   flex-direction: column;
   align-items: center;
   background: #fff;
-  border-right: 1px solid #e6e9ef;
+  border-right: 1px solid var(--border);
   padding: 16px 0;
   transition: width 0.15s ease;
 }
@@ -52,7 +53,7 @@
   border: none;
   background: transparent;
   border-radius: 6px;
-  color: #9699a6;
+  color: var(--text-muted);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -64,7 +65,7 @@
 
 .sidebar__toggle:hover {
   background: #f0f4fa;
-  color: #0073ea;
+  color: var(--primary-blue);
 }
 
 .sidebar__nav {
@@ -92,7 +93,7 @@
   justify-content: center;
   gap: 10px;
   font-size: 20px;
-  color: #9699a6;
+  color: var(--text-muted);
   cursor: pointer;
   padding: 0;
   font-family: inherit;
@@ -100,7 +101,7 @@
 
 .sidebar__nav-item:hover:not(.sidebar__nav-item--active) {
   background: #f0f4fa;
-  color: #0073ea;
+  color: var(--primary-blue);
 }
 
 .sidebar__nav-item--active {
@@ -120,8 +121,8 @@
 }
 
 .sidebar__nav-item--active {
-  background: #eef6ff;
-  color: #0073ea;
+  background: var(--tint-info);
+  color: var(--tint-info-text);
 }
 
 .sidebar__footer {
@@ -143,7 +144,7 @@
   width: 32px;
   height: 32px;
   border-radius: 50%;
-  background: #0073ea;
+  background: var(--primary-blue);
   color: #fff;
   font-size: 12px;
   font-weight: 700;
@@ -170,9 +171,71 @@
 .sidebar__user-name {
   font-size: 13px;
   font-weight: 600;
-  color: #323338;
+  color: var(--text-dark);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;
+}
+
+/* Auditoría responsive: en celular la barra de 200px (o 64px) fija a la izquierda dejaba
+   ~175px útiles al contenido. Por debajo de 640px (mismo breakpoint que --page-gutter,
+   ver index.css) pasa a ser una barra horizontal fija abajo, con targets de 44px
+   (WCAG 2.5.8). El toggle expandir/contraer y el nombre de usuario no tienen sentido
+   en ese layout y se ocultan; el avatar queda como recordatorio de sesión. */
+@media (max-width: 640px) {
+  .app-shell {
+    flex-direction: column-reverse;
+  }
+
+  .sidebar,
+  .sidebar--expanded {
+    width: 100%;
+    min-height: auto;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    padding: 6px var(--page-gutter);
+    border-right: none;
+    border-top: 1px solid var(--border);
+    position: sticky;
+    bottom: 0;
+    z-index: var(--z-sticky);
+    background: var(--bg);
+  }
+
+  .sidebar__top {
+    margin-bottom: 0;
+    flex-direction: row;
+  }
+
+  .sidebar__brand-img,
+  .sidebar__brand-img--full {
+    width: auto;
+    height: 28px;
+  }
+
+  .sidebar__toggle,
+  .sidebar__user-name {
+    display: none;
+  }
+
+  .sidebar__nav {
+    flex: 0 0 auto;
+    flex-direction: row;
+    width: auto;
+  }
+
+  .sidebar__nav-item,
+  .sidebar--expanded .sidebar__nav-item {
+    width: auto;
+    min-width: 44px;
+    min-height: 44px;
+    height: auto;
+    padding: 0 12px;
+  }
+
+  .sidebar--expanded .sidebar__footer {
+    padding: 0;
+  }
 }

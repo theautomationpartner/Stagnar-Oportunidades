@@ -1,7 +1,7 @@
 .step-footer {
   position: sticky;
   bottom: 0;
-  z-index: 5;
+  z-index: var(--z-sticky);
   display: flex;
   align-items: center;
   justify-content: space-between;

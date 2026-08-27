@@ -8,7 +8,7 @@
 .confirmar-step__section {
   padding: 20px 24px;
   background: #fff;
-  border: 1px solid #e6e9ef;
+  border: 1px solid var(--border);
   border-radius: 10px;
 }
 
@@ -21,13 +21,13 @@
 .confirmar-step__title {
   font-size: 16px;
   font-weight: 700;
-  color: #323338;
+  color: var(--text-dark);
   margin: 0 0 4px;
 }
 
 .confirmar-step__subtitle {
   font-size: 13px;
-  color: #676879;
+  color: var(--text-gray);
   margin: 0 0 16px;
 }
 
@@ -69,7 +69,7 @@
   margin: 0;
   padding: 20px 0;
   text-align: center;
-  color: #9699a6;
+  color: var(--text-muted);
   font-size: 13px;
 }
 
@@ -102,15 +102,15 @@
   flex-direction: column;
   gap: 12px;
   padding: 16px 20px;
-  border: 1px solid #d0d4e4;
+  border: 1px solid var(--border-input);
   border-left-width: 4px;
   border-radius: 10px;
   background: #fff;
 }
 
 .confirmar-step__card--selected {
-  border-color: #0073ea;
-  background: #eef6ff;
+  border-color: var(--primary-blue);
+  background: var(--tint-info);
 }
 
 .confirmar-step__card-header {
@@ -143,7 +143,7 @@
   width: 20px;
   height: 20px;
   border-radius: 50%;
-  background: #00c875;
+  background: var(--green);
   color: #fff;
   font-size: 11px;
   flex-shrink: 0;
@@ -156,7 +156,7 @@
 
 .confirmar-step__card-cobertura {
   font-size: 13px;
-  color: #676879;
+  color: var(--text-gray);
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -165,7 +165,7 @@
 
 .confirmar-step__card-deducible {
   font-size: 12px;
-  color: #676879;
+  color: var(--text-gray);
 }
 
 .confirmar-step__card-total-block {
@@ -179,7 +179,7 @@
 
 .confirmar-step__card-total-label {
   font-size: 11px;
-  color: #676879;
+  color: var(--text-gray);
 }
 
 /* Mismo verde que el costo total del paso 2 (ver .quote-card__total-value en
@@ -202,20 +202,20 @@
   text-align: left;
   font-size: 10px;
   font-weight: 700;
-  color: #9699a6;
+  color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
 
 .confirmar-step__card-cuotas-table td {
   padding: 2px 12px 2px 0;
-  color: #323338;
+  color: var(--text-dark);
 }
 
 .confirmar-step__card-promo {
   display: block;
   font-size: 12px;
-  color: #676879;
+  color: var(--text-gray);
   margin-top: 6px;
 }
 
@@ -227,7 +227,7 @@
 
 .confirmar-step__error {
   margin: 0;
-  color: #e2445c;
+  color: var(--tint-danger-text);
   font-size: 13px;
 }
 
@@ -255,12 +255,12 @@
 .confirmar-step__chosen-compania {
   font-size: 15px;
   font-weight: 700;
-  color: #0073ea;
+  color: var(--primary-blue);
 }
 
 .confirmar-step__chosen-cobertura {
   font-size: 14px;
-  color: #676879;
+  color: var(--text-gray);
 }
 
 .confirmar-step__chosen-grid {
@@ -286,19 +286,19 @@
   flex-direction: column;
   gap: 4px;
   padding: 10px 12px;
-  background: #f6f7fb;
+  background: var(--bg-subtle);
   border-radius: 8px;
 }
 
 .confirmar-step__chosen-grid span {
   font-size: 11px;
   font-weight: 600;
-  color: #676879;
+  color: var(--text-gray);
   text-transform: uppercase;
   letter-spacing: 0.02em;
 }
 
 .confirmar-step__chosen-grid strong {
   font-size: 14px;
-  color: #323338;
+  color: var(--text-dark);
 }

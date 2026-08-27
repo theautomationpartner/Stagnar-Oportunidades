@@ -1,6 +1,7 @@
 import { MdEdit, MdLocationOn, MdSmartphone, MdHome } from 'react-icons/md'
 import { Button } from '@vibe/core'
 import ClienteArchivos from './ClienteArchivos'
+import { formatShortDate } from '../services/format'
 import './ClientFicha.css'
 
 // Ficha del cliente/Lead de la oportunidad — antes solo vivía en el paso "Cotizar" (ver
@@ -77,7 +78,7 @@ export default function ClientFicha({
 
       <div className="client-ficha__badges">
         <span className="client-ficha__badge">CI: {opportunity.ci || '—'}</span>
-        <span className="client-ficha__badge">Nacimiento: {opportunity.fechaNacimiento || '—'}</span>
+        <span className="client-ficha__badge">Nacimiento: {opportunity.fechaNacimiento ? formatShortDate(opportunity.fechaNacimiento) : "—"}</span>
         <span className="client-ficha__badge">
           <MdSmartphone />
           {opportunity.telefono || '—'}

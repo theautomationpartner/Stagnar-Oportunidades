@@ -39,7 +39,7 @@
 .wa-modal__preview-label {
   font-size: 13px;
   font-weight: 600;
-  color: #323338;
+  color: var(--text-dark);
   margin-bottom: 10px;
 }
 
@@ -58,19 +58,19 @@
 
 .wa-modal__preview-item img {
   width: 100%;
-  border: 1px solid #e6e9ef;
+  border: 1px solid var(--border);
   border-radius: 8px;
   display: block;
 }
 
 .wa-modal__preview-item span {
   font-size: 11px;
-  color: #676879;
+  color: var(--text-gray);
   text-align: center;
 }
 
 .wa-modal__error {
-  color: #e2445c;
+  color: var(--red);
   font-size: 13px;
   margin: 0 0 12px;
 }
@@ -94,13 +94,13 @@
 .wa-modal__sending-title {
   font-size: 16px;
   font-weight: 700;
-  color: #323338;
+  color: var(--text-dark);
   margin: 0;
 }
 
 .wa-modal__sending-subtitle {
   font-size: 13px;
-  color: #676879;
+  color: var(--text-gray);
   margin: 4px 0 20px;
 }
 
@@ -133,13 +133,13 @@
 .wa-modal__success-title {
   font-size: 16px;
   font-weight: 700;
-  color: #323338;
+  color: var(--text-dark);
   margin: 0;
 }
 
 .wa-modal__success-subtitle {
   font-size: 13px;
-  color: #676879;
+  color: var(--text-gray);
   margin: 4px 0 16px;
 }
 
@@ -149,8 +149,8 @@
   gap: 4px;
   font-size: 12px;
   font-weight: 600;
-  color: #0073ea;
-  background: #eef6ff;
+  color: var(--tint-info-text);
+  background: var(--tint-info);
   border-radius: 14px;
   padding: 6px 14px;
 }

@@ -11,7 +11,7 @@
   gap: 24px;
   padding: 16px var(--page-gutter) 0;
   font-size: 13px;
-  color: #676879;
+  color: var(--text-gray);
 }
 
 @media (max-width: 900px) {
@@ -44,11 +44,11 @@
   align-items: center;
   gap: 14px;
   text-align: center;
-  color: #676879;
+  color: var(--text-gray);
 }
 
 .opp-detail__status--error {
-  color: #e2445c;
+  color: var(--tint-danger-text);
 }
 
 /* Pantalla de carga al abrir una oportunidad desde la tabla — Loader nativo de
@@ -83,7 +83,7 @@
   height: 32px;
   flex-shrink: 0;
   border-radius: 50%;
-  background: #0073ea;
+  background: var(--primary-blue);
   color: #fff;
   font-size: 15px;
   font-weight: 700;
@@ -92,7 +92,7 @@
 .opp-detail__title {
   font-size: 26px;
   font-weight: 700;
-  color: #323338;
+  color: var(--text-dark);
   margin: 0;
 }
 
@@ -115,7 +115,7 @@
 }
 
 .opp-detail__subtitle {
-  color: #676879;
+  color: var(--text-gray);
   font-size: 14px;
   margin: 0;
 }
@@ -145,10 +145,10 @@
   margin: 20px var(--page-gutter) 32px;
   padding: 32px;
   background: #fff;
-  border: 1px dashed #d0d4e4;
+  border: 1px dashed var(--border-input);
   border-radius: 10px;
   text-align: center;
-  color: #676879;
+  color: var(--text-gray);
 }
 
 @media (max-width: 640px) {
@@ -224,7 +224,7 @@
   align-items: center;
   gap: 14px;
   font-size: 13px;
-  color: #323338;
+  color: var(--text-dark);
   font-weight: 600;
 }
 
@@ -278,7 +278,7 @@
   gap: 8px;
   font-size: 12px;
   font-weight: 600;
-  color: #676879;
+  color: var(--text-gray);
 }
 
 .opp-detail__lectura-gate-row {
