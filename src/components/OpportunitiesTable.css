@@ -224,3 +224,12 @@
   justify-content: flex-end;
   padding-right: 12px;
 }
+
+/* Auditoría WCAG 2.5.8: en celular los botones de paginación (32px) pasan a 44px de
+   área táctil; en desktop se mantienen como estaban. */
+@media (max-width: 640px) {
+  .opps-table-wrap__page-btn {
+    min-width: 44px;
+    min-height: 44px;
+  }
+}

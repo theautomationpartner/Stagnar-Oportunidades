@@ -400,7 +400,7 @@ export default function FileUploadField({
         )}
       </div>
 
-      {error && <p className="file-field__error">Error: {error}</p>}
+      {error && <p className="file-field__error" role="alert">Error: {error}</p>}
 
       {showPreview &&
         previewUrl &&

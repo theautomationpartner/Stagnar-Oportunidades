@@ -426,3 +426,13 @@
 /* NumberField (@vibe/core) ya trae su propio padding/borde/radio — no queda nada que
    pisar acá (antes esto apuntaba al <input type="number"> a mano). */
 
+
+/* Auditoría (WCAG 1.4.10 reflow): la tabla de cuotas desbordaba la tarjeta en celular
+   sin forma de scrollear — misma solución que ya tenía EmitirStepPanel. */
+@media (max-width: 640px) {
+  .quote-card__cuotas-table {
+    display: block;
+    overflow-x: auto;
+    max-width: 100%;
+  }
+}

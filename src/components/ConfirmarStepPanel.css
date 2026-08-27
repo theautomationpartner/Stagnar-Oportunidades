@@ -302,3 +302,12 @@
   font-size: 14px;
   color: var(--text-dark);
 }
+
+/* Auditoría (WCAG 1.4.10 reflow): ver el mismo bloque en QuoteCard.css. */
+@media (max-width: 640px) {
+  .confirmar-step__card-cuotas-table {
+    display: block;
+    overflow-x: auto;
+    max-width: 100%;
+  }
+}

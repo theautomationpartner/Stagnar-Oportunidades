@@ -43,6 +43,9 @@ export default function FilterPanel({
   onClear,
 }) {
   const [advancedOpen, setAdvancedOpen] = useState(false)
+  // Auditoría (Nielsen N1, visibilidad del estado): con el panel cerrado no había forma
+  // de saber que había filtros aplicados. El contador va en el propio toggle.
+  const activeCount = Object.values(filters).filter(Boolean).length
 
   return (
     <section className="filter-panel">
@@ -62,7 +65,13 @@ export default function FilterPanel({
         onClick={() => setAdvancedOpen((v) => !v)}
         aria-expanded={advancedOpen}
       >
-        Filtros avanzados {advancedOpen ? <MdExpandLess /> : <MdExpandMore />}
+        Filtros avanzados
+        {activeCount > 0 && (
+          <span className="filter-panel__active-count" aria-label={`${activeCount} filtros activos`}>
+            {activeCount}
+          </span>
+        )}
+        {advancedOpen ? <MdExpandLess /> : <MdExpandMore />}
       </button>
 
       {advancedOpen && (

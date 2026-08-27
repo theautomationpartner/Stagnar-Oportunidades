@@ -722,7 +722,7 @@ function EditarContactoModal({ form, departamentoOptions, localidades, onSave, o
                 onChange={(e) => setFechaNacimiento(e.target.value)}
               />
             </div>
-            {fechaErr && <span className="crear-op__field-error">{fechaErr}</span>}
+            {fechaErr && <span className="crear-op__field-error" role="alert">{fechaErr}</span>}
           </label>
           <label className="crear-op__field crear-op__field--full">
             <span>Teléfono <Required /></span>
@@ -745,7 +745,7 @@ function EditarContactoModal({ form, departamentoOptions, localidades, onSave, o
                 validation={telefonoErr ? { status: 'error' } : telefono ? { status: 'success' } : undefined}
               />
             </div>
-            {telefonoErr && <span className="crear-op__field-error">{telefonoErr}</span>}
+            {telefonoErr && <span className="crear-op__field-error" role="alert">{telefonoErr}</span>}
           </label>
           <label className="crear-op__field">
             <span>Departamento <Required /></span>
@@ -845,7 +845,7 @@ function EditarLeadModal({ form, departamentoOptions, localidades, onSave, onClo
           <label className={`crear-op__field${fieldStateClass(ci, ciErr)}`}>
             <span>CI <Required /></span>
             <input type="text" value={ci} onChange={(e) => setCi(e.target.value)} />
-            {ciErr && <span className="crear-op__field-error">{ciErr}</span>}
+            {ciErr && <span className="crear-op__field-error" role="alert">{ciErr}</span>}
           </label>
           <label className={`crear-op__field${fieldStateClass(fechaNacimiento, fechaErr)}`}>
             <span>Fecha Nacimiento <Required /></span>
@@ -857,7 +857,7 @@ function EditarLeadModal({ form, departamentoOptions, localidades, onSave, onClo
                 onChange={(e) => setFechaNacimiento(e.target.value)}
               />
             </div>
-            {fechaErr && <span className="crear-op__field-error">{fechaErr}</span>}
+            {fechaErr && <span className="crear-op__field-error" role="alert">{fechaErr}</span>}
           </label>
           <label className="crear-op__field">
             <span>Departamento <Required /></span>
@@ -958,7 +958,7 @@ function TelefonoField({ form, handleChange, resetKey }) {
             />
           </div>
           {telefonoError(form.telefono, form.codigoPais) && (
-            <span className="crear-op__field-error">{telefonoError(form.telefono, form.codigoPais)}</span>
+            <span className="crear-op__field-error" role="alert">{telefonoError(form.telefono, form.codigoPais)}</span>
           )}
         </label>
       </div>
@@ -2398,7 +2398,7 @@ export default function CrearOportunidadForm({
                               )}
                             </div>
                             {fechaError(form.fechaNacimiento) && (
-                              <span className="crear-op__field-error">{fechaError(form.fechaNacimiento)}</span>
+                              <span className="crear-op__field-error" role="alert">{fechaError(form.fechaNacimiento)}</span>
                             )}
                           </label>
                           </div>

@@ -241,7 +241,7 @@ export default function EmitirStepPanel({
           showReplaceButton={false}
           compactDelete
         />
-        {confirmarEmisionError && <p className="emitir-step__error">Error: {confirmarEmisionError}</p>}
+        {confirmarEmisionError && <p className="emitir-step__error" role="alert">Error: {confirmarEmisionError}</p>}
         {!polling && <ErrorDetailBox detail={errorDetail} className="emitir-step__error-detail-spacing" />}
       </div>
 

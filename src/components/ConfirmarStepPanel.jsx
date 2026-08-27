@@ -352,7 +352,7 @@ export default function ConfirmarStepPanel({
             </button>
           </div>
         </div>
-        {elegidaError && <p className="confirmar-step__error">Error: {elegidaError}</p>}
+        {elegidaError && <p className="confirmar-step__error" role="alert">Error: {elegidaError}</p>}
         {visibleEntries.length === 0 ? (
           <p className="confirmar-step__empty">
             {filterTab === 'sent'
@@ -382,7 +382,7 @@ export default function ConfirmarStepPanel({
       {confirmError && (
         <div className="confirmar-step__section">
           <h2 className="confirmar-step__title">Confirmar</h2>
-          <p className="confirmar-step__error">Error: {confirmError}</p>
+          <p className="confirmar-step__error" role="alert">Error: {confirmError}</p>
         </div>
       )}
 
