@@ -35,6 +35,9 @@ const OPPORTUNITY_COLUMN_IDS = [
   // Tipo de Sujeto (Cliente/Lead): columna Mirror de la "Situación" del Cliente vinculado
   // (la color_mm51mm5v propia de Oportunidades quedó obsoleta, la automatización ya no la escribe).
   'lookup_mm6m64w7', // Tipo de Sujeto (mirror desde Clientes)
+  // Cliente/Lead vinculado — en el detalle trae además sus datos (linked_items, ver
+  // OPPORTUNITY_DETAIL_QUERY): domicilio principal, Situación, etc.
+  'board_relation_mm4qg1n2',
   'color_mm4wr1t4', // Estado Envio
   'numeric_mm527wpm', // Edad
   'dropdown_mm5jqdk', // Tipo
@@ -117,6 +120,23 @@ const OPPORTUNITY_DETAIL_QUERY = `
         text
         ... on BoardRelationValue {
           display_value
+          # A pedido: datos del Cliente/Lead vinculado (board_relation_mm4qg1n2) para
+          # mostrarlos en la ficha de la oportunidad — domicilio principal (Dirección +
+          # Localidad + Departamento del tablero Clientes), Nombre/Apellido y Situación.
+          # Las demás conexiones (Departamento, Localidad, Modelo...) no tienen estas
+          # columnas y devuelven column_values vacío — opportunityMapper solo lee la del
+          # Cliente.
+          linked_items {
+            id
+            name
+            column_values(ids: ["long_text_mm6m7d8c", "board_relation_mm65e7he", "board_relation_mm657jse", "text_mm6mrx0a", "text_mm6mx38p", "color_mm6570m0"]) {
+              id
+              text
+              ... on BoardRelationValue {
+                display_value
+              }
+            }
+          }
         }
       }
       subitems {
@@ -661,13 +681,56 @@ export async function leerCedula(file) {
   return response.json()
 }
 
-export async function clearFileColumn(itemId, columnId) {
+export async function clearFileColumn(itemId, columnId, boardId = OPPORTUNITIES_BOARD_ID) {
   const data = await callMondayApi(CLEAR_FILE_COLUMN_MUTATION, {
-    boardId: OPPORTUNITIES_BOARD_ID,
+    boardId,
     itemId,
     columnId,
   })
   return data.update_assets_on_item
+}
+
+// Columna "file" con VARIOS archivos (a pedido: "Archivos" genéricos del Cliente, ver
+// CONTACTO_ARCHIVOS_COLUMN_ID) — a diferencia de fetchFileColumnAsset (que devuelve solo
+// el primero, para columnas de un único archivo), acá se listan todos.
+export async function fetchFileColumnAssets(itemId, columnId) {
+  const data = await callMondayApi(FILE_COLUMN_VALUE_QUERY, { itemId, columnId: [columnId] })
+  const raw = data.items?.[0]?.column_values?.[0]?.value
+  if (!raw) return []
+  const parsed = JSON.parse(raw)
+  return (parsed.files ?? [])
+    .filter((f) => f.assetId)
+    .map((f) => ({ assetId: String(f.assetId), name: f.name }))
+}
+
+// Sacar UN archivo de una columna con varios: la API no tiene "borrar este asset",
+// update_assets_on_item reemplaza la lista completa — se le manda la lista que queda
+// (misma mutation que CLEAR_FILE_COLUMN_MUTATION, pero con `files` no vacío).
+const SET_FILE_COLUMN_ASSETS_MUTATION = `
+  mutation SetFileColumnAssets($boardId: ID!, $itemId: ID!, $columnId: String!, $files: [FileInput!]!) {
+    update_assets_on_item(board_id: $boardId, item_id: $itemId, column_id: $columnId, files: $files) {
+      id
+    }
+  }
+`
+
+export async function removeFileFromColumn(itemId, columnId, boardId, keepFiles) {
+  const data = await callMondayApi(SET_FILE_COLUMN_ASSETS_MUTATION, {
+    boardId,
+    itemId,
+    columnId,
+    files: keepFiles.map((f) => ({ assetId: f.assetId, name: f.name, fileType: 'asset' })),
+  })
+  return data.update_assets_on_item
+}
+
+// Descarga un asset puntual (por id) como File — variante de fetchFileColumnAsFile para
+// columnas con varios archivos, donde ya se sabe cuál se quiere ver.
+export async function fetchAssetAsFile(assetId, name) {
+  const response = await fetch(`/api/monday-asset?assetId=${assetId}`)
+  if (!response.ok) return null
+  const blob = await response.blob()
+  return new File([blob], name || 'archivo', { type: blob.type })
 }
 
 // A pedido: al elegir en el buscador una Oportunidad que ya tiene Cédula Identidad
@@ -782,6 +845,19 @@ const CONTACTO_CI_COLUMN_ID = 'text_mm4vk9aq'
 const CONTACTO_TELEFONO_COLUMN_ID = 'phone_mm65zhnn'
 const CONTACTO_FECHA_NACIMIENTO_COLUMN_ID = 'date_mm65sgmw'
 const CONTACTO_CI_FRENTE_COLUMN_ID = 'file_mm65486d'
+// A pedido: domicilio principal = Departamento + Localidad (las 2 conexiones de abajo,
+// ya existían) + Dirección exacta (calle y número, texto largo — nueva). Los 3 son
+// obligatorios en la app (ver isStepValid en CrearOportunidadForm.jsx).
+const CONTACTO_DIRECCION_COLUMN_ID = 'long_text_mm6m7d8c'
+// A pedido: además del nombre del ítem ("Nombre Apellido"), Nombre y Apellido van en
+// columnas propias — se escriben al crear y se leen al buscar (antes se partía el
+// nombre del ítem a ciegas, ver splitNombreApellido en CrearOportunidadForm.jsx).
+const CONTACTO_NOMBRE_COLUMN_ID = 'text_mm6mrx0a'
+const CONTACTO_APELLIDO_COLUMN_ID = 'text_mm6mx38p'
+// A pedido: documentos genéricos del Cliente (varios archivos por ítem) — columna
+// aparte de CI Frente a propósito: esa la asumen de un solo archivo tanto "Leer
+// cédula con IA" como el escenario de Make de creación de póliza.
+const CONTACTO_ARCHIVOS_COLUMN_ID = 'file_mm6ma0kd'
 const CONTACTO_LOCALIDAD_COLUMN_ID = 'board_relation_mm65e7he'
 // A diferencia de antes (mirror automático desde Localidad), ahora es una conexión
 // propia e independiente al mismo tablero de Departamentos que ya usa fetchDepartamentos
@@ -805,7 +881,7 @@ const SEARCH_CONTACTOS_QUERY = `
         items {
           id
           name
-          column_values(ids: ["${CONTACTO_ESTADO_COLUMN_ID}", "${CONTACTO_CI_COLUMN_ID}", "${CONTACTO_TELEFONO_COLUMN_ID}", "${CONTACTO_FECHA_NACIMIENTO_COLUMN_ID}", "${CONTACTO_LOCALIDAD_COLUMN_ID}", "${CONTACTO_DEPARTAMENTO_COLUMN_ID}"]) {
+          column_values(ids: ["${CONTACTO_ESTADO_COLUMN_ID}", "${CONTACTO_CI_COLUMN_ID}", "${CONTACTO_TELEFONO_COLUMN_ID}", "${CONTACTO_FECHA_NACIMIENTO_COLUMN_ID}", "${CONTACTO_LOCALIDAD_COLUMN_ID}", "${CONTACTO_DEPARTAMENTO_COLUMN_ID}", "${CONTACTO_DIRECCION_COLUMN_ID}", "${CONTACTO_NOMBRE_COLUMN_ID}", "${CONTACTO_APELLIDO_COLUMN_ID}"]) {
             id
             text
             value
@@ -852,6 +928,11 @@ function mapContactoItem(item) {
     telefonoCountryShortName,
     localidadNombre: byId[CONTACTO_LOCALIDAD_COLUMN_ID]?.display_value?.trim() || '',
     departamentoNombre: byId[CONTACTO_DEPARTAMENTO_COLUMN_ID]?.display_value?.trim() || '',
+    direccion: byId[CONTACTO_DIRECCION_COLUMN_ID]?.text?.trim() || '',
+    // Vacíos en ítems viejos (creados antes de estas columnas) — el form cae a partir
+    // el nombre del ítem en ese caso.
+    nombre: byId[CONTACTO_NOMBRE_COLUMN_ID]?.text?.trim() || '',
+    apellido: byId[CONTACTO_APELLIDO_COLUMN_ID]?.text?.trim() || '',
   }
 }
 
@@ -884,6 +965,30 @@ export async function findContactoByCedula(ci) {
   })
   const items = data.boards[0]?.items_page.items ?? []
   return items.map(mapContactoItem).find((c) => c.ci === digits) ?? null
+}
+
+// Mismo criterio que findContactoByCedula pero por Teléfono — a pedido, para no cargar
+// dos veces la misma persona con distinta Cédula (o sin ella). Se compara el número
+// completo con código de país y solo dígitos ("59899123456"), que es exactamente como
+// la app lo guarda en la columna phone (ver createContactoItem en CrearOportunidadForm).
+// contains_text sobre la columna phone matchea por el número local, y después se filtra
+// por igualdad exacta para no confundir "99123456" con "199123456".
+export async function findContactoByTelefono(codigoPais, telefono) {
+  const localDigits = (telefono ?? '').replace(/\D/g, '')
+  if (localDigits.length < 6) return null
+  const fullDigits = `${(codigoPais ?? '').replace(/\D/g, '')}${localDigits}`
+  const data = await callMondayApi(SEARCH_CONTACTOS_QUERY, {
+    boardId: CLIENTES_BOARD_ID,
+    rules: [{ column_id: CONTACTO_TELEFONO_COLUMN_ID, compare_value: [localDigits], operator: 'contains_text' }],
+    limit: 5,
+  })
+  const items = data.boards[0]?.items_page.items ?? []
+  return (
+    items.map(mapContactoItem).find((c) => {
+      const stored = (c.telefono ?? '').replace(/\D/g, '')
+      return stored === fullDigits || stored === localDigits
+    }) ?? null
+  )
 }
 
 const FETCH_CONTACTO_OPORTUNIDADES_QUERY = `
@@ -964,4 +1069,8 @@ export {
   CONTACTO_DEPARTAMENTO_COLUMN_ID,
   CONTACTO_CI_FRENTE_COLUMN_ID,
   CONTACTO_ESTADO_COLUMN_ID,
+  CONTACTO_DIRECCION_COLUMN_ID,
+  CONTACTO_ARCHIVOS_COLUMN_ID,
+  CONTACTO_NOMBRE_COLUMN_ID,
+  CONTACTO_APELLIDO_COLUMN_ID,
 }

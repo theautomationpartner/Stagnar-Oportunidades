@@ -23,6 +23,10 @@ const CLIENTE_FIELDS = [
   { key: 'telefono', label: 'Teléfono' },
   { key: 'fechaNacimiento', label: 'Fecha de nacimiento' },
   { key: 'departamento', label: 'Departamento' },
+  // A pedido: domicilio principal del Cliente/Lead (tablero Clientes, ver
+  // opportunityMapper.js). `optional`: se muestra pero no bloquea la emisión — los
+  // clientes cargados antes de esta columna no lo tienen y no se edita desde acá.
+  { key: 'clienteDomicilio', label: 'Domicilio', optional: true },
 ]
 
 const BIEN_FIELDS = [
@@ -49,7 +53,7 @@ const DOCS_FIELDS = [
 
 function getMissingLabels(opportunity) {
   return [...CLIENTE_FIELDS, ...BIEN_FIELDS, ...DOCS_FIELDS]
-    .filter((f) => !opportunity[f.key])
+    .filter((f) => !f.optional && !opportunity[f.key])
     .map((f) => f.label)
 }
 

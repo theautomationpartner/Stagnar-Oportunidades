@@ -29,6 +29,7 @@ import {
 } from '@vibe/core'
 import Stepper from './Stepper'
 import StatusBadge from './StatusBadge'
+import ClienteArchivos from './ClienteArchivos'
 import AlertModal from './AlertModal'
 import ErrorDetailBox from './ErrorDetailBox'
 import FileUploadField from './FileUploadField'
@@ -46,6 +47,7 @@ import {
   fetchItemState,
   searchContactos,
   findContactoByCedula,
+  findContactoByTelefono,
   fetchContactoOportunidades,
   createContactoItem,
   fetchFileColumnAsFile,
@@ -58,6 +60,10 @@ import {
   CONTACTO_DEPARTAMENTO_COLUMN_ID,
   CONTACTO_CI_FRENTE_COLUMN_ID,
   CONTACTO_ESTADO_COLUMN_ID,
+  CONTACTO_DIRECCION_COLUMN_ID,
+  CONTACTO_ARCHIVOS_COLUMN_ID,
+  CONTACTO_NOMBRE_COLUMN_ID,
+  CONTACTO_APELLIDO_COLUMN_ID,
 } from '../services/mondayApi'
 import { mapOpportunities } from '../services/opportunityMapper'
 import { matchesSearchQuery } from '../services/format'
@@ -278,6 +284,9 @@ function ExistingRecordSearch({ value, onChange }) {
             telefonoCountryShortName: c.telefonoCountryShortName,
             departamentoNombre: c.departamentoNombre,
             localidadNombre: c.localidadNombre,
+            direccion: c.direccion,
+            nombre: c.nombre,
+            apellido: c.apellido,
           }))
         )
         setSearched(true)
@@ -403,6 +412,12 @@ function buildInitialForm() {
     telefono: '',
     localidadId: '',
     departamentoId: '',
+    // A pedido: dirección exacta (calle y número) del domicilio principal — obligatoria
+    // junto con Departamento y Localidad (ver isStepValid).
+    direccion: '',
+    // A pedido: documentos genéricos de un Lead NUEVO (todavía sin ítem en monday) — se
+    // suben al Cliente recién creado al guardar (ver handleGuardar / ClienteArchivos).
+    archivosCliente: [],
     tipoRiesgo: '',
     poseeVehiculo: '',
     // Modelo (Autodata) — se pide siempre que sea Automóvil, sin importar la respuesta
@@ -679,6 +694,7 @@ function EditarContactoModal({ form, departamentoOptions, localidades, onSave, o
   const [telefono, setTelefono] = useState(form.telefono)
   const [departamentoId, setDepartamentoId] = useState(form.departamentoId)
   const [localidadId, setLocalidadId] = useState(form.localidadId)
+  const [direccion, setDireccion] = useState(form.direccion)
 
   const selectedDepartamento = departamentoOptions.find((o) => o.value === departamentoId) ?? null
   const localidadOptions = localidades
@@ -688,7 +704,7 @@ function EditarContactoModal({ form, departamentoOptions, localidades, onSave, o
 
   const telefonoErr = telefonoError(telefono, codigoPais)
   const fechaErr = fechaError(fechaNacimiento)
-  const canSave = !telefonoErr && !fechaErr && departamentoId && localidadId
+  const canSave = !telefonoErr && !fechaErr && departamentoId && localidadId && direccion.trim()
 
   return (
     <Modal id="editar-contacto-modal" show onClose={onClose} size="medium">
@@ -755,6 +771,15 @@ function EditarContactoModal({ form, departamentoOptions, localidades, onSave, o
               onChange={(option) => setLocalidadId(option?.value ?? '')}
             />
           </label>
+          <label className={`crear-op__field crear-op__field--full${fieldStateClass(direccion, null)}`}>
+            <span>Dirección (calle y número) <Required /></span>
+            <input
+              type="text"
+              value={direccion}
+              placeholder="Ej: Av. Italia 1234 apto 5"
+              onChange={(e) => setDireccion(e.target.value)}
+            />
+          </label>
         </div>
       </ModalContent>
       <ModalFooter
@@ -762,7 +787,7 @@ function EditarContactoModal({ form, departamentoOptions, localidades, onSave, o
         primaryButton={{
           text: saving ? 'Guardando...' : 'Guardar',
           disabled: !canSave || saving,
-          onClick: () => onSave({ fechaNacimiento, codigoPais, telefono, departamentoId, localidadId }),
+          onClick: () => onSave({ fechaNacimiento, codigoPais, telefono, departamentoId, localidadId, direccion }),
         }}
       />
     </Modal>
@@ -783,6 +808,7 @@ function EditarLeadModal({ form, departamentoOptions, localidades, onSave, onClo
   const [fechaNacimiento, setFechaNacimiento] = useState(form.fechaNacimiento)
   const [departamentoId, setDepartamentoId] = useState(form.departamentoId)
   const [localidadId, setLocalidadId] = useState(form.localidadId)
+  const [direccion, setDireccion] = useState(form.direccion)
 
   const selectedDepartamento = departamentoOptions.find((o) => o.value === departamentoId) ?? null
   const localidadOptions = localidades
@@ -793,7 +819,15 @@ function EditarLeadModal({ form, departamentoOptions, localidades, onSave, onClo
   const ciErr = ciError(ci)
   const fechaErr = fechaError(fechaNacimiento)
   const canSave =
-    nombre.trim() && apellido.trim() && ci.trim() && !ciErr && fechaNacimiento && !fechaErr && departamentoId && localidadId
+    nombre.trim() &&
+    apellido.trim() &&
+    ci.trim() &&
+    !ciErr &&
+    fechaNacimiento &&
+    !fechaErr &&
+    departamentoId &&
+    localidadId &&
+    direccion.trim()
 
   return (
     <Modal id="editar-lead-modal" show onClose={onClose} size="medium">
@@ -849,6 +883,15 @@ function EditarLeadModal({ form, departamentoOptions, localidades, onSave, onClo
               onChange={(option) => setLocalidadId(option?.value ?? '')}
             />
           </label>
+          <label className={`crear-op__field crear-op__field--full${fieldStateClass(direccion, null)}`}>
+            <span>Dirección (calle y número) <Required /></span>
+            <input
+              type="text"
+              value={direccion}
+              placeholder="Ej: Av. Italia 1234 apto 5"
+              onChange={(e) => setDireccion(e.target.value)}
+            />
+          </label>
         </div>
       </ModalContent>
       <ModalFooter
@@ -856,7 +899,8 @@ function EditarLeadModal({ form, departamentoOptions, localidades, onSave, onClo
         primaryButton={{
           text: 'Guardar',
           disabled: !canSave,
-          onClick: () => onSave({ nombre, apellido, ci: stripCi(ci), fechaNacimiento, departamentoId, localidadId }),
+          onClick: () =>
+            onSave({ nombre, apellido, ci: stripCi(ci), fechaNacimiento, departamentoId, localidadId, direccion }),
         }}
       />
     </Modal>
@@ -1130,6 +1174,7 @@ export default function CrearOportunidadForm({
         telefono: '',
         departamentoId: '',
         localidadId: '',
+        direccion: '',
       }))
       setTextFieldsResetKey((k) => k + 1)
       return
@@ -1149,7 +1194,12 @@ export default function CrearOportunidadForm({
     // El tablero Clientes no tiene columnas separadas de Nombre/Apellido (Cliente o
     // Lead, da igual) — se parte el nombre completo del ítem, mismo criterio que
     // splitNombreApellido de más arriba.
-    const { nombre, apellido } = splitNombreApellido(resultado.name)
+    // A pedido: Nombre/Apellido ahora tienen columnas propias en Clientes — se usan si
+    // están; partir el nombre del ítem queda solo como respaldo para ítems viejos.
+    const { nombre, apellido } =
+      resultado.nombre || resultado.apellido
+        ? { nombre: resultado.nombre, apellido: resultado.apellido }
+        : splitNombreApellido(resultado.name)
     setForm((prev) => ({
       ...prev,
       nombre: nombre || prev.nombre,
@@ -1160,6 +1210,7 @@ export default function CrearOportunidadForm({
       telefono: telefono || prev.telefono,
       departamentoId: departamentoMatch?.id ?? prev.departamentoId,
       localidadId: localidadMatch?.id ?? prev.localidadId,
+      direccion: resultado.direccion || prev.direccion,
     }))
     // A pedido: si esa persona ya tenía Cédula Identidad (CI Frente) subida en Clientes,
     // se reusa acá — Cliente y Lead viven en el mismo tablero ahora, así que siempre es
@@ -1220,6 +1271,7 @@ export default function CrearOportunidadForm({
             telefono: form.telefono,
             departamentoId: form.departamentoId,
             localidadId: form.localidadId,
+            direccion: form.direccion,
           }
         : null,
       // A pedido: además de los datos personales, se guarda en qué paso estaba y el
@@ -1320,20 +1372,38 @@ export default function CrearOportunidadForm({
     const digits = stripCi(form.ci)
     const ciValida = digits && !ciError(form.ci)
     const nombreCompleto = form.nombre.trim() && form.apellido.trim() ? `${form.nombre} ${form.apellido}`.trim() : ''
-    if (!ciValida && !nombreCompleto) {
+    // A pedido: también por Teléfono (misma validación que la Cédula, ver
+    // findContactoByTelefono en mondayApi.js) — solo con un número ya válido, para no
+    // consultar a mitad de tipeo.
+    const telefonoValido = form.telefono.trim() && !telefonoError(form.telefono, form.codigoPais)
+    if (!ciValida && !nombreCompleto && !telefonoValido) {
       setDuplicadoCheck(null)
       return undefined
     }
     let cancelled = false
     const timer = setTimeout(() => {
-      const lookup = ciValida
-        ? findContactoByCedula(digits)
-        : searchContactos(nombreCompleto).then((r) => r[0] ?? null)
+      // Orden de prioridad: CI exacto > Teléfono exacto > Nombre+Apellido (laxo). Se
+      // recuerda por cuál se encontró (`motivo`) para que el popup diga qué coincidió.
+      const lookup = (async () => {
+        if (ciValida) {
+          const porCi = await findContactoByCedula(digits)
+          if (porCi) return { contacto: porCi, motivo: 'ci' }
+        }
+        if (telefonoValido) {
+          const porTelefono = await findContactoByTelefono(form.codigoPais, form.telefono)
+          if (porTelefono) return { contacto: porTelefono, motivo: 'telefono' }
+        }
+        if (!ciValida && nombreCompleto) {
+          const porNombre = (await searchContactos(nombreCompleto))[0] ?? null
+          if (porNombre) return { contacto: porNombre, motivo: 'nombre' }
+        }
+        return { contacto: null, motivo: null }
+      })()
       lookup
-        .then((contacto) => {
+        .then((result) => {
           if (cancelled) return
-          setDuplicadoCheck({ contacto })
-          if (contacto) setShowDuplicadoModal(true)
+          setDuplicadoCheck(result)
+          if (result.contacto) setShowDuplicadoModal(true)
         })
         .catch(() => {
           if (!cancelled) setDuplicadoCheck(null)
@@ -1343,7 +1413,15 @@ export default function CrearOportunidadForm({
       cancelled = true
       clearTimeout(timer)
     }
-  }, [form.ci, form.nombre, form.apellido, busquedaResuelta, resultadoSeleccionado])
+  }, [
+    form.ci,
+    form.nombre,
+    form.apellido,
+    form.telefono,
+    form.codigoPais,
+    busquedaResuelta,
+    resultadoSeleccionado,
+  ])
 
   // "Cancelar" — cierra el popup sin tocar nada, el usuario sigue completando el form a
   // mano como si el aviso no hubiera aparecido.
@@ -1385,6 +1463,8 @@ export default function CrearOportunidadForm({
         // A diferencia de antes (mirror automático desde Localidad), ahora Departamento
         // es una conexión propia — hay que escribirla explícitamente.
         [CONTACTO_DEPARTAMENTO_COLUMN_ID]: { item_ids: [Number(values.departamentoId)] },
+        // Columna "long text": el JSON de change_multiple_column_values es {"text": ...}.
+        [CONTACTO_DIRECCION_COLUMN_ID]: { text: values.direccion.trim() },
       })
       setForm((prev) => ({ ...prev, ...values }))
       setEditingContacto(false)
@@ -1505,7 +1585,9 @@ export default function CrearOportunidadForm({
           form.telefono &&
           !telefonoError(form.telefono, form.codigoPais) &&
           form.localidadId &&
-          form.departamentoId
+          form.departamentoId &&
+          // A pedido: domicilio principal completo = Departamento + Localidad + Dirección.
+          form.direccion.trim()
       )
     }
     if (index === 1) {
@@ -1746,6 +1828,8 @@ export default function CrearOportunidadForm({
     if (resultadoSeleccionado?.id) return resultadoSeleccionado.id
     const created = await createContactoItem(`${form.nombre} ${form.apellido}`.trim(), {
       [CONTACTO_ESTADO_COLUMN_ID]: 'Lead',
+      [CONTACTO_NOMBRE_COLUMN_ID]: form.nombre.trim(),
+      [CONTACTO_APELLIDO_COLUMN_ID]: form.apellido.trim(),
       [CONTACTO_CI_COLUMN_ID]: stripCi(form.ci),
       [CONTACTO_TELEFONO_COLUMN_ID]: {
         phone: `${form.codigoPais.replace('+', '')}${form.telefono.replace(/\D/g, '')}`,
@@ -1754,6 +1838,7 @@ export default function CrearOportunidadForm({
       [CONTACTO_FECHA_NACIMIENTO_COLUMN_ID]: form.fechaNacimiento,
       [CONTACTO_LOCALIDAD_COLUMN_ID]: { item_ids: [Number(form.localidadId)] },
       [CONTACTO_DEPARTAMENTO_COLUMN_ID]: { item_ids: [Number(form.departamentoId)] },
+      [CONTACTO_DIRECCION_COLUMN_ID]: { text: form.direccion.trim() },
     })
     return created.id
   }
@@ -1792,6 +1877,12 @@ export default function CrearOportunidadForm({
       const contactoId = await ensureContactoId()
       if (!yaExistiaContacto) createdContactoId = contactoId
       await setConnectedColumnValue(itemId, OPORTUNIDAD_CONTACTO_COLUMN_ID, [Number(contactoId)])
+      // Documentos genéricos elegidos para un Lead nuevo (ver ClienteArchivos): recién
+      // ahora existe el ítem del Cliente al que subirlos. Para un Cliente/Lead ya
+      // existente ClienteArchivos los sube directo y esta lista queda vacía.
+      for (const file of form.archivosCliente) {
+        await uploadFileToColumn(contactoId, CONTACTO_ARCHIVOS_COLUMN_ID, file)
+      }
 
       if (esAutomovil) {
         setGuardarStepKey('vehiculo')
@@ -2017,15 +2108,31 @@ export default function CrearOportunidadForm({
                   <AlertModal
                     id="duplicado-cedula-modal"
                     type="warning"
-                    title="Cédula de Identidad ya registrada"
+                    title={
+                      duplicadoCheck.motivo === 'telefono'
+                        ? 'Teléfono ya registrado'
+                        : duplicadoCheck.motivo === 'nombre'
+                          ? 'Persona ya registrada'
+                          : 'Cédula de Identidad ya registrada'
+                    }
                     description={
                       <>
-                        Encontramos esta Cédula de Identidad ya cargada en el tablero Clientes:
+                        {duplicadoCheck.motivo === 'telefono'
+                          ? 'Encontramos este Teléfono ya cargado en el tablero Clientes:'
+                          : duplicadoCheck.motivo === 'nombre'
+                            ? 'Encontramos una persona con este Nombre y Apellido ya cargada en el tablero Clientes:'
+                            : 'Encontramos esta Cédula de Identidad ya cargada en el tablero Clientes:'}
                         <br />
                         <br />
                         Nombre: <strong>{duplicadoCheck.contacto.name}</strong>
                         <br />
                         Situación: <strong>{duplicadoCheck.contacto.situacion || 'Cliente'}</strong>
+                        {duplicadoCheck.motivo === 'telefono' && duplicadoCheck.contacto.ci && (
+                          <>
+                            <br />
+                            CI: <strong>{duplicadoCheck.contacto.ci}</strong>
+                          </>
+                        )}
                         <br />
                         <br />
                         ¿Deseás continuar con la información de este registro?
@@ -2077,7 +2184,7 @@ export default function CrearOportunidadForm({
                         </h2>
                         <span className="crear-op__ficha-address">
                           <MdLocationOn />
-                          {[selectedDepartamento?.label, selectedLocalidad?.label].filter(Boolean).join(', ') ||
+                          {[form.direccion, selectedLocalidad?.label, selectedDepartamento?.label].filter(Boolean).join(', ') ||
                             'Sin ubicación cargada'}
                         </span>
                       </div>
@@ -2117,6 +2224,13 @@ export default function CrearOportunidadForm({
                       onDelete={() => handleCedulaIdentidadChange(null)}
                     />
                   </div>
+
+                  {/* A pedido: documentos genéricos del Cliente/Lead — se leen y escriben
+                      directo en el ítem real de Clientes (ver ClienteArchivos). */}
+                  <ClienteArchivos
+                    contactoId={resultadoSeleccionado.id}
+                    tipo={resultadoSeleccionado.source === 'contacto' ? 'cliente' : 'lead'}
+                  />
 
                   {/* A pedido: la ficha de acá arriba es de solo lectura — sin esto,
                       si el Cliente/Lead elegido tiene algún dato obligatorio sin
@@ -2284,7 +2398,7 @@ export default function CrearOportunidadForm({
                               </h2>
                               <span className="crear-op__ficha-address">
                                 <MdLocationOn />
-                                {[selectedDepartamento?.label, selectedLocalidad?.label].filter(Boolean).join(', ') ||
+                                {[form.direccion, selectedLocalidad?.label, selectedDepartamento?.label].filter(Boolean).join(', ') ||
                                   'Sin ubicación cargada'}
                               </span>
                             </div>
@@ -2313,6 +2427,11 @@ export default function CrearOportunidadForm({
                         </div>
 
                         <TelefonoField form={form} handleChange={handleChange} resetKey={textFieldsResetKey} />
+
+                        <ClienteArchivos
+                          pendingFiles={form.archivosCliente}
+                          onPendingChange={(files) => handleChange('archivosCliente', files)}
+                        />
 
                         {/* A pedido: mismo aviso que la ficha de un Cliente/Lead ya
                             existente de más arriba — acá la lectura con IA puede haber
@@ -2363,8 +2482,25 @@ export default function CrearOportunidadForm({
                                 onChange={(option) => handleChange('localidadId', option?.value ?? '')}
                               />
                             </label>
+                            <TextField
+                              key={`direccion-${textFieldsResetKey}`}
+                              wrapperClassName="crear-op__field crear-op__field--full"
+                              title="Dirección (calle y número)"
+                              required
+                              placeholder="Ej: Av. Italia 1234 apto 5"
+                              value={form.direccion}
+                              onChange={(value) => handleChange('direccion', value)}
+                              icon={MdClear}
+                              onIconClick={() => handleChange('direccion', '')}
+                              validation={form.direccion.trim() ? { status: 'success' } : undefined}
+                            />
                           </div>
                         </div>
+
+                        <ClienteArchivos
+                          pendingFiles={form.archivosCliente}
+                          onPendingChange={(files) => handleChange('archivosCliente', files)}
+                        />
                       </>
                     )}
 

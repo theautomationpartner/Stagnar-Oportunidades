@@ -75,10 +75,27 @@ export function mapOpportunityItem(item, statusColors = {}) {
   const estadoLectura = textOf(cv, 'color_mm5rzrhk')
   const estadoLecturaColor = statusColors.estadoLectura?.[estadoLectura] ?? DEFAULT_COLOR
 
+  // A pedido: datos del ítem de Clientes vinculado (solo llegan en el detalle — ver
+  // linked_items en OPPORTUNITY_DETAIL_QUERY; en el listado quedan vacíos). Domicilio
+  // principal = Dirección + Localidad + Departamento DEL CLIENTE, distinto de
+  // departamento/zonaCirculacion de arriba, que son de circulación del vehículo.
+  const clienteItem = cv.find((c) => c.id === 'board_relation_mm4qg1n2')?.linked_items?.[0] ?? null
+  const ccv = clienteItem?.column_values ?? []
+  const clienteDireccion = textOf(ccv, 'long_text_mm6m7d8c')
+  const clienteLocalidad = boardRelationDisplayOf(ccv, 'board_relation_mm65e7he')
+  const clienteDepartamento = boardRelationDisplayOf(ccv, 'board_relation_mm657jse')
+  const clienteSituacion = textOf(ccv, 'color_mm6570m0')
+
   return {
     id: item.id,
     oppNumber: `ID-${item.id}`,
     clienteNombre,
+    clienteId: clienteItem?.id ?? null,
+    clienteSituacion,
+    clienteDireccion,
+    clienteLocalidad,
+    clienteDepartamento,
+    clienteDomicilio: [clienteDireccion, clienteLocalidad, clienteDepartamento].filter(Boolean).join(', '),
     ci: textOf(cv, 'numeric_mm51mb0s'),
     telefono: textOf(cv, 'phone_mm519m27'),
     marca,

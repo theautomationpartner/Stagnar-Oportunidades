@@ -1,5 +1,6 @@
-import { MdEdit, MdLocationOn, MdSmartphone } from 'react-icons/md'
+import { MdEdit, MdLocationOn, MdSmartphone, MdHome } from 'react-icons/md'
 import { Button } from '@vibe/core'
+import ClienteArchivos from './ClienteArchivos'
 import './ClientFicha.css'
 
 // Ficha del cliente/Lead de la oportunidad — antes solo vivía en el paso "Cotizar" (ver
@@ -17,8 +18,23 @@ import './ClientFicha.css'
 // cambios. `children`: contenido extra dentro de la misma tarjeta, debajo del Vehículo
 // (ej. la propuesta elegida en el paso "Emitir", ver EmitirStepPanel.jsx) — para no
 // repetir la info personal/del vehículo en una tarjeta aparte.
-export default function ClientFicha({ opportunity, onEdit, onEditVehiculo, tag, actions, children }) {
+// `showDocumentos` (default true): sección "Documentos del cliente/lead" (columna
+// Archivos del tablero Clientes, ver ClienteArchivos) — solo aparece si la oportunidad
+// tiene un Cliente/Lead vinculado (opportunity.clienteId, llega en el detalle).
+export default function ClientFicha({
+  opportunity,
+  onEdit,
+  onEditVehiculo,
+  tag,
+  actions,
+  children,
+  showDocumentos = true,
+}) {
   const ubicacion = [opportunity.departamento, opportunity.zonaCirculacion].filter(Boolean).join(' — ')
+  // A pedido: "Cliente" o "Lead" según la Situación real en el tablero Clientes — no
+  // llamar "cliente" a quien todavía es un lead.
+  const situacion = opportunity.clienteSituacion || ''
+  const esLead = situacion.toLowerCase() === 'lead'
 
   return (
     <div className="client-ficha">
@@ -29,11 +45,24 @@ export default function ClientFicha({ opportunity, onEdit, onEditVehiculo, tag, 
             <div className="client-ficha__name-row">
               <h3 className="client-ficha__name">{opportunity.clienteNombre}</h3>
               {tag && <span className="client-ficha__tag">{tag}</span>}
+              {situacion && <span className="client-ficha__tag">{situacion}</span>}
             </div>
-            <span className="client-ficha__address">
-              <MdLocationOn />
-              {ubicacion || 'Sin ubicación cargada'}
-            </span>
+            {/* A pedido: una sola línea de ubicación. Con Cliente/Lead vinculado se muestra
+                su domicilio principal (casa: Dirección, Localidad, Departamento del tablero
+                Clientes); solo si la oportunidad no tiene persona vinculada (casos viejos)
+                se cae a la ubicación de circulación propia de la oportunidad, para no
+                perder el dato. */}
+            {opportunity.clienteId ? (
+              <span className="client-ficha__address" title="Domicilio principal">
+                <MdHome />
+                {opportunity.clienteDomicilio || 'Sin domicilio cargado'}
+              </span>
+            ) : (
+              <span className="client-ficha__address" title="Ubicación">
+                <MdLocationOn />
+                {ubicacion || 'Sin ubicación cargada'}
+              </span>
+            )}
           </div>
         </div>
         <div className="client-ficha__header-actions">
@@ -80,6 +109,10 @@ export default function ClientFicha({ opportunity, onEdit, onEditVehiculo, tag, 
           </span>
         )}
       </div>
+
+      {showDocumentos && opportunity.clienteId && (
+        <ClienteArchivos contactoId={opportunity.clienteId} tipo={esLead ? 'lead' : 'cliente'} />
+      )}
 
       {children}
     </div>
