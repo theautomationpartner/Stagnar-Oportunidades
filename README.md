@@ -10,7 +10,8 @@ fallar en vez de arrancar en otro puerto — hay que liberar el 5173, no cambiar
 
 ## Pasos
 ```bash
-cd app
+# en la raíz del repo (donde está package.json) — la carpeta `app/` sin trackear es una
+# copia vieja de `src/` y no es la que corre
 npm install     # solo la primera vez, o cuando cambian dependencias
 npm run dev
 ```
@@ -42,5 +43,7 @@ Dejarlo corriendo y abrir http://localhost:5173 en el navegador.
   5 variables en el proyecto de Vercel (Production + Preview + Development) para que el
   deploy funcione igual que en local.
 - La lógica de negocio (qué se muestra, cómo se calculan las cotizaciones, qué falta)
-  está documentada en `/logica-monday-vibe.md`, en la raíz del repo (un nivel arriba
-  de esta carpeta `app/`).
+  está documentada en `/logica-monday-vibe.md`, en la raíz del repo.
+- Navegación por URL (hash): `#/` Inicio, `#/oportunidades` tabla,
+  `#/oportunidades/<id>/<paso>` detalle (paso: cotizar|comparar|confirmar|emitir),
+  `#/crear` wizard. Ver `src/hooks/useHashRoute.js`.
