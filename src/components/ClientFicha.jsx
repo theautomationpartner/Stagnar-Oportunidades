@@ -2,6 +2,7 @@ import { MdEdit, MdLocationOn, MdSmartphone, MdHome } from 'react-icons/md'
 import { Button } from '@vibe/core'
 import ClienteArchivos from './ClienteArchivos'
 import { formatShortDate } from '../services/format'
+import { initialsOf } from '../services/personaFields'
 import './ClientFicha.css'
 
 // Ficha del cliente/Lead de la oportunidad — antes solo vivía en el paso "Cotizar" (ver
@@ -41,7 +42,7 @@ export default function ClientFicha({
     <div className="client-ficha">
       <div className="client-ficha__header">
         <div className="client-ficha__identity">
-          <div className="client-ficha__avatar">{opportunity.clienteNombre.slice(0, 2).toUpperCase()}</div>
+          <div className="client-ficha__avatar">{initialsOf(opportunity.clienteNombre)}</div>
           <div className="client-ficha__heading">
             <div className="client-ficha__name-row">
               <h3 className="client-ficha__name">{opportunity.clienteNombre}</h3>

@@ -3,6 +3,7 @@ import { Table, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell, Em
 import Avatar from './Avatar'
 import StatusBadge from './StatusBadge'
 import './OpportunitiesTable.css'
+import { initialsOf } from '../services/personaFields'
 
 // A pedido: anchos explícitos en vez del reparto parejo por defecto (7 columnas a
 // ancho igual) — "Bien" y "Cliente" traen 2 líneas de texto y quedaban muy angostas
@@ -145,7 +146,7 @@ export default function OpportunitiesTable({
                 <TableCell>
                   <ClickableCell onOpen={openThisOpportunity}>
                     <div className="opps-table__cliente">
-                      <Avatar label={opp.clienteNombre.slice(0, 2).toUpperCase()} />
+                      <Avatar label={initialsOf(opp.clienteNombre)} />
                       <div>
                         <div className="opps-table__cliente-name">{opp.clienteNombre}</div>
                         <div className="opps-table__cliente-meta">

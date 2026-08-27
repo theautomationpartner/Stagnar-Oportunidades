@@ -11,10 +11,7 @@
 // con un valor de prueba que nunca se terminó de cargar bien; se unificó todo acá,
 // verificado contra el Excel (hoja "PANEL" interna, tabla "SANCOR PARA COTIZACIONES").
 import { fetchPanelItems } from './mondayApi'
-
-function textOf(columnValues, columnId) {
-  return columnValues.find((cv) => cv.id === columnId)?.text?.trim() || ''
-}
+import { textOf } from './mondayColumns'
 
 function grupoOf(columnValues) {
   return textOf(columnValues, 'color_mm5fdknw')

@@ -145,3 +145,25 @@ export function normalizeFechaIA(raw) {
   const [, d, m, y] = match
   return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
 }
+
+// Payload que espera la columna "phone" de monday (phone_mm519m27 en Oportunidades,
+// CONTACTO_TELEFONO_COLUMN_ID en Clientes): código de país + número, solo dígitos, y el
+// countryShortName. Antes estaba copiado 3 veces en CrearOportunidadForm.jsx.
+export function buildMondayPhone(codigoPais, telefono) {
+  return {
+    phone: `${(codigoPais ?? '').replace('+', '')}${(telefono ?? '').replace(/\D/g, '')}`,
+    countryShortName: COUNTRY_SHORT_NAMES[codigoPais] ?? 'UY',
+  }
+}
+
+// Iniciales para avatares: primera letra del primer y del último "token" (ej. "Santiago
+// González" -> "SG"; "María Clara Pérez" -> "MP"), para no quedar con 1 sola letra en
+// nombres compuestos ni con demasiadas en nombres de 3+ palabras. Antes había 3
+// versiones (Sidebar.jsx, ClientFicha.jsx y OpportunitiesTable.jsx tomaban las 2
+// primeras letras del nombre, "SA").
+export function initialsOf(name) {
+  const parts = (name ?? '').trim().split(/\s+/).filter(Boolean)
+  if (!parts.length) return '?'
+  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
+  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
+}

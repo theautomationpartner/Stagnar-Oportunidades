@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react'
 import { MdPersonAddAlt, MdMenu, MdMenuOpen } from 'react-icons/md'
 import stagnariLogo from '../assets/stagnari-logo.png'
 import stagnariLogoSimple from '../assets/stagnari-logo-simple.png'
+import { initialsOf } from '../services/personaFields'
+import { useMondayUser } from '../context/AppContext'
 import './Sidebar.css'
 
 // A pedido: barra lateral desplegable — colapsada (default, angosta, mismo look de
@@ -12,17 +14,11 @@ import './Sidebar.css'
 // — y se resetea — según `defaultExpanded`, que App.jsx manda en true solo en la
 // pantalla principal (landing) y en false en el resto: A pedido, la barra abre sola
 // nada más al entrar a la principal, no en cualquier otra pantalla.
-// A pedido: iniciales a partir del nombre real (ej. "Santiago González" -> "SG") —
-// primera letra del primer y del último "token", para no quedar con solo 1 letra en
-// nombres compuestos ni con demasiadas en nombres con 3+ palabras.
-function initialsOf(name) {
-  const parts = name.trim().split(/\s+/).filter(Boolean)
-  if (!parts.length) return '?'
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
-  return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
-}
 
-export default function Sidebar({ active = true, onNavigateOportunidades, defaultExpanded = false, user }) {
+export default function Sidebar({ active = true, onNavigateOportunidades, defaultExpanded = false, user: userProp }) {
+  // `user` puede venir por prop (compatibilidad) o del contexto global (ver AppContext).
+  const ctxUser = useMondayUser()
+  const user = userProp ?? ctxUser
   const [expanded, setExpanded] = useState(defaultExpanded)
 
   useEffect(() => {

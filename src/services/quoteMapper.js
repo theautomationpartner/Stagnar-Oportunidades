@@ -1,9 +1,7 @@
 // Convierte los subitems crudos de monday (Cotización por compañía/cobertura) en el
 // modelo "raw" que consume pricingEngine.computeQuote, mas metadatos de exhibicion.
+import { textOf } from './mondayColumns'
 
-function textOf(columnValues, columnId) {
-  return columnValues.find((cv) => cv.id === columnId)?.text?.trim() || ''
-}
 
 function boolOf(columnValues, columnId) {
   return textOf(columnValues, columnId) === 'v' || textOf(columnValues, columnId).toLowerCase() === 'true'

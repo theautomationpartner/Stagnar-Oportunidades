@@ -4,20 +4,9 @@
 // desde la config real de las columnas (ver services/boardSchema.js).
 
 import { formatShortDate } from './format'
+import { textOf, boardRelationDisplayOf } from './mondayColumns'
 
 const DEFAULT_COLOR = { bg: '#c4c4c4', border: '#b0b0b0' }
-
-function textOf(columnValues, columnId) {
-  return columnValues.find((cv) => cv.id === columnId)?.text?.trim() || ''
-}
-
-// Las columnas "conectada" (board_relation) devuelven `text` vacío/null vía API sin
-// importar si tienen un ítem vinculado o no — hay que pedir `display_value` (fragmento
-// GraphQL "... on BoardRelationValue", ver mondayApi.js) en su lugar. Confirmado contra
-// la API real: `text` da `null` incluso en ítems con Departamento cargado.
-function boardRelationDisplayOf(columnValues, columnId) {
-  return columnValues.find((cv) => cv.id === columnId)?.display_value?.trim() || ''
-}
 
 function uniqueNonEmpty(values) {
   return [...new Set(values.filter(Boolean))]

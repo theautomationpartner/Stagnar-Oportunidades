@@ -24,6 +24,8 @@ import {
   fetchLatestUpdate,
 } from '../services/mondayApi'
 import { mapOpportunityItem } from '../services/opportunityMapper'
+import { textOf } from '../services/mondayColumns'
+import { useSchema } from '../context/AppContext'
 import { mapSubitemToRawQuote, groupQuotesByCompania } from '../services/quoteMapper'
 import { computeQuote } from '../services/pricingEngine'
 import { applyRecargoLookup } from '../services/recargoPanel'
@@ -67,7 +69,7 @@ export default function OpportunityDetail({
   // Auditoría: salida SIEMPRE visible a la tabla de Oportunidades (antes, entrando desde
   // la tabla no había ningún botón de salida en pantalla — solo el ícono del Sidebar).
   onGoToList,
-  schema,
+  schema: schemaProp,
   showReturnToCrearFlow = false,
   onOpportunityAction,
   onGoHome,
@@ -77,6 +79,9 @@ export default function OpportunityDetail({
   urlStep = null,
   onStepChange,
 }) {
+  // `schema` por prop (compatibilidad) o del contexto global (ver AppContext).
+  const ctxSchema = useSchema()
+  const schema = schemaProp ?? ctxSchema
   const [item, setItem] = useState(null)
   const [rawQuotes, setRawQuotes] = useState([])
   const [loading, setLoading] = useState(true)
@@ -284,7 +289,6 @@ export default function OpportunityDetail({
     let cancelled = false
     pollFailsRef.current = 0
 
-    const textOf = (data, id) => data.column_values.find((cv) => cv.id === id)?.text?.trim()
 
     const tick = async () => {
       let data
@@ -320,8 +324,8 @@ export default function OpportunityDetail({
       // alcanza con una sola — el robot las setea juntas al terminar), corta y avanza
       // a "Comparar y enviar".
       if (polling) {
-        const estadoCotizacion = textOf(data, ESTADO_COTIZACION_COLUMN_ID)
-        const estadoOportunidad = textOf(data, ESTADO_OPORTUNIDAD_COLUMN_ID)
+        const estadoCotizacion = textOf(data.column_values, ESTADO_COTIZACION_COLUMN_ID)
+        const estadoOportunidad = textOf(data.column_values, ESTADO_OPORTUNIDAD_COLUMN_ID)
         const mapped = (data.subitems ?? []).map(mapSubitemToRawQuote)
         const raws = applyRecargoLookup(mapped, schema?.recargoLookup ?? {})
 
@@ -353,7 +357,7 @@ export default function OpportunityDetail({
       // --- Estado Envio (color_mm4wr1t4): corta en "Enviado" o "Error". El paso activo
       // pasa a "Confirmar" recién acá, cuando "Enviado" se confirma de verdad.
       if (sendPolling) {
-        const estadoEnvio = textOf(data, ESTADO_ENVIO_COLUMN_ID)
+        const estadoEnvio = textOf(data.column_values, ESTADO_ENVIO_COLUMN_ID)
         if (estadoEnvio === 'Enviado' || estadoEnvio === 'Error') {
           setSendPolling(false)
           if (estadoEnvio === 'Error') {
@@ -366,7 +370,7 @@ export default function OpportunityDetail({
 
       // --- Crear Poliza (color_mm5ejysv): corta en "Creada" o "Error".
       if (polizaPolling) {
-        const estadoCreacion = textOf(data, ESTADO_CREACION_COLUMN_ID)
+        const estadoCreacion = textOf(data.column_values, ESTADO_CREACION_COLUMN_ID)
         if (estadoCreacion === 'Creada' || estadoCreacion === 'Error') {
           setPolizaPolling(false)
           if (estadoCreacion === 'Error') {
@@ -378,7 +382,7 @@ export default function OpportunityDetail({
       // --- Leer Cédula y Archivo Automóvil (color_mm5rzrhk): corta en "Leidos" o
       // "Error". Solo se prende cuando aplica (ver mount effect — Posee Vehículo === "Si").
       if (lecturaPolling) {
-        const estadoLectura = textOf(data, ESTADO_LECTURA_COLUMN_ID)
+        const estadoLectura = textOf(data.column_values, ESTADO_LECTURA_COLUMN_ID)
         if (estadoLectura === 'Leidos' || estadoLectura === 'Error') {
           setLecturaPolling(false)
           if (estadoLectura === 'Error') {

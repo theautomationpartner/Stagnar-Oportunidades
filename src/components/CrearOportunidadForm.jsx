@@ -21,6 +21,8 @@ import {
   Loader,
   TextField,
 } from '@vibe/core'
+import PersonaFicha from './crear/PersonaFicha'
+import { useSchema } from '../context/AppContext'
 import Stepper from './Stepper'
 import StatusBadge from './StatusBadge'
 import ClienteArchivos from './ClienteArchivos'
@@ -59,7 +61,7 @@ import {
   CONTACTO_APELLIDO_COLUMN_ID,
 } from '../services/mondayApi'
 import { mapOpportunities } from '../services/opportunityMapper'
-import { COUNTRY_SHORT_NAMES, ciError, fechaError, fieldStateClass, maxFechaNacimiento, normalizeFechaIA, splitNombreApellido, splitTelefono, stripCi, telefonoError } from '../services/personaFields'
+import { ciError, fechaError, fieldStateClass, maxFechaNacimiento, normalizeFechaIA, splitNombreApellido, splitTelefono, stripCi, telefonoError, buildMondayPhone } from '../services/personaFields'
 import { clearPersistedSearch, loadPersistedSearch, savePersistedSearch } from '../services/persistedSearch'
 import { DocumentChoiceToggle, Required, RequiredDropdown, SectionTitle, StepHeading, TelefonoField } from './crear/FormPrimitives'
 import { ExistingRecordSearch } from './crear/ExistingRecordSearch'
@@ -122,7 +124,7 @@ function buildInitialForm() {
 }
 
 export default function CrearOportunidadForm({
-  schema,
+  schema: schemaProp,
   opportunities,
   onCancel,
   onVerOportunidades,
@@ -130,6 +132,9 @@ export default function CrearOportunidadForm({
   onOpenOportunidad,
   onCreated,
 }) {
+  // `schema` por prop (compatibilidad) o del contexto global (ver AppContext).
+  const ctxSchema = useSchema()
+  const schema = schemaProp ?? ctxSchema
   // Calculado una sola vez, al montar (ver loadPersistedSearch) — de acá salen los
   // valores iniciales de stepIndex/form/resultadoSeleccionado/searchPreview/
   // busquedaResuelta más abajo, para que la Oportunidad anterior a medio cargar (si hay
@@ -607,10 +612,7 @@ export default function CrearOportunidadForm({
     try {
       await setContactoColumnValues(resultadoSeleccionado.id, {
         [CONTACTO_FECHA_NACIMIENTO_COLUMN_ID]: values.fechaNacimiento,
-        [CONTACTO_TELEFONO_COLUMN_ID]: {
-          phone: `${values.codigoPais.replace('+', '')}${values.telefono.replace(/\D/g, '')}`,
-          countryShortName: COUNTRY_SHORT_NAMES[values.codigoPais] ?? 'UY',
-        },
+        [CONTACTO_TELEFONO_COLUMN_ID]: buildMondayPhone(values.codigoPais, values.telefono),
         [CONTACTO_LOCALIDAD_COLUMN_ID]: { item_ids: [Number(values.localidadId)] },
         // A diferencia de antes (mirror automático desde Localidad), ahora Departamento
         // es una conexión propia — hay que escribirla explícitamente.
@@ -808,10 +810,7 @@ export default function CrearOportunidadForm({
       text_mm51ez7e: form.apellido,
       numeric_mm51mb0s: stripCi(form.ci),
       date_mm516agw: form.fechaNacimiento,
-      phone_mm519m27: {
-        phone: `${form.codigoPais.replace('+', '')}${form.telefono.replace(/\D/g, '')}`,
-        countryShortName: COUNTRY_SHORT_NAMES[form.codigoPais] ?? 'UY',
-      },
+      phone_mm519m27: buildMondayPhone(form.codigoPais, form.telefono),
       color_mm5atxav: form.tipoRiesgo,
       board_relation_mm5sqf8t: { item_ids: [Number(form.localidadId)] },
       board_relation_mm54tq30: { item_ids: [Number(form.departamentoId)] },
@@ -983,10 +982,7 @@ export default function CrearOportunidadForm({
       [CONTACTO_NOMBRE_COLUMN_ID]: form.nombre.trim(),
       [CONTACTO_APELLIDO_COLUMN_ID]: form.apellido.trim(),
       [CONTACTO_CI_COLUMN_ID]: stripCi(form.ci),
-      [CONTACTO_TELEFONO_COLUMN_ID]: {
-        phone: `${form.codigoPais.replace('+', '')}${form.telefono.replace(/\D/g, '')}`,
-        countryShortName: COUNTRY_SHORT_NAMES[form.codigoPais] ?? 'UY',
-      },
+      [CONTACTO_TELEFONO_COLUMN_ID]: buildMondayPhone(form.codigoPais, form.telefono),
       [CONTACTO_FECHA_NACIMIENTO_COLUMN_ID]: form.fechaNacimiento,
       [CONTACTO_LOCALIDAD_COLUMN_ID]: { item_ids: [Number(form.localidadId)] },
       [CONTACTO_DEPARTAMENTO_COLUMN_ID]: { item_ids: [Number(form.departamentoId)] },
@@ -1328,54 +1324,21 @@ export default function CrearOportunidadForm({
                   // formulario editable de siempre cuando no hay ningún resultado
                   // elegido ("Crear Lead" desde cero, ver handleSaltearBusqueda).
                   <>
-                  <div className="crear-op__ficha">
-                    <div className="crear-op__ficha-header">
-                      <div className="crear-op__ficha-heading">
-                        <h2 className="crear-op__ficha-name">
-                          {`${form.nombre} ${form.apellido}`.trim() || '—'}
-                        </h2>
-                        <span className="crear-op__ficha-address">
-                          <MdLocationOn />
-                          {[form.direccion, selectedLocalidad?.label, selectedDepartamento?.label].filter(Boolean).join(', ') ||
-                            'Sin ubicación cargada'}
-                        </span>
-                      </div>
-                      <Button kind="tertiary" onClick={() => setEditingContacto(true)}>
-                        <MdEdit /> Editar
-                      </Button>
-                    </div>
-                    <div className="crear-op__ficha-badges">
-                      <span className="crear-op__ficha-badge">CI: {form.ci || '—'}</span>
-                      <span className="crear-op__ficha-badge">Nacimiento: {form.fechaNacimiento || '—'}</span>
-                      <span className="crear-op__ficha-badge">
-                        <MdSmartphone />
-                        {form.telefono ? `${form.codigoPais} ${form.telefono}` : '—'}
-                      </span>
-                    </div>
-                    <span
-                      className={`crear-op__source-tag crear-op__source-tag--${resultadoSeleccionado.source}`}
-                    >
-                      {resultadoSeleccionado.source === 'contacto' ? 'Cliente' : 'Lead'}
-                    </span>
-
-                    {/* A pedido: la Cédula de Identidad ya se auto-completaba en
-                        silencio acá atrás (ver handleAutofillCedula más arriba, reusa
-                        la que ya tenía cargada este Cliente/Lead) pero no se mostraba
-                        en ningún lado de este paso — quedaba invisible hasta el
-                        resumen del paso 3. Mismo componente de archivo que el resto de
-                        la app (FileUploadField): si ya tiene una (autocompletada, o
-                        cargada en una edición anterior de esta misma Oportunidad
-                        todavía sin guardar) la muestra con su preview; si no, deja
-                        subir una nueva acá mismo. */}
-                    <FileUploadField
-                      label="Cédula de Identidad (frente)"
-                      file={form.cedulaIdentidad}
-                      uploading={cedulaAutofillLoading}
-                      required={false}
-                      onUpload={handleCedulaIdentidadChange}
-                      onDelete={() => handleCedulaIdentidadChange(null)}
-                    />
-                  </div>
+                  {/* Ficha compartida (ver crear/PersonaFicha.jsx). La Cédula ya se
+                      auto-completaba en silencio (ver handleAutofillCedula) — acá se
+                      muestra con su preview o deja subir una nueva. */}
+                  <PersonaFicha
+                    form={form}
+                    selectedLocalidad={selectedLocalidad}
+                    selectedDepartamento={selectedDepartamento}
+                    source={resultadoSeleccionado.source}
+                    onEdit={() => setEditingContacto(true)}
+                    cedula={{
+                      file: form.cedulaIdentidad,
+                      uploading: cedulaAutofillLoading,
+                      onChange: handleCedulaIdentidadChange,
+                    }}
+                  />
 
                   {/* A pedido: documentos genéricos del Cliente/Lead — se leen y escriben
                       directo en el ítem real de Clientes (ver ClienteArchivos). */}
@@ -1542,41 +1505,18 @@ export default function CrearOportunidadForm({
 
                     {tieneCedulaLead === 'Si' && leadPerfilListo && (
                       <>
-                        <div className="crear-op__ficha">
-                          <div className="crear-op__ficha-header">
-                            <div className="crear-op__ficha-heading">
-                              <h2 className="crear-op__ficha-name">
-                                {`${form.nombre} ${form.apellido}`.trim() || '—'}
-                              </h2>
-                              <span className="crear-op__ficha-address">
-                                <MdLocationOn />
-                                {[form.direccion, selectedLocalidad?.label, selectedDepartamento?.label].filter(Boolean).join(', ') ||
-                                  'Sin ubicación cargada'}
-                              </span>
-                            </div>
-                            <Button kind="tertiary" onClick={() => setEditingLeadPerfil(true)}>
-                              <MdEdit /> Editar
-                            </Button>
-                          </div>
-                          <div className="crear-op__ficha-badges">
-                            <span className="crear-op__ficha-badge">CI: {form.ci || '—'}</span>
-                            <span className="crear-op__ficha-badge">Nacimiento: {form.fechaNacimiento || '—'}</span>
-                          </div>
-                          <span className="crear-op__source-tag crear-op__source-tag--lead">Lead</span>
-
-                          {/* A pedido: mismo campo de Cédula que la ficha de un
-                              Cliente/Lead ya existente de más arriba — acá casi
-                              siempre ya viene cargada (es la misma que se acaba de
-                              leer con IA para armar este perfil), pero igual se deja
-                              ver/reemplazar en vez de quedar oculta hasta el paso 3. */}
-                          <FileUploadField
-                            label="Cédula de Identidad (frente)"
-                            file={form.cedulaIdentidad}
-                            required={false}
-                            onUpload={handleCedulaIdentidadChange}
-                            onDelete={() => handleCedulaIdentidadChange(null)}
-                          />
-                        </div>
+                        {/* Misma ficha compartida que la de un Cliente/Lead existente
+                            (crear/PersonaFicha.jsx) — sin teléfono porque la IA no lo
+                            devuelve: se pide aparte justo debajo (TelefonoField). */}
+                        <PersonaFicha
+                          form={form}
+                          selectedLocalidad={selectedLocalidad}
+                          selectedDepartamento={selectedDepartamento}
+                          source="lead"
+                          showTelefono={false}
+                          onEdit={() => setEditingLeadPerfil(true)}
+                          cedula={{ file: form.cedulaIdentidad, onChange: handleCedulaIdentidadChange }}
+                        />
 
                         <TelefonoField form={form} handleChange={handleChange} resetKey={textFieldsResetKey} />
 

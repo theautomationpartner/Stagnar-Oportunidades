@@ -1,4 +1,4 @@
-import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useDeferredValue, useEffect, useMemo, useState } from 'react'
 import { Loader } from '@vibe/core'
 import { useHashRoute } from './hooks/useHashRoute'
 import { AppProviders } from './context/AppContext'
@@ -126,27 +126,30 @@ export default function App() {
     setFilters((prev) => ({ ...prev, [field]: value }))
   }
 
+  // A pedido: "una sola barra de búsqueda para todos los campos posibles" — marca/año
+  // además de lo que ya cubría bienLinea1 (marca+modelo/año). Auditoría: el texto de
+  // búsqueda de cada fila se arma UNA vez por carga (antes se concatenaba y pasaba a
+  // minúsculas para las 500 filas en cada tecla), y el término se difiere
+  // (useDeferredValue) para que el tipeo no espere al filtrado.
+  const haystacks = useMemo(
+    () =>
+      new Map(
+        opportunities.map((opp) => [
+          opp,
+          [opp.clienteNombre, opp.ci, opp.telefono, opp.bienLinea1, opp.companias, opp.marca, opp.anio]
+            .join(' ')
+            .toLowerCase(),
+        ])
+      ),
+    [opportunities]
+  )
+  const deferredSearchTerm = useDeferredValue(searchTerm)
+
   const filteredOpportunities = useMemo(() => {
-    const term = searchTerm.trim().toLowerCase()
+    const term = deferredSearchTerm.trim().toLowerCase()
 
     return opportunities.filter((opp) => {
-      if (term) {
-        // A pedido: "una sola barra de búsqueda para todos los campos posibles" — se
-        // agregan acá marca/año (antes cada uno tenía su propio Dropdown, ver
-        // FilterPanel.jsx) además de lo que ya cubría bienLinea1 (marca+modelo/año).
-        const haystack = [
-          opp.clienteNombre,
-          opp.ci,
-          opp.telefono,
-          opp.bienLinea1,
-          opp.companias,
-          opp.marca,
-          opp.anio,
-        ]
-          .join(' ')
-          .toLowerCase()
-        if (!haystack.includes(term)) return false
-      }
+      if (term && !haystacks.get(opp).includes(term)) return false
 
       if (filters.estadoCotizacion && opp.estadoCotizacion !== filters.estadoCotizacion) return false
       if (filters.tipoSujeto && opp.tipoSujeto !== filters.tipoSujeto) return false
@@ -154,7 +157,7 @@ export default function App() {
 
       return true
     })
-  }, [opportunities, searchTerm, filters])
+  }, [opportunities, haystacks, deferredSearchTerm, filters])
 
   // A pedido: vuelve a la página 1 en cuanto cambia la búsqueda, algún filtro, o la
   // cantidad por página — si no, se podía quedar en una página que ya no existe (ej.
