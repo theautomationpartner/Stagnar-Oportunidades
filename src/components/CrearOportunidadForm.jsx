@@ -490,7 +490,8 @@ export default function CrearOportunidadForm({
   // (un File no es serializable), por eso el aviso lo dice explícito.
   const [pendingExit, setPendingExit] = useState(null)
   const hasUnsavedWork = Boolean(
-    searchPreview || stepIndex > 0 || form.nombre || form.apellido || form.ci || form.tipoRiesgo
+    // tipoRiesgo queda afuera a propósito: se autocompleta solo (único tipo disponible).
+    searchPreview || stepIndex > 0 || form.nombre || form.apellido || form.ci || form.telefono
   )
   const handleExit = (destino) => {
     if (hasUnsavedWork && !saving && !createdItemId) {

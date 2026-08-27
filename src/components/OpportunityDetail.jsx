@@ -71,6 +71,11 @@ export default function OpportunityDetail({
   showReturnToCrearFlow = false,
   onOpportunityAction,
   onGoHome,
+  // Router (ver useHashRoute): paso pedido en la URL (#/oportunidades/:id/:step) y
+  // callback para reflejar el paso activo en la URL. Si urlStep viene, pisa el paso
+  // que se deriva de deal_stage al montar (solo la primera vez).
+  urlStep = null,
+  onStepChange,
 }) {
   const [item, setItem] = useState(null)
   const [rawQuotes, setRawQuotes] = useState([])
@@ -187,7 +192,10 @@ export default function OpportunityDetail({
           (cv) => cv.id === ESTADO_LECTURA_COLUMN_ID
         )?.text?.trim()
 
-        if (estadoOportunidad === 'Nueva') {
+        const VALID_STEPS = ['cotizar', 'comparar', 'confirmar', 'emitir']
+        if (urlStep && VALID_STEPS.includes(urlStep) && (urlStep === 'cotizar' || raws.length > 0)) {
+          setActiveStep(urlStep)
+        } else if (estadoOportunidad === 'Nueva') {
           setActiveStep('cotizar')
         } else if (estadoOportunidad === 'Cotizacion Enviada') {
           setActiveStep(raws.length > 0 ? 'confirmar' : 'cotizar')
@@ -396,6 +404,12 @@ export default function OpportunityDetail({
       window.removeEventListener('focus', handleVisibility)
     }
   }, [anyPolling, polling, sendPolling, polizaPolling, lecturaPolling, opportunityId, schema])
+
+  // Refleja el paso activo en la URL (solo después de cargar, para no pisar el paso
+  // pedido en la URL con el 'cotizar' inicial del useState).
+  useEffect(() => {
+    if (!loading && !error) onStepChange?.(activeStep)
+  }, [activeStep, loading, error])
 
   // "Reintentar" del aviso de polling cortado: vuelve a prender exactamente los flags
   // que estaban activos cuando se cortó.

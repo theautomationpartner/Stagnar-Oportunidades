@@ -8,19 +8,13 @@ import FileUploadField from './FileUploadField'
 import StepFooter from './StepFooter'
 import AlertModal from './AlertModal'
 import { fetchFileColumnAsFile } from '../services/mondayApi'
+import { getMissingLabels } from '../services/requiredFields'
 import './PillTabs.css'
 import './ConfirmarStepPanel.css'
 
-// Subconjunto de COTIZAR_FIELDS que el paso 3 exige verificar antes de emitir: si falta
-// alguno se marca con advertencia en vez de tilde, pero no bloquea la pantalla.
-const CHECKLIST_FIELDS = [
-  { key: 'ci', label: 'CI' },
-  { key: 'modelo', label: 'Modelo' },
-  { key: 'anio', label: 'Año' },
-  { key: 'marca', label: 'Marca' },
-  { key: 'combustible', label: 'Combustible' },
-  { key: 'fechaNacimiento', label: 'Fecha de nacimiento' },
-]
+// Los datos que el paso 3 exige verificar antes de emitir viven en
+// services/requiredFields.js (REQUIRED_BY_STAGE.confirmar) — misma lista que antes,
+// ahora en la fuente única compartida con Cotizar/Emitir.
 
 // Cuánto se muestran los guiones "cambiando" antes de asentar los datos de la nueva
 // propuesta elegida (ver ChosenProposal más abajo).
@@ -245,9 +239,8 @@ export default function ConfirmarStepPanel({
   // "Faltan datos requeridos"), no un texto suelto — se guarda el array de labels
   // (antes un string ya armado) para poder listarlos como viñetas.
   const handleConfirmClick = () => {
-    const missingFields = CHECKLIST_FIELDS.filter((f) => !opportunity[f.key])
     const missingDocs = documentos.filter((d) => !d.fileName)
-    const missingLabels = [...missingFields.map((f) => f.label), ...missingDocs.map((d) => d.label)]
+    const missingLabels = [...getMissingLabels(opportunity, 'confirmar'), ...missingDocs.map((d) => d.label)]
     if (!elegida) {
       missingLabels.push('Cotización elegida')
     } else if (elegida.quote.blocked) {

@@ -181,57 +181,77 @@ export default function CotizarStepPanel({
   const [consistencyWarning, setConsistencyWarning] = useState(null)
   const [checkingConsistencia, setCheckingConsistencia] = useState(false)
 
-  const runCotizarChecks = async (proceed) => {
-    if (!canCotizar) {
-      setShowMissingFieldsModal(true)
-      return
-    }
+  // Auditoría (Nielsen N8): la validación contra Autodata se separa del "qué hacer
+  // después" — devuelve el aviso (o null) sin abrir ningún popup. Así "Cotizar" y
+  // "Recotizar" la comparten: Cotizar la muestra en su propio popup, Recotizar la
+  // incorpora al popup de confirmación (un solo popup, antes eran dos encadenados).
+  const getConsistencyWarning = async () => {
     setCheckingConsistencia(true)
     try {
       const modelos = await fetchAutodataModelosByAnioMarca(opportunity.anio, opportunity.marca)
       const match = modelos.find((m) => m.name.trim().toLowerCase() === opportunity.modelo.trim().toLowerCase())
       if (!match) {
-        // A pedido: nada de listar TODOS los modelos disponibles para esa Marca/Año (con
-        // marcas de muchas versiones termina siendo una lista larguísima e irrelevante,
-        // ver mockup) — en vez de eso, un aviso simple de "no tenemos datos confirmados
-        // para este modelo" + un recordatorio de qué Año/Combustible/Tipo hay cargados
-        // ahora mismo en la oportunidad, para que el usuario los revise sin tener que
-        // salir del popup.
-        setConsistencyWarning({
+        return {
           title: 'El modelo no coincide con Marca/Año',
-          description: `No tenemos datos confirmados en nuestro sistema para el modelo cargado ("${opportunity.modelo}") con ${opportunity.marca} ${opportunity.anio}. Esto puede hacer que falle la cotización. ¿Querés intentar igualmente?`,
+          description: `No tenemos datos confirmados en nuestro sistema para el modelo cargado ("${opportunity.modelo}") con ${opportunity.marca} ${opportunity.anio}. Esto puede hacer que falle la cotización.`,
           detailsTitle: 'Datos cargados para este modelo:',
           detailsList: [
             `Año: ${opportunity.anio || '—'}`,
             `Combustible: ${opportunity.combustible || '—'}`,
             `Tipo: ${opportunity.tipo || '—'}`,
           ],
-          onConfirm: proceed,
-        })
-        return
+        }
       }
       const combustibleOk =
         !match.combustible || match.combustible.toLowerCase() === (opportunity.combustible || '').toLowerCase()
       const tipoOk = !match.tipo || match.tipo.toLowerCase() === (opportunity.tipo || '').toLowerCase()
       if (!combustibleOk || !tipoOk) {
-        // A pedido: acá el dato correcto es uno solo (el real de este modelo, no una
-        // lista) — se lo mostramos directo en la descripción en vez de un detailsList.
-        setConsistencyWarning({
+        return {
           title: 'Combustible/Tipo no coinciden',
           description: `Estás por completar una cotización con Combustible "${opportunity.combustible || '—'}" y Tipo "${
             opportunity.tipo || '—'
           }", pero en nuestro sistema este modelo tiene Combustible "${match.combustible || '—'}" y Tipo "${
             match.tipo || '—'
-          }". Esto puede hacer que falle la cotización. ¿Querés intentar igualmente?`,
-          onConfirm: proceed,
-        })
-        return
+          }". Esto puede hacer que falle la cotización.`,
+        }
       }
+      return null
     } catch {
       // Si la validación en sí falla (ej. problema de red al consultar Autodata), no
       // bloqueamos cotizar por eso — se sigue de largo sin el aviso.
+      return null
     } finally {
       setCheckingConsistencia(false)
+    }
+  }
+
+  // "Recotizar": primero se valida (datos faltantes → popup bloqueante; Autodata → se
+  // guarda el aviso), y recién ahí se abre UN solo popup de confirmación que ya
+  // incluye la advertencia si la hubo.
+  const [recotizarWarning, setRecotizarWarning] = useState(null)
+  const handleRecotizarClick = async () => {
+    if (!canCotizar) {
+      setShowMissingFieldsModal(true)
+      return
+    }
+    const warning = await getConsistencyWarning()
+    setRecotizarWarning(warning)
+    setConfirmingRecotizar(true)
+  }
+
+  const runCotizarChecks = async (proceed) => {
+    if (!canCotizar) {
+      setShowMissingFieldsModal(true)
+      return
+    }
+    const warning = await getConsistencyWarning()
+    if (warning) {
+      setConsistencyWarning({
+        ...warning,
+        description: `${warning.description} ¿Querés intentar igualmente?`,
+        onConfirm: proceed,
+      })
+      return
     }
     proceed()
   }
@@ -506,20 +526,30 @@ export default function CotizarStepPanel({
         <AlertModal
           id="cotizar-recotizar-modal"
           type="warning"
-          title="¿Recotizar esta oportunidad?"
+          title={recotizarWarning ? `¿Recotizar igualmente? ${recotizarWarning.title}` : '¿Recotizar esta oportunidad?'}
           description={
             <>
               Al recotizar se van a <strong>eliminar todos los datos de la cotización actual</strong> (todas
               las tarjetas por compañía y cobertura) y se van a generar unos nuevos desde cero.
+              {recotizarWarning && (
+                <>
+                  <br />
+                  <br />
+                  {recotizarWarning.description}
+                </>
+              )}
             </>
           }
+          detailsTitle={recotizarWarning?.detailsTitle}
+          detailsList={recotizarWarning?.detailsList}
+          detailsTone="neutral"
           onClose={() => setConfirmingRecotizar(false)}
           secondaryButton={{ text: 'Cancelar', onClick: () => setConfirmingRecotizar(false), disabled: marking }}
           primaryButton={{
-            text: checkingConsistencia ? 'Verificando...' : marking ? 'Marcando...' : 'Sí, recotizar',
+            text: marking ? 'Marcando...' : 'Sí, recotizar',
             danger: true,
-            onClick: () => runCotizarChecks(handleRecotizarConfirm),
-            disabled: marking || !canCotizar || checkingConsistencia,
+            onClick: handleRecotizarConfirm,
+            disabled: marking || !canCotizar,
           }}
         />
       )}
@@ -542,10 +572,11 @@ export default function CotizarStepPanel({
             <>
               <Button
                 kind="secondary"
-                onClick={() => setConfirmingRecotizar(true)}
-                disabled={marking || !canCotizar || polling}
+                onClick={handleRecotizarClick}
+                disabled={marking || !canCotizar || polling || checkingConsistencia}
+                loading={checkingConsistencia}
               >
-                <MdAutorenew /> Recotizar
+                <MdAutorenew /> {checkingConsistencia ? 'Verificando...' : 'Recotizar'}
               </Button>
               <Button kind="primary" onClick={onGoToComparar} disabled={polling}>
                 Ir a Comparar y enviar <MdArrowForward />
@@ -568,7 +599,12 @@ export default function CotizarStepPanel({
           id="cotizar-error-modal"
           type="warning"
           title="No se pudo completar la cotización"
-          description="Faltan datos necesarios para realizar la cotización. Revisá la información ingresada y completá los campos requeridos."
+          description={
+            markError ||
+            'La cotización automática terminó con error. Revisá la información ingresada y volvé a intentar.'
+          }
+          detailsTitle={errorDetail ? 'Detalle del error:' : undefined}
+          detailsList={errorDetail ? [errorDetail] : undefined}
           onClose={() => setErrorModalDismissed(true)}
           primaryButton={{ text: 'Entendido', onClick: () => setErrorModalDismissed(true) }}
         />

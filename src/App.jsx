@@ -1,5 +1,7 @@
 import { Suspense, lazy, useEffect, useMemo, useState } from 'react'
 import { Loader } from '@vibe/core'
+import { useHashRoute } from './hooks/useHashRoute'
+import { AppProviders } from './context/AppContext'
 import Sidebar from './components/Sidebar'
 import PageHeader from './components/PageHeader'
 import FilterPanel from './components/FilterPanel'
@@ -51,7 +53,7 @@ export default function App() {
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
-  const [openOpportunityId, setOpenOpportunityId] = useState(null)
+  const [route, go] = useHashRoute()
   // A pedido: el botón "Volver a Persona Seleccionada" de arriba de la Oportunidad (ver
   // OpportunityDetail.jsx) solo aparece cuando se llegó ahí apretando "Ir a esta
   // oportunidad" en el historial de Crear Oportunidad (paso 1) — no si se abrió desde la
@@ -59,11 +61,6 @@ export default function App() {
   // cuanto se hace alguna acción adentro de la Oportunidad: en ese punto ya no tiene
   // sentido "volver" a terminar de crearla, la Oportunidad ya está en curso.
   const [openedFromCrearFlow, setOpenedFromCrearFlow] = useState(false)
-  // Pantalla previa a la tabla: elegir entre crear una oportunidad nueva o ver las ya
-  // existentes. 'landing' | 'table' | 'create' — se puede ir de una a otra directo,
-  // sin pasar necesariamente por 'landing' de nuevo (botón "Nueva oportunidad" en la
-  // tabla, y "Ver oportunidades existentes" desde el formulario de creación).
-  const [view, setView] = useState('landing')
   // Nombre + avatar reales de quien está mirando la app (pie de Sidebar.jsx) — se pide
   // una sola vez acá arriba (en vez de en cada instancia de Sidebar, que se
   // monta/desmonta con cada cambio de pantalla) y se pasa como prop a las 4. Nunca
@@ -172,132 +169,111 @@ export default function App() {
     [filteredOpportunities, page, pageSize]
   )
 
-  if (openOpportunityId) {
-    return (
-      <div className="app-shell">
-        <Sidebar
-          user={mondayUser}
-          onNavigateOportunidades={() => {
-            setOpenOpportunityId(null)
+  // ---- Navegación (ver hooks/useHashRoute.js): la URL es la fuente de verdad de qué
+  // pantalla se ve. / de antes se derivan de .
+  const nav = {
+    route,
+    go,
+    goHome: () => go('inicio'),
+    goTable: () => go('oportunidades'),
+    goCreate: () => go('crear'),
+    openOpportunity: (id, step) => go('oportunidades', id, step),
+  }
+  const closeDetail = (seg) => {
+    setOpenedFromCrearFlow(false)
+    go(seg)
+  }
+
+  let main
+  if (route.seg === 'oportunidades' && route.id) {
+    main = (
+      <Suspense fallback={<div className="app" style={{ padding: 40, textAlign: 'center' }}><Loader size={48} /></div>}>
+        <OpportunityDetail
+          key={route.id}
+          opportunityId={route.id}
+          urlStep={route.step}
+          onStepChange={(step) => go('oportunidades', route.id, step, { replace: true })}
+          onBack={() => closeDetail(openedFromCrearFlow ? 'crear' : 'oportunidades')}
+          onGoToList={() => closeDetail('oportunidades')}
+          showReturnToCrearFlow={openedFromCrearFlow}
+          onOpportunityAction={() => setOpenedFromCrearFlow(false)}
+          onGoHome={() => closeDetail('inicio')}
+          schema={schema}
+        />
+      </Suspense>
+    )
+  } else if (route.seg === 'inicio') {
+    main = <LandingScreen onCreateNew={nav.goCreate} onSearchExisting={nav.goTable} />
+  } else if (route.seg === 'crear') {
+    main = (
+      <Suspense fallback={<div className="app" style={{ padding: 40, textAlign: 'center' }}><Loader size={48} /></div>}>
+        <CrearOportunidadForm
+          schema={schema}
+          opportunities={opportunities}
+          onCancel={nav.goHome}
+          onVerOportunidades={nav.goTable}
+          onHome={nav.goHome}
+          onOpenOportunidad={(id) => {
+            setOpenedFromCrearFlow(true)
+            nav.openOpportunity(id)
+          }}
+          onCreated={(newItemId) => {
             setOpenedFromCrearFlow(false)
-            setView('table')
+            nav.openOpportunity(newItemId)
           }}
         />
-        <div className="app-shell__main"><Suspense fallback={<div className="app" style={{ padding: 40, textAlign: 'center' }}><Loader size={48} /></div>}>
-          <OpportunityDetail
-            opportunityId={openOpportunityId}
-            onBack={() => {
-              setOpenOpportunityId(null)
-              setOpenedFromCrearFlow(false)
-            }}
-            onGoToList={() => {
-              setOpenOpportunityId(null)
-              setOpenedFromCrearFlow(false)
-              setView('table')
-            }}
-            showReturnToCrearFlow={openedFromCrearFlow}
-            onOpportunityAction={() => setOpenedFromCrearFlow(false)}
-            onGoHome={() => {
-              setOpenOpportunityId(null)
-              setOpenedFromCrearFlow(false)
-              setView('landing')
-            }}
-            schema={schema}
-          />
-        </Suspense></div>
+      </Suspense>
+    )
+  } else {
+    main = (
+      <div className="app">
+        <PageHeader onCreateNew={nav.goCreate} onHome={nav.goHome} />
+        <FilterPanel
+          searchTerm={searchTerm}
+          onSearchTermChange={setSearchTerm}
+          filters={filters}
+          onFilterChange={handleFilterChange}
+          filterOptions={filterOptions}
+          onClear={() => {
+            setSearchTerm('')
+            setFilters(EMPTY_FILTERS)
+          }}
+        />
+        <OpportunitiesTable
+          opportunities={pagedOpportunities}
+          totalFiltered={filteredOpportunities.length}
+          totalLoaded={opportunities.length}
+          boardTotalCount={boardTotalCount}
+          loading={loading}
+          error={error}
+          page={page}
+          totalPages={totalPages}
+          onPageChange={setPage}
+          pageSize={pageSize}
+          pageSizeOptions={PAGE_SIZE_OPTIONS}
+          onPageSizeChange={setPageSize}
+          onOpenOpportunity={(id) => {
+            setOpenedFromCrearFlow(false)
+            nav.openOpportunity(id)
+          }}
+        />
       </div>
     )
   }
 
-  if (view === 'landing') {
-    return (
-      <div className="app-shell">
-        <Sidebar
-          defaultExpanded
-          user={mondayUser}
-          onNavigateOportunidades={() => {
-            setOpenOpportunityId(null)
-            setOpenedFromCrearFlow(false)
-            setView('table')
-          }}
-        />
-        <div className="app-shell__main">
-          <LandingScreen onCreateNew={() => setView('create')} onSearchExisting={() => setView('table')} />
-        </div>
-      </div>
-    )
-  }
-
-  if (view === 'create') {
-    return (
-      <div className="app-shell">
-        <Sidebar
-          user={mondayUser}
-          onNavigateOportunidades={() => {
-            setOpenOpportunityId(null)
-            setOpenedFromCrearFlow(false)
-            setView('table')
-          }}
-        />
-        <div className="app-shell__main"><Suspense fallback={<div className="app" style={{ padding: 40, textAlign: 'center' }}><Loader size={48} /></div>}>
-          <CrearOportunidadForm
-            schema={schema}
-            opportunities={opportunities}
-            onCancel={() => setView('landing')}
-            onVerOportunidades={() => setView('table')}
-            onHome={() => setView('landing')}
-            onOpenOportunidad={(id) => {
-              setOpenedFromCrearFlow(true)
-              setOpenOpportunityId(id)
-            }}
-            onCreated={(newItemId) => {
-              setOpenedFromCrearFlow(false)
-              setView('table')
-              setOpenOpportunityId(newItemId)
-            }}
-          />
-        </Suspense></div>
-      </div>
-    )
-  }
-
+  // Un solo shell: la Sidebar se monta UNA vez (antes se escribía 4 veces, una por
+  // vista, y se desmontaba/remontaba en cada cambio de pantalla).
   return (
-    <div className="app-shell">
-      <Sidebar user={mondayUser} />
-      <div className="app-shell__main">
-        <div className="app">
-          <PageHeader onCreateNew={() => setView('create')} onHome={() => setView('landing')} />
-          <FilterPanel
-            searchTerm={searchTerm}
-            onSearchTermChange={setSearchTerm}
-            filters={filters}
-            onFilterChange={handleFilterChange}
-            filterOptions={filterOptions}
-            onClear={() => {
-              setSearchTerm('')
-              setFilters(EMPTY_FILTERS)
-            }}
-          />
-          <OpportunitiesTable
-            opportunities={pagedOpportunities}
-            totalFiltered={filteredOpportunities.length}
-            totalLoaded={opportunities.length}
-            boardTotalCount={boardTotalCount}
-            loading={loading}
-            error={error}
-            page={page}
-            totalPages={totalPages}
-            onPageChange={setPage}
-            pageSize={pageSize}
-            pageSizeOptions={PAGE_SIZE_OPTIONS}
-            onPageSizeChange={setPageSize}
-            onOpenOpportunity={(id) => {
-              setOpenedFromCrearFlow(false)
-              setOpenOpportunityId(id)
-            }}
-          />
-        </div>
+    <AppProviders schema={schema} mondayUser={mondayUser} nav={nav}>
+      <div className="app-shell">
+        <Sidebar
+          active={route.seg === 'oportunidades'}
+          defaultExpanded={route.seg === 'inicio'}
+          user={mondayUser}
+          onNavigateOportunidades={() => closeDetail('oportunidades')}
+        />
+        <div className="app-shell__main">{main}</div>
       </div>
-    </div>
+    </AppProviders>
   )
 }

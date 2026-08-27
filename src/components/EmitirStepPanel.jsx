@@ -4,6 +4,7 @@ import { AttentionBox, Button, Modal, ModalContent } from '@vibe/core'
 import { formatMoney } from '../services/format'
 import { accentForCompania } from '../services/companyColors'
 import { fetchFileColumnAsFile } from '../services/mondayApi'
+import { getMissingLabels as getMissingLabelsByStage } from '../services/requiredFields'
 import FileUploadField from './FileUploadField'
 import StepFooter from './StepFooter'
 import StatusBadge from './StatusBadge'
@@ -17,45 +18,15 @@ import './EmitirStepPanel.css'
 // asegurado y la propuesta que quedó elegida en el paso 3 — última revisión antes de
 // cargar la póliza. No repite el checklist "falta/no falta" del paso 3 (ya se validó
 // ahí); acá se listan los valores tal cual quedaron.
-const CLIENTE_FIELDS = [
-  { key: 'clienteNombre', label: 'Cliente' },
-  { key: 'ci', label: 'CI' },
-  { key: 'telefono', label: 'Teléfono' },
-  { key: 'fechaNacimiento', label: 'Fecha de nacimiento' },
-  { key: 'departamento', label: 'Departamento' },
-  // A pedido: domicilio principal del Cliente/Lead (tablero Clientes, ver
-  // opportunityMapper.js). `optional`: se muestra pero no bloquea la emisión — los
-  // clientes cargados antes de esta columna no lo tienen y no se edita desde acá.
-  { key: 'clienteDomicilio', label: 'Domicilio', optional: true },
-]
-
-const BIEN_FIELDS = [
-  { key: 'marca', label: 'Marca' },
-  { key: 'modelo', label: 'Modelo' },
-  { key: 'anio', label: 'Año' },
-  { key: 'combustible', label: 'Combustible' },
-  { key: 'uso', label: 'Uso' },
-]
-
 // A pedido: chequeo explícito acá (paso 4), no solo confiar en el gate del paso 3
 // (ConfirmarStepPanel) — cubre el caso de volver atrás y borrar un dato después de
-// haber confirmado, o entrar directo a este paso en una oportunidad vieja. Mismos
-// campos que ya se muestran en "Resumen final" (CLIENTE_FIELDS/BIEN_FIELDS) + los 2
-// documentos del asegurado (Cédula/Libreta, ver `opportunity.cedula`/
-// `.libretaConducir` — mismos nombres que usa ConfirmarStepPanel). "Propuesta elegida"
-// queda afuera a propósito — este paso ya deja explícito que se puede cargar la póliza
-// sin una elegida (ver el aviso más abajo, "Todavía no se eligió..."), no hace falta
-// bloquear algo que el resto de la pantalla dice que es opcional.
-const DOCS_FIELDS = [
-  { key: 'libretaConducir', label: 'Libreta de Conducir / Carta Automóvil' },
-  { key: 'cedula', label: 'Cédula de Identidad' },
-]
-
-function getMissingLabels(opportunity) {
-  return [...CLIENTE_FIELDS, ...BIEN_FIELDS, ...DOCS_FIELDS]
-    .filter((f) => !f.optional && !opportunity[f.key])
-    .map((f) => f.label)
-}
+// haber confirmado, o entrar directo a este paso en una oportunidad vieja. La lista de
+// campos (cliente + bien + 2 documentos, con Domicilio opcional) vive en
+// services/requiredFields.js (REQUIRED_BY_STAGE.emitir) — misma lista que antes, ahora
+// en la fuente única compartida con Cotizar/Confirmar. "Propuesta elegida" queda afuera
+// a propósito — este paso ya deja explícito que se puede cargar la póliza sin una
+// elegida (ver el aviso más abajo, "Todavía no se eligió...").
+const getMissingLabels = (opportunity) => getMissingLabelsByStage(opportunity, 'emitir')
 
 export default function EmitirStepPanel({
   opportunity,
