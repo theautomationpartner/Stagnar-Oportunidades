@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import { MdUploadFile, MdClose, MdCheckCircle, MdZoomIn, MdDeleteOutline } from 'react-icons/md'
 import { Button, IconButton, Loader } from '@vibe/core'
 import './FileUploadField.css'
@@ -150,10 +151,34 @@ export default function FileUploadField({
   }
 
   const closePreview = (e) => {
-    e.preventDefault()
-    e.stopPropagation()
+    e?.preventDefault?.()
+    e?.stopPropagation?.()
     setShowPreview(false)
   }
+
+  // Auditoría WCAG 2.1.2 / 4.1.2: el lightbox se cierra con Escape, recibe el foco al
+  // abrir (botón "Cerrar") y lo devuelve al elemento que lo abrió al cerrarse. Se
+  // renderiza con un portal en document.body (no adentro del <label>) para que un
+  // click en el fondo no dispare el selector de archivos y para que el diálogo no
+  // quede anidado en un control de formulario (HTML inválido).
+  const lightboxCloseRef = useRef(null)
+  const lightboxOpenerRef = useRef(null)
+  useEffect(() => {
+    if (!showPreview) return
+    lightboxOpenerRef.current = document.activeElement
+    lightboxCloseRef.current?.focus()
+    const onKey = (e) => {
+      if (e.key === 'Escape') {
+        e.stopPropagation()
+        setShowPreview(false)
+      }
+    }
+    document.addEventListener('keydown', onKey)
+    return () => {
+      document.removeEventListener('keydown', onKey)
+      lightboxOpenerRef.current?.focus?.()
+    }
+  }, [showPreview])
 
   // El fondo/borde reflejan si HAY archivo o no (uploaded), no si está ocupado en este
   // instante — subiendo uno nuevo se sigue viendo "falta" hasta que termina, eliminando
@@ -377,22 +402,37 @@ export default function FileUploadField({
 
       {error && <p className="file-field__error">Error: {error}</p>}
 
-      {showPreview && previewUrl && (
-        <div className="file-field__lightbox" onClick={closePreview}>
-          <button type="button" className="file-field__lightbox-close" onClick={closePreview} aria-label="Cerrar">
-            <MdClose />
-          </button>
-          <img
-            className="file-field__lightbox-img"
-            src={previewUrl}
-            alt=""
-            onClick={(e) => {
-              e.preventDefault()
-              e.stopPropagation()
-            }}
-          />
-        </div>
-      )}
+      {showPreview &&
+        previewUrl &&
+        createPortal(
+          <div
+            className="file-field__lightbox"
+            role="dialog"
+            aria-modal="true"
+            aria-label={label ? `Vista previa de ${label}` : 'Vista previa del archivo'}
+            onClick={closePreview}
+          >
+            <button
+              type="button"
+              ref={lightboxCloseRef}
+              className="file-field__lightbox-close"
+              onClick={closePreview}
+              aria-label="Cerrar vista previa"
+            >
+              <MdClose />
+            </button>
+            <img
+              className="file-field__lightbox-img"
+              src={previewUrl}
+              alt={label ? `Vista previa de ${label}` : 'Vista previa del archivo'}
+              onClick={(e) => {
+                e.preventDefault()
+                e.stopPropagation()
+              }}
+            />
+          </div>,
+          document.body
+        )}
     </label>
   )
 }
