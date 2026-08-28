@@ -13,6 +13,16 @@ import './ClientContextBar.css'
 // domicilio, ID de monday, tipo de vehículo, documentos) — nada se repite — como panel
 // flotante por ENCIMA del contenido de abajo (no lo empuja); se cierra con click afuera,
 // Escape o el mismo botón. Las acciones (Editar/Recotizar) van en la barra.
+function edadDesde(fechaIso) {
+  if (!fechaIso) return null
+  const [y, m, d] = String(fechaIso).slice(0, 10).split('-').map(Number)
+  if (!y || !m || !d) return null
+  const hoy = new Date()
+  let edad = hoy.getFullYear() - y
+  if (hoy.getMonth() + 1 < m || (hoy.getMonth() + 1 === m && hoy.getDate() < d)) edad -= 1
+  return edad > 0 && edad < 130 ? edad : null
+}
+
 export default function ClientContextBar({ opportunity, onEdit, actions, tag }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef(null)
@@ -40,6 +50,9 @@ export default function ClientContextBar({ opportunity, onEdit, actions, tag }) 
   const situacion = opportunity.clienteSituacion || ''
   const esLead = situacion.toLowerCase() === 'lead'
   const ubicacion = [opportunity.departamento, opportunity.zonaCirculacion].filter(Boolean).join(' — ')
+  // Edad: la columna Edad de la Oportunidad (numeric_mm527wpm) si está; si no, calculada
+  // desde la fecha de nacimiento (solo para mostrar, no se escribe en monday).
+  const edad = opportunity.edad || edadDesde(opportunity.fechaNacimiento)
   const vehiculo = [opportunity.marca, opportunity.modelo].filter(Boolean).join(' ')
   const vehiculoMeta = [opportunity.anio && `(${opportunity.anio})`, opportunity.combustible, opportunity.uso]
     .filter(Boolean)
@@ -94,12 +107,19 @@ export default function ClientContextBar({ opportunity, onEdit, actions, tag }) 
           <dl className="client-bar__details">
             <div className="client-bar__detail">
               <dt>Nacimiento</dt>
-              <dd>{opportunity.fechaNacimiento ? formatShortDate(opportunity.fechaNacimiento) : '—'}</dd>
+              <dd>
+                {opportunity.fechaNacimiento ? formatShortDate(opportunity.fechaNacimiento) : '—'}
+                {edad ? ` · ${edad} años` : ''}
+              </dd>
             </div>
-            <div className="client-bar__detail">
-              <dt>{opportunity.clienteId ? 'Domicilio' : 'Ubicación'}</dt>
-              <dd>{opportunity.clienteId ? opportunity.clienteDomicilio || '—' : ubicacion || '—'}</dd>
-            </div>
+            {/* Domicilio = tablero Clientes (dirección + localidad + depto de la persona);
+                Zona de circulación = columnas de la Oportunidad (dónde circula el auto). */}
+            {opportunity.clienteId && (
+              <div className="client-bar__detail">
+                <dt>Domicilio (cliente)</dt>
+                <dd>{opportunity.clienteDomicilio || '—'}</dd>
+              </div>
+            )}
             <div className="client-bar__detail">
               <dt>Zona de circulación</dt>
               <dd>{ubicacion || '—'}</dd>
@@ -107,10 +127,6 @@ export default function ClientContextBar({ opportunity, onEdit, actions, tag }) 
             <div className="client-bar__detail">
               <dt>Tipo de vehículo</dt>
               <dd>{opportunity.tipo || '—'}</dd>
-            </div>
-            <div className="client-bar__detail">
-              <dt>ID en monday</dt>
-              <dd>{opportunity.id}</dd>
             </div>
           </dl>
           {opportunity.clienteId && (
