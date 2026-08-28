@@ -322,3 +322,26 @@
     align-items: stretch;
   }
 }
+
+/* Breadcrumb en tablet/celular: al pasar a una sola columna, los grid-column fijos de
+   arriba (acciones en 1, Stepper en 2) forzaban una 2ª columna y el Stepper se salía
+   de la pantalla. Se apilan: acciones arriba, Stepper centrado debajo. */
+@media (max-width: 900px) {
+  .opp-detail__breadcrumb {
+    gap: 10px;
+    justify-items: center;
+  }
+
+  .opp-detail__breadcrumb-actions,
+  .opp-detail__breadcrumb .stepper {
+    grid-column: auto;
+  }
+
+  .opp-detail__breadcrumb-actions {
+    justify-self: start;
+  }
+
+  .opp-detail__breadcrumb .stepper {
+    max-width: 100%;
+  }
+}
