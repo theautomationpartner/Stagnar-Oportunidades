@@ -1285,3 +1285,12 @@
     align-self: flex-end;
   }
 }
+
+/* El <input> interno de los Dropdown buscables (react-select) hereda el halo de foco de
+   .crear-op__field input:focus y se veía como un rectángulo celeste que sobresalía del
+   control; el Dropdown de vibe ya marca el foco con su borde azul. */
+.crear-op__field input[role='combobox']:focus,
+.crear-op__field input[role='combobox']:focus-visible {
+  box-shadow: none;
+  outline: none;
+}
