@@ -574,11 +574,13 @@ function drawFooter(ctx, y, logos) {
   ctx.fillRect(0, y, WIDTH, 64)
   if (logos.miniBlanco) drawImageFit(ctx, logos.miniBlanco, PAD, y + 12, 50, 40, 'left')
   else if (logos.blanco) drawImageFit(ctx, logos.blanco, PAD, y + 14, 240, 36, 'left')
-  text(ctx, 'Tu tranquilidad, nuestra prioridad. Siempre.', WIDTH - PAD, y + 39, {
-    size: 19,
+  // A pedido: eslogan centrado en la barra, blanco y bien visible.
+  text(ctx, 'Tu tranquilidad, nuestra prioridad. Siempre.', WIDTH / 2, y + 40, {
+    size: 21,
+    weight: 'bold',
     style: 'italic',
     color: C.blanco,
-    align: 'right',
+    align: 'center',
   })
   return y + 64
 }
