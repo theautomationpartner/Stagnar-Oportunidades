@@ -56,12 +56,13 @@ import {
   CONTACTO_CI_FRENTE_COLUMN_ID,
   CONTACTO_ESTADO_COLUMN_ID,
   CONTACTO_DIRECCION_COLUMN_ID,
+  CONTACTO_EMAIL_COLUMN_ID,
   CONTACTO_ARCHIVOS_COLUMN_ID,
   CONTACTO_NOMBRE_COLUMN_ID,
   CONTACTO_APELLIDO_COLUMN_ID,
 } from '../services/mondayApi'
 import { mapOpportunities } from '../services/opportunityMapper'
-import { ciError, fechaError, fieldStateClass, maxFechaNacimiento, normalizeFechaIA, splitNombreApellido, splitTelefono, stripCi, telefonoError, buildMondayPhone } from '../services/personaFields'
+import { ciError, fechaError, fieldStateClass, maxFechaNacimiento, normalizeFechaIA, splitNombreApellido, splitTelefono, stripCi, telefonoError, buildMondayPhone, emailError, buildMondayEmail } from '../services/personaFields'
 import { clearPersistedSearch, loadPersistedSearch, savePersistedSearch } from '../services/persistedSearch'
 import { DocumentChoiceToggle, Required, RequiredDropdown, SectionTitle, StepHeading, TelefonoField } from './crear/FormPrimitives'
 import { ExistingRecordSearch } from './crear/ExistingRecordSearch'
@@ -94,6 +95,8 @@ function buildInitialForm() {
     fechaNacimiento: '',
     codigoPais: '+598',
     telefono: '',
+    // A pedido: email del Cliente/Lead (opcional, columna email_mm6539g3 de Clientes).
+    email: '',
     localidadId: '',
     departamentoId: '',
     // A pedido: dirección exacta (calle y número) del domicilio principal — obligatoria
@@ -310,6 +313,7 @@ export default function CrearOportunidadForm({
         fechaNacimiento: '',
         codigoPais: '+598',
         telefono: '',
+        email: '',
         departamentoId: '',
         localidadId: '',
         direccion: '',
@@ -349,6 +353,7 @@ export default function CrearOportunidadForm({
       departamentoId: departamentoMatch?.id ?? prev.departamentoId,
       localidadId: localidadMatch?.id ?? prev.localidadId,
       direccion: resultado.direccion || prev.direccion,
+      email: resultado.email || prev.email,
     }))
     // A pedido: si esa persona ya tenía Cédula Identidad (CI Frente) subida en Clientes,
     // se reusa acá — Cliente y Lead viven en el mismo tablero ahora, así que siempre es
@@ -407,6 +412,7 @@ export default function CrearOportunidadForm({
             fechaNacimiento: form.fechaNacimiento,
             codigoPais: form.codigoPais,
             telefono: form.telefono,
+            email: form.email,
             departamentoId: form.departamentoId,
             localidadId: form.localidadId,
             direccion: form.direccion,
@@ -496,7 +502,7 @@ export default function CrearOportunidadForm({
   const [pendingExit, setPendingExit] = useState(null)
   const hasUnsavedWork = Boolean(
     // tipoRiesgo queda afuera a propósito: se autocompleta solo (único tipo disponible).
-    searchPreview || stepIndex > 0 || form.nombre || form.apellido || form.ci || form.telefono
+    searchPreview || stepIndex > 0 || form.nombre || form.apellido || form.ci || form.telefono || form.email
   )
   const handleExit = (destino) => {
     if (hasUnsavedWork && !saving && !createdItemId) {
@@ -619,6 +625,8 @@ export default function CrearOportunidadForm({
         [CONTACTO_DEPARTAMENTO_COLUMN_ID]: { item_ids: [Number(values.departamentoId)] },
         // Columna "long text": el JSON de change_multiple_column_values es {"text": ...}.
         [CONTACTO_DIRECCION_COLUMN_ID]: { text: values.direccion.trim() },
+        // Email opcional: solo se escribe si hay algo (no se puede vaciar desde acá).
+        ...(values.email?.trim() ? { [CONTACTO_EMAIL_COLUMN_ID]: buildMondayEmail(values.email) } : {}),
       })
       setForm((prev) => ({ ...prev, ...values }))
       setEditingContacto(false)
@@ -738,6 +746,8 @@ export default function CrearOportunidadForm({
           form.codigoPais &&
           form.telefono &&
           !telefonoError(form.telefono, form.codigoPais) &&
+          // Email opcional, pero si se cargó tiene que ser válido.
+          !emailError(form.email) &&
           form.localidadId &&
           form.departamentoId &&
           // A pedido: domicilio principal completo = Departamento + Localidad + Dirección.
@@ -987,6 +997,7 @@ export default function CrearOportunidadForm({
       [CONTACTO_LOCALIDAD_COLUMN_ID]: { item_ids: [Number(form.localidadId)] },
       [CONTACTO_DEPARTAMENTO_COLUMN_ID]: { item_ids: [Number(form.departamentoId)] },
       [CONTACTO_DIRECCION_COLUMN_ID]: { text: form.direccion.trim() },
+      ...(form.email?.trim() ? { [CONTACTO_EMAIL_COLUMN_ID]: buildMondayEmail(form.email) } : {}),
     })
     return created.id
   }

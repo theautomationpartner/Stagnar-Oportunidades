@@ -865,6 +865,9 @@ const CONTACTO_CI_FRENTE_COLUMN_ID = 'file_mm65486d'
 // ya existían) + Dirección exacta (calle y número, texto largo — nueva). Los 3 son
 // obligatorios en la app (ver isStepValid en CrearOportunidadForm.jsx).
 const CONTACTO_DIRECCION_COLUMN_ID = 'long_text_mm6m7d8c'
+// A pedido: Email del Cliente/Lead (columna tipo email de monday: value {email, text}).
+// Opcional en la app — se valida el formato si se carga (ver emailError).
+const CONTACTO_EMAIL_COLUMN_ID = 'email_mm6539g3'
 // A pedido: además del nombre del ítem ("Nombre Apellido"), Nombre y Apellido van en
 // columnas propias — se escriben al crear y se leen al buscar (antes se partía el
 // nombre del ítem a ciegas, ver splitNombreApellido en CrearOportunidadForm.jsx).
@@ -897,7 +900,7 @@ const SEARCH_CONTACTOS_QUERY = `
         items {
           id
           name
-          column_values(ids: ["${CONTACTO_ESTADO_COLUMN_ID}", "${CONTACTO_CI_COLUMN_ID}", "${CONTACTO_TELEFONO_COLUMN_ID}", "${CONTACTO_FECHA_NACIMIENTO_COLUMN_ID}", "${CONTACTO_LOCALIDAD_COLUMN_ID}", "${CONTACTO_DEPARTAMENTO_COLUMN_ID}", "${CONTACTO_DIRECCION_COLUMN_ID}", "${CONTACTO_NOMBRE_COLUMN_ID}", "${CONTACTO_APELLIDO_COLUMN_ID}"]) {
+          column_values(ids: ["${CONTACTO_ESTADO_COLUMN_ID}", "${CONTACTO_CI_COLUMN_ID}", "${CONTACTO_TELEFONO_COLUMN_ID}", "${CONTACTO_FECHA_NACIMIENTO_COLUMN_ID}", "${CONTACTO_LOCALIDAD_COLUMN_ID}", "${CONTACTO_DEPARTAMENTO_COLUMN_ID}", "${CONTACTO_DIRECCION_COLUMN_ID}", "${CONTACTO_EMAIL_COLUMN_ID}", "${CONTACTO_NOMBRE_COLUMN_ID}", "${CONTACTO_APELLIDO_COLUMN_ID}"]) {
             id
             text
             value
@@ -945,6 +948,7 @@ function mapContactoItem(item) {
     localidadNombre: byId[CONTACTO_LOCALIDAD_COLUMN_ID]?.display_value?.trim() || '',
     departamentoNombre: byId[CONTACTO_DEPARTAMENTO_COLUMN_ID]?.display_value?.trim() || '',
     direccion: byId[CONTACTO_DIRECCION_COLUMN_ID]?.text?.trim() || '',
+    email: byId[CONTACTO_EMAIL_COLUMN_ID]?.text?.trim() || '',
     // Vacíos en ítems viejos (creados antes de estas columnas) — el form cae a partir
     // el nombre del ítem en ese caso.
     nombre: byId[CONTACTO_NOMBRE_COLUMN_ID]?.text?.trim() || '',
@@ -1086,6 +1090,7 @@ export {
   CONTACTO_CI_FRENTE_COLUMN_ID,
   CONTACTO_ESTADO_COLUMN_ID,
   CONTACTO_DIRECCION_COLUMN_ID,
+  CONTACTO_EMAIL_COLUMN_ID,
   CONTACTO_ARCHIVOS_COLUMN_ID,
   CONTACTO_NOMBRE_COLUMN_ID,
   CONTACTO_APELLIDO_COLUMN_ID,

@@ -1,4 +1,4 @@
-import { MdEdit, MdLocationOn, MdSmartphone } from 'react-icons/md'
+import { MdEdit, MdEmail, MdLocationOn, MdSmartphone } from 'react-icons/md'
 import { Button } from '@vibe/core'
 import FileUploadField from '../FileUploadField'
 import { formatShortDate } from '../../services/format'
@@ -52,6 +52,12 @@ export default function PersonaFicha({
           <span className="crear-op__ficha-badge">
             <MdSmartphone />
             {form.telefono ? `${form.codigoPais} ${form.telefono}` : '—'}
+          </span>
+        )}
+        {showTelefono && form.email && (
+          <span className="crear-op__ficha-badge">
+            <MdEmail />
+            {form.email}
           </span>
         )}
       </div>

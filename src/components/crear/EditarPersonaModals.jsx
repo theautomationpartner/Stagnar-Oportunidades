@@ -11,7 +11,7 @@
 import { useState } from 'react'
 import { MdClear } from 'react-icons/md'
 import { Modal, ModalContent, ModalFooter, TextField } from '@vibe/core'
-import { CODIGO_PAIS_OPTIONS, ciError, fechaError, fieldStateClass, maxFechaNacimiento, stripCi, telefonoError } from '../../services/personaFields'
+import { CODIGO_PAIS_OPTIONS, ciError, emailError, fechaError, fieldStateClass, maxFechaNacimiento, stripCi, telefonoError } from '../../services/personaFields'
 import { Required, RequiredDropdown } from './FormPrimitives'
 
 // Localidades filtradas por el departamento elegido (antes copiado en los 2 popups y en
@@ -93,6 +93,7 @@ export function EditarContactoModal({ form, departamentoOptions, localidades, on
   const [fechaNacimiento, setFechaNacimiento] = useState(form.fechaNacimiento)
   const [codigoPais, setCodigoPais] = useState(form.codigoPais)
   const [telefono, setTelefono] = useState(form.telefono)
+  const [email, setEmail] = useState(form.email ?? '')
   const [departamentoId, setDepartamentoId] = useState(form.departamentoId)
   const [localidadId, setLocalidadId] = useState(form.localidadId)
   const [direccion, setDireccion] = useState(form.direccion)
@@ -106,7 +107,8 @@ export function EditarContactoModal({ form, departamentoOptions, localidades, on
 
   const telefonoErr = telefonoError(telefono, codigoPais)
   const fechaErr = fechaError(fechaNacimiento)
-  const canSave = !telefonoErr && !fechaErr && departamentoId && localidadId && direccion.trim()
+  const emailErr = emailError(email)
+  const canSave = !telefonoErr && !fechaErr && !emailErr && departamentoId && localidadId && direccion.trim()
 
   return (
     <Modal id="editar-contacto-modal" show onClose={onClose} size="medium">
@@ -138,6 +140,19 @@ export function EditarContactoModal({ form, departamentoOptions, localidades, on
             </div>
             {telefonoErr && <span className="crear-op__field-error" role="alert">{telefonoErr}</span>}
           </label>
+          <label className="crear-op__field crear-op__field--full">
+            <span>Email</span>
+            <TextField
+              type="email"
+              placeholder="Ej: nombre@dominio.com"
+              value={email}
+              onChange={setEmail}
+              icon={MdClear}
+              onIconClick={() => setEmail('')}
+              validation={emailErr ? { status: 'error' } : email.trim() ? { status: 'success' } : undefined}
+            />
+            {emailErr && <span className="crear-op__field-error" role="alert">{emailErr}</span>}
+          </label>
           <UbicacionFields
             departamentoOptions={departamentoOptions}
             selectedDepartamento={selectedDepartamento}
@@ -158,7 +173,7 @@ export function EditarContactoModal({ form, departamentoOptions, localidades, on
         primaryButton={{
           text: saving ? 'Guardando...' : 'Guardar',
           disabled: !canSave || saving,
-          onClick: () => onSave({ fechaNacimiento, codigoPais, telefono, departamentoId, localidadId, direccion }),
+          onClick: () => onSave({ fechaNacimiento, codigoPais, telefono, email, departamentoId, localidadId, direccion }),
         }}
       />
     </Modal>

@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Dropdown, TextField } from '@vibe/core'
 import { MdCall, MdClear, MdDescription, MdEdit } from 'react-icons/md'
-import { CODIGO_PAIS_OPTIONS, telefonoError } from '../../services/personaFields'
+import { CODIGO_PAIS_OPTIONS, emailError, telefonoError } from '../../services/personaFields'
 import { matchesSearchQuery } from '../../services/format'
 
 // A pedido: asterisco de obligatorio en rojo en TODOS los campos — antes era texto
@@ -152,6 +152,26 @@ export function TelefonoField({ form, handleChange, resetKey }) {
           </div>
           {telefonoError(form.telefono, form.codigoPais) && (
             <span className="crear-op__field-error" role="alert">{telefonoError(form.telefono, form.codigoPais)}</span>
+          )}
+        </label>
+        {/* A pedido: Email del Cliente/Lead (columna email_mm6539g3 de Clientes). Opcional,
+            pero si se carga se valida el formato (ver emailError). */}
+        <label className="crear-op__field crear-op__field--full">
+          <span>Email</span>
+          <TextField
+            key={`email-${resetKey}`}
+            type="email"
+            placeholder="Ej: nombre@dominio.com"
+            value={form.email ?? ''}
+            onChange={(value) => handleChange('email', value)}
+            icon={MdClear}
+            onIconClick={() => handleChange('email', '')}
+            validation={
+              emailError(form.email) ? { status: 'error' } : form.email?.trim() ? { status: 'success' } : undefined
+            }
+          />
+          {emailError(form.email) && (
+            <span className="crear-op__field-error" role="alert">{emailError(form.email)}</span>
           )}
         </label>
       </div>

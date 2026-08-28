@@ -167,3 +167,18 @@ export function initialsOf(name) {
   if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase()
   return `${parts[0][0]}${parts[parts.length - 1][0]}`.toUpperCase()
 }
+
+// Email (opcional): si se carga, tiene que tener formato válido. Chequeo simple
+// (algo@algo.algo), sin pretender validar contra el RFC entero.
+export function emailError(value) {
+  const v = (value ?? '').trim()
+  if (!v) return null
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]{2,}$/.test(v)) return 'El email no tiene un formato válido (ej: nombre@dominio.com).'
+  return null
+}
+
+// Payload de una columna "email" de monday (email_mm6539g3 en Clientes): {email, text}.
+export function buildMondayEmail(email) {
+  const v = (email ?? '').trim()
+  return { email: v, text: v }
+}
