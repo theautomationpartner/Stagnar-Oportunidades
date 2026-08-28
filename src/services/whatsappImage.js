@@ -569,11 +569,11 @@ function drawFooter(ctx, y, logos) {
   iconCalendar(ctx, PAD + 12, y + 22, 20)
   text(ctx, `Cotización generada el ${new Date().toLocaleDateString('es-UY')}`, PAD + 34, y + 28, { size: 15, color: C.texto })
   y += 44
-  // Barra verde: logo completo en blanco a la izquierda + eslogan a la derecha
+  // Barra verde: isotipo (la "S" sola, en blanco) a la izquierda + eslogan a la derecha
   ctx.fillStyle = C.verdeOscuro
   ctx.fillRect(0, y, WIDTH, 64)
-  if (logos.blanco) drawImageFit(ctx, logos.blanco, PAD, y + 14, 240, 36, 'left')
-  else if (logos.miniBlanco) drawImageFit(ctx, logos.miniBlanco, PAD, y + 14, 44, 36, 'left')
+  if (logos.miniBlanco) drawImageFit(ctx, logos.miniBlanco, PAD, y + 12, 50, 40, 'left')
+  else if (logos.blanco) drawImageFit(ctx, logos.blanco, PAD, y + 14, 240, 36, 'left')
   text(ctx, 'Tu tranquilidad, nuestra prioridad. Siempre.', WIDTH - PAD, y + 39, {
     size: 19,
     style: 'italic',
