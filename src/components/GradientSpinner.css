@@ -1,4 +1,8 @@
 .gradient-spinner {
+  /* transform-origin explícito: en SVG el default es la esquina (0 0), no el centro —
+     sin esto el arco "orbita" en vez de girar sobre sí mismo en algunos navegadores. */
+  transform-origin: 50% 50%;
+  transform-box: fill-box;
   animation: gradient-spinner-spin 1s linear infinite;
 }
 

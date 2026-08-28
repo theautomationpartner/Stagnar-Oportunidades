@@ -157,7 +157,11 @@ body {
 /* WCAG 2.3.3: un solo bloque global en vez de uno por archivo (varios componentes con
    animation/transition no tenían el suyo: GradientSpinner, Sidebar, PillTabs, etc.). */
 @media (prefers-reduced-motion: reduce) {
-  *,
+  /* Se frenan las animaciones DECORATIVAS. Los spinners quedan afuera a propósito
+     (.gradient-spinner propio y el Loader de @vibe/core): son el único indicador de
+     "está cargando" y sin girar parecen colgados — WCAG 2.3.3 pide reducir movimiento
+     no esencial, no ocultar el estado del sistema. */
+  *:not(.gradient-spinner):not([class*='loader']):not([class*='Loader']),
   *::before,
   *::after {
     animation-duration: 0.01ms !important;
