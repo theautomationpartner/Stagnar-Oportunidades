@@ -32,6 +32,10 @@ export const REQUIRED_BY_STAGE = {
     { key: 'marca', label: labelOf('marca') },
     { key: 'combustible', label: labelOf('combustible') },
     { key: 'fechaNacimiento', label: labelOf('fechaNacimiento') },
+    // A pedido: la Dirección (domicilio del Cliente/Lead, tablero Clientes) ya no es
+    // obligatoria al crear la oportunidad — se pide acá, en Confirmar, junto con los
+    // documentos. Solo aplica si hay Cliente/Lead vinculado (ver getMissing).
+    { key: 'clienteDireccion', label: 'Dirección', requiresCliente: true },
   ],
 
   // Paso 4 — "Emitir": última revisión antes de cargar la póliza / concretar.
@@ -58,7 +62,9 @@ export const REQUIRED_BY_STAGE = {
 // conectados cuando se le pasa el form en edición).
 export function getMissing(opportunity, stage) {
   if (stage === 'cotizar') return getMissingCotizarFields(opportunity)
-  return REQUIRED_BY_STAGE[stage].filter((f) => !f.optional && !opportunity?.[f.key])
+  return REQUIRED_BY_STAGE[stage].filter(
+    (f) => !f.optional && !(f.requiresCliente && !opportunity?.clienteId) && !opportunity?.[f.key]
+  )
 }
 
 export function getMissingLabels(opportunity, stage) {

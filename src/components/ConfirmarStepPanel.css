@@ -311,3 +311,37 @@
     max-width: 100%;
   }
 }
+
+/* Dirección del Cliente/Lead (a pedido: se pide en este paso, junto con los documentos). */
+.confirmar-step__direccion {
+  margin-bottom: 14px;
+}
+
+.confirmar-step__direccion-label {
+  display: block;
+  margin-bottom: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.confirmar-step__required {
+  color: var(--red);
+}
+
+.confirmar-step__direccion-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.confirmar-step__direccion-row > :first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+.confirmar-step__direccion-hint {
+  margin: 6px 0 0;
+  font-size: 12px;
+  color: var(--text-gray);
+}

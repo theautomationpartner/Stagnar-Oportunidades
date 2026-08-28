@@ -23,6 +23,8 @@ import {
   uploadFileToColumn,
   clearFileColumn,
   fetchLatestUpdate,
+  setContactoColumnValues,
+  CONTACTO_DIRECCION_COLUMN_ID,
 } from '../services/mondayApi'
 import { mapOpportunityItem } from '../services/opportunityMapper'
 import { textOf } from '../services/mondayColumns'
@@ -767,6 +769,28 @@ export default function OpportunityDetail({
   // ConfirmarStepPanel antes de llamar a esto — acá solo queda dejar registrado en
   // monday que la cotización fue aceptada (mismo estado real "Cotizacion aceptada" que
   // ya hace aterrizar directo en el paso 4 al reabrir la oportunidad) y avanzar la UI.
+  // Paso 3: Dirección del Cliente/Lead (a pedido, se pide acá y no al crear). Escribe
+  // en el ítem de Clientes y vuelve a leer la oportunidad para refrescar linked_items.
+  const [savingDireccion, setSavingDireccion] = useState(false)
+  const [direccionError, setDireccionError] = useState(null)
+  const handleSaveDireccion = async (direccion) => {
+    if (!opportunity?.clienteId) return
+    onOpportunityAction?.()
+    setSavingDireccion(true)
+    setDireccionError(null)
+    try {
+      await setContactoColumnValues(opportunity.clienteId, {
+        [CONTACTO_DIRECCION_COLUMN_ID]: { text: direccion.trim() },
+      })
+      const data = await fetchOpportunityDetail(opportunityId)
+      if (data) setItem(data)
+    } catch (err) {
+      setDireccionError(err.message)
+    } finally {
+      setSavingDireccion(false)
+    }
+  }
+
   const handleConfirmarPaso3 = async () => {
     onOpportunityAction?.()
     setConfirmingPaso3(true)
@@ -1257,6 +1281,9 @@ export default function OpportunityDetail({
               docUploadError={docUploadError}
               onUploadDocument={handleUploadDocument}
               onDeleteDocument={handleDeleteDocument}
+              onSaveDireccion={handleSaveDireccion}
+              savingDireccion={savingDireccion}
+              direccionError={direccionError}
               confirming={confirmingPaso3}
               confirmError={confirmPaso3Error}
               onConfirmar={handleConfirmarPaso3}

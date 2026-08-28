@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { MdCheckCircle, MdChatBubbleOutline } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
-import { Button } from '@vibe/core'
+import { Button, TextField } from '@vibe/core'
 import { formatMoney, CUOTA_COUNTS, toPercentString } from '../services/format'
 import { accentForCompania } from '../services/companyColors'
 import FileUploadField from './FileUploadField'
@@ -210,12 +210,22 @@ export default function ConfirmarStepPanel({
   docUploadError,
   onUploadDocument,
   onDeleteDocument,
+  // A pedido: la Dirección del Cliente/Lead se pide acá (paso 3) junto con los
+  // documentos — antes era obligatoria al crear la oportunidad.
+  onSaveDireccion,
+  savingDireccion,
+  direccionError,
   confirming,
   confirmError,
   onConfirmar,
   onBack,
 }) {
   const [validationError, setValidationError] = useState(null)
+  const [direccionDraft, setDireccionDraft] = useState(opportunity.clienteDireccion || '')
+  useEffect(() => {
+    setDireccionDraft(opportunity.clienteDireccion || '')
+  }, [opportunity.clienteDireccion])
+  const direccionDirty = direccionDraft.trim() !== (opportunity.clienteDireccion || '').trim()
   const entries = groups.flatMap((g) => g.entries)
   const elegida = entries.find((e) => e.raw.propuestaElegida)
   // Ordenadas por compañía (a pedido, sin agrupar por renglón como antes — ver el
@@ -283,6 +293,40 @@ export default function ConfirmarStepPanel({
           Verificá que estén cargados los documentos del asegurado. Si falta alguno, se puede
           subir directo desde acá.
         </p>
+        {opportunity.clienteId && (
+          <div className="confirmar-step__direccion">
+            <label className="confirmar-step__direccion-label" htmlFor="confirmar-direccion">
+              Dirección (calle y número) <span className="confirmar-step__required">*</span>
+            </label>
+            <div className="confirmar-step__direccion-row">
+              <TextField
+                id="confirmar-direccion"
+                size="medium"
+                placeholder="Ej: Av. Italia 1234 apto 5"
+                value={direccionDraft}
+                onChange={setDireccionDraft}
+                validation={opportunity.clienteDireccion && !direccionDirty ? { status: 'success' } : undefined}
+              />
+              <Button
+                kind={direccionDirty ? 'primary' : 'secondary'}
+                onClick={() => onSaveDireccion?.(direccionDraft)}
+                disabled={!direccionDirty || !direccionDraft.trim() || savingDireccion}
+                loading={savingDireccion}
+              >
+                Guardar
+              </Button>
+            </div>
+            <p className="confirmar-step__direccion-hint">
+              Domicilio del {opportunity.clienteSituacion?.toLowerCase() === 'lead' ? 'lead' : 'cliente'} — se guarda
+              en su ficha de Clientes.
+            </p>
+            {direccionError && (
+              <p className="confirmar-step__error" role="alert">
+                Error: {direccionError}
+              </p>
+            )}
+          </div>
+        )}
         <div className="confirmar-step__docs">
           {docsOrdenados.map((doc) => (
             <FileUploadField

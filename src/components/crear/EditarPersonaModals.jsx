@@ -72,7 +72,7 @@ function UbicacionFields({
         />
       </label>
       <label className={`crear-op__field crear-op__field--full${fieldStateClass(direccion, null)}`}>
-        <span>Dirección (calle y número) <Required /></span>
+        <span>Dirección (calle y número)</span>
         <input
           type="text"
           value={direccion}
@@ -108,7 +108,8 @@ export function EditarContactoModal({ form, departamentoOptions, localidades, on
   const telefonoErr = telefonoError(telefono, codigoPais)
   const fechaErr = fechaError(fechaNacimiento)
   const emailErr = emailError(email)
-  const canSave = !telefonoErr && !fechaErr && !emailErr && departamentoId && localidadId && direccion.trim()
+  // Dirección opcional (a pedido: se pide en el paso 3 de la oportunidad).
+  const canSave = !telefonoErr && !fechaErr && !emailErr && departamentoId && localidadId
 
   return (
     <Modal id="editar-contacto-modal" show onClose={onClose} size="medium">
@@ -213,8 +214,7 @@ export function EditarLeadModal({ form, departamentoOptions, localidades, onSave
     fechaNacimiento &&
     !fechaErr &&
     departamentoId &&
-    localidadId &&
-    direccion.trim()
+    localidadId
 
   return (
     <Modal id="editar-lead-modal" show onClose={onClose} size="medium">

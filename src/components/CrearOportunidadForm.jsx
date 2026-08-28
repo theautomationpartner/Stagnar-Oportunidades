@@ -758,9 +758,9 @@ export default function CrearOportunidadForm({
           // Email opcional, pero si se cargó tiene que ser válido.
           !emailError(form.email) &&
           form.localidadId &&
-          form.departamentoId &&
-          // A pedido: domicilio principal completo = Departamento + Localidad + Dirección.
-          form.direccion.trim()
+          form.departamentoId
+        // A pedido: la Dirección ya no es obligatoria acá — se pide en el paso 3
+        // (Confirmar) de la oportunidad, junto con los documentos.
       )
     }
     if (index === 1) {
@@ -1608,7 +1608,6 @@ export default function CrearOportunidadForm({
                               key={`direccion-${textFieldsResetKey}`}
                               wrapperClassName="crear-op__field"
                               title="Dirección (calle y número)"
-                              required
                               placeholder="Ej: Av. Italia 1234 apto 5"
                               value={form.direccion}
                               onChange={(value) => handleChange('direccion', value)}
