@@ -1261,3 +1261,10 @@
   min-height: 22px;
   line-height: 20px;
 }
+
+/* El valor seleccionado del Dropdown de vibe vive en un wrapper con padding 9px que NO
+   se centra verticalmente dentro del control de 40px (quedaba 6px arriba). Con 22px de
+   alto en nuestro span, 22 + 9 + 9 = 40 y el contenido queda centrado exacto. */
+.crear-op__phone-code-value {
+  height: 22px;
+}
