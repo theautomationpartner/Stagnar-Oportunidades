@@ -436,3 +436,24 @@
     max-width: 100%;
   }
 }
+
+/* Cotización no seleccionable (sin fórmula o COSTO TOTAL en 0, ver isQuoteSelectable):
+   atenuada y sin interacción — no se puede marcar para enviar. */
+.quote-card--unavailable {
+  opacity: 0.55;
+  filter: grayscale(0.6);
+  background: var(--bg-subtle);
+}
+
+.quote-card--unavailable .quote-card__radio,
+.quote-card--unavailable .quote-card__actions button,
+.quote-card--unavailable .quote-card__footer button {
+  pointer-events: none;
+}
+
+.quote-card__unavailable-msg {
+  margin: 0;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-warning);
+}

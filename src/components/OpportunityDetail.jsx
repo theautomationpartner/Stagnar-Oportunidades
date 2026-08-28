@@ -30,7 +30,7 @@ import { mapOpportunityItem } from '../services/opportunityMapper'
 import { textOf } from '../services/mondayColumns'
 import { useSchema } from '../context/AppContext'
 import { mapSubitemToRawQuote, groupQuotesByCompania } from '../services/quoteMapper'
-import { computeQuote } from '../services/pricingEngine'
+import { computeQuote, isQuoteSelectable } from '../services/pricingEngine'
 import { applyRecargoLookup } from '../services/recargoPanel'
 import { COTIZAR_FIELDS, getMissingCotizarFields } from '../services/cotizarFields'
 import { COBERTURA_TABS, coberturaGroupOf } from '../services/coberturaGroups'
@@ -513,6 +513,20 @@ export default function OpportunityDetail({
     return flat.filter((e) => coberturaGroupOf(e.raw.cobertura) === activeCoberturaTab)
   }, [groups, activeCoberturaTab])
 
+  // A pedido: solo cuentan (y se envían) las seleccionadas que además son
+  // seleccionables (COSTO TOTAL > 0 y con fórmula) — una marcada en monday con total 0
+  // queda fuera aunque tenga el tilde de "incluir".
+  const selectableSelectedIds = useMemo(
+    () =>
+      new Set(
+        groups
+          .flatMap((g) => g.entries)
+          .filter((e) => selectedIds.has(e.raw.id) && isQuoteSelectable(e.quote))
+          .map((e) => e.raw.id)
+      ),
+    [groups, selectedIds]
+  )
+
   const toggleSelected = (id) => {
     setSelectedIds((prev) => {
       const next = new Set(prev)
@@ -904,7 +918,7 @@ export default function OpportunityDetail({
   const openWhatsAppModalWith = async (renderQuoteImageDataUrl) => {
     const selectedEntries = groups
       .flatMap((g) => g.entries)
-      .filter((e) => selectedIds.has(e.raw.id))
+      .filter((e) => selectableSelectedIds.has(e.raw.id))
     const images = await Promise.all(
       selectedEntries.map(async (e) => ({
         raw: e.raw,
@@ -1214,7 +1228,7 @@ export default function OpportunityDetail({
                 onBack={() => setActiveStep('cotizar')}
                 extraLeft={
                   <div className="opp-detail__footer-status">
-                    <span>{selectedIds.size} opciones seleccionadas</span>
+                    <span>{selectableSelectedIds.size} opciones seleccionadas</span>
                     {opportunity.estadoEnvio && (
                       <span className="opp-detail__envio-status">
                         {sendPolling && (
@@ -1236,7 +1250,7 @@ export default function OpportunityDetail({
                   kind="primary"
                   color="positive"
                   onClick={handleOpenWhatsAppModal}
-                  disabled={selectedIds.size === 0 || preparingWaImages}
+                  disabled={selectableSelectedIds.size === 0 || preparingWaImages}
                   loading={preparingWaImages}
                 >
                   <MdSend /> {preparingWaImages ? 'Preparando imágenes...' : 'Enviar seleccionadas por WhatsApp'}

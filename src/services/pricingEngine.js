@@ -315,3 +315,10 @@ export function computeQuote(raw, overrides = {}, panelContext = {}) {
     rc: eff.rc || '',
   }
 }
+
+// A pedido: una cotización sin fórmula (blocked) o con COSTO TOTAL en 0 no se puede
+// seleccionar para nada — ni para enviar por WhatsApp (paso 2) ni como elegida (paso 3).
+// Se muestra atenuada. Regla única para las dos pantallas.
+export function isQuoteSelectable(quote) {
+  return Boolean(quote) && !quote.blocked && Number(quote.total) > 0
+}

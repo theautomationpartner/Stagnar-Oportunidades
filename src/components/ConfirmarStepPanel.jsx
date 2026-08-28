@@ -3,6 +3,7 @@ import { MdCheckCircle, MdChatBubbleOutline } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
 import { Button, TextField } from '@vibe/core'
 import { formatMoney, CUOTA_COUNTS, toPercentString } from '../services/format'
+import { isQuoteSelectable } from '../services/pricingEngine'
 import { accentForCompania } from '../services/companyColors'
 import FileUploadField from './FileUploadField'
 import StepFooter from './StepFooter'
@@ -28,12 +29,19 @@ const CHOSEN_TRANSITION_MS = 300
 function QuoteChoiceCard({ entry, selected, onSelect, selecting }) {
   const { raw, quote } = entry
   const accent = accentForCompania(raw.compania)
+  // A pedido: COSTO TOTAL en 0 → atenuada, no se puede marcar como elegida.
+  const selectable = isQuoteSelectable(quote)
   return (
     <div
-      className={
-        selected ? 'confirmar-step__card confirmar-step__card--selected' : 'confirmar-step__card'
-      }
+      className={[
+        'confirmar-step__card',
+        selected && 'confirmar-step__card--selected',
+        !selectable && 'confirmar-step__card--unavailable',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       style={{ borderLeftColor: accent }}
+      aria-disabled={!selectable || undefined}
     >
       <div className="confirmar-step__card-header">
         <div className="confirmar-step__card-header-main">
@@ -95,10 +103,12 @@ function QuoteChoiceCard({ entry, selected, onSelect, selecting }) {
       <Button
         kind={selected ? 'primary' : 'secondary'}
         className="confirmar-step__card-btn"
-        onClick={onSelect}
-        disabled={selecting}
+        onClick={selectable ? onSelect : undefined}
+        disabled={selecting || !selectable}
       >
-        {selecting ? (
+        {!selectable ? (
+          'Sin costo total'
+        ) : selecting ? (
           'Guardando...'
         ) : selected ? (
           <>

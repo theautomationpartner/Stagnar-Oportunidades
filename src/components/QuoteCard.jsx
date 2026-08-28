@@ -8,6 +8,7 @@ import {
 } from 'react-icons/md'
 import { Button, IconButton, Dropdown, Checkbox, NumberField } from '@vibe/core'
 import { formatMoney, CUOTA_COUNTS, toPercentString } from '../services/format'
+import { isQuoteSelectable } from '../services/pricingEngine'
 import { accentForCompania } from '../services/companyColors'
 import './QuoteCard.css'
 
@@ -257,10 +258,19 @@ function QuoteCard({
     )
   }
 
+  // A pedido: COSTO TOTAL en 0 → tarjeta atenuada, no se puede seleccionar para enviar.
+  const selectable = isQuoteSelectable(quote)
   return (
     <div
-      className={selected ? 'quote-card quote-card--selected' : 'quote-card'}
+      className={[
+        'quote-card',
+        selected && selectable && 'quote-card--selected',
+        !selectable && 'quote-card--unavailable',
+      ]
+        .filter(Boolean)
+        .join(' ')}
       style={{ borderLeftColor: accent }}
+      aria-disabled={!selectable || undefined}
     >
       {/* A pedido, estética tipo mockup: layout vertical (título+deducible a la
           izquierda, COSTO TOTAL a la derecha, arriba de todo) en vez de las 3 columnas
@@ -273,9 +283,10 @@ function QuoteCard({
           <div className="quote-card__title-row">
             <IconButton
               className="quote-card__radio"
-              icon={selected ? MdRadioButtonChecked : MdRadioButtonUnchecked}
-              onClick={onToggleSelected}
-              aria-label="Seleccionar opción"
+              icon={selected && selectable ? MdRadioButtonChecked : MdRadioButtonUnchecked}
+              onClick={selectable ? onToggleSelected : undefined}
+              disabled={!selectable}
+              aria-label={selectable ? 'Seleccionar opción' : 'No seleccionable: sin costo total'}
             />
             <span className="quote-card__company" style={{ color: accent }}>
               {raw.compania}
@@ -283,6 +294,7 @@ function QuoteCard({
             <span className="quote-card__title">{raw.cobertura || raw.name}</span>
           </div>
           <span className="quote-card__deducible-line">Deduc.: {quote.deducibleDisplay}</span>
+          {!selectable && <p className="quote-card__unavailable-msg">Sin costo total — no se puede seleccionar</p>}
         </div>
 
         <div className="quote-card__total">
