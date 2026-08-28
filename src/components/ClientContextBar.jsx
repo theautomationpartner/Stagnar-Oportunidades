@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { MdEmail, MdExpandLess, MdExpandMore, MdSmartphone } from 'react-icons/md'
 import { Button } from '@vibe/core'
 import ClienteArchivos from './ClienteArchivos'
-import { formatShortDate } from '../services/format'
+import { formatShortDate, modeloSinMarca } from '../services/format'
 import { initialsOf } from '../services/personaFields'
 import './ClientContextBar.css'
 
@@ -52,7 +52,7 @@ export default function ClientContextBar({ opportunity, onEdit, actions, tag }) 
   // Edad: la columna Edad de la Oportunidad (numeric_mm527wpm) si está; si no, calculada
   // desde la fecha de nacimiento (solo para mostrar, no se escribe en monday).
   const edad = opportunity.edad || edadDesde(opportunity.fechaNacimiento)
-  const vehiculo = [opportunity.marca, opportunity.modelo].filter(Boolean).join(' ')
+  const vehiculo = [opportunity.marca, modeloSinMarca(opportunity.marca, opportunity.modelo)].filter(Boolean).join(' ')
   // A pedido: cerrada muestra solo marca + modelo + año; combustible y uso van al desplegable.
   const vehiculoMeta = opportunity.anio ? `(${opportunity.anio})` : ''
 

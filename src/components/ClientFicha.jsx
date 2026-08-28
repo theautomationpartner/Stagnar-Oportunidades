@@ -1,7 +1,7 @@
 import { MdEdit, MdLocationOn, MdSmartphone, MdHome } from 'react-icons/md'
 import { Button } from '@vibe/core'
 import ClienteArchivos from './ClienteArchivos'
-import { formatShortDate } from '../services/format'
+import { formatShortDate, modeloSinMarca } from '../services/format'
 import { initialsOf } from '../services/personaFields'
 import './ClientFicha.css'
 
@@ -100,7 +100,7 @@ export default function ClientFicha({
           )}
         </div>
         <strong className="client-ficha__vehiculo-title">
-          {[opportunity.marca, opportunity.modelo].filter(Boolean).join(' ') || 'Sin vehículo cargado'}
+          {[opportunity.marca, modeloSinMarca(opportunity.marca, opportunity.modelo)].filter(Boolean).join(' ') || 'Sin vehículo cargado'}
           {opportunity.anio && ` (${opportunity.anio})`}
         </strong>
         {(opportunity.combustible || opportunity.tipo || opportunity.uso) && (
