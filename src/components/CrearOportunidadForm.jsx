@@ -1427,7 +1427,7 @@ export default function CrearOportunidadForm({
                       {tieneCedulaLead === 'No' && (
                         <div className="crear-op__section-subblock">
                           <SectionTitle icon={MdPerson}>Datos personales</SectionTitle>
-                          <div className="crear-op__fields--grid">
+                          <div className="crear-op__fields--grid crear-op__fields--grid-3">
                           {/* TextField nativo de @vibe/core en vez de <label> + ClearableInput a
                               mano — ya trae label (title/required), botón de limpiar (icon/
                               onIconClick/clearOnIconClick) y el borde verde/rojo (validation) de
@@ -1509,6 +1509,8 @@ export default function CrearOportunidadForm({
                               <span className="crear-op__field-error" role="alert">{fechaError(form.fechaNacimiento)}</span>
                             )}
                           </label>
+                          {/* Teléfono + Email en la misma grilla que los datos personales (2ª fila) */}
+                          <TelefonoField inline form={form} handleChange={handleChange} resetKey={textFieldsResetKey} />
                           </div>
                         </div>
                       )}
@@ -1551,11 +1553,9 @@ export default function CrearOportunidadForm({
 
                     {tieneCedulaLead === 'No' && (
                       <>
-                        <TelefonoField form={form} handleChange={handleChange} resetKey={textFieldsResetKey} />
-
                         <div className="crear-op__section">
                           <SectionTitle icon={MdLocationOn}>Ubicación</SectionTitle>
-                          <div className="crear-op__fields--grid">
+                          <div className="crear-op__fields--grid crear-op__fields--grid-3">
                             <label className="crear-op__field">
                               <span>Departamento <Required /></span>
                               <RequiredDropdown
@@ -1587,7 +1587,7 @@ export default function CrearOportunidadForm({
                             </label>
                             <TextField
                               key={`direccion-${textFieldsResetKey}`}
-                              wrapperClassName="crear-op__field crear-op__field--full"
+                              wrapperClassName="crear-op__field"
                               title="Dirección (calle y número)"
                               required
                               placeholder="Ej: Av. Italia 1234 apto 5"

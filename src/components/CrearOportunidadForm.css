@@ -1083,3 +1083,114 @@
     flex: 1;
   }
 }
+
+/* ============================================================================
+   Auditoría UX — densidad del wizard (paso 1 "Seleccionar Cliente"): el objetivo es
+   que el formulario completo entre en una pantalla de notebook (≈768px de alto) sin
+   scroll. Se reorganizan los campos en grillas de 3 (Nombre/Apellido/CI ·
+   Fecha/Teléfono/Email · Departamento/Localidad/Dirección) y se ajustan aires; ningún
+   campo, validación ni orden de guardado cambia.
+   ============================================================================ */
+.crear-op__card {
+  padding: 20px 32px 24px;
+}
+
+.crear-op__header {
+  margin-bottom: 14px;
+}
+
+.crear-op__form-card {
+  gap: 18px;
+  padding: 18px 22px;
+}
+
+.crear-op__section-subblock {
+  margin-top: 14px;
+}
+
+.crear-op__section-title-row {
+  margin: 0 0 10px;
+}
+
+.crear-op__section-icon {
+  width: 28px;
+  height: 28px;
+  font-size: 15px;
+}
+
+.crear-op__section-title {
+  font-size: 15px;
+}
+
+.crear-op__fields--grid {
+  gap: 12px 20px;
+}
+
+.crear-op__fields--grid-3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.crear-op__field input {
+  padding: 9px 12px;
+  font-size: 14px;
+}
+
+.crear-op__risk-subtitle {
+  font-size: 15px;
+  margin-bottom: 8px;
+}
+
+.crear-op__risk-option {
+  padding: 10px 16px;
+  font-size: 14px;
+  gap: 10px;
+}
+
+.crear-op__risk-option-icon {
+  font-size: 18px;
+}
+
+.crear-op__footer {
+  margin: 18px -32px 0;
+  padding: 12px 32px;
+}
+
+/* En anchos medios, la grilla de 3 pasa a 2 (y a 1 en celular, ver la regla de 640px). */
+@media (max-width: 960px) {
+  .crear-op__fields--grid-3 {
+    grid-template-columns: 1fr 1fr;
+  }
+}
+
+@media (max-width: 640px) {
+  .crear-op__fields--grid-3 {
+    grid-template-columns: 1fr;
+  }
+
+  .crear-op__footer {
+    margin: 16px -16px 0;
+    padding: 12px 16px;
+  }
+}
+
+.crear-op {
+  padding: 20px 32px 24px;
+}
+
+/* "Documentos del lead/cliente": la descripción pasa de frase en negrita (competía con
+   los títulos de sección) a texto de ayuda chico y gris — jerarquía: título > campos >
+   ayuda. */
+.cliente-archivos .crear-op__risk-subtitle {
+  margin: -4px 0 8px;
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-gray);
+}
+
+.crear-op {
+  padding-bottom: 12px;
+}
+
+.crear-op__card {
+  padding-bottom: 16px;
+}

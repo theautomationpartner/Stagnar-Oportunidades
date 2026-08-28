@@ -117,12 +117,13 @@ export function SectionTitle({ icon: Icon, children }) {
 // Fila de Teléfono, reusada tanto por el formulario manual ("No tengo la Cédula") como
 // por el perfil leído con IA ("Sí" + lectura ok) — la IA no devuelve teléfono, así que
 // en los 2 casos hay que pedirlo aparte.
-export function TelefonoField({ form, handleChange, resetKey }) {
-  return (
-    <div className="crear-op__section">
-      <SectionTitle icon={MdCall}>Contacto</SectionTitle>
-      <div className="crear-op__fields--grid">
-        <label className="crear-op__field crear-op__field--full">
+// `inline`: devuelve solo los 2 campos (Teléfono, Email) para meterlos en la grilla de
+// otra sección (ver "Datos personales" en CrearOportunidadForm.jsx: así Nombre/Apellido/
+// CI y Fecha/Teléfono/Email quedan en 2 filas de 3 y el paso entra en una pantalla).
+export function TelefonoField({ form, handleChange, resetKey, inline = false }) {
+  const fields = (
+    <>
+        <label className="crear-op__field">
           <span>Teléfono <Required /></span>
           <div className="crear-op__phone">
             <div className="crear-op__phone-code">
@@ -156,7 +157,7 @@ export function TelefonoField({ form, handleChange, resetKey }) {
         </label>
         {/* A pedido: Email del Cliente/Lead (columna email_mm6539g3 de Clientes). Opcional,
             pero si se carga se valida el formato (ver emailError). */}
-        <label className="crear-op__field crear-op__field--full">
+        <label className="crear-op__field">
           <span>Email</span>
           <TextField
             key={`email-${resetKey}`}
@@ -174,7 +175,13 @@ export function TelefonoField({ form, handleChange, resetKey }) {
             <span className="crear-op__field-error" role="alert">{emailError(form.email)}</span>
           )}
         </label>
-      </div>
+    </>
+  )
+  if (inline) return fields
+  return (
+    <div className="crear-op__section">
+      <SectionTitle icon={MdCall}>Contacto</SectionTitle>
+      <div className="crear-op__fields--grid">{fields}</div>
     </div>
   )
 }
