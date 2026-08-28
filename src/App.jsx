@@ -1,4 +1,4 @@
-import { Suspense, lazy, useDeferredValue, useEffect, useMemo, useState } from 'react'
+import { Suspense, lazy, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
 import LoadingScreen from './components/LoadingScreen'
 import { useHashRoute } from './hooks/useHashRoute'
 import { AppProviders } from './context/AppContext'
@@ -172,8 +172,36 @@ export default function App() {
     [filteredOpportunities, page, pageSize]
   )
 
+  // Recarga solo la lista de oportunidades (no el schema ni los catálogos). Bug
+  // reportado: la tabla se pedía UNA vez al abrir la app, así que una oportunidad recién
+  // creada (o un cambio de estado hecho en el detalle) no aparecía al volver a la tabla
+  // hasta recargar la página. Se llama al crear y cada vez que se entra a la tabla.
+  const reloadOpportunities = async () => {
+    if (!schema) return
+    try {
+      const { items, totalCount } = await fetchOpportunities(ITEMS_FETCH_LIMIT)
+      setBoardTotalCount(totalCount)
+      setOpportunities(
+        mapOpportunities(items, {
+          estadoOportunidad: schema.estadoOportunidad.colorsByLabel,
+          estadoCotizacion: schema.estadoCotizacion.colorsByLabel,
+        })
+      )
+    } catch {
+      // Si falla la recarga se sigue mostrando la lista anterior (no es crítico).
+    }
+  }
+  const isTableRoute = route.seg === 'oportunidades' && !route.id
+  const tableVisitsRef = useRef(0)
+  useEffect(() => {
+    if (!isTableRoute || !schema) return
+    // La primera vez la lista ya viene del load inicial; de ahí en más se refresca.
+    tableVisitsRef.current += 1
+    if (tableVisitsRef.current > 1) reloadOpportunities()
+  }, [isTableRoute, schema])
+
   // ---- Navegación (ver hooks/useHashRoute.js): la URL es la fuente de verdad de qué
-  // pantalla se ve. / de antes se derivan de .
+  // pantalla se ve; view/openOpportunityId de antes se derivan de route.
   const nav = {
     route,
     go,
@@ -222,6 +250,8 @@ export default function App() {
           }}
           onCreated={(newItemId) => {
             setOpenedFromCrearFlow(false)
+            // La lista se refresca en segundo plano para que la nueva ya esté al volver.
+            reloadOpportunities()
             nav.openOpportunity(newItemId)
           }}
         />
