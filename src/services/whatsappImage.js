@@ -11,7 +11,8 @@
 import { formatMoney, modeloSinMarca } from './format'
 import { BRAND_COLORS } from './companyColors'
 import { coberturaGroupOf } from './coberturaGroups'
-import stagnariLogo from '../assets/stagnari-logo.png'
+// A pedido: logo del header desde logo-blanco-.png con el fondo blanco recortado.
+import stagnariLogo from '../assets/stagnari-logo-header.png'
 import stagnariLogoSimple from '../assets/stagnari-logo-simple.png'
 // A pedido: isotipo y logo completo en BLANCO sobre transparente para la barra verde del
 // pie (generados a partir de los archivos de marca: mini-logo-blanco-fondo-verde.png con
