@@ -517,18 +517,22 @@ function drawPaymentOptions(ctx, quote, y) {
   return y + ch
 }
 
-function drawBenefits(ctx, incluye, y) {
+// `fontSize` baja (15 → 12) cuando el contenido no entra en el alto fijo; `extraH`
+// estira la tarjeta para llenar el lienzo cuando sobra espacio (ver renderQuoteImageDataUrl).
+function drawBenefits(ctx, incluye, y, { fontSize = 15, extraH = 0 } = {}) {
   const cols = Math.min(4, Math.max(1, incluye.length))
   const gap = 16
   const colW = (INNER - 32 - gap * (cols - 1)) / cols
-  const itemFont = `15px ${FONT}`
-  const lineH = 20
+  const itemFont = `${fontSize}px ${FONT}`
+  const lineH = Math.round(fontSize * 1.34)
+  // Modo compacto (cuando hubo que bajar la letra): menos aire entre filas.
+  const rowPad = fontSize < 15 ? 10 : 18
   const rows = []
   for (let i = 0; i < incluye.length; i += cols) rows.push(incluye.slice(i, i + cols))
   const rowHeights = rows.map((row) =>
-    Math.max(...row.map((item) => wrapLines(ctx, item, colW - 36, itemFont).length)) * lineH + 18
+    Math.max(...row.map((item) => wrapLines(ctx, item, colW - 36, itemFont).length)) * lineH + rowPad
   )
-  const h = 52 + rowHeights.reduce((a, b) => a + b, 0) + 8
+  const h = 52 + rowHeights.reduce((a, b) => a + b, 0) + 8 + extraH
   card(ctx, PAD, y, INNER, h, { radius: 14 })
   iconGift(ctx, PAD + 30, y + 30, 24)
   text(ctx, 'BENEFICIOS INCLUIDOS', PAD + 54, y + 36, { size: 16, weight: 'bold', color: C.verdeOscuro })
@@ -539,7 +543,7 @@ function drawBenefits(ctx, incluye, y) {
       const x = PAD + 16 + ci * (colW + gap)
       iconCircleCheck(ctx, x + 11, ry + 12, 10)
       const lines = wrapLines(ctx, item, colW - 36, itemFont)
-      lines.forEach((line, li) => text(ctx, line, x + 30, ry + 17 + li * lineH, { size: 15 }))
+      lines.forEach((line, li) => text(ctx, line, x + 30, ry + 17 + li * lineH, { size: fontSize }))
       if (ci > 0) {
         ctx.strokeStyle = C.borde
         ctx.lineWidth = 1
@@ -588,18 +592,30 @@ function drawFooter(ctx, y, logos) {
 const FOOTER_TOTAL = 44 + 64
 const MEASURE_CANVAS_HEIGHT = 3000
 
-function drawContent(ctx, opportunity, raw, quote, canvasHeight, logos) {
+function drawContent(ctx, opportunity, raw, quote, canvasHeight, logos, layout = {}) {
   ctx.fillStyle = C.blanco
   ctx.fillRect(0, 0, WIDTH, canvasHeight)
+  // gapExtra: sin tarjeta de beneficios que estirar, el espacio sobrante se reparte
+  // entre las secciones (con tope) en vez de quedar todo junto antes del pie.
+  const g = layout.gapExtra || 0
   let y = drawHeader(ctx, logos)
-  y = drawCoverTitle(ctx, raw, y + 14)
-  y = drawVehicleCard(ctx, opportunity, raw, quote, y + 6)
-  y = drawPriceBand(ctx, quote, y + 18)
-  y = drawPaymentOptions(ctx, quote, y + 22)
-  if (quote.incluye?.length) y = drawBenefits(ctx, quote.incluye, y + 18)
+  y = drawCoverTitle(ctx, raw, y + 14 + g)
+  y = drawVehicleCard(ctx, opportunity, raw, quote, y + 6 + g)
+  y = drawPriceBand(ctx, quote, y + 18 + g)
+  y = drawPaymentOptions(ctx, quote, y + 22 + g)
+  if (quote.incluye?.length) {
+    y = drawBenefits(ctx, quote.incluye, y + 18, { fontSize: layout.benefitsFont, extraH: layout.benefitsExtra })
+  }
   if (quote.warning) y = drawWarning(ctx, quote.warning, y + 16)
   return y + 22
 }
+
+// A pedido: TODAS las cotizaciones salen del mismo tamaño (900 × 1200) — en un chat se
+// ven parejas, sin importar cuántos beneficios traiga cada compañía/cobertura. Si el
+// contenido es más corto, la tarjeta de beneficios se estira para llenar; si es más
+// largo, primero se compacta la letra de los beneficios (15 → 12px) y, solo si ni así
+// entra, la imagen crece lo justo (caso raro).
+const FIXED_HEIGHT = 1240
 
 // Dos pasadas: la primera sobre un canvas descartable para medir hasta dónde llega el
 // contenido (el nombre del vehículo y los beneficios varían de alto), la segunda sobre
@@ -618,14 +634,28 @@ export async function renderQuoteImageDataUrl(opportunity, raw, quote) {
   const measureCanvas = document.createElement('canvas')
   measureCanvas.width = WIDTH
   measureCanvas.height = MEASURE_CANVAS_HEIGHT
-  const contentBottom = drawContent(measureCanvas.getContext('2d'), opportunity, raw, quote, MEASURE_CANVAS_HEIGHT, logos)
+  const measureCtx = measureCanvas.getContext('2d')
+  const available = FIXED_HEIGHT - FOOTER_TOTAL
 
-  const height = Math.ceil(contentBottom) + FOOTER_TOTAL
+  // 1) Buscar el tamaño de letra de beneficios con el que el contenido entra.
+  let benefitsFont = 15
+  let contentBottom = drawContent(measureCtx, opportunity, raw, quote, MEASURE_CANVAS_HEIGHT, logos, { benefitsFont })
+  while (contentBottom > available && benefitsFont > 11) {
+    benefitsFont -= 1
+    contentBottom = drawContent(measureCtx, opportunity, raw, quote, MEASURE_CANVAS_HEIGHT, logos, { benefitsFont })
+  }
+  // 2) Si sobra, estirar la tarjeta de beneficios hasta llenar el lienzo fijo.
+  const extra = Math.max(0, available - Math.ceil(contentBottom))
+  const hasBenefits = Boolean(quote.incluye?.length)
+  const gapExtra = hasBenefits ? 0 : Math.min(56, Math.floor(extra / 4))
+  const benefitsExtra = hasBenefits ? extra : 0
+  const height = Math.max(FIXED_HEIGHT, Math.ceil(contentBottom) + FOOTER_TOTAL)
+
   const canvas = document.createElement('canvas')
   canvas.width = WIDTH
   canvas.height = height
   const ctx = canvas.getContext('2d')
-  drawContent(ctx, opportunity, raw, quote, height, logos)
+  drawContent(ctx, opportunity, raw, quote, height, logos, { benefitsFont, benefitsExtra, gapExtra })
   drawFooter(ctx, height - FOOTER_TOTAL, logos)
 
   return canvas.toDataURL('image/png')
