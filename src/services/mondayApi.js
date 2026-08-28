@@ -130,7 +130,7 @@ const OPPORTUNITY_DETAIL_QUERY = `
           linked_items {
             id
             name
-            column_values(ids: ["long_text_mm6m7d8c", "board_relation_mm65e7he", "board_relation_mm657jse", "text_mm6mrx0a", "text_mm6mx38p", "color_mm6570m0"]) {
+            column_values(ids: ["long_text_mm6m7d8c", "board_relation_mm65e7he", "board_relation_mm657jse", "text_mm6mrx0a", "text_mm6mx38p", "color_mm6570m0", "email_mm6539g3"]) {
               id
               text
               ... on BoardRelationValue {

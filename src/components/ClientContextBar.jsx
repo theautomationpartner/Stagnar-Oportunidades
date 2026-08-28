@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { MdExpandLess, MdExpandMore, MdSmartphone } from 'react-icons/md'
+import { MdEmail, MdExpandLess, MdExpandMore, MdSmartphone } from 'react-icons/md'
 import { Button } from '@vibe/core'
 import ClienteArchivos from './ClienteArchivos'
 import { formatShortDate } from '../services/format'
@@ -7,10 +7,10 @@ import { initialsOf } from '../services/personaFields'
 import './ClientContextBar.css'
 
 // Barra de contexto del Cliente/Lead para los pasos 2, 3 y 4 de una Oportunidad
-// (a pedido): una sola línea con lo justo para saber de quién y de qué vehículo es la
-// oportunidad, a todo el ancho, CERRADA por defecto. "Ver más" despliega, como
-// continuación de la misma tarjeta, SOLO lo que la barra no muestra (nacimiento,
-// domicilio, ID de monday, tipo de vehículo, documentos) — nada se repite — como panel
+// (a pedido): una sola línea con lo mínimo — quién (nombre, Cliente/Lead, ID de la
+// oportunidad) y qué vehículo — a todo el ancho, CERRADA por defecto. "Ver más"
+// despliega, como continuación de la misma tarjeta, el resto (CI, teléfono, email,
+// nacimiento/edad, domicilio, zona, tipo, documentos) — nada se repite — como panel
 // flotante por ENCIMA del contenido de abajo (no lo empuja); se cierra con click afuera,
 // Escape o el mismo botón. Las acciones (Editar/Recotizar) van en la barra.
 function edadDesde(fechaIso) {
@@ -69,12 +69,6 @@ export default function ClientContextBar({ opportunity, onEdit, actions, tag }) 
             <strong className="client-bar__name">{opportunity.clienteNombre}</strong>
             {tag && <span className="client-bar__tag">{tag}</span>}
             {situacion && <span className="client-bar__tag">{situacion}</span>}
-            <span className="client-bar__sep" aria-hidden="true">·</span>
-            <span className="client-bar__data">CI {opportunity.ci || '—'}</span>
-            <span className="client-bar__sep" aria-hidden="true">·</span>
-            <span className="client-bar__data">
-              <MdSmartphone /> {opportunity.telefono || '—'}
-            </span>
           </div>
           <div className="client-bar__line client-bar__line--vehiculo">
             <span className="client-bar__vehiculo">{vehiculo || 'Sin vehículo cargado'}</span>
@@ -105,6 +99,22 @@ export default function ClientContextBar({ opportunity, onEdit, actions, tag }) 
       {open && (
         <div className="client-bar__panel" id="client-bar-panel" role="region" aria-label="Más datos del cliente">
           <dl className="client-bar__details">
+            <div className="client-bar__detail">
+              <dt>CI</dt>
+              <dd>{opportunity.ci || '—'}</dd>
+            </div>
+            <div className="client-bar__detail">
+              <dt>Teléfono</dt>
+              <dd>
+                <MdSmartphone /> {opportunity.telefono || '—'}
+              </dd>
+            </div>
+            <div className="client-bar__detail">
+              <dt>Email</dt>
+              <dd>
+                <MdEmail /> {opportunity.clienteEmail || '—'}
+              </dd>
+            </div>
             <div className="client-bar__detail">
               <dt>Nacimiento</dt>
               <dd>

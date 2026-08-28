@@ -212,3 +212,9 @@
 .opp-detail__client-card .client-bar {
   margin-top: 0;
 }
+
+.client-bar__detail dd svg {
+  vertical-align: -2px;
+  color: var(--text-muted);
+  margin-right: 2px;
+}

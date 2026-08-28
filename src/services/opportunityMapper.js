@@ -74,6 +74,8 @@ export function mapOpportunityItem(item, statusColors = {}) {
   const clienteLocalidad = boardRelationDisplayOf(ccv, 'board_relation_mm65e7he')
   const clienteDepartamento = boardRelationDisplayOf(ccv, 'board_relation_mm657jse')
   const clienteSituacion = textOf(ccv, 'color_mm6570m0')
+  // Email del Cliente/Lead (columna email_mm6539g3 de Clientes) — solo lectura acá.
+  const clienteEmail = textOf(ccv, 'email_mm6539g3')
 
   return {
     id: item.id,
@@ -81,6 +83,7 @@ export function mapOpportunityItem(item, statusColors = {}) {
     clienteNombre,
     clienteId: clienteItem?.id ?? null,
     clienteSituacion,
+    clienteEmail,
     clienteDireccion,
     clienteLocalidad,
     clienteDepartamento,
