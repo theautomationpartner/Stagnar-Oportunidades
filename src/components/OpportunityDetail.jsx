@@ -12,6 +12,7 @@ import WhatsAppSendModal from './WhatsAppSendModal'
 import ErrorDetailBox from './ErrorDetailBox'
 import ClientFicha from './ClientFicha'
 import StepFooter from './StepFooter'
+import LoadingScreen from './LoadingScreen'
 import './PillTabs.css'
 import {
   fetchOpportunityDetail,
@@ -996,10 +997,11 @@ export default function OpportunityDetail({
       )}
 
       {loading && (
-        <div className="opp-detail__status">
-          <Loader size={64} className="opp-detail__loading-spinner" />
-          Cargando cotizaciones...
-        </div>
+        <LoadingScreen
+          compact
+          title="Cargando la oportunidad"
+          message="Estamos trayendo los datos del cliente, el vehículo y las cotizaciones desde monday."
+        />
       )}
       {error && <div className="opp-detail__status opp-detail__status--error">Error: {error}</div>}
 

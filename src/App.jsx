@@ -1,5 +1,5 @@
 import { Suspense, lazy, useDeferredValue, useEffect, useMemo, useState } from 'react'
-import { Loader } from '@vibe/core'
+import LoadingScreen from './components/LoadingScreen'
 import { useHashRoute } from './hooks/useHashRoute'
 import { AppProviders } from './context/AppContext'
 import Sidebar from './components/Sidebar'
@@ -190,7 +190,7 @@ export default function App() {
   let main
   if (route.seg === 'oportunidades' && route.id) {
     main = (
-      <Suspense fallback={<div className="app" style={{ padding: 40, textAlign: 'center' }}><Loader size={48} /></div>}>
+      <Suspense fallback={<LoadingScreen title="Abriendo la oportunidad" message="Estamos trayendo los datos del cliente y las cotizaciones desde monday." />}>
         <OpportunityDetail
           key={route.id}
           opportunityId={route.id}
@@ -209,7 +209,7 @@ export default function App() {
     main = <LandingScreen onCreateNew={nav.goCreate} onSearchExisting={nav.goTable} />
   } else if (route.seg === 'crear') {
     main = (
-      <Suspense fallback={<div className="app" style={{ padding: 40, textAlign: 'center' }}><Loader size={48} /></div>}>
+      <Suspense fallback={<LoadingScreen title="Preparando el formulario" message="Un momento, estamos cargando el asistente para crear la oportunidad." />}>
         <CrearOportunidadForm
           schema={schema}
           opportunities={opportunities}
