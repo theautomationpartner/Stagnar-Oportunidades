@@ -294,7 +294,6 @@ function QuoteCard({
             <span className="quote-card__title">{raw.cobertura || raw.name}</span>
           </div>
           <span className="quote-card__deducible-line">Deduc.: {quote.deducibleDisplay}</span>
-          {!selectable && <p className="quote-card__unavailable-msg">Sin costo total — no se puede seleccionar</p>}
         </div>
 
         <div className="quote-card__total">
@@ -308,11 +307,20 @@ function QuoteCard({
           min-height en CSS) para que todas las tarjetas de un mismo renglón midan lo
           mismo: con advertencia, aparece el texto; sin ella, el espacio queda vacío pero
           ocupado igual. */}
+      {/* Renglón SIEMPRE reservado (min-height en CSS) para que todas las tarjetas del
+          renglón midan lo mismo: acá va la advertencia corta o, si la cotización no es
+          seleccionable, el aviso de "sin costo total" — nunca una línea extra. */}
       <div className="quote-card__meta-warning">
-        {quote.warning && (
+        {!selectable ? (
           <>
-            <MdWarningAmber /> {quote.warning.short}
+            <MdWarningAmber /> Sin costo total — no se puede seleccionar
           </>
+        ) : (
+          quote.warning && (
+            <>
+              <MdWarningAmber /> {quote.warning.short}
+            </>
+          )
         )}
       </div>
 

@@ -451,9 +451,25 @@
   pointer-events: none;
 }
 
-.quote-card__unavailable-msg {
-  margin: 0;
-  font-size: 12px;
-  font-weight: 600;
-  color: var(--text-warning);
+
+/* Los montos no se parten en 2 líneas ("$" arriba, "22.583" abajo): cada fila de cuotas
+   mide lo mismo en todas las tarjetas y el renglón queda parejo (antes una tarjeta con
+   montos cortos, ej. "$ 0", quedaba más baja que sus vecinas). */
+.quote-card__cuotas-table td,
+.quote-card__cuotas-table th {
+  white-space: nowrap;
+}
+
+/* La promo "➜ N cuotas SIN RECARGO de $X" ocupa 1 o 2 líneas según el monto; se
+   reserva el alto de 2 para que las tarjetas de un mismo renglón midan igual. */
+.quote-card__cuotas-label {
+  min-height: calc(2 * 1.4em);
+  line-height: 1.4;
+}
+
+/* El renglón reservado mide lo mismo vacío o con texto (antes 17px vacío vs ~20px con
+   una advertencia, y las tarjetas con aviso quedaban 3px más altas). */
+.quote-card__meta-warning {
+  min-height: 20px;
+  line-height: 20px;
 }
