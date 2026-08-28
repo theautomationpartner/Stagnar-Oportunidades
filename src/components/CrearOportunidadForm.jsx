@@ -43,6 +43,7 @@ import {
   searchContactos,
   findContactoByCedula,
   findContactoByTelefono,
+  findContactoByEmail,
   fetchContactoOportunidades,
   createContactoItem,
   fetchFileColumnAsFile,
@@ -539,13 +540,15 @@ export default function CrearOportunidadForm({
     // findContactoByTelefono en mondayApi.js) — solo con un número ya válido, para no
     // consultar a mitad de tipeo.
     const telefonoValido = form.telefono.trim() && !telefonoError(form.telefono, form.codigoPais)
-    if (!ciValida && !nombreCompleto && !telefonoValido) {
+    // A pedido: también por Email — solo con un email ya válido (ver emailError).
+    const emailValido = (form.email ?? '').trim() && !emailError(form.email)
+    if (!ciValida && !nombreCompleto && !telefonoValido && !emailValido) {
       setDuplicadoCheck(null)
       return undefined
     }
     let cancelled = false
     const timer = setTimeout(() => {
-      // Orden de prioridad: CI exacto > Teléfono exacto > Nombre+Apellido (laxo). Se
+      // Orden de prioridad: CI exacto > Teléfono exacto > Email exacto > Nombre+Apellido (laxo). Se
       // recuerda por cuál se encontró (`motivo`) para que el popup diga qué coincidió.
       const lookup = (async () => {
         if (ciValida) {
@@ -555,6 +558,10 @@ export default function CrearOportunidadForm({
         if (telefonoValido) {
           const porTelefono = await findContactoByTelefono(form.codigoPais, form.telefono)
           if (porTelefono) return { contacto: porTelefono, motivo: 'telefono' }
+        }
+        if (emailValido) {
+          const porEmail = await findContactoByEmail(form.email)
+          if (porEmail) return { contacto: porEmail, motivo: 'email' }
         }
         if (!ciValida && nombreCompleto) {
           const porNombre = (await searchContactos(nombreCompleto))[0] ?? null
@@ -582,6 +589,7 @@ export default function CrearOportunidadForm({
     form.apellido,
     form.telefono,
     form.codigoPais,
+    form.email,
     busquedaResuelta,
     resultadoSeleccionado,
   ])
@@ -1268,25 +1276,31 @@ export default function CrearOportunidadForm({
                     id="duplicado-cedula-modal"
                     type="warning"
                     title={
-                      duplicadoCheck.motivo === 'telefono'
-                        ? 'Teléfono ya registrado'
-                        : duplicadoCheck.motivo === 'nombre'
-                          ? 'Persona ya registrada'
-                          : 'Cédula de Identidad ya registrada'
+                      {
+                        telefono: 'Teléfono ya registrado',
+                        email: 'Email ya registrado',
+                        nombre: 'Persona ya registrada',
+                      }[duplicadoCheck.motivo] ?? 'Cédula de Identidad ya registrada'
                     }
                     description={
                       <>
-                        {duplicadoCheck.motivo === 'telefono'
-                          ? 'Encontramos este Teléfono ya cargado en el tablero Clientes:'
-                          : duplicadoCheck.motivo === 'nombre'
-                            ? 'Encontramos una persona con este Nombre y Apellido ya cargada en el tablero Clientes:'
-                            : 'Encontramos esta Cédula de Identidad ya cargada en el tablero Clientes:'}
+                        {{
+                          telefono: 'Encontramos este Teléfono ya cargado en el tablero Clientes:',
+                          email: 'Encontramos este Email ya cargado en el tablero Clientes:',
+                          nombre: 'Encontramos una persona con este Nombre y Apellido ya cargada en el tablero Clientes:',
+                        }[duplicadoCheck.motivo] ?? 'Encontramos esta Cédula de Identidad ya cargada en el tablero Clientes:'}
                         <br />
                         <br />
                         Nombre: <strong>{duplicadoCheck.contacto.name}</strong>
                         <br />
                         Situación: <strong>{duplicadoCheck.contacto.situacion || 'Cliente'}</strong>
-                        {duplicadoCheck.motivo === 'telefono' && duplicadoCheck.contacto.ci && (
+                        {duplicadoCheck.motivo === 'email' && duplicadoCheck.contacto.email && (
+                          <>
+                            <br />
+                            Email: <strong>{duplicadoCheck.contacto.email}</strong>
+                          </>
+                        )}
+                        {(duplicadoCheck.motivo === 'telefono' || duplicadoCheck.motivo === 'email') && duplicadoCheck.contacto.ci && (
                           <>
                             <br />
                             CI: <strong>{duplicadoCheck.contacto.ci}</strong>

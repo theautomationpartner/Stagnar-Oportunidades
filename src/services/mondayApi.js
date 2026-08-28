@@ -1011,6 +1011,20 @@ export async function findContactoByTelefono(codigoPais, telefono) {
   )
 }
 
+// A pedido: duplicados también por Email (misma mecánica que findContactoByTelefono) —
+// búsqueda laxa en la API (contains_text) y match exacto, sin importar mayúsculas, acá.
+export async function findContactoByEmail(email) {
+  const needle = (email ?? '').trim().toLowerCase()
+  if (!needle.includes('@')) return null
+  const data = await callMondayApi(SEARCH_CONTACTOS_QUERY, {
+    boardId: CLIENTES_BOARD_ID,
+    rules: [{ column_id: CONTACTO_EMAIL_COLUMN_ID, compare_value: [needle], operator: 'contains_text' }],
+    limit: 5,
+  })
+  const items = data.boards[0]?.items_page.items ?? []
+  return items.map(mapContactoItem).find((c) => (c.email ?? '').trim().toLowerCase() === needle) ?? null
+}
+
 const FETCH_CONTACTO_OPORTUNIDADES_QUERY = `
   query FetchContactoOportunidades($itemId: [ID!], $columnIds: [String!]) {
     items(ids: $itemId) {
