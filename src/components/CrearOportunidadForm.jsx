@@ -1444,6 +1444,7 @@ export default function CrearOportunidadForm({
                               (pantalla en blanco). Pasando siempre un ícono definido, esa
                               combinación imposible de lograr no existe más. */}
                           <TextField
+                            size="medium"
                             key={`nombre-${textFieldsResetKey}`}
                             wrapperClassName="crear-op__field"
                             title="Nombre"
@@ -1456,6 +1457,7 @@ export default function CrearOportunidadForm({
                             validation={form.nombre ? { status: 'success' } : undefined}
                           />
                           <TextField
+                            size="medium"
                             key={`apellido-${textFieldsResetKey}`}
                             wrapperClassName="crear-op__field"
                             title="Apellido"
@@ -1468,6 +1470,7 @@ export default function CrearOportunidadForm({
                             validation={form.apellido ? { status: 'success' } : undefined}
                           />
                           <TextField
+                            size="medium"
                             key={`ci-${textFieldsResetKey}`}
                             wrapperClassName="crear-op__field"
                             title="CI"
@@ -1586,6 +1589,7 @@ export default function CrearOportunidadForm({
                               />
                             </label>
                             <TextField
+                              size="medium"
                               key={`direccion-${textFieldsResetKey}`}
                               wrapperClassName="crear-op__field"
                               title="Dirección (calle y número)"

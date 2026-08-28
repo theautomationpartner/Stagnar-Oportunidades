@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Dropdown, TextField } from '@vibe/core'
 import { MdCall, MdClear, MdDescription, MdEdit } from 'react-icons/md'
 import { CODIGO_PAIS_OPTIONS, emailError, telefonoError } from '../../services/personaFields'
+import FlagIcon from './FlagIcon'
 import { matchesSearchQuery } from '../../services/format'
 
 // A pedido: asterisco de obligatorio en rojo en TODOS los campos — antes era texto
@@ -11,6 +12,25 @@ import { matchesSearchQuery } from '../../services/format'
 // Teléfono, Departamento, Localidad, Año/Marca/Modelo/etc.), mientras que el TextField
 // nativo de @vibe/core (Nombre/Apellido/CI) sí lo trae rojo de fábrica — quedaba
 // inconsistente. Un solo componente en vez de repetir el span a mano en cada campo.
+// Selector de código de país: cerrado muestra bandera + código; el menú, bandera +
+// código + nombre del país.
+export const codigoPaisDropdownProps = {
+  valueRenderer: (option) => (
+    <span className="crear-op__phone-code-value">
+      <FlagIcon iso={option.iso} />
+      {option.value}
+    </span>
+  ),
+  optionRenderer: (option) => (
+    <span className="crear-op__phone-code-option">
+      <FlagIcon iso={option.iso} />
+      <span>{option.value}</span>
+      <span className="crear-op__phone-code-pais">{option.pais}</span>
+    </span>
+  ),
+  menuWrapperClassName: 'crear-op__phone-menu',
+}
+
 export function Required() {
   return <span className="crear-op__required">*</span>
 }
@@ -131,10 +151,12 @@ export function TelefonoField({ form, handleChange, resetKey, inline = false }) 
                 size="medium"
                 options={CODIGO_PAIS_OPTIONS}
                 value={CODIGO_PAIS_OPTIONS.find((o) => o.value === form.codigoPais) ?? null}
+                {...codigoPaisDropdownProps}
                 onChange={(option) => handleChange('codigoPais', option?.value ?? '')}
               />
             </div>
             <TextField
+              size="medium"
               key={`telefono-${resetKey}`}
               wrapperClassName="crear-op__phone-number"
               placeholder="Ej: 099 123 456"
@@ -160,6 +182,7 @@ export function TelefonoField({ form, handleChange, resetKey, inline = false }) 
         <label className="crear-op__field">
           <span>Email</span>
           <TextField
+            size="medium"
             key={`email-${resetKey}`}
             type="email"
             placeholder="Ej: nombre@dominio.com"

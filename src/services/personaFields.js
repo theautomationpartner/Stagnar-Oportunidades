@@ -5,17 +5,19 @@
 
 // Uruguay por default (mercado principal de la app), pero editable por si hace falta
 // cargar un cliente con otro código — no hay columna real de monday detrás todavía.
+// A pedido: código de país compacto con bandera (ver FlagIcon.jsx: SVG, porque los
+// emoji de banderas no se ven en Windows). `label` es el texto plano (búsqueda/lectores
+// de pantalla); lo visual lo arman valueRenderer/optionRenderer en TelefonoField y
+// EditarContactoModal.
 export const CODIGO_PAIS_OPTIONS = [
-  { value: '+598', label: '(+598) Uruguay' },
-  { value: '+54', label: '(+54) Argentina' },
-  { value: '+55', label: '(+55) Brasil' },
-  { value: '+595', label: '(+595) Paraguay' },
-  { value: '+56', label: '(+56) Chile' },
+  { value: '+598', label: '+598 Uruguay', iso: 'UY', pais: 'Uruguay' },
+  { value: '+54', label: '+54 Argentina', iso: 'AR', pais: 'Argentina' },
+  { value: '+55', label: '+55 Brasil', iso: 'BR', pais: 'Brasil' },
+  { value: '+595', label: '+595 Paraguay', iso: 'PY', pais: 'Paraguay' },
+  { value: '+56', label: '+56 Chile', iso: 'CL', pais: 'Chile' },
 ]
 
-// La columna Teléfono (phone_mm519m27) es tipo "phone" real de monday — el formato que
-// espera change_column_value es {"phone": "<código+número sin espacios>", "countryShortName": "XX"}.
-export const COUNTRY_SHORT_NAMES = {
+const COUNTRY_SHORT_NAMES = {
   '+598': 'UY',
   '+54': 'AR',
   '+55': 'BR',

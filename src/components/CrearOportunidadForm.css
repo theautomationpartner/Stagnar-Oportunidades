@@ -1194,3 +1194,59 @@
 .crear-op__card {
   padding-bottom: 16px;
 }
+
+/* Teléfono: código de país compacto (bandera + código, ver CODIGO_PAIS_OPTIONS) de
+   ancho fijo, y el número ocupa todo el resto de la celda — antes el selector con
+   "(+598) Uruguay" completo se llevaba 210px y el número quedaba aplastado. */
+.crear-op__phone-code {
+  width: 118px;
+}
+
+.crear-op__phone-number {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+/* Selector de código de país: bandera + código (cerrado) y bandera + código + país
+   (menú, que se portalea a body — de ahí la clase de menú propia via
+   menuWrapperClassName, más ancha que el control). */
+.crear-op__phone-code {
+  width: 128px;
+}
+
+.crear-op__phone-code-value,
+.crear-op__phone-code-option {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.crear-op__phone-code-pais {
+  color: var(--text-gray);
+}
+
+.flag-icon {
+  flex-shrink: 0;
+  border-radius: 2px;
+  box-shadow: 0 0 0 1px rgba(0, 0, 0, 0.08);
+}
+
+.crear-op__phone-menu {
+  min-width: 220px !important;
+}
+
+/* Auditoría: TODOS los controles del wizard a la misma altura (40px = size "medium" de
+   @vibe/core, que ya usan los Dropdown). Los <input> nativos (fecha, texto) y los
+   TextField (ahora con size="medium" en el JSX) quedan parejos. */
+.crear-op__field input:not([type='checkbox']):not([type='radio']):not([type='file']) {
+  height: 40px;
+  padding: 0 12px;
+  font-size: 14px;
+  box-sizing: border-box;
+}
+
+.crear-op__form-card {
+  gap: 16px;
+}

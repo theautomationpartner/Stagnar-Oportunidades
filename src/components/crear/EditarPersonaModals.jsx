@@ -12,7 +12,7 @@ import { useState } from 'react'
 import { MdClear } from 'react-icons/md'
 import { Modal, ModalContent, ModalFooter, TextField } from '@vibe/core'
 import { CODIGO_PAIS_OPTIONS, ciError, emailError, fechaError, fieldStateClass, maxFechaNacimiento, stripCi, telefonoError } from '../../services/personaFields'
-import { Required, RequiredDropdown } from './FormPrimitives'
+import { Required, RequiredDropdown, codigoPaisDropdownProps } from './FormPrimitives'
 
 // Localidades filtradas por el departamento elegido (antes copiado en los 2 popups y en
 // otros 2 lugares del formulario) — mismo criterio: sin departamento, todas.
@@ -125,10 +125,12 @@ export function EditarContactoModal({ form, departamentoOptions, localidades, on
                   size="medium"
                   options={CODIGO_PAIS_OPTIONS}
                   value={CODIGO_PAIS_OPTIONS.find((o) => o.value === codigoPais) ?? null}
+                  {...codigoPaisDropdownProps}
                   onChange={(option) => setCodigoPais(option?.value ?? '')}
                 />
               </div>
               <TextField
+                size="medium"
                 wrapperClassName="crear-op__phone-number"
                 placeholder="Ej: 099 123 456"
                 value={telefono}
@@ -143,6 +145,7 @@ export function EditarContactoModal({ form, departamentoOptions, localidades, on
           <label className="crear-op__field crear-op__field--full">
             <span>Email</span>
             <TextField
+              size="medium"
               type="email"
               placeholder="Ej: nombre@dominio.com"
               value={email}
