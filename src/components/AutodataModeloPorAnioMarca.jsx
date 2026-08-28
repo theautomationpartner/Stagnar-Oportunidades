@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Dropdown } from '@vibe/core'
 import { fetchAutodataModelosByAnioMarca } from '../services/mondayApi'
-import { matchesSearchQuery } from '../services/format'
+import { matchesSearchQuery, modeloSinMarca } from '../services/format'
 
 // Modelo (Autodata) filtrado por Año + Marca ya elegidos — a diferencia de una búsqueda
 // libre por texto (que trae resultados de CUALQUIER año/marca), acá solo se pide la
@@ -61,6 +61,11 @@ export default function AutodataModeloPorAnioMarca({
       searchable
       filterOption={(option, inputValue) => matchesSearchQuery(option.label, inputValue)}
       options={options}
+      // Solo presentación: la marca ya está elegida arriba, en la lista y en el valor se
+      // muestra el modelo sin ella ("206 1.6 Presence Full…"). El label/valor real que se
+      // guarda sigue siendo el nombre completo de Autodata.
+      optionRenderer={(option) => <span>{modeloSinMarca(marca, option.label)}</span>}
+      valueRenderer={(option) => <span>{modeloSinMarca(marca, option.label)}</span>}
       value={selected}
       loading={loading || forceDisabled}
       disabled={disabled}

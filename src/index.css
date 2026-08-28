@@ -201,3 +201,11 @@ body {
     transform: scale(1);
   }
 }
+
+/* El <input> interno de los Dropdown buscables de @vibe/core (react-select, role
+   combobox) no lleva el outline global: el control ya marca el foco con su propio borde
+   azul redondeado, y el outline sobre el input interno se veía como un rectángulo que
+   sobresalía del control. */
+input[role='combobox']:focus-visible {
+  outline: none;
+}
