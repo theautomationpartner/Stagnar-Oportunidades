@@ -106,29 +106,85 @@
   flex-shrink: 0;
 }
 
-/* Panel desplegado: flota por encima del contenido siguiente (absoluto, no ocupa lugar
-   en el flujo), a todo el ancho de la barra. */
+/* Panel desplegado: continuación de la MISMA tarjeta (sin separación: la barra pierde
+   el redondeo/borde inferior y el panel arranca pegado), flotando por encima del
+   contenido siguiente (absoluto, no ocupa lugar en el flujo). Animación de despliegue
+   con clip-path (se "descubre" de arriba hacia abajo) + fade. */
+.client-bar--open .client-bar__row {
+  border-bottom-left-radius: 0;
+  border-bottom-right-radius: 0;
+  border-bottom-color: transparent;
+  box-shadow: none;
+}
+
 .client-bar__panel {
   position: absolute;
-  top: calc(100% + 6px);
+  top: 100%;
   left: 0;
   right: 0;
   z-index: var(--z-sticky);
-  animation: client-bar-in 0.16s ease-out both;
+  padding: 4px 14px 16px 64px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-top: none;
+  border-radius: 0 0 var(--radius-xl) var(--radius-xl);
+  box-shadow: var(--shadow-lg);
+  animation: client-bar-in 0.22s ease-out both;
 }
 
-.client-bar__panel .client-ficha {
-  box-shadow: var(--shadow-lg);
+/* Sombra única para barra + panel como un solo bloque */
+.client-bar--open::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-floating);
+  pointer-events: none;
+}
+
+.client-bar__details {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 10px 20px;
+  margin: 0;
+  padding: 10px 0 12px;
+  border-top: 1px solid var(--border-subtle);
+}
+
+.client-bar__detail dt {
+  font-size: 11px;
+  font-weight: 600;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+  margin-bottom: 2px;
+}
+
+.client-bar__detail dd {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+/* Documentos dentro del panel: sin tarjeta propia (ya está adentro de una) */
+.client-bar__panel .cliente-archivos {
+  padding: 10px 0 0;
+  background: none;
+  border: none;
+  border-top: 1px solid var(--border-subtle);
+  border-radius: 0;
+  box-shadow: none;
 }
 
 @keyframes client-bar-in {
   from {
     opacity: 0;
-    transform: translateY(-4px);
+    clip-path: inset(0 0 100% 0);
   }
   to {
     opacity: 1;
-    transform: translateY(0);
+    clip-path: inset(0 0 -24px 0);
   }
 }
 

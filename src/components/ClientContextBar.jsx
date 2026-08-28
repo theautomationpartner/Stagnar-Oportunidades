@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from 'react'
 import { MdExpandLess, MdExpandMore, MdSmartphone } from 'react-icons/md'
 import { Button } from '@vibe/core'
-import ClientFicha from './ClientFicha'
+import ClienteArchivos from './ClienteArchivos'
+import { formatShortDate } from '../services/format'
 import { initialsOf } from '../services/personaFields'
 import './ClientContextBar.css'
 
 // Barra de contexto del Cliente/Lead para los pasos 2, 3 y 4 de una Oportunidad
 // (a pedido): una sola línea con lo justo para saber de quién y de qué vehículo es la
-// oportunidad, a todo el ancho, CERRADA por defecto. "Ver ficha" despliega la
-// ClientFicha completa (la misma del paso 1) como panel flotante por ENCIMA del
-// contenido de abajo — no lo empuja — y se cierra con click afuera, Escape o el mismo
-// botón. Las acciones (Editar/Recotizar) van en la barra, siempre a mano.
+// oportunidad, a todo el ancho, CERRADA por defecto. "Ver más" despliega, como
+// continuación de la misma tarjeta, SOLO lo que la barra no muestra (nacimiento,
+// domicilio, ID de monday, tipo de vehículo, documentos) — nada se repite — como panel
+// flotante por ENCIMA del contenido de abajo (no lo empuja); se cierra con click afuera,
+// Escape o el mismo botón. Las acciones (Editar/Recotizar) van en la barra.
 export default function ClientContextBar({ opportunity, onEdit, actions, tag }) {
   const [open, setOpen] = useState(false)
   const rootRef = useRef(null)
@@ -36,13 +38,15 @@ export default function ClientContextBar({ opportunity, onEdit, actions, tag }) 
   }, [open])
 
   const situacion = opportunity.clienteSituacion || ''
+  const esLead = situacion.toLowerCase() === 'lead'
+  const ubicacion = [opportunity.departamento, opportunity.zonaCirculacion].filter(Boolean).join(' — ')
   const vehiculo = [opportunity.marca, opportunity.modelo].filter(Boolean).join(' ')
   const vehiculoMeta = [opportunity.anio && `(${opportunity.anio})`, opportunity.combustible, opportunity.uso]
     .filter(Boolean)
     .join(' · ')
 
   return (
-    <div className="client-bar" ref={rootRef}>
+    <div className={open ? 'client-bar client-bar--open' : 'client-bar'} ref={rootRef}>
       <div className="client-bar__row">
         <div className="client-bar__avatar" aria-hidden="true">
           {initialsOf(opportunity.clienteNombre)}
@@ -80,14 +84,38 @@ export default function ClientContextBar({ opportunity, onEdit, actions, tag }) 
             aria-expanded={open}
             aria-controls="client-bar-panel"
           >
-            {open ? 'Ocultar ficha' : 'Ver ficha'} {open ? <MdExpandLess /> : <MdExpandMore />}
+            {open ? 'Ver menos' : 'Ver más'} {open ? <MdExpandLess /> : <MdExpandMore />}
           </Button>
         </div>
       </div>
 
       {open && (
-        <div className="client-bar__panel" id="client-bar-panel" role="region" aria-label="Ficha del cliente">
-          <ClientFicha opportunity={opportunity} onEdit={onEdit} tag={tag} />
+        <div className="client-bar__panel" id="client-bar-panel" role="region" aria-label="Más datos del cliente">
+          <dl className="client-bar__details">
+            <div className="client-bar__detail">
+              <dt>Nacimiento</dt>
+              <dd>{opportunity.fechaNacimiento ? formatShortDate(opportunity.fechaNacimiento) : '—'}</dd>
+            </div>
+            <div className="client-bar__detail">
+              <dt>{opportunity.clienteId ? 'Domicilio' : 'Ubicación'}</dt>
+              <dd>{opportunity.clienteId ? opportunity.clienteDomicilio || '—' : ubicacion || '—'}</dd>
+            </div>
+            <div className="client-bar__detail">
+              <dt>Zona de circulación</dt>
+              <dd>{ubicacion || '—'}</dd>
+            </div>
+            <div className="client-bar__detail">
+              <dt>Tipo de vehículo</dt>
+              <dd>{opportunity.tipo || '—'}</dd>
+            </div>
+            <div className="client-bar__detail">
+              <dt>ID en monday</dt>
+              <dd>{opportunity.id}</dd>
+            </div>
+          </dl>
+          {opportunity.clienteId && (
+            <ClienteArchivos contactoId={opportunity.clienteId} tipo={esLead ? 'lead' : 'cliente'} />
+          )}
         </div>
       )}
     </div>
