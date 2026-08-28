@@ -53,9 +53,8 @@ export default function ClientContextBar({ opportunity, onEdit, actions, tag }) 
   // desde la fecha de nacimiento (solo para mostrar, no se escribe en monday).
   const edad = opportunity.edad || edadDesde(opportunity.fechaNacimiento)
   const vehiculo = [opportunity.marca, opportunity.modelo].filter(Boolean).join(' ')
-  const vehiculoMeta = [opportunity.anio && `(${opportunity.anio})`, opportunity.combustible, opportunity.uso]
-    .filter(Boolean)
-    .join(' · ')
+  // A pedido: cerrada muestra solo marca + modelo + año; combustible y uso van al desplegable.
+  const vehiculoMeta = opportunity.anio ? `(${opportunity.anio})` : ''
 
   return (
     <div className={open ? 'client-bar client-bar--open' : 'client-bar'} ref={rootRef}>
@@ -135,6 +134,14 @@ export default function ClientContextBar({ opportunity, onEdit, actions, tag }) 
             <div className="client-bar__detail">
               <dt>Dirección</dt>
               <dd>{opportunity.clienteDireccion || '—'}</dd>
+            </div>
+            <div className="client-bar__detail">
+              <dt>Combustible</dt>
+              <dd>{opportunity.combustible || '—'}</dd>
+            </div>
+            <div className="client-bar__detail">
+              <dt>Uso</dt>
+              <dd>{opportunity.uso || '—'}</dd>
             </div>
             <div className="client-bar__detail">
               <dt>Tipo de vehículo</dt>
