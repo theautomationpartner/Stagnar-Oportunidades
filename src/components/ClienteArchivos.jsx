@@ -1,6 +1,10 @@
 import { useEffect, useState } from 'react'
 import { MdFolder } from 'react-icons/md'
 import FileUploadField from './FileUploadField'
+// Usa las clases .crear-op__section* de CrearOportunidadForm.css — se importa acá para que
+// también estén cargadas cuando ClienteArchivos se monta desde el detalle (ClientFicha),
+// donde ese CSS no llegaba (chunk aparte) y el bloque quedaba sin estilo.
+import './CrearOportunidadForm.css'
 import {
   CLIENTES_BOARD_ID,
   CONTACTO_ARCHIVOS_COLUMN_ID,

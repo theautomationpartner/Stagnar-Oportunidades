@@ -10,7 +10,7 @@ import ConfirmarStepPanel from './ConfirmarStepPanel'
 import EmitirStepPanel from './EmitirStepPanel'
 import WhatsAppSendModal from './WhatsAppSendModal'
 import ErrorDetailBox from './ErrorDetailBox'
-import ClientFicha from './ClientFicha'
+import ClientContextBar from './ClientContextBar'
 import StepFooter from './StepFooter'
 import LoadingScreen from './LoadingScreen'
 import './PillTabs.css'
@@ -415,6 +415,15 @@ export default function OpportunityDetail({
   useEffect(() => {
     if (!loading && !error) onStepChange?.(activeStep)
   }, [activeStep, loading, error])
+
+  // Y al revés: si cambia el paso en la URL con el detalle ya montado (atrás/adelante
+  // del navegador, o un link pegado a mano), se sigue — mismos límites que al montar
+  // (cualquier paso distinto de Cotizar necesita cotizaciones cargadas).
+  useEffect(() => {
+    if (loading || error || !urlStep || urlStep === activeStep) return
+    const valid = ['cotizar', 'comparar', 'confirmar', 'emitir'].includes(urlStep)
+    if (valid && (urlStep === 'cotizar' || rawQuotes.length > 0)) setActiveStep(urlStep)
+  }, [urlStep])
 
   // "Reintentar" del aviso de polling cortado: vuelve a prender exactamente los flags
   // que estaban activos cuando se cortó.
@@ -1030,7 +1039,7 @@ export default function OpportunityDetail({
               (ver EmitirStepPanel.jsx), con la propuesta elegida adentro. */}
           {activeStep !== 'cotizar' && activeStep !== 'emitir' && (
             <div className="opp-detail__client-card">
-              <ClientFicha
+              <ClientContextBar
                 opportunity={opportunity}
                 onEdit={() => setActiveStep('cotizar')}
                 tag={opportunity.oppNumber}

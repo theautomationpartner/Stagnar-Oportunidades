@@ -11,7 +11,7 @@ import StatusBadge from './StatusBadge'
 import GradientSpinner from './GradientSpinner'
 import ErrorDetailBox from './ErrorDetailBox'
 import AlertModal from './AlertModal'
-import ClientFicha from './ClientFicha'
+import ClientContextBar from './ClientContextBar'
 import './EmitirStepPanel.css'
 
 // Resumen final de todos los datos con los que se cerró la oportunidad: cliente, bien
@@ -114,15 +114,10 @@ export default function EmitirStepPanel({
           Última revisión de los datos antes de cargar la póliza.
         </p>
 
-        {/* A pedido: misma ficha del cliente que el resto de los pasos (ver
-            ClientFicha.jsx) en vez de la grilla de campos Cliente/Bien asegurado — sin
-            `onEdit`, así no aparece el link "Editar" (acá es último repaso antes de
-            cargar la póliza, no un lugar para tocar datos). La propuesta elegida va
-            adentro de esta misma tarjeta (children), no en una sección aparte — antes
-            se repetía la info personal/del vehículo (esta ficha + la de arriba de todo
-            en OpportunityDetail.jsx, que ahora se esconde en este paso, ver
-            OpportunityDetail.jsx). */}
-        <ClientFicha opportunity={opportunity}>
+        {/* A pedido: barra compacta (misma que Comparar/Confirmar, ver ClientContextBar)
+            en vez de la ficha completa; la propuesta elegida pasa a su propia tarjeta. */}
+        <ClientContextBar opportunity={opportunity} />
+        <div className="client-ficha emitir-step__chosen-card">
           {elegida && !elegida.quote.blocked && (
             <div className="emitir-step__chosen-in-ficha">
               {/* A pedido, estética tipo mockup: la compañía/cobertura elegida como una
@@ -173,7 +168,7 @@ export default function EmitirStepPanel({
               pero conviene volver a "Confirmar" y elegir una antes de emitir.
             </p>
           )}
-        </ClientFicha>
+        </div>
       </div>
 
       <div className="emitir-step__section">

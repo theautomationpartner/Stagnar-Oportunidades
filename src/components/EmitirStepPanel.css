@@ -191,3 +191,9 @@
   max-height: 220px;
   overflow-y: auto;
 }
+
+/* Tarjeta propia de "Propuesta elegida" (antes iba adentro de la ClientFicha del
+   resumen; ahora el cliente va en la barra compacta ClientContextBar). */
+.emitir-step__chosen-card {
+  margin-top: 12px;
+}

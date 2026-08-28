@@ -1,0 +1,158 @@
+/* Barra de contexto del Cliente/Lead (pasos 2-4). `position: relative` para que el
+   panel desplegado (absoluto, abajo) se apoye acá y flote sobre el contenido siguiente
+   sin empujarlo. */
+.client-bar {
+  position: relative;
+  margin: 12px var(--page-gutter) 0;
+  z-index: var(--z-sticky);
+}
+
+.client-bar__row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 8px 14px;
+  background: var(--bg-surface-elevated);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-xl);
+  box-shadow: var(--shadow-floating);
+  min-height: 56px;
+}
+
+.client-bar__avatar {
+  flex-shrink: 0;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: var(--primary-blue);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 700;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.client-bar__main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.client-bar__line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 8px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-gray);
+}
+
+.client-bar__name {
+  font-size: 15px;
+  color: var(--text-dark);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 40ch;
+}
+
+.client-bar__tag {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--tint-info-text);
+  background: var(--tint-info);
+  border-radius: 10px;
+  padding: 2px 8px;
+  white-space: nowrap;
+}
+
+.client-bar__sep {
+  color: var(--text-muted);
+}
+
+.client-bar__data {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.client-bar__line--vehiculo {
+  gap: 6px;
+}
+
+.client-bar__vehiculo {
+  color: var(--text-dark);
+  font-weight: 600;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 60ch;
+}
+
+.client-bar__vehiculo-meta {
+  white-space: nowrap;
+}
+
+.client-bar__actions {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
+/* Panel desplegado: flota por encima del contenido siguiente (absoluto, no ocupa lugar
+   en el flujo), a todo el ancho de la barra. */
+.client-bar__panel {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  right: 0;
+  z-index: var(--z-sticky);
+  animation: client-bar-in 0.16s ease-out both;
+}
+
+.client-bar__panel .client-ficha {
+  box-shadow: var(--shadow-lg);
+}
+
+@keyframes client-bar-in {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@media (max-width: 640px) {
+  .client-bar__row {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+
+  .client-bar__actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}
+
+/* Cuando la barra vive adentro de un contenedor que ya tiene su propio margen/gutter
+   (.opp-detail__client-card en Comparar/Confirmar, .emitir-step__section en Emitir),
+   no duplicar el sangrado. */
+.opp-detail__client-card .client-bar,
+.emitir-step .client-bar {
+  margin-left: 0;
+  margin-right: 0;
+}
+
+.opp-detail__client-card .client-bar {
+  margin-top: 0;
+}
