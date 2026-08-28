@@ -41,14 +41,17 @@
   color: var(--text-gray);
 }
 
+/* Sin caja blanca interna (quedaba "recuadro dentro del recuadro"): los datos van
+   directo sobre el celeste, separados del encabezado y de las acciones por líneas
+   sutiles del mismo tono. */
 .crear-contacto__data {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 10px 20px;
   margin: 0;
-  padding: 12px 14px;
-  background: var(--bg);
-  border-radius: var(--radius-md);
+  padding: 12px 0;
+  border-top: 1px solid var(--tint-info-bd);
+  border-bottom: 1px solid var(--tint-info-bd);
 }
 
 .crear-contacto__data dt {
@@ -79,6 +82,7 @@
 }
 
 .crear-contacto__actions {
+  margin-top: -2px;
   display: flex;
   justify-content: flex-end;
   gap: 8px;
