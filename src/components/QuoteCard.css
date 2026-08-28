@@ -483,3 +483,19 @@
   min-height: 20px;
   line-height: 20px;
 }
+
+/* Etiquetas en flujo de FILA (antes columna con alto fijo 120px + overflow hidden: al
+   ceder ancho a la tabla de montos, la 2ª columna de etiquetas quedaba recortada). Con
+   filas que envuelven, ninguna etiqueta se corta; min-height mantiene la altura base
+   pareja entre tarjetas. */
+.quote-card__override-tags {
+  flex-direction: row;
+  flex-wrap: wrap;
+  align-content: flex-start;
+  align-items: flex-start;
+  gap: 6px 8px;
+  height: auto;
+  min-height: 120px;
+  min-width: 0;
+  overflow: visible;
+}
