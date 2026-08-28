@@ -49,7 +49,6 @@ export default function ClientContextBar({ opportunity, onEdit, actions, tag }) 
 
   const situacion = opportunity.clienteSituacion || ''
   const esLead = situacion.toLowerCase() === 'lead'
-  const ubicacion = [opportunity.departamento, opportunity.zonaCirculacion].filter(Boolean).join(' — ')
   // Edad: la columna Edad de la Oportunidad (numeric_mm527wpm) si está; si no, calculada
   // desde la fecha de nacimiento (solo para mostrar, no se escribe en monday).
   const edad = opportunity.edad || edadDesde(opportunity.fechaNacimiento)
@@ -122,17 +121,20 @@ export default function ClientContextBar({ opportunity, onEdit, actions, tag }) 
                 {edad ? ` · ${edad} años` : ''}
               </dd>
             </div>
-            {/* Domicilio = tablero Clientes (dirección + localidad + depto de la persona);
-                Zona de circulación = columnas de la Oportunidad (dónde circula el auto). */}
-            {opportunity.clienteId && (
-              <div className="client-bar__detail">
-                <dt>Domicilio (cliente)</dt>
-                <dd>{opportunity.clienteDomicilio || '—'}</dd>
-              </div>
-            )}
+            {/* Departamento / Localidad / Dirección del Cliente/Lead vinculado (tablero
+                Clientes); si la oportunidad no tiene persona vinculada (casos viejos) se
+                cae a Departamento/Localidad de circulación de la propia oportunidad. */}
             <div className="client-bar__detail">
-              <dt>Zona de circulación</dt>
-              <dd>{ubicacion || '—'}</dd>
+              <dt>Departamento</dt>
+              <dd>{(opportunity.clienteId ? opportunity.clienteDepartamento : opportunity.departamento) || '—'}</dd>
+            </div>
+            <div className="client-bar__detail">
+              <dt>Localidad</dt>
+              <dd>{(opportunity.clienteId ? opportunity.clienteLocalidad : opportunity.zonaCirculacion) || '—'}</dd>
+            </div>
+            <div className="client-bar__detail">
+              <dt>Dirección</dt>
+              <dd>{opportunity.clienteDireccion || '—'}</dd>
             </div>
             <div className="client-bar__detail">
               <dt>Tipo de vehículo</dt>
