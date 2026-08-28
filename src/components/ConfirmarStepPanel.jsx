@@ -287,13 +287,15 @@ export default function ConfirmarStepPanel({
 
   return (
     <div className="confirmar-step">
-      <div className="confirmar-step__section">
-        <h2 className="confirmar-step__title">Documentos</h2>
-        <p className="confirmar-step__subtitle">
-          Verificá que estén cargados los documentos del asegurado. Si falta alguno, se puede
-          subir directo desde acá.
-        </p>
-        {opportunity.clienteId && (
+      {/* A pedido: la Dirección del Cliente/Lead se pide en este paso, como sección
+          propia (es un dato de la persona, no un documento). */}
+      {opportunity.clienteId && (
+        <div className="confirmar-step__section">
+          <h2 className="confirmar-step__title">Domicilio</h2>
+          <p className="confirmar-step__subtitle">
+            Dirección del {opportunity.clienteSituacion?.toLowerCase() === 'lead' ? 'lead' : 'cliente'} para la
+            emisión. Se guarda en su ficha de Clientes.
+          </p>
           <div className="confirmar-step__direccion">
             <label className="confirmar-step__direccion-label" htmlFor="confirmar-direccion">
               Dirección (calle y número) <span className="confirmar-step__required">*</span>
@@ -316,17 +318,21 @@ export default function ConfirmarStepPanel({
                 Guardar
               </Button>
             </div>
-            <p className="confirmar-step__direccion-hint">
-              Domicilio del {opportunity.clienteSituacion?.toLowerCase() === 'lead' ? 'lead' : 'cliente'} — se guarda
-              en su ficha de Clientes.
-            </p>
             {direccionError && (
               <p className="confirmar-step__error" role="alert">
                 Error: {direccionError}
               </p>
             )}
           </div>
-        )}
+        </div>
+      )}
+
+      <div className="confirmar-step__section">
+        <h2 className="confirmar-step__title">Documentos</h2>
+        <p className="confirmar-step__subtitle">
+          Verificá que estén cargados los documentos del asegurado. Si falta alguno, se puede
+          subir directo desde acá.
+        </p>
         <div className="confirmar-step__docs">
           {docsOrdenados.map((doc) => (
             <FileUploadField
