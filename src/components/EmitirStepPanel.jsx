@@ -12,6 +12,7 @@ import GradientSpinner from './GradientSpinner'
 import ErrorDetailBox from './ErrorDetailBox'
 import AlertModal from './AlertModal'
 import ClientContextBar from './ClientContextBar'
+import CrearContactoCard from './CrearContactoCard'
 import './EmitirStepPanel.css'
 
 // Resumen final de todos los datos con los que se cerró la oportunidad: cliente, bien
@@ -107,6 +108,10 @@ export default function EmitirStepPanel({
           Póliza cargada — la oportunidad se marcó como <strong>Concretada</strong>.
         </AttentionBox>
       )}
+
+      {/* A pedido: con la oportunidad ya concretada, ofrecer crear el contacto del
+          Cliente/Lead en el tablero Contactos si todavía no tiene (ver CrearContactoCard). */}
+      {concretada && opportunity.clienteId && <CrearContactoCard opportunity={opportunity} />}
 
       <div className="emitir-step__section">
         <h2 className="emitir-step__title">Resumen final</h2>

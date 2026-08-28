@@ -1109,3 +1109,60 @@ export {
   CONTACTO_NOMBRE_COLUMN_ID,
   CONTACTO_APELLIDO_COLUMN_ID,
 }
+
+// ---------------------------------------------------------------------------
+// Tablero Contactos (CRM): personas de contacto vinculadas a un Cliente. A pedido: al
+// concretar una oportunidad (paso 4) se ofrece crear el contacto del Cliente/Lead si
+// todavía no tiene ninguno, con nombre + teléfono + email, y vincularlo en los dos
+// sentidos (Contactos.Clientes ↔ Clientes.Contactos).
+// ---------------------------------------------------------------------------
+const CONTACTOS_BOARD_ID = 18420863016
+const CONTACTO_CRM_CLIENTE_COLUMN_ID = 'board_relation_mm4tdbm9'
+const CONTACTO_CRM_TELEFONO_COLUMN_ID = 'contact_phone'
+const CONTACTO_CRM_EMAIL_COLUMN_ID = 'contact_email'
+const CLIENTE_CONTACTOS_COLUMN_ID = 'board_relation_mm4t6dfm'
+
+const FETCH_CLIENTE_CONTACTOS_QUERY = `
+  query FetchClienteContactos($itemId: [ID!]) {
+    items(ids: $itemId) {
+      column_values(ids: ["${CLIENTE_CONTACTOS_COLUMN_ID}"]) {
+        ... on BoardRelationValue {
+          linked_items {
+            id
+            name
+          }
+        }
+      }
+    }
+  }
+`
+
+// Contactos ya vinculados a un Cliente/Lead ([{id, name}]).
+export async function fetchClienteContactos(clienteId) {
+  const data = await callMondayApi(FETCH_CLIENTE_CONTACTOS_QUERY, { itemId: [clienteId] })
+  return data.items?.[0]?.column_values?.[0]?.linked_items ?? []
+}
+
+// Crea el contacto en el tablero Contactos y lo vincula al Cliente en los dos sentidos.
+// `existingContactIds`: los que el Cliente ya tenía (update_assets/relations reemplaza
+// la lista completa, hay que mandar todos).
+export async function createContactoCrm({ name, phone, email, clienteId, existingContactIds = [] }) {
+  const created = await callMondayApi(CREATE_ITEM_MUTATION, { boardId: CONTACTOS_BOARD_ID, itemName: name })
+  const id = created.create_item.id
+  const columnValues = {
+    [CONTACTO_CRM_CLIENTE_COLUMN_ID]: { item_ids: [Number(clienteId)] },
+  }
+  if (phone?.phone) columnValues[CONTACTO_CRM_TELEFONO_COLUMN_ID] = phone
+  if (email?.email) columnValues[CONTACTO_CRM_EMAIL_COLUMN_ID] = email
+  await callMondayApi(CHANGE_MULTIPLE_COLUMN_VALUES_MUTATION, {
+    boardId: CONTACTOS_BOARD_ID,
+    itemId: id,
+    columnValues: JSON.stringify(columnValues),
+  })
+  // Lado Clientes: la relación puede ser de dos vías (monday la espeja sola), pero se
+  // escribe igual por si está configurada en un solo sentido.
+  await setContactoColumnValues(clienteId, {
+    [CLIENTE_CONTACTOS_COLUMN_ID]: { item_ids: [...existingContactIds.map(Number), Number(id)] },
+  })
+  return { id }
+}

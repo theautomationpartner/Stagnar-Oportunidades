@@ -184,3 +184,15 @@ export function buildMondayEmail(email) {
   const v = (email ?? '').trim()
   return { email: v, text: v }
 }
+
+// countryShortName a partir de un teléfono guardado como dígitos con el código de país
+// adelante (ej. "5492281580112" → "AR"; "59899123456" → "UY"). Se prueban primero los
+// prefijos más largos para no confundir +595 con +59… Devuelve 'UY' si no matchea.
+export function countryShortNameFromDigits(digits) {
+  const d = String(digits ?? '').replace(/\D/g, '')
+  const codes = Object.keys(COUNTRY_SHORT_NAMES)
+    .map((c) => c.replace('+', ''))
+    .sort((a, b) => b.length - a.length)
+  const hit = codes.find((c) => d.startsWith(c))
+  return hit ? COUNTRY_SHORT_NAMES[`+${hit}`] : 'UY'
+}
