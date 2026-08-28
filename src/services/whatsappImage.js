@@ -13,6 +13,11 @@ import { BRAND_COLORS } from './companyColors'
 import { coberturaGroupOf } from './coberturaGroups'
 import stagnariLogo from '../assets/stagnari-logo.png'
 import stagnariLogoSimple from '../assets/stagnari-logo-simple.png'
+// A pedido: isotipo y logo completo en BLANCO sobre transparente para la barra verde del
+// pie (generados a partir de los archivos de marca: mini-logo-blanco-fondo-verde.png con
+// el verde recortado, y el logo verde recoloreado a blanco).
+import stagnariMiniBlanco from '../assets/stagnari-mini-blanco.png'
+import stagnariLogoBlanco from '../assets/stagnari-logo-blanco.png'
 import logoBse from '../assets/aseguradoras/bse.png'
 import logoPorto from '../assets/aseguradoras/porto.png'
 import logoSancor from '../assets/aseguradoras/sancor.png'
@@ -563,24 +568,21 @@ function drawFooter(ctx, y, logos) {
   iconCalendar(ctx, PAD + 12, y + 22, 20)
   text(ctx, `Cotización generada el ${new Date().toLocaleDateString('es-UY')}`, PAD + 34, y + 28, { size: 15, color: C.texto })
   y += 44
-  // Barra verde con isotipo + eslogan
+  // Barra verde: logo completo en blanco a la izquierda + eslogan a la derecha
   ctx.fillStyle = C.verdeOscuro
-  ctx.fillRect(0, y, WIDTH, 60)
-  ctx.fillStyle = C.blanco
-  ctx.beginPath()
-  ctx.arc(PAD + 22, y + 30, 20, 0, Math.PI * 2)
-  ctx.fill()
-  drawImageFit(ctx, logos.simple, PAD + 22, y + 12, 36, 36, 'center')
-  text(ctx, 'Tu tranquilidad, nuestra prioridad. Siempre.', WIDTH / 2 + 20, y + 37, {
-    size: 20,
+  ctx.fillRect(0, y, WIDTH, 64)
+  if (logos.blanco) drawImageFit(ctx, logos.blanco, PAD, y + 14, 240, 36, 'left')
+  else if (logos.miniBlanco) drawImageFit(ctx, logos.miniBlanco, PAD, y + 14, 44, 36, 'left')
+  text(ctx, 'Tu tranquilidad, nuestra prioridad. Siempre.', WIDTH - PAD, y + 39, {
+    size: 19,
     style: 'italic',
     color: C.blanco,
-    align: 'center',
+    align: 'right',
   })
-  return y + 60
+  return y + 64
 }
 
-const FOOTER_TOTAL = 44 + 60
+const FOOTER_TOTAL = 44 + 64
 const MEASURE_CANVAS_HEIGHT = 3000
 
 function drawContent(ctx, opportunity, raw, quote, canvasHeight, logos) {
@@ -601,12 +603,14 @@ function drawContent(ctx, opportunity, raw, quote, canvasHeight, logos) {
 // el canvas del tamaño justo con el pie pegado al final.
 export async function renderQuoteImageDataUrl(opportunity, raw, quote) {
   const key = (raw.compania || '').trim().toUpperCase()
-  const [stagnari, simple, insurer] = await Promise.all([
+  const [stagnari, simple, miniBlanco, blanco, insurer] = await Promise.all([
     loadImage(stagnariLogo),
     loadImage(stagnariLogoSimple),
+    loadImage(stagnariMiniBlanco),
+    loadImage(stagnariLogoBlanco),
     loadImage(INSURER_LOGOS[key]),
   ])
-  const logos = { stagnari, simple, insurer }
+  const logos = { stagnari, simple, miniBlanco, blanco, insurer }
 
   const measureCanvas = document.createElement('canvas')
   measureCanvas.width = WIDTH
