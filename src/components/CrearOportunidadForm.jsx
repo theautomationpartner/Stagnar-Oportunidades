@@ -22,6 +22,7 @@ import {
   TextField,
 } from '@vibe/core'
 import PersonaFicha from './crear/PersonaFicha'
+import { modeloSinMarca } from '../services/format'
 import { useSchema } from '../context/AppContext'
 import Stepper from './Stepper'
 import StatusBadge from './StatusBadge'
@@ -852,7 +853,7 @@ export default function CrearOportunidadForm({
     const nombreCompleto = `${form.nombre} ${form.apellido}`.trim()
     const itemName =
       esAutomovil && form.modeloSeleccion
-        ? `${nombreCompleto}-${form.marca}-${form.anio}-${form.modeloSeleccion.name}`
+        ? `${nombreCompleto}-${form.marca}-${form.anio}-${modeloSinMarca(form.marca, form.modeloSeleccion.name)}`
         : nombreCompleto
     const created = await createOpportunityItem(itemName)
     setCreatedItemId(created.id)

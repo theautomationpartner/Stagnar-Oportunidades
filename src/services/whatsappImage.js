@@ -8,7 +8,7 @@
 // Los NÚMEROS salen tal cual de `quote` (pricingEngine.computeQuote) — acá no se
 // calcula nada: total, cuotas[n].valor, promo.{count,valor}, deducibleDisplay, rc,
 // incluye, warning. Devuelve un data URL PNG listo para previsualizar o mandar a Make.
-import { formatMoney } from './format'
+import { formatMoney, modeloSinMarca } from './format'
 import { BRAND_COLORS } from './companyColors'
 import { coberturaGroupOf } from './coberturaGroups'
 import stagnariLogo from '../assets/stagnari-logo.png'
@@ -396,10 +396,7 @@ function drawVehicleCard(ctx, opportunity, raw, quote, y) {
 // dato guardado en monday.
 function splitVehicleName(opportunity) {
   const marca = (opportunity.marca || '').trim()
-  let modelo = (opportunity.modelo || opportunity.bienLinea1 || '').trim()
-  if (marca && modelo.toUpperCase().startsWith(marca.toUpperCase())) {
-    modelo = modelo.slice(marca.length).replace(/^[\s\-–·]+/, '').trim()
-  }
+  const modelo = modeloSinMarca(marca, opportunity.modelo || opportunity.bienLinea1)
   const [first, ...rest] = modelo.split(/,\s*/)
   return {
     title: `${marca.toUpperCase()} ${first}`.trim(),

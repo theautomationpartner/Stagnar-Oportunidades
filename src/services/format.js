@@ -40,3 +40,14 @@ export function matchesSearchQuery(label, query) {
   const haystack = label.toLowerCase()
   return words.every((word) => haystack.includes(word))
 }
+
+// El nombre de un modelo de Autodata ya trae la marca adelante ("PEUGEOT - 206 1.6
+// Presence Full…"). Para textos donde la marca ya se menciona aparte (nombre del ítem
+// "Nombre-Marca-Año-Modelo", tarjeta de WhatsApp) se la quita del principio junto con el
+// separador. Si el modelo no empieza con la marca, vuelve tal cual.
+export function modeloSinMarca(marca, modelo) {
+  const m = (marca ?? '').trim()
+  const texto = (modelo ?? '').trim()
+  if (!m || !texto.toUpperCase().startsWith(m.toUpperCase())) return texto
+  return texto.slice(m.length).replace(/^[\s\-–·]+/, '').trim()
+}
