@@ -453,11 +453,21 @@
 
 
 /* Los montos no se parten en 2 líneas ("$" arriba, "22.583" abajo): cada fila de cuotas
-   mide lo mismo en todas las tarjetas y el renglón queda parejo (antes una tarjeta con
-   montos cortos, ej. "$ 0", quedaba más baja que sus vecinas). */
-.quote-card__cuotas-table td,
-.quote-card__cuotas-table th {
+   mide lo mismo en todas las tarjetas. Solo la columna de montos va en nowrap — la de
+   etiquetas (derecha) cede ancho y envuelve, así la tarjeta nunca desborda. */
+.quote-card__cuotas-table th,
+.quote-card__cuotas-table td:nth-child(2) {
   white-space: nowrap;
+}
+
+.quote-card__cuotas {
+  flex: 0 0 auto;
+}
+
+.quote-card__body > :last-child:not(.quote-card__cuotas) {
+  flex: 1 1 0;
+  min-width: 0;
+  flex-wrap: wrap;
 }
 
 /* La promo "➜ N cuotas SIN RECARGO de $X" ocupa 1 o 2 líneas según el monto; se
