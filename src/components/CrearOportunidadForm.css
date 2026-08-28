@@ -1250,3 +1250,14 @@
 .crear-op__form-card {
   gap: 16px;
 }
+
+/* Alineación label/control entre los <label><span> propios y los TextField de vibe: el
+   título de vibe mide 24px (line-height 20 + 2px arriba y abajo), los span propios
+   medían 16 → el control de al lado arrancaba 6px más arriba. Misma caja para los dos. */
+.crear-op__field > span:first-child {
+  display: flex;
+  align-items: center;
+  /* 22 + gap 6 = 28px hasta el control, igual que el TextField de vibe (24 + 4). */
+  min-height: 22px;
+  line-height: 20px;
+}
