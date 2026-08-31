@@ -431,7 +431,13 @@ export async function fetchAutodataModelosByAnioMarca(anio, marca) {
     { column_id: board.marcaColumnId, compare_value: [marca], operator: 'contains_text' },
     { column_id: board.anioColumnId, compare_value: [anio], operator: 'contains_text' },
   ]
-  return queryAutodataBoards(buildRules, 'and', 500)
+  const results = await queryAutodataBoards(buildRules, 'and', 500)
+  // A pedido: fichas con Combustible "Sin motor" y Tipo "Sin tipo" no son modelos
+  // reales elegibles (remolques, casos sin datos cargados en Autodata) — se excluyen
+  // de la búsqueda de modelo.
+  return results.filter(
+    (r) => !(r.combustible?.toLowerCase() === 'sin motor' && r.tipo?.toLowerCase() === 'sin tipo')
+  )
 }
 
 // Tablero "PANEL": tarifario de recargos por compañía + cantidad de cuotas, textos
