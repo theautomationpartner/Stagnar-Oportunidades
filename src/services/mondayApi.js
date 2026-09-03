@@ -844,7 +844,7 @@ export async function fetchCurrentMondayUser() {
     const data = await callMondayApi(CURRENT_USER_QUERY, { userId: [String(userId)] })
     const user = data.users?.[0]
     if (!user) return null
-    return { name: user.name, photo: user.photo_thumb_small || null }
+    return { id: userId, name: user.name, photo: user.photo_thumb_small || null }
   } catch {
     return null
   }

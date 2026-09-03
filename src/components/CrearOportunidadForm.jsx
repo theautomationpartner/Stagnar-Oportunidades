@@ -23,7 +23,7 @@ import {
 } from '@vibe/core'
 import PersonaFicha from './crear/PersonaFicha'
 import { modeloSinMarca } from '../services/format'
-import { useSchema } from '../context/AppContext'
+import { useSchema, useMondayUser } from '../context/AppContext'
 import Stepper from './Stepper'
 import StatusBadge from './StatusBadge'
 import ClienteArchivos from './ClienteArchivos'
@@ -140,6 +140,10 @@ export default function CrearOportunidadForm({
   // `schema` por prop (compatibilidad) o del contexto global (ver AppContext).
   const ctxSchema = useSchema()
   const schema = schemaProp ?? ctxSchema
+  // Persona de monday que está creando la oportunidad (ver fetchCurrentMondayUser) —
+  // null fuera del iframe real de monday (dev local, preview suelta): en ese caso
+  // buildBaseColumnValues() abajo simplemente omite deal_owner y "Asignado" queda vacío.
+  const mondayUser = useMondayUser()
   // Calculado una sola vez, al montar (ver loadPersistedSearch) — de acá salen los
   // valores iniciales de stepIndex/form/resultadoSeleccionado/searchPreview/
   // busquedaResuelta más abajo, para que la Oportunidad anterior a medio cargar (si hay
@@ -835,6 +839,7 @@ export default function CrearOportunidadForm({
       board_relation_mm54tq30: { item_ids: [Number(form.departamentoId)] },
     }
     if (esAutomovil) columnValues.color_mm51n4j = form.poseeVehiculo
+    if (mondayUser?.id) columnValues.deal_owner = { personsAndTeams: [{ id: Number(mondayUser.id), kind: 'person' }] }
     return columnValues
   }
 
