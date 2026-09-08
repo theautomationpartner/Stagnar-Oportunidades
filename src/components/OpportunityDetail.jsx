@@ -697,6 +697,35 @@ export default function OpportunityDetail({
     }
   }
 
+  // LOG-20: cancelar una cotización en curso. La app no puede frenar al robot —corre
+  // afuera, en Apify—, así que lo único que hace es dejar escrito "Cancelada" en el estado
+  // y dejar de esperar. Del otro lado, cuando la corrida termina, Make lee ese estado y
+  // descarta los resultados en vez de escribirlos (MON-10). Para el usuario el efecto es
+  // el mismo: no aparecen cotizaciones de algo que canceló.
+  const [cancelando, setCancelando] = useState(false)
+  const handleCancelarCotizacion = async () => {
+    onOpportunityAction?.()
+    setCancelando(true)
+    setMarkError(null)
+    try {
+      await setSimpleColumnValue(opportunityId, ESTADO_COTIZACION_COLUMN_ID, 'Cancelada')
+      cotizarPollStartRef.current = null
+      cotizarProgresoVistoRef.current = 0
+      setPolling(false)
+      setCotizarProgress({})
+      setItem((prev) => ({
+        ...prev,
+        column_values: prev.column_values.map((cv) =>
+          cv.id === ESTADO_COTIZACION_COLUMN_ID ? { ...cv, text: 'Cancelada' } : cv
+        ),
+      }))
+    } catch (err) {
+      setMarkError(err.message)
+    } finally {
+      setCancelando(false)
+    }
+  }
+
   const handleMarcarParaCotizar = async () => {
     onOpportunityAction?.()
     setMarking(true)
@@ -1500,6 +1529,8 @@ export default function OpportunityDetail({
         recotizando={hasQuotes}
         progress={cotizarProgress}
         onClose={() => setCotizandoModalDismissed(true)}
+        onCancelar={handleCancelarCotizacion}
+        cancelando={cancelando}
       />
     </div>
   )

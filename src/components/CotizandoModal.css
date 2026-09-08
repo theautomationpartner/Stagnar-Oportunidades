@@ -67,3 +67,10 @@
 .cotizando-modal__item-status svg {
   font-size: 14px;
 }
+
+/* LOG-20: acción secundaria — cancelar la cotización en curso. Va discreta al pie del
+   popup: es una salida, no la acción esperada. */
+.cotizando-modal__cancelar {
+  margin-top: 18px;
+  align-self: center;
+}

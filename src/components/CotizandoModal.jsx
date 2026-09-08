@@ -1,5 +1,5 @@
 import { MdCheckCircle } from 'react-icons/md'
-import { Modal, ModalContent } from '@vibe/core'
+import { Button, Modal, ModalContent } from '@vibe/core'
 import { EXPECTED_QUOTE_COUNT_BY_COMPANIA, accentForCompania } from '../services/companyColors'
 import GradientSpinner from './GradientSpinner'
 import ProgressBar from './ProgressBar'
@@ -18,7 +18,7 @@ const COMPANIAS = Object.keys(EXPECTED_QUOTE_COUNT_BY_COMPANIA)
 // importar el vehículo), `progress` es lo que ya se creó de verdad (ver el polling en
 // OpportunityDetail.jsx). El cierre de este popup es solo visual — no corta el polling
 // de fondo, mismo criterio que WhatsAppSendModal.
-export default function CotizandoModal({ show, recotizando, progress, onClose }) {
+export default function CotizandoModal({ show, recotizando, progress, onClose, onCancelar, cancelando }) {
   if (!show) return null
 
   const totalExpected = COMPANIAS.reduce((sum, c) => sum + EXPECTED_QUOTE_COUNT_BY_COMPANIA[c], 0)
@@ -85,6 +85,20 @@ export default function CotizandoModal({ show, recotizando, progress, onClose })
             )
           })}
         </div>
+
+        {/* LOG-20: cortar una cotización en curso. Cerrar este popup es solo visual (la
+            cotización sigue); esto la cancela de verdad. Una vez que ya están todas, no
+            tiene sentido ofrecerlo. */}
+        {onCancelar && !allDone && (
+          <Button
+            kind="tertiary"
+            className="cotizando-modal__cancelar"
+            onClick={onCancelar}
+            disabled={cancelando}
+          >
+            {cancelando ? 'Cancelando...' : 'Cancelar cotización'}
+          </Button>
+        )}
       </ModalContent>
     </Modal>
   )
