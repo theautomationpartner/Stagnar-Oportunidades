@@ -8,7 +8,7 @@ import {
 } from 'react-icons/md'
 import { Button, IconButton, Dropdown, Checkbox, NumberField } from '@vibe/core'
 import { formatMoney, CUOTA_COUNTS, toPercentString } from '../services/format'
-import { isQuoteSelectable, opcionalesEditables } from '../services/pricingEngine'
+import { autoExtraOpciones, isQuoteSelectable, opcionalesDeCompania } from '../services/pricingEngine'
 import { accentForCompania } from '../services/companyColors'
 import './QuoteCard.css'
 
@@ -16,28 +16,11 @@ const BSE_DEDUCIBLE_OPTIONS = ['0.5', '1', '1.5', '2', '2.5', '3']
 const BSE_EDAD_OPTIONS = ['No', '35 a 75', '56 a 75']
 const SURA_DEDUCIBLE_OPTIONS = ['1', '1.3', '2']
 
-// Opcionales por compañía: a diferencia de los "Parámetros ajustables" de abajo (locales
-// hasta apretar "Aplicar"), estos escriben directo en monday apenas se tocan
-// (onToggleOpcional), porque son un dato real de la cotización, no un ajuste de prueba.
-// Tienen que coincidir con pricingEngine.js#OPCIONALES, que es quien decide el precio y
-// si esta cobertura puntual los ofrece.
-const OPCIONALES_POR_COMPANIA = {
-  PORTO: [
-    { field: 'granizo', label: 'Granizo' },
-    { field: 'cristales', label: 'Cristales' },
-    { field: 'usoRural', label: 'Uso rural' },
-  ],
-  SURA: [
-    { field: 'granizo', label: 'Granizo' },
-    { field: 'suraTeLleva', label: 'SURA te lleva' },
-    { field: 'ap', label: 'Accidentes Personales' },
-  ],
-}
-// "Auto extra" se elige por duración, no se tilda: PORTO ofrece las 3, SURA solo 15 días.
-const AUTO_EXTRA_OPCIONES = {
-  PORTO: ['7 días', '15 días', '30 días'],
-  SURA: ['15 días'],
-}
+// Los opcionales (y las duraciones de "Auto extra") salen de pricingEngine, que es quien
+// decide el precio y si esta cobertura puntual los ofrece — antes esta lista estaba
+// copiada acá y podía decir algo distinto del cálculo. A diferencia de los "Parámetros
+// ajustables" de abajo (locales), estos escriben directo en monday apenas se tocan
+// (onToggleOpcional): son un dato real de la cotización, no un ajuste de prueba.
 
 // Datos "de tarifa" — vienen fijos de monday y no se editan por cotización: el Contado
 // base y el Deducible general son parte de la tarifa cargada, no un parámetro que el
@@ -189,11 +172,8 @@ function QuoteCard({
   // Qué opcionales ofrece esta cotización lo decide pricingEngine (la misma regla que
   // define el precio), no la tarjeta: así no se muestran controles que no harían nada —
   // ej. PORTO TRIPLE no ofrece ninguno, y SURA TOTAL PLUS ya los trae todos incluidos.
-  const editables = opcionalesEditables(raw)
-  const opcionalesDeLaCompania = (OPCIONALES_POR_COMPANIA[raw.compania] ?? []).filter((o) =>
-    editables.campos.includes(o.field)
-  )
-  const autoExtraOpciones = editables.autoExtra ? AUTO_EXTRA_OPCIONES[raw.compania] ?? [] : []
+  const opcionalesDeLaCompania = opcionalesDeCompania(raw)
+  const autoExtraDias = autoExtraOpciones(raw)
 
   const handleToggleOpcional = async (field, checked) => {
     setSavingOpcional(field)
@@ -540,12 +520,12 @@ function QuoteCard({
                     onChange={(e) => handleToggleOpcional(opt.field, e.target.checked)}
                   />
                 ))}
-                {autoExtraOpciones.length > 0 && (
+                {autoExtraDias.length > 0 && (
                   <label className="quote-card__params-field">
                     <span>Auto extra</span>
                     <Dropdown
                       size="small"
-                      options={autoExtraOpciones.map((d) => ({ value: d, label: d }))}
+                      options={autoExtraDias.map((d) => ({ value: d, label: d }))}
                       value={raw.autoExtra ? { value: raw.autoExtra, label: raw.autoExtra } : null}
                       placeholder="Sin auto extra"
                       clearable

@@ -60,6 +60,9 @@ const OPCIONAL_COLUMN_IDS = {
   ap: 'boolean_mm6zzwq5',
 }
 const AUTO_EXTRA_COLUMN_ID = 'color_mm6zpx3j'
+// LOG-13: la Bonificación (columna "Bonif" del subitem) se puede guardar de verdad desde
+// el paso "Confirmar" — en "Comparar y enviar" sigue siendo un ajuste de prueba local.
+const BONIF_COLUMN_ID = 'numeric_mm52ey7f'
 const POLL_INTERVAL_MS = 4000
 // Auditoría: cantidad de ticks seguidos fallidos tras la cual el polling se corta y
 // avisa (antes giraba para siempre si la API de monday no respondía).
@@ -680,6 +683,29 @@ export default function OpportunityDetail({
     } catch (err) {
       setRawQuotes((prev) => prev.map((r) => (r.id === rawId ? { ...r, [field]: !checked } : r)))
       setElegidaError(err.message)
+    }
+  }
+
+  // LOG-13: la Bonificación que se ajusta en el paso "Confirmar" NO es la prueba local
+  // de "Comparar y enviar" (overridesByQuoteId, que se pierde al recargar): acá ya se
+  // está cerrando la venta, así que se escribe en el subitem real y queda para quien
+  // emite la póliza. Al guardarla se borra el override local de esa cotización — si no,
+  // el ajuste de prueba seguiría tapando el valor recién guardado y las 2 pantallas
+  // mostrarían números distintos.
+  const handleSetBonif = async (rawId, bonif) => {
+    onOpportunityAction?.()
+    const anterior = rawQuotes.find((r) => r.id === rawId)?.bonif ?? ''
+    setRawQuotes((prev) => prev.map((r) => (r.id === rawId ? { ...r, bonif } : r)))
+    setOverridesByQuoteId((prev) => {
+      if (prev[rawId]?.bonif == null) return prev
+      const { bonif: _descartado, ...resto } = prev[rawId]
+      return { ...prev, [rawId]: resto }
+    })
+    try {
+      await setSubitemColumnValue(rawId, BONIF_COLUMN_ID, bonif)
+    } catch (err) {
+      setRawQuotes((prev) => prev.map((r) => (r.id === rawId ? { ...r, bonif: anterior } : r)))
+      throw err
     }
   }
 
@@ -1447,6 +1473,11 @@ export default function OpportunityDetail({
               onSetElegida={handleSetElegida}
               settingElegidaId={settingElegidaId}
               elegidaError={elegidaError}
+              // LOG-13: mismos handlers que usa la tarjeta del paso anterior — los
+              // opcionales ya escribían en monday, la Bonificación ahora también.
+              onSetBonif={handleSetBonif}
+              onToggleOpcional={handleToggleOpcional}
+              onAutoExtraChange={handleAutoExtraChange}
               documentos={[
                 {
                   key: 'libretaConducir',

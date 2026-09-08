@@ -108,19 +108,28 @@ function portoAuxilioMecanico(eff, serviciosIlimitadosPortoMinYear) {
 // se movía. Ahora los opcionales SUMAN al total (ver computeAdicionales), salvo el AP de
 // SURA, que ya viene adentro del contado que trae el portal: ese arranca tildado y, al
 // destildarlo, se RESTA.
+// `label` es el texto que va al bloque INCLUYE de la propuesta (en mayúsculas, como el
+// resto de los textos de PANEL); `labelCorto` es el de los controles de la app —
+// demasiado largo el otro para un checkbox. Los dos salen de acá para que la tarjeta de
+// "Comparar y enviar" y el panel de "Confirmar" no puedan discrepar (antes cada una
+// tenía su propia copia de la lista, ver opcionalesDeCompania más abajo).
 const OPCIONALES = {
   PORTO: [
-    { field: 'granizo', precioKey: 'Granizo', label: 'GRANIZO SIN DEDUCIBLE' },
-    { field: 'cristales', precioKey: 'Cristales', label: 'VIDRIOS HASTA U$S 200 SIN DEDUCIBLE' },
-    { field: 'usoRural', precioKey: 'Uso rural', label: 'USO RURAL' },
+    { field: 'granizo', precioKey: 'Granizo', label: 'GRANIZO SIN DEDUCIBLE', labelCorto: 'Granizo' },
+    { field: 'cristales', precioKey: 'Cristales', label: 'VIDRIOS HASTA U$S 200 SIN DEDUCIBLE', labelCorto: 'Cristales' },
+    { field: 'usoRural', precioKey: 'Uso rural', label: 'USO RURAL', labelCorto: 'Uso rural' },
   ],
   SURA: [
-    { field: 'granizo', precioKey: 'Granizo', label: 'GRANIZO SIN DEDUCIBLE' },
-    { field: 'suraTeLleva', precioKey: 'SURA te lleva', label: 'SURA TE LLEVA' },
+    { field: 'granizo', precioKey: 'Granizo', label: 'GRANIZO SIN DEDUCIBLE', labelCorto: 'Granizo' },
+    { field: 'suraTeLleva', precioKey: 'SURA te lleva', label: 'SURA TE LLEVA', labelCorto: 'SURA te lleva' },
     // Incluido en el precio del portal: destildarlo descuenta.
-    { field: 'ap', precioKey: 'AP', label: 'ACCIDENTES PERSONALES', incluidoPorDefecto: true },
+    { field: 'ap', precioKey: 'AP', label: 'ACCIDENTES PERSONALES', labelCorto: 'Accidentes Personales', incluidoPorDefecto: true },
   ],
 }
+
+// "Auto extra" es el único opcional que no se tilda: se elige la duración. PORTO ofrece
+// las 3, SURA solo 15 días (a pedido: "Coche Cortesía" de SURA = auto extra 15 días).
+const AUTO_EXTRA_DIAS = { PORTO: ['7 días', '15 días', '30 días'], SURA: ['15 días'] }
 
 // "Auto extra" no es un tilde sino una duración elegida (7/15/30 días en PORTO, solo 15
 // en SURA): cada opción tiene su propia fila de precio en PANEL.
@@ -166,9 +175,26 @@ const todosIncluidos = (eff) => eff.compania === 'SURA' && eff.cobertura === 'TO
 // Qué opcionales puede tocar el usuario en esta cotización — lo usa QuoteCard para no
 // mostrar controles que no harían nada (ej. PORTO TRIPLE no ofrece ninguno). Es la misma
 // regla que decide el precio, para que UI y cálculo no se contradigan.
-export function opcionalesEditables(raw) {
+function opcionalesEditables(raw) {
   if (todosIncluidos(raw)) return { campos: [], autoExtra: false }
   return { campos: opcionalesDisponibles(raw).map((o) => o.field), autoExtra: autoExtraDisponible(raw) }
+}
+
+// Los opcionales que ESTA cotización puede tildar/destildar, ya con la etiqueta corta
+// lista para mostrar. Es la misma fuente para la tarjeta de "Comparar y enviar" y para
+// el panel de "Confirmar" (LOG-13): antes cada pantalla tenía su propia copia de la
+// lista y podían decir cosas distintas sobre la misma cotización.
+export function opcionalesDeCompania(raw) {
+  const editables = opcionalesEditables(raw)
+  return (OPCIONALES[raw.compania] ?? [])
+    .filter((o) => editables.campos.includes(o.field))
+    .map((o) => ({ field: o.field, label: o.labelCorto }))
+}
+
+// Duraciones de "Auto extra" que ofrece esta cotización — vacío si no aplica (ver
+// autoExtraDisponible: solo Todo Riesgo y Parcial, y en SURA solo TOTAL).
+export function autoExtraOpciones(raw) {
+  return opcionalesEditables(raw).autoExtra ? AUTO_EXTRA_DIAS[raw.compania] ?? [] : []
 }
 
 // Lo que hay que sumarle (o restarle) al precio base por los opcionales de esta

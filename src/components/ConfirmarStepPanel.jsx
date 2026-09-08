@@ -1,9 +1,9 @@
 import { useEffect, useRef, useState } from 'react'
 import { MdCheckCircle, MdChatBubbleOutline } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
-import { Button, TextField } from '@vibe/core'
+import { Button, Checkbox, Dropdown, NumberField, TextField } from '@vibe/core'
 import { formatMoney, CUOTA_COUNTS, toPercentString } from '../services/format'
-import { isQuoteSelectable } from '../services/pricingEngine'
+import { autoExtraOpciones, isQuoteSelectable, opcionalesDeCompania } from '../services/pricingEngine'
 import { accentForCompania } from '../services/companyColors'
 import FileUploadField from './FileUploadField'
 import StepFooter from './StepFooter'
@@ -122,34 +122,166 @@ function QuoteChoiceCard({ entry, selected, onSelect, selecting }) {
   )
 }
 
+// LOG-13: hasta acá el paso "Confirmar" era de solo lectura — mostraba la tabla de
+// cuotas y nada más. Pero es el momento en que se cierra la venta: los adicionales
+// pueden haber cambiado desde que se cotizó y la bonificación se termina de negociar
+// ahí. A diferencia de los "Parámetros ajustables" de "Comparar y enviar" (pruebas
+// locales que se pierden al recargar, ver overridesByQuoteId en OpportunityDetail.jsx),
+// lo que se toca acá se escribe en monday: es la decisión final y tiene que llegarle a
+// quien emite la póliza. Solo se ofrece sobre la cotización YA elegida — el resto se
+// siguen comparando como estaban.
+function AjustesElegida({ entry, onSetBonif, onToggleOpcional, onAutoExtraChange }) {
+  const { raw } = entry
+  const bonifReal = String(raw.bonif ?? '')
+  const [bonifDraft, setBonifDraft] = useState(bonifReal)
+  const [savingBonif, setSavingBonif] = useState(false)
+  const [savingOpcional, setSavingOpcional] = useState(null)
+  const [error, setError] = useState(null)
+
+  // Misma fuente que la tarjeta del paso anterior (pricingEngine): qué opcionales ofrece
+  // esta cobertura puntual y con qué etiqueta — así los dos pasos no pueden mostrar
+  // cosas distintas de la misma cotización.
+  const opcionales = opcionalesDeCompania(raw)
+  const autoExtraDias = autoExtraOpciones(raw)
+  const bonifDirty = bonifDraft.trim() !== bonifReal.trim()
+
+  const correr = async (clave, accion) => {
+    setSavingOpcional(clave)
+    setError(null)
+    try {
+      await accion()
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSavingOpcional(null)
+    }
+  }
+
+  const handleGuardarBonif = async () => {
+    setSavingBonif(true)
+    setError(null)
+    try {
+      await onSetBonif(raw.id, bonifDraft.trim())
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setSavingBonif(false)
+    }
+  }
+
+  return (
+    <div className="confirmar-step__ajustes">
+      <div className="confirmar-step__ajustes-head">
+        <h3 className="confirmar-step__ajustes-title">Ajustes finales</h3>
+        <p className="confirmar-step__ajustes-subtitle">
+          Se guardan en la cotización de monday y son los que se usan para emitir.
+        </p>
+      </div>
+
+      <div className="confirmar-step__ajustes-grid">
+        <label className="confirmar-step__ajustes-field">
+          <span>Bonificación (%)</span>
+          <div className="confirmar-step__ajustes-bonif">
+            <NumberField
+              size="small"
+              value={bonifDraft === '' ? null : Number(bonifDraft)}
+              onChange={(value) => setBonifDraft(value == null ? '' : String(value))}
+            />
+            <Button
+              kind={bonifDirty ? 'primary' : 'secondary'}
+              size="small"
+              onClick={handleGuardarBonif}
+              disabled={!bonifDirty || savingBonif}
+            >
+              {savingBonif ? 'Guardando...' : 'Guardar'}
+            </Button>
+          </div>
+        </label>
+
+        {autoExtraDias.length > 0 && (
+          <label className="confirmar-step__ajustes-field">
+            <span>Auto extra</span>
+            <Dropdown
+              size="small"
+              options={autoExtraDias.map((d) => ({ value: d, label: d }))}
+              value={raw.autoExtra ? { value: raw.autoExtra, label: raw.autoExtra } : null}
+              placeholder="Sin auto extra"
+              clearable
+              onClear={() => correr('autoExtra', () => onAutoExtraChange(raw.id, ''))}
+              onChange={(option) => correr('autoExtra', () => onAutoExtraChange(raw.id, option?.value ?? ''))}
+            />
+          </label>
+        )}
+      </div>
+
+      {opcionales.length > 0 && (
+        <div className="confirmar-step__ajustes-opcionales">
+          <span className="confirmar-step__ajustes-label">Adicionales {raw.compania}</span>
+          <div className="confirmar-step__ajustes-checks">
+            {opcionales.map((opt) => (
+              <Checkbox
+                key={opt.field}
+                label={opt.label}
+                checked={!!raw[opt.field]}
+                disabled={savingOpcional === opt.field}
+                onChange={(e) => correr(opt.field, () => onToggleOpcional(raw.id, opt.field, e.target.checked))}
+              />
+            ))}
+          </div>
+        </div>
+      )}
+
+      {opcionales.length === 0 && autoExtraDias.length === 0 && (
+        <p className="confirmar-step__ajustes-vacio">
+          Esta cobertura no tiene adicionales para ajustar.
+        </p>
+      )}
+
+      {error && (
+        <p className="confirmar-step__error" role="alert">
+          Error: {error}
+        </p>
+      )}
+    </div>
+  )
+}
+
 // Al cambiar cuál es la propuesta elegida, en vez de saltar directo del detalle viejo al
 // nuevo, mostramos un instante con guiones ("—") en el medio — a pedido, para que se note
 // visualmente que los datos están cambiando y no que quedó pegado el valor anterior.
-function ChosenProposal({ elegida }) {
+function ChosenProposal({ elegida, onSetBonif, onToggleOpcional, onAutoExtraChange }) {
   const elegidaId = elegida?.raw.id ?? null
-  const [shown, setShown] = useState(elegida ?? null)
+  // Se retiene CUÁL es la elegida, no sus datos: lo que se muestra es siempre el objeto
+  // vigente. Antes se guardaba la cotización entera en el estado y quedaba congelada en
+  // los valores que tenía al elegirla — con los ajustes de LOG-13 acá abajo eso significa
+  // tocar la bonificación o un adicional y no ver cambiar ni el total ni el propio
+  // control.
+  const [shownId, setShownId] = useState(elegidaId)
   const [transitioning, setTransitioning] = useState(false)
   const mounted = useRef(false)
 
   useEffect(() => {
     if (!mounted.current) {
       mounted.current = true
-      setShown(elegida ?? null)
+      setShownId(elegidaId)
       return undefined
     }
     if (!elegidaId) {
       setTransitioning(false)
-      setShown(null)
+      setShownId(null)
       return undefined
     }
     setTransitioning(true)
     const timer = setTimeout(() => {
-      setShown(elegida ?? null)
+      setShownId(elegidaId)
       setTransitioning(false)
     }, CHOSEN_TRANSITION_MS)
     return () => clearTimeout(timer)
   }, [elegidaId])
 
+  // Mientras dura el parpadeo, `shownId` todavía apunta a la anterior y no hay nada que
+  // mostrar: se ven los guiones igual (todos los valores de abajo miran `transitioning`).
+  const shown = elegida && elegida.raw.id === shownId ? elegida : null
   if (!shown && !transitioning) return null
   if (shown?.quote.blocked && !transitioning) return null
 
@@ -204,6 +336,20 @@ function ChosenProposal({ elegida }) {
           </div>
         </div>
       </div>
+
+      {/* LOG-13: los ajustes van sobre la cotización ya asentada — mientras se está
+          cambiando de propuesta (guiones) no se muestran, para no dejar controles
+          apuntando a una cotización que ya no es la elegida. El `key` fuerza que el
+          borrador de la Bonificación se rearme al cambiar de cotización. */}
+      {!transitioning && shown && !shown.quote.blocked && (
+        <AjustesElegida
+          key={shown.raw.id}
+          entry={shown}
+          onSetBonif={onSetBonif}
+          onToggleOpcional={onToggleOpcional}
+          onAutoExtraChange={onAutoExtraChange}
+        />
+      )}
     </div>
   )
 }
@@ -214,6 +360,10 @@ export default function ConfirmarStepPanel({
   onSetElegida,
   settingElegidaId,
   elegidaError,
+  // LOG-13: ajustes finales sobre la cotización elegida (ver AjustesElegida arriba).
+  onSetBonif,
+  onToggleOpcional,
+  onAutoExtraChange,
   documentos,
   uploadingDoc,
   deletingDoc,
@@ -427,7 +577,12 @@ export default function ConfirmarStepPanel({
         )}
       </div>
 
-      <ChosenProposal elegida={elegida} />
+      <ChosenProposal
+        elegida={elegida}
+        onSetBonif={onSetBonif}
+        onToggleOpcional={onToggleOpcional}
+        onAutoExtraChange={onAutoExtraChange}
+      />
 
       {/* A pedido: se saca el texto fijo de acá (se repetía siempre, complete o no) —
           ahora esa misma explicación solo aparece como advertencia puntual, si falta
