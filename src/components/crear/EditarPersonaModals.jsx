@@ -11,8 +11,8 @@
 import { useState } from 'react'
 import { MdClear } from 'react-icons/md'
 import { Modal, ModalContent, ModalFooter, TextField } from '@vibe/core'
-import { CODIGO_PAIS_OPTIONS, ciError, emailError, fechaError, fieldStateClass, maxFechaNacimiento, stripCi, telefonoError } from '../../services/personaFields'
-import { Required, RequiredDropdown, codigoPaisDropdownProps } from './FormPrimitives'
+import { CODIGO_PAIS_OPTIONS, ciError, emailError, fechaError, fieldStateClass, maxFechaNacimiento, NACIONALIDAD_URUGUAY, stripCi, telefonoError } from '../../services/personaFields'
+import { ExtranjeroFields, Required, RequiredDropdown, codigoPaisDropdownProps } from './FormPrimitives'
 
 // Localidades filtradas por el departamento elegido (antes copiado en los 2 popups y en
 // otros 2 lugares del formulario) — mismo criterio: sin departamento, todas.
@@ -23,6 +23,23 @@ export function useLocalidadOptions(departamentoOptions, localidades, departamen
     .map((l) => ({ value: l.id, label: l.name }))
   const selectedLocalidad = localidadOptions.find((o) => o.value === localidadId) ?? null
   return { selectedDepartamento, localidadOptions, selectedLocalidad }
+}
+
+// LOG-06: mismo par Extranjero/Nacionalidad que el formulario, con la misma regla de
+// sincronización (ver handleExtranjeroChange en CrearOportunidadForm.jsx) acotada a lo
+// que aplica en un popup de edición: acá la ubicación ya está cargada de verdad, así que
+// no se toca — solo la Nacionalidad, que en URUGUAY es el default de "no extranjero" y
+// deja de tener sentido apenas marcan que sí lo es.
+function useExtranjeroState(form) {
+  const [extranjero, setExtranjero] = useState(form.extranjero || 'No')
+  const [nacionalidad, setNacionalidad] = useState(form.nacionalidad || NACIONALIDAD_URUGUAY)
+  const onExtranjeroChange = (value) => {
+    setExtranjero(value)
+    setNacionalidad((prev) =>
+      value === 'Si' ? (prev === NACIONALIDAD_URUGUAY ? '' : prev) : prev || NACIONALIDAD_URUGUAY
+    )
+  }
+  return { extranjero, nacionalidad, onExtranjeroChange, onNacionalidadChange: setNacionalidad }
 }
 
 function FechaNacimientoField({ value, onChange }) {
@@ -47,9 +64,24 @@ function UbicacionFields({
   onLocalidadChange,
   direccion,
   onDireccionChange,
+  extranjero,
+  nacionalidad,
+  nacionalidadOptions,
+  onExtranjeroChange,
+  onNacionalidadChange,
 }) {
   return (
     <>
+      {/* LOG-06: van arriba de Departamento/Localidad a propósito — marcar Extranjero
+          cambia el sentido de lo de abajo (la ubicación es la zona de circulación del
+          vehículo, no el domicilio de la persona). */}
+      <ExtranjeroFields
+        extranjero={extranjero}
+        nacionalidad={nacionalidad}
+        nacionalidadOptions={nacionalidadOptions}
+        onExtranjeroChange={onExtranjeroChange}
+        onNacionalidadChange={onNacionalidadChange}
+      />
       <label className="crear-op__field">
         <span>Departamento <Required /></span>
         <RequiredDropdown
@@ -89,7 +121,7 @@ function UbicacionFields({
 // que se cambia acá escribe DE UNA en el Contacto real (ver handleSaveContacto en el
 // componente principal). CI/Nombre/Apellido quedan afuera a propósito — son datos de
 // identidad, no se tocan desde una Oportunidad puntual.
-export function EditarContactoModal({ form, departamentoOptions, localidades, onSave, onClose, saving, error }) {
+export function EditarContactoModal({ form, departamentoOptions, localidades, nacionalidadOptions, onSave, onClose, saving, error }) {
   const [fechaNacimiento, setFechaNacimiento] = useState(form.fechaNacimiento)
   const [codigoPais, setCodigoPais] = useState(form.codigoPais)
   const [telefono, setTelefono] = useState(form.telefono)
@@ -97,6 +129,7 @@ export function EditarContactoModal({ form, departamentoOptions, localidades, on
   const [departamentoId, setDepartamentoId] = useState(form.departamentoId)
   const [localidadId, setLocalidadId] = useState(form.localidadId)
   const [direccion, setDireccion] = useState(form.direccion)
+  const { extranjero, nacionalidad, onExtranjeroChange, onNacionalidadChange } = useExtranjeroState(form)
 
   const { selectedDepartamento, localidadOptions, selectedLocalidad } = useLocalidadOptions(
     departamentoOptions,
@@ -109,7 +142,7 @@ export function EditarContactoModal({ form, departamentoOptions, localidades, on
   const fechaErr = fechaError(fechaNacimiento)
   const emailErr = emailError(email)
   // Dirección opcional (a pedido: se pide en el paso 3 de la oportunidad).
-  const canSave = !telefonoErr && !fechaErr && !emailErr && departamentoId && localidadId
+  const canSave = !telefonoErr && !fechaErr && !emailErr && departamentoId && localidadId && nacionalidad
 
   return (
     <Modal id="editar-contacto-modal" show onClose={onClose} size="medium">
@@ -169,6 +202,11 @@ export function EditarContactoModal({ form, departamentoOptions, localidades, on
             onLocalidadChange={setLocalidadId}
             direccion={direccion}
             onDireccionChange={setDireccion}
+            extranjero={extranjero}
+            nacionalidad={nacionalidad}
+            nacionalidadOptions={nacionalidadOptions}
+            onExtranjeroChange={onExtranjeroChange}
+            onNacionalidadChange={onNacionalidadChange}
           />
         </div>
       </ModalContent>
@@ -177,7 +215,18 @@ export function EditarContactoModal({ form, departamentoOptions, localidades, on
         primaryButton={{
           text: saving ? 'Guardando...' : 'Guardar',
           disabled: !canSave || saving,
-          onClick: () => onSave({ fechaNacimiento, codigoPais, telefono, email, departamentoId, localidadId, direccion }),
+          onClick: () =>
+            onSave({
+              fechaNacimiento,
+              codigoPais,
+              telefono,
+              email,
+              departamentoId,
+              localidadId,
+              direccion,
+              extranjero,
+              nacionalidad,
+            }),
         }}
       />
     </Modal>
@@ -188,7 +237,7 @@ export function EditarContactoModal({ form, departamentoOptions, localidades, on
 // handleCedulaLeadChange en el componente principal) — todavía no hay ningún ítem
 // creado: "Guardar" solo actualiza el `form` local, igual que cualquier campo tipeado a
 // mano. Incluye Nombre/Apellido/CI: son justo los campos que la IA pudo haber leído mal.
-export function EditarLeadModal({ form, departamentoOptions, localidades, onSave, onClose }) {
+export function EditarLeadModal({ form, departamentoOptions, localidades, nacionalidadOptions, onSave, onClose }) {
   const [nombre, setNombre] = useState(form.nombre)
   const [apellido, setApellido] = useState(form.apellido)
   const [ci, setCi] = useState(form.ci)
@@ -196,6 +245,7 @@ export function EditarLeadModal({ form, departamentoOptions, localidades, onSave
   const [departamentoId, setDepartamentoId] = useState(form.departamentoId)
   const [localidadId, setLocalidadId] = useState(form.localidadId)
   const [direccion, setDireccion] = useState(form.direccion)
+  const { extranjero, nacionalidad, onExtranjeroChange, onNacionalidadChange } = useExtranjeroState(form)
 
   const { selectedDepartamento, localidadOptions, selectedLocalidad } = useLocalidadOptions(
     departamentoOptions,
@@ -214,7 +264,8 @@ export function EditarLeadModal({ form, departamentoOptions, localidades, onSave
     fechaNacimiento &&
     !fechaErr &&
     departamentoId &&
-    localidadId
+    localidadId &&
+    nacionalidad
 
   return (
     <Modal id="editar-lead-modal" show onClose={onClose} size="medium">
@@ -247,6 +298,11 @@ export function EditarLeadModal({ form, departamentoOptions, localidades, onSave
             onLocalidadChange={setLocalidadId}
             direccion={direccion}
             onDireccionChange={setDireccion}
+            extranjero={extranjero}
+            nacionalidad={nacionalidad}
+            nacionalidadOptions={nacionalidadOptions}
+            onExtranjeroChange={onExtranjeroChange}
+            onNacionalidadChange={onNacionalidadChange}
           />
         </div>
       </ModalContent>
@@ -256,7 +312,17 @@ export function EditarLeadModal({ form, departamentoOptions, localidades, onSave
           text: 'Guardar',
           disabled: !canSave,
           onClick: () =>
-            onSave({ nombre, apellido, ci: stripCi(ci), fechaNacimiento, departamentoId, localidadId, direccion }),
+            onSave({
+              nombre,
+              apellido,
+              ci: stripCi(ci),
+              fechaNacimiento,
+              departamentoId,
+              localidadId,
+              direccion,
+              extranjero,
+              nacionalidad,
+            }),
         }}
       />
     </Modal>

@@ -3,6 +3,11 @@
 // reusarlos desde CotizarStepPanel/ClientFicha sin duplicar).
 
 
+// LOG-06 / LOG-08: label real de la columna Nacionalidad del tablero Clientes
+// (dropdown_mm6zq8bg). Es el default de cualquier persona no extranjera y lo que se
+// completa solo cuando la cédula leída con IA trae un departamento uruguayo.
+export const NACIONALIDAD_URUGUAY = 'URUGUAY'
+
 // Uruguay por default (mercado principal de la app), pero editable por si hace falta
 // cargar un cliente con otro código — no hay columna real de monday detrás todavía.
 // A pedido: código de país compacto con bandera (ver FlagIcon.jsx: SVG, porque los

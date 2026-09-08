@@ -897,6 +897,10 @@ const CONTACTO_EMAIL_COLUMN_ID = 'email_mm6539g3'
 // nombre del ítem a ciegas, ver splitNombreApellido en CrearOportunidadForm.jsx).
 const CONTACTO_NOMBRE_COLUMN_ID = 'text_mm6mrx0a'
 const CONTACTO_APELLIDO_COLUMN_ID = 'text_mm6mx38p'
+// MON-09 / LOG-06 / LOG-08: para clientes del exterior, en vez de forzarles un
+// departamento uruguayo. "Extranjero" es un Si/No y "Nacionalidad" la lista de países.
+const CONTACTO_EXTRANJERO_COLUMN_ID = 'color_mm6zs3fk'
+const CONTACTO_NACIONALIDAD_COLUMN_ID = 'dropdown_mm6zq8bg'
 // A pedido: documentos genéricos del Cliente (varios archivos por ítem) — columna
 // aparte de CI Frente a propósito: esa la asumen de un solo archivo tanto "Leer
 // cédula con IA" como el escenario de Make de creación de póliza.
@@ -924,7 +928,7 @@ const SEARCH_CONTACTOS_QUERY = `
         items {
           id
           name
-          column_values(ids: ["${CONTACTO_ESTADO_COLUMN_ID}", "${CONTACTO_CI_COLUMN_ID}", "${CONTACTO_TELEFONO_COLUMN_ID}", "${CONTACTO_FECHA_NACIMIENTO_COLUMN_ID}", "${CONTACTO_LOCALIDAD_COLUMN_ID}", "${CONTACTO_DEPARTAMENTO_COLUMN_ID}", "${CONTACTO_DIRECCION_COLUMN_ID}", "${CONTACTO_EMAIL_COLUMN_ID}", "${CONTACTO_NOMBRE_COLUMN_ID}", "${CONTACTO_APELLIDO_COLUMN_ID}"]) {
+          column_values(ids: ["${CONTACTO_ESTADO_COLUMN_ID}", "${CONTACTO_CI_COLUMN_ID}", "${CONTACTO_TELEFONO_COLUMN_ID}", "${CONTACTO_FECHA_NACIMIENTO_COLUMN_ID}", "${CONTACTO_LOCALIDAD_COLUMN_ID}", "${CONTACTO_DEPARTAMENTO_COLUMN_ID}", "${CONTACTO_DIRECCION_COLUMN_ID}", "${CONTACTO_EMAIL_COLUMN_ID}", "${CONTACTO_NOMBRE_COLUMN_ID}", "${CONTACTO_APELLIDO_COLUMN_ID}", "${CONTACTO_EXTRANJERO_COLUMN_ID}", "${CONTACTO_NACIONALIDAD_COLUMN_ID}"]) {
             id
             text
             value
@@ -977,6 +981,8 @@ function mapContactoItem(item) {
     // el nombre del ítem en ese caso.
     nombre: byId[CONTACTO_NOMBRE_COLUMN_ID]?.text?.trim() || '',
     apellido: byId[CONTACTO_APELLIDO_COLUMN_ID]?.text?.trim() || '',
+    extranjero: byId[CONTACTO_EXTRANJERO_COLUMN_ID]?.text?.trim() || '',
+    nacionalidad: byId[CONTACTO_NACIONALIDAD_COLUMN_ID]?.text?.trim() || '',
   }
 }
 
@@ -1129,6 +1135,8 @@ export {
   CONTACTO_ESTADO_COLUMN_ID,
   CONTACTO_DIRECCION_COLUMN_ID,
   CONTACTO_EMAIL_COLUMN_ID,
+  CONTACTO_EXTRANJERO_COLUMN_ID,
+  CONTACTO_NACIONALIDAD_COLUMN_ID,
   CONTACTO_ARCHIVOS_COLUMN_ID,
   CONTACTO_NOMBRE_COLUMN_ID,
   CONTACTO_APELLIDO_COLUMN_ID,

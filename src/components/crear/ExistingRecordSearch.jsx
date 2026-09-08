@@ -33,21 +33,15 @@ export function ExistingRecordSearch({ value, onChange }) {
     searchContactos(term)
       .then((resultados) => {
         setOptions(
+          // Se pasa el contacto ENTERO (ver mapContactoItem en mondayApi.js) + lo que
+          // necesita el Dropdown (value/label). Antes se copiaban los campos uno por uno
+          // y cada columna nueva del tablero Clientes había que acordarse de agregarla
+          // acá también: así se perdía el Email (nunca llegaba a autocompletarse) y así
+          // se habrían perdido Extranjero/Nacionalidad (LOG-06).
           resultados.map((c) => ({
+            ...c,
             value: `${c.source}:${c.id}`,
             label: c.name,
-            ci: c.ci,
-            source: c.source,
-            id: c.id,
-            name: c.name,
-            fechaNacimiento: c.fechaNacimiento,
-            telefono: c.telefono,
-            telefonoCountryShortName: c.telefonoCountryShortName,
-            departamentoNombre: c.departamentoNombre,
-            localidadNombre: c.localidadNombre,
-            direccion: c.direccion,
-            nombre: c.nombre,
-            apellido: c.apellido,
           }))
         )
         setSearched(true)

@@ -6,6 +6,8 @@ import {
   SUBITEMS_BOARD_ID,
   CLIENTES_BOARD_ID,
   CONTACTO_ESTADO_COLUMN_ID,
+  CONTACTO_EXTRANJERO_COLUMN_ID,
+  CONTACTO_NACIONALIDAD_COLUMN_ID,
 } from './mondayApi'
 
 const DEFAULT_COLOR = { bg: '#c4c4c4', border: '#b0b0b0' }
@@ -73,10 +75,17 @@ export async function fetchFilterAndStatusSchema() {
   const [columns, subitemColumns, clienteColumns] = await Promise.all([
     fetchColumnsSettings(allColumnIds),
     fetchColumnsSettings(Object.values(SUBITEM_DROPDOWN_COLUMNS), SUBITEMS_BOARD_ID),
-    fetchColumnsSettings([CONTACTO_ESTADO_COLUMN_ID], CLIENTES_BOARD_ID),
+    // MON-09: además de "Situación", del tablero Clientes salen Extranjero (status
+    // Si/No) y Nacionalidad (dropdown con la lista de países) — se leen igual que el
+    // resto, sin hardcodear los ~150 países acá.
+    fetchColumnsSettings(
+      [CONTACTO_ESTADO_COLUMN_ID, CONTACTO_EXTRANJERO_COLUMN_ID, CONTACTO_NACIONALIDAD_COLUMN_ID],
+      CLIENTES_BOARD_ID
+    ),
   ])
   const byId = Object.fromEntries(columns.map((c) => [c.id, c]))
   const subitemById = Object.fromEntries(subitemColumns.map((c) => [c.id, c]))
+  const clienteById = Object.fromEntries(clienteColumns.map((c) => [c.id, c]))
 
   const statuses = Object.fromEntries(
     Object.entries(STATUS_COLUMNS).map(([key, colId]) => [key, parseStatusColumn(byId[colId])])
@@ -84,7 +93,9 @@ export async function fetchFilterAndStatusSchema() {
 
   return {
     ...statuses,
-    tipoSujeto: parseStatusColumn(clienteColumns[0]),
+    tipoSujeto: parseStatusColumn(clienteById[CONTACTO_ESTADO_COLUMN_ID]),
+    extranjero: parseStatusColumn(clienteById[CONTACTO_EXTRANJERO_COLUMN_ID]),
+    nacionalidades: parseDropdownColumn(clienteById[CONTACTO_NACIONALIDAD_COLUMN_ID]),
     marcas: parseDropdownColumn(byId[DROPDOWN_COLUMNS.marcas]).sort((a, b) => a.localeCompare(b)),
     anios: parseDropdownColumn(byId[DROPDOWN_COLUMNS.anios]).sort((a, b) => Number(b) - Number(a)),
     combustibles: parseDropdownColumn(byId[DROPDOWN_COLUMNS.combustibles]),

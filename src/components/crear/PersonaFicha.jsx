@@ -1,4 +1,4 @@
-import { MdEdit, MdEmail, MdLocationOn, MdSmartphone } from 'react-icons/md'
+import { MdEdit, MdEmail, MdLocationOn, MdPublic, MdSmartphone } from 'react-icons/md'
 import { Button } from '@vibe/core'
 import FileUploadField from '../FileUploadField'
 import { formatShortDate } from '../../services/format'
@@ -47,6 +47,17 @@ export default function PersonaFicha({
         <span className="crear-op__ficha-badge">CI: {form.ci || '—'}</span>
         <span className="crear-op__ficha-badge">
           Nacimiento: {form.fechaNacimiento ? formatShortDate(form.fechaNacimiento) : '—'}
+        </span>
+        {/* LOG-06: la ficha es de solo lectura, así que la Nacionalidad se muestra
+            SIEMPRE (no solo cuando es extranjero) — es la única pista de que quedó en
+            URUGUAY por defecto y hay que corregirla desde "Editar" si la persona es del
+            exterior (la lectura con IA no lo puede deducir: un documento que no se pudo
+            leer se ve igual que uno extranjero). */}
+        <span className="crear-op__ficha-badge">
+          <MdPublic />
+          {form.extranjero === 'Si'
+            ? `Extranjero · ${form.nacionalidad || 'Sin nacionalidad'}`
+            : form.nacionalidad || 'Sin nacionalidad'}
         </span>
         {showTelefono && (
           <span className="crear-op__ficha-badge">

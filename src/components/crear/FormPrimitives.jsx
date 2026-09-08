@@ -83,6 +83,45 @@ export function RequiredDropdown({ onChange, onClear, searchable, options, ...pr
   )
 }
 
+// LOG-06 / LOG-08: "Extranjero" (status Si/No de Clientes) + "Nacionalidad" (dropdown
+// con los países del mismo tablero). Van juntos y en el mismo orden en los 3 lugares
+// donde se cargan los datos de la persona (el formulario de Lead manual y los 2 popups
+// de edición, ver EditarPersonaModals.jsx) — de ahí que sean un componente y no 2
+// campos copiados. Nacionalidad es obligatoria, pero en el caso común ya viene en
+// URUGUAY: en la práctica solo frena a quien marca Extranjero = Sí.
+export function ExtranjeroFields({ extranjero, nacionalidad, nacionalidadOptions, onExtranjeroChange, onNacionalidadChange }) {
+  const selectedNacionalidad = nacionalidadOptions.find((o) => o.value === nacionalidad) ?? null
+  return (
+    <>
+      <label className="crear-op__field">
+        <span>Extranjero <Required /></span>
+        <RequiredDropdown
+          options={EXTRANJERO_OPTIONS}
+          value={EXTRANJERO_OPTIONS.find((o) => o.value === extranjero) ?? null}
+          onChange={(option) => onExtranjeroChange(option?.value ?? 'No')}
+        />
+      </label>
+      <label className="crear-op__field">
+        <span>Nacionalidad <Required /></span>
+        <RequiredDropdown
+          options={nacionalidadOptions}
+          value={selectedNacionalidad}
+          placeholder="Escribe para buscar resultados"
+          searchable
+          onChange={(option) => onNacionalidadChange(option?.value ?? '')}
+        />
+      </label>
+    </>
+  )
+}
+
+// "Si" (sin tilde) es el label real de la columna color_mm6zs3fk — el valor que se
+// escribe en monday; la tilde es solo lo que se ve en pantalla.
+const EXTRANJERO_OPTIONS = [
+  { value: 'No', label: 'No' },
+  { value: 'Si', label: 'Sí' },
+]
+
 // A pedido, estética tipo mockup: 2 tarjetas sueltas con ícono (documento/lápiz) en vez
 // del control segmentado unido de antes — mismo componente para las 2 preguntas
 // "¿Tenés la Cédula o Carta del vehículo?" (paso 3) y "¿Tenés la Cédula de Identidad de

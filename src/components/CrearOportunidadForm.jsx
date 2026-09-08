@@ -61,11 +61,13 @@ import {
   CONTACTO_ARCHIVOS_COLUMN_ID,
   CONTACTO_NOMBRE_COLUMN_ID,
   CONTACTO_APELLIDO_COLUMN_ID,
+  CONTACTO_EXTRANJERO_COLUMN_ID,
+  CONTACTO_NACIONALIDAD_COLUMN_ID,
 } from '../services/mondayApi'
 import { mapOpportunities } from '../services/opportunityMapper'
-import { ciError, fechaError, fieldStateClass, maxFechaNacimiento, normalizeFechaIA, splitNombreApellido, splitTelefono, stripCi, telefonoError, buildMondayPhone, emailError, buildMondayEmail } from '../services/personaFields'
+import { ciError, fechaError, fieldStateClass, maxFechaNacimiento, NACIONALIDAD_URUGUAY, normalizeFechaIA, splitNombreApellido, splitTelefono, stripCi, telefonoError, buildMondayPhone, emailError, buildMondayEmail } from '../services/personaFields'
 import { clearPersistedSearch, loadPersistedSearch, savePersistedSearch } from '../services/persistedSearch'
-import { DocumentChoiceToggle, Required, RequiredDropdown, SectionTitle, StepHeading, TelefonoField } from './crear/FormPrimitives'
+import { DocumentChoiceToggle, ExtranjeroFields, Required, RequiredDropdown, SectionTitle, StepHeading, TelefonoField } from './crear/FormPrimitives'
 import { ExistingRecordSearch } from './crear/ExistingRecordSearch'
 import { VehiculoManualFields } from './crear/VehiculoManualFields'
 import { EditarContactoModal, EditarLeadModal } from './crear/EditarPersonaModals'
@@ -85,6 +87,19 @@ const STEPS = [
 // todavía no tienen esos campos definidos.
 const TIPO_RIESGO_AUTOMOVIL = '🚗 Automóvil'
 
+// LOG-08: label real de la columna Nacionalidad del tablero Clientes (dropdown_mm6zq8bg)
+// — es el default de cualquier persona no extranjera, y también lo que se completa solo
+// cuando la cédula leída con IA trae un departamento uruguayo.
+// Ubicación por defecto del formulario (el caso más común) — se usa en 2 lugares: al
+// cargar el schema (useEffect más abajo) y al marcar Extranjero = Sí, que la deshace
+// justamente si sigue siendo ESTA y no algo que ya hayan elegido a mano.
+function defaultUbicacion(schema) {
+  return {
+    departamentoId: (schema?.departamentos ?? []).find((d) => d.name === 'Montevideo')?.id ?? '',
+    localidadId: (schema?.localidades ?? []).find((l) => l.name === 'Montevideo - CP11500')?.id ?? '',
+  }
+}
+
 // Mismos valores reales que color_mm51n4j ("Posee Vehiculo?") en el tablero
 // Oportunidades — el toggle de 2 botones (ver JSX) los usa tal cual, "Si"/"No".
 
@@ -100,6 +115,13 @@ function buildInitialForm() {
     email: '',
     localidadId: '',
     departamentoId: '',
+    // LOG-06 / LOG-08: personas del exterior. "Extranjero" arranca en No (el caso
+    // común) y con eso Nacionalidad queda en URUGUAY sola; marcarlo en Sí saca el
+    // default de Montevideo (ver el useEffect del schema) y obliga a elegir el país.
+    // Departamento/Localidad siguen siendo obligatorios en los dos casos: son la zona
+    // de circulación del vehículo, no el domicilio de la persona.
+    extranjero: 'No',
+    nacionalidad: NACIONALIDAD_URUGUAY,
     // A pedido: dirección exacta (calle y número) del domicilio principal — obligatoria
     // junto con Departamento y Localidad (ver isStepValid).
     direccion: '',
@@ -327,6 +349,8 @@ export default function CrearOportunidadForm({
         email: '',
         departamentoId: '',
         localidadId: '',
+        extranjero: 'No',
+        nacionalidad: NACIONALIDAD_URUGUAY,
         direccion: '',
       }))
       setTextFieldsResetKey((k) => k + 1)
@@ -365,6 +389,11 @@ export default function CrearOportunidadForm({
       localidadId: localidadMatch?.id ?? prev.localidadId,
       direccion: resultado.direccion || prev.direccion,
       email: resultado.email || prev.email,
+      // LOG-06: si el Cliente/Lead ya tenía cargado Extranjero/Nacionalidad se respeta
+      // lo que dice monday; los ítems viejos (creados antes de estas columnas) vienen
+      // vacíos y caen al default de siempre (No / URUGUAY).
+      extranjero: resultado.extranjero || 'No',
+      nacionalidad: resultado.nacionalidad || NACIONALIDAD_URUGUAY,
     }))
     // A pedido: si esa persona ya tenía Cédula Identidad (CI Frente) subida en Clientes,
     // se reusa acá — Cliente y Lead viven en el mismo tablero ahora, así que siempre es
@@ -427,6 +456,8 @@ export default function CrearOportunidadForm({
             departamentoId: form.departamentoId,
             localidadId: form.localidadId,
             direccion: form.direccion,
+            extranjero: form.extranjero,
+            nacionalidad: form.nacionalidad,
           }
         : null,
       // A pedido: además de los datos personales, se guarda en qué paso estaba y el
@@ -643,6 +674,11 @@ export default function CrearOportunidadForm({
         [CONTACTO_DEPARTAMENTO_COLUMN_ID]: { item_ids: [Number(values.departamentoId)] },
         // Columna "long text": el JSON de change_multiple_column_values es {"text": ...}.
         [CONTACTO_DIRECCION_COLUMN_ID]: { text: values.direccion.trim() },
+        // LOG-06: mismo criterio que ensureContactoId más abajo.
+        [CONTACTO_EXTRANJERO_COLUMN_ID]: values.extranjero,
+        ...(values.nacionalidad
+          ? { [CONTACTO_NACIONALIDAD_COLUMN_ID]: { labels: [values.nacionalidad] } }
+          : {}),
         // Email opcional: solo se escribe si hay algo (no se puede vaciar desde acá).
         ...(values.email?.trim() ? { [CONTACTO_EMAIL_COLUMN_ID]: buildMondayEmail(values.email) } : {}),
       })
@@ -665,21 +701,49 @@ export default function CrearOportunidadForm({
     if (!schema) return
     setForm((prev) => {
       if (prev.tipoRiesgo || prev.departamentoId || prev.localidadId) return prev
-      const defaultDepartamento = (schema.departamentos ?? []).find((d) => d.name === 'Montevideo')
-      const defaultLocalidad = (schema.localidades ?? []).find((l) => l.name === 'Montevideo - CP11500')
       const defaultUso = (schema.uso?.options ?? []).find((o) => o.toLowerCase() === 'particular')
+      const ubicacion = defaultUbicacion(schema)
       return {
         ...prev,
         tipoRiesgo: TIPO_RIESGO_AUTOMOVIL,
-        departamentoId: defaultDepartamento?.id ?? '',
-        localidadId: defaultLocalidad?.id ?? '',
+        // LOG-06: a un extranjero no se le asume Montevideo — arranca vacío para que lo
+        // elijan a mano (siguen siendo obligatorios, ver isStepValid).
+        departamentoId: prev.extranjero === 'Si' ? '' : ubicacion.departamentoId,
+        localidadId: prev.extranjero === 'Si' ? '' : ubicacion.localidadId,
         uso: defaultUso ?? prev.uso,
       }
     })
   }, [schema])
 
+  // LOG-06: marcar "Extranjero = Sí" deshace el default de Montevideo — pero solo si
+  // seguía siendo el default sin tocar: si ya habían elegido otro departamento (ej. lo
+  // leyó la cédula, o lo eligieron a mano) no se les borra nada. Volver a "No" no repone
+  // la ubicación (ya la están completando a mano), solo la Nacionalidad si quedó vacía.
+  const handleExtranjeroChange = (value) => {
+    setForm((prev) => {
+      const next = { ...prev, extranjero: value }
+      if (value === 'Si') {
+        const ubicacion = defaultUbicacion(schema)
+        if (prev.departamentoId === ubicacion.departamentoId && prev.localidadId === ubicacion.localidadId) {
+          next.departamentoId = ''
+          next.localidadId = ''
+        }
+        // URUGUAY era el default de "no extranjero": lo eligen ellos.
+        if (prev.nacionalidad === NACIONALIDAD_URUGUAY) next.nacionalidad = ''
+      } else if (!next.nacionalidad) {
+        next.nacionalidad = NACIONALIDAD_URUGUAY
+      }
+      return next
+    })
+  }
+
   const departamentos = schema?.departamentos ?? []
   const departamentoOptions = departamentos.map((d) => ({ value: d.id, label: d.name }))
+
+  // LOG-06: los países salen del schema real (dropdown_mm6zq8bg del tablero Clientes,
+  // ver boardSchema.js) y en el orden en que están cargados ahí (URUGUAY y los
+  // limítrofes primero), no alfabético — el dropdown igual es searchable.
+  const nacionalidadOptions = (schema?.nacionalidades ?? []).map((n) => ({ value: n, label: n }))
   const selectedDepartamento = departamentoOptions.find((o) => o.value === form.departamentoId) ?? null
 
   // Filtro interactivo: sin Departamento elegido, se ven todas las localidades; una vez
@@ -762,7 +826,10 @@ export default function CrearOportunidadForm({
           // Email opcional, pero si se cargó tiene que ser válido.
           !emailError(form.email) &&
           form.localidadId &&
-          form.departamentoId
+          form.departamentoId &&
+          // LOG-06: en el caso común ya viene en URUGUAY, así que esto solo frena
+          // cuando marcaron Extranjero = Sí y todavía no eligieron el país.
+          form.nacionalidad
         // A pedido: la Dirección ya no es obligatoria acá — se pide en el paso 3
         // (Confirmar) de la oportunidad, junto con los documentos.
       )
@@ -952,8 +1019,8 @@ export default function CrearOportunidadForm({
   // A pedido: al crear un Lead desde cero, si tienen la Cédula de Identidad a mano se
   // manda a leer con IA (mismo escenario de Make que ya lee la Carta Automóvil, ver
   // services/mondayApi.js#leerCedula) en vez de tipear todo a mano — nombre_completo se
-  // parte igual que un Contacto (splitNombreApellido), y Departamento/Localidad (vienen
-  // como nombre, no id) se matchean contra el schema real, mismo criterio que
+  // parte igual que un Contacto (splitNombreApellido), y el Departamento (viene como
+  // nombre, no id) se matchea contra el schema real, mismo criterio que
   // handleResultadoSeleccionado más abajo para un resultado del buscador. El mismo
   // archivo se reusa como Cédula Identidad de la Documentación (ver
   // handleCedulaIdentidadChange arriba) para no pedirlo 2 veces.
@@ -970,10 +1037,6 @@ export default function CrearOportunidadForm({
       const departamentoMatch = (schema?.departamentos ?? []).find(
         (d) => d.name.toLowerCase() === departamentoNombre.toLowerCase()
       )
-      const localidadNombre = (data.localidad || '').trim()
-      const localidadMatch = (schema?.localidades ?? []).find(
-        (l) => l.name.toLowerCase() === localidadNombre.toLowerCase()
-      )
       if (!nombre && !data.ci) {
         // La IA no pudo leer nada útil — se avisa y se deja el archivo puesto para
         // reintentar (o pasar a "No" y cargar a mano), en vez de mostrar un perfil vacío.
@@ -987,7 +1050,19 @@ export default function CrearOportunidadForm({
         ci: data.ci || prev.ci,
         fechaNacimiento: normalizeFechaIA(data.fecha_nacimineto || data.fecha_nacimiento) || prev.fechaNacimiento,
         departamentoId: departamentoMatch?.id ?? prev.departamentoId,
-        localidadId: localidadMatch?.id ?? prev.localidadId,
+        // LOG-08: la Localidad ya NO se completa con la del documento — la que se pide
+        // acá es la zona de circulación del vehículo, no el domicilio que figura en la
+        // cédula (eran cosas distintas y se cargaba mal). Se elige a mano. Si el
+        // documento cambió el Departamento, se limpia lo que hubiera: una localidad de
+        // otro departamento ni siquiera aparece en el dropdown (se filtra por
+        // departamento) pero seguía contando como "completo" para poder avanzar.
+        localidadId:
+          departamentoMatch && departamentoMatch.id !== prev.departamentoId ? '' : prev.localidadId,
+        // LOG-08: documento uruguayo leído OK ⇒ Nacionalidad URUGUAY. Si no se pudo
+        // leer el departamento no se asume nada (puede ser un extranjero o un documento
+        // que la IA no leyó bien) — queda lo que ya estuviera cargado.
+        nacionalidad: departamentoMatch ? NACIONALIDAD_URUGUAY : prev.nacionalidad,
+        extranjero: departamentoMatch ? 'No' : prev.extranjero,
       }))
       handleCedulaIdentidadChange(file, true)
       setLeadPerfilListo(true)
@@ -1023,6 +1098,11 @@ export default function CrearOportunidadForm({
       [CONTACTO_LOCALIDAD_COLUMN_ID]: { item_ids: [Number(form.localidadId)] },
       [CONTACTO_DEPARTAMENTO_COLUMN_ID]: { item_ids: [Number(form.departamentoId)] },
       [CONTACTO_DIRECCION_COLUMN_ID]: { text: form.direccion.trim() },
+      // LOG-06: status (label suelto) y dropdown ({labels: [...]}) — las 2 salen del
+      // schema real del tablero, así que la etiqueta siempre existe (no hace falta
+      // create_labels_if_missing).
+      [CONTACTO_EXTRANJERO_COLUMN_ID]: form.extranjero,
+      ...(form.nacionalidad ? { [CONTACTO_NACIONALIDAD_COLUMN_ID]: { labels: [form.nacionalidad] } } : {}),
       ...(form.email?.trim() ? { [CONTACTO_EMAIL_COLUMN_ID]: buildMondayEmail(form.email) } : {}),
     })
     return created.id
@@ -1362,6 +1442,7 @@ export default function CrearOportunidadForm({
                     form={form}
                     departamentoOptions={departamentoOptions}
                     localidades={localidades}
+                    nacionalidadOptions={nacionalidadOptions}
                     saving={savingContacto}
                     error={savingContactoError}
                     onClose={() => {
@@ -1613,6 +1694,16 @@ export default function CrearOportunidadForm({
                         <div className="crear-op__section">
                           <SectionTitle icon={MdLocationOn}>Ubicación</SectionTitle>
                           <div className="crear-op__fields--grid crear-op__fields--grid-3">
+                            {/* LOG-06: van primero porque cambian el sentido de lo de
+                                abajo — a un extranjero no se le asume Montevideo (ver
+                                handleExtranjeroChange). */}
+                            <ExtranjeroFields
+                              extranjero={form.extranjero}
+                              nacionalidad={form.nacionalidad}
+                              nacionalidadOptions={nacionalidadOptions}
+                              onExtranjeroChange={handleExtranjeroChange}
+                              onNacionalidadChange={(value) => handleChange('nacionalidad', value)}
+                            />
                             <label className="crear-op__field">
                               <span>Departamento <Required /></span>
                               <RequiredDropdown
@@ -1669,6 +1760,7 @@ export default function CrearOportunidadForm({
                         form={form}
                         departamentoOptions={departamentoOptions}
                         localidades={localidades}
+                        nacionalidadOptions={nacionalidadOptions}
                         onClose={() => setEditingLeadPerfil(false)}
                         onSave={handleSaveLeadPerfil}
                       />
