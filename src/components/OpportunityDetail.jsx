@@ -35,7 +35,7 @@ import { renderQuoteText } from '../services/whatsappText'
 import { buildQuotesCsv, descargarCsv, nombreArchivoCotizaciones } from '../services/quotesExport'
 import { computeQuote, isQuoteSelectable } from '../services/pricingEngine'
 import { applyRecargoLookup } from '../services/recargoPanel'
-import { COTIZAR_FIELDS, getMissingCotizarFields } from '../services/cotizarFields'
+import { COTIZAR_FIELDS, getInvalidCotizarFields, getMissingCotizarFields } from '../services/cotizarFields'
 import { COBERTURA_TABS, coberturaGroupOf } from '../services/coberturaGroups'
 import './OpportunityDetail.css'
 
@@ -579,7 +579,12 @@ export default function OpportunityDetail({
   // A pedido: el botón "Cotizar" (paso 1, cuando todavía no hay ninguna cotización) vive
   // en la tarjeta de cliente, no en CotizarStepPanel — mismo criterio de "faltan campos"
   // que ese panel usa para su propio banner de advertencia.
-  const canCotizar = opportunity ? getMissingCotizarFields(opportunity).length === 0 : false
+  // LOG-09: mismo criterio que el panel — no alcanza con que estén cargados, el valor
+  // tiene que existir en el catálogo de su columna (ver getInvalidCotizarFields).
+  const canCotizar = opportunity
+    ? getMissingCotizarFields(opportunity).length === 0 &&
+      getInvalidCotizarFields(opportunity, dropdownOptions).length === 0
+    : false
 
   // Solapa activa del paso "Comparar y enviar": "general" no filtra nada (como antes);
   // "GLOBAL"/"TRIPLE" solo dejan pasar las cotizaciones de esa familia de cobertura,

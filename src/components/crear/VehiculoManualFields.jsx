@@ -91,8 +91,13 @@ export function VehiculoManualFields({
         />
         {form.modeloSeleccion && !form.combustible && (
           <span className="crear-op__autofill-note">
-            No fue posible completar este campo automáticamente con el modelo
-            seleccionado. Por favor, complételo manualmente.
+            {/* LOG-09: si la ficha del modelo SÍ trae el dato pero no es uno de los
+                valores que acepta la cotización (hoy pasa con "EREV"), se dice cuál es
+                — antes el campo quedaba vacío con un mensaje genérico y no había forma
+                de saber que el problema era el catálogo. */}
+            {form.modeloSeleccion.combustible
+              ? `El modelo dice "${form.modeloSeleccion.combustible}", que no está entre las opciones que acepta la cotización. Elegí una de la lista.`
+              : 'No fue posible completar este campo automáticamente con el modelo seleccionado. Por favor, complételo manualmente.'}
           </span>
         )}
       </label>
@@ -107,8 +112,10 @@ export function VehiculoManualFields({
         />
         {form.modeloSeleccion && !form.tipo && (
           <span className="crear-op__autofill-note">
-            No fue posible completar este campo automáticamente con el modelo
-            seleccionado. Por favor, complételo manualmente.
+            {/* LOG-09: mismo criterio que Combustible acá arriba. */}
+            {form.modeloSeleccion.tipo
+              ? `El modelo dice "${form.modeloSeleccion.tipo}", que no está entre las opciones que acepta la cotización. Elegí una de la lista.`
+              : 'No fue posible completar este campo automáticamente con el modelo seleccionado. Por favor, complételo manualmente.'}
           </span>
         )}
       </label>

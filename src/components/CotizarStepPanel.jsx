@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { MdAutorenew, MdArrowForward, MdCheckCircle, MdWarningAmber } from 'react-icons/md'
 import { Button, Dropdown, AttentionBox, TextField, NumberField, Modal, ModalContent, ModalFooter } from '@vibe/core'
-import { COTIZAR_FIELDS, getMissingCotizarFields } from '../services/cotizarFields'
+import { COTIZAR_FIELDS, getInvalidCotizarFields, getMissingCotizarFields } from '../services/cotizarFields'
 import { fetchAutodataModelosByAnioMarca } from '../services/mondayApi'
 import { matchesSearchQuery, matchOption } from '../services/format'
 import AutodataModeloPorAnioMarca from './AutodataModeloPorAnioMarca'
@@ -171,7 +171,11 @@ export default function CotizarStepPanel({
   // Ningún campo base puede quedar vacío: si falta alguno, no dejamos cotizar/recotizar
   // (la automatización de monday que genera los subitems necesita todos estos datos).
   const missingFields = getMissingCotizarFields(opportunity)
-  const canCotizar = missingFields.length === 0
+  // LOG-09: además de los vacíos, los valores que NO existen en el catálogo de su
+  // columna (ej. una ficha de Autodata con Combustible "EREV"). Antes esto se descubría
+  // del otro lado, con el robot ya corriendo — o el dato entraba vacío al portal.
+  const invalidFields = getInvalidCotizarFields(opportunity, dropdownOptions)
+  const canCotizar = missingFields.length === 0 && invalidFields.length === 0
   // LOG-07: lo mismo pero sobre lo que se está editando AHORA (no sobre la oportunidad
   // guardada), para resaltar en vivo lo que falta dentro del popup y que el resaltado se
   // apague apenas se completa, sin esperar a "Guardar cambios".
@@ -334,6 +338,10 @@ export default function CotizarStepPanel({
   // cotizar"). missingKeys sale de missingFields (ya calculado arriba) para no
   // duplicar la lógica de qué está completo.
   const missingKeys = new Set(missingFields.map((f) => f.key))
+  // LOG-09: cargado pero con un valor que la columna no tiene. Se marca distinto de
+  // "falta": el dato está a la vista, el problema es que no lo acepta el catálogo, y sin
+  // decirlo el usuario ve el campo completo y no entiende por qué no puede cotizar.
+  const invalidKeys = new Set(invalidFields.map((f) => f.key))
   const checklistItems = [
     { key: 'ci', label: 'Cédula de identidad', value: opportunity.ci, missing: missingKeys.has('ci') },
     {
@@ -376,20 +384,28 @@ export default function CotizarStepPanel({
         <div className="cotizar-step__checklist">
           <h3 className="cotizar-step__checklist-title">Datos obligatorios para cotizar</h3>
           <div className="cotizar-step__checklist-items">
-            {checklistItems.map((item) => (
-              <div
-                key={item.key}
-                className={
-                  item.missing
-                    ? 'cotizar-step__checklist-item cotizar-step__checklist-item--missing'
-                    : 'cotizar-step__checklist-item cotizar-step__checklist-item--ok'
-                }
-              >
-                {item.missing ? <MdWarningAmber /> : <MdCheckCircle />}
-                <span className="cotizar-step__checklist-label">{item.label}</span>
-                <span className="cotizar-step__checklist-value">{item.value || '—'}</span>
-              </div>
-            ))}
+            {checklistItems.map((item) => {
+              // LOG-09: 3 estados en vez de 2 — completo, falta, o cargado con un valor
+              // que la columna de monday no tiene (se muestra el valor real y se aclara
+              // el problema, en vez de dejarlo pasar como si estuviera bien).
+              const invalido = !item.missing && invalidKeys.has(item.key)
+              return (
+                <div
+                  key={item.key}
+                  className={
+                    item.missing || invalido
+                      ? 'cotizar-step__checklist-item cotizar-step__checklist-item--missing'
+                      : 'cotizar-step__checklist-item cotizar-step__checklist-item--ok'
+                  }
+                >
+                  {item.missing || invalido ? <MdWarningAmber /> : <MdCheckCircle />}
+                  <span className="cotizar-step__checklist-label">{item.label}</span>
+                  <span className="cotizar-step__checklist-value">
+                    {invalido ? `${item.value} (no está en la lista)` : item.value || '—'}
+                  </span>
+                </div>
+              )
+            })}
           </div>
 
           {/* A pedido, estética tipo mockup: pegado al checklist que describe (antes
@@ -521,8 +537,25 @@ export default function CotizarStepPanel({
           duplicaba el de advertencia). */}
       {!editingSection && !polling && !canCotizar && (
         <AttentionBox type="negative">
-          Completá estos campos antes de {hasQuotes ? 'recotizar' : 'cotizar'}:{' '}
-          <strong>{missingFields.map((f) => f.label).join(', ')}</strong>.
+          {missingFields.length > 0 && (
+            <>
+              Completá estos campos antes de {hasQuotes ? 'recotizar' : 'cotizar'}:{' '}
+              <strong>{missingFields.map((f) => f.label).join(', ')}</strong>.{' '}
+            </>
+          )}
+          {/* LOG-09: el campo está cargado, pero con un valor que la columna de monday
+              no tiene — hay que elegir uno de la lista antes de mandar a cotizar, si no
+              el error recién aparece con el robot ya corriendo. */}
+          {invalidFields.length > 0 && (
+            <>
+              Estos campos tienen un valor que no está en la lista de monday y hay que
+              corregirlos:{' '}
+              <strong>
+                {invalidFields.map((f) => `${f.label} ("${opportunity[f.key]}")`).join(', ')}
+              </strong>
+              .
+            </>
+          )}
         </AttentionBox>
       )}
 
@@ -646,7 +679,12 @@ export default function CotizarStepPanel({
           title="Faltan datos requeridos"
           description={`No podés ${hasQuotes ? 'recotizar' : 'cotizar'} porque hay información obligatoria que no ha sido completada.`}
           detailsTitle="Campos pendientes:"
-          detailsList={missingFields.map((f) => f.label)}
+          detailsList={[
+            ...missingFields.map((f) => f.label),
+            // LOG-09: los que están cargados pero con un valor fuera del catálogo se
+            // listan igual acá, aclarando cuál es el valor que no se acepta.
+            ...invalidFields.map((f) => `${f.label}: "${opportunity[f.key]}" no está en la lista`),
+          ]}
           onClose={() => setShowMissingFieldsModal(false)}
           primaryButton={{
             text: 'Completar datos faltantes',
@@ -657,8 +695,12 @@ export default function CotizarStepPanel({
               // faltando algo del vehículo, este mismo popup vuelve a aparecer al
               // tocar "Cotizar" de nuevo). Si lo único que falta es del vehículo, va
               // directo a ese popup.
+              // LOG-09: los valores fuera de catálogo cuentan igual que los vacíos para
+              // decidir qué popup abrir (hoy son todos del vehículo, pero no hay motivo
+              // para que este criterio los ignore).
               const personalKeys = new Set(PERSONAL_FIELD_LAYOUT.map((f) => f.key))
-              startEditing(missingFields.some((f) => personalKeys.has(f.key)) ? 'personales' : 'vehiculo')
+              const aCorregir = [...missingFields, ...invalidFields]
+              startEditing(aCorregir.some((f) => personalKeys.has(f.key)) ? 'personales' : 'vehiculo')
             },
           }}
         />

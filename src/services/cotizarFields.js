@@ -21,6 +21,8 @@
 //    automatización de "Cotizar" lee la conexión, deja el nombre del modelo asentado en
 //    ese texto, y vacía la conexión después (para no acumular conexiones de
 //    board_relation). Ver CotizarStepPanel.jsx#AutodataModeloSelect.
+import { matchOption } from './format'
+
 export const COTIZAR_FIELDS = [
   { key: 'ci', label: 'CI', kind: 'number', columnId: 'numeric_mm51mb0s' },
   { key: 'anio', label: 'Año', kind: 'dropdown', columnId: 'dropdown_mm51mdmq', optionsKey: 'anios' },
@@ -72,5 +74,39 @@ export function getMissingCotizarFields(values) {
   return COTIZAR_FIELDS.filter((f) => {
     const raw = f.kind === 'connected' ? values[f.idKey] ?? values[f.key] : values[f.key]
     return !String(raw ?? '').trim()
+  })
+}
+
+// Las opciones reales de un campo, vengan como array plano (marcas/años/combustibles/
+// tipo) o como {options, colorsByLabel} (los status, ver boardSchema.js).
+function opcionesDe(schema, field) {
+  const raw = schema?.[field.optionsKey]
+  return Array.isArray(raw) ? raw : (raw?.options ?? [])
+}
+
+// LOG-09: no alcanza con que el campo esté cargado — tiene que tener un valor que EXISTA
+// en el catálogo de esa columna. Si no, la cotización se dispara igual y el error recién
+// aparece del otro lado, con el robot ya corriendo (varios minutos después) o, peor, con
+// el dato entrando vacío en el portal.
+//
+// El caso típico: una ficha de Autodata con un Combustible que la columna de la
+// Oportunidad no tiene (hoy, "EREV"). Al elegir ese modelo el valor no matchea y queda
+// vacío, sin ninguna explicación de por qué no se puede avanzar.
+//
+// Solo aplica a las columnas con opciones fijas (dropdown/status): las conectadas ya se
+// eligen de una lista real y no se pueden inventar. La comparación es la misma de la app
+// (matchOption): ignora tildes, mayúsculas y espacios de más.
+export function getInvalidCotizarFields(values, schema) {
+  if (!schema || !values) return []
+  return COTIZAR_FIELDS.filter((f) => {
+    if (f.kind !== 'dropdown' && f.kind !== 'status') return false
+    const opciones = opcionesDe(schema, f)
+    // Sin catálogo cargado (el schema todavía no llegó) no se puede afirmar que un valor
+    // sea inválido — se calla en vez de acusar en falso.
+    if (!opciones.length) return false
+    const valor = String(values[f.key] ?? '').trim()
+    // Vacío no es "incompatible": eso ya lo reporta getMissingCotizarFields.
+    if (!valor) return false
+    return !matchOption(opciones, valor)
   })
 }
