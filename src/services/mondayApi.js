@@ -363,13 +363,26 @@ const SEARCH_AUTODATA_QUERY = `
 // Selecciona el ÍTEM entero (id + name, para la conexión board_relation) aunque el
 // filtro haya sido sobre la columna "Modelo" puntual, no sobre "name" — más
 // combustible/tipo ya resueltos para autocompletar.
+// MON-03: en Autodata, "Sin motor", "Sin tipo" y "Sin datos" no son valores del vehículo
+// — son la forma de decir que el dato no está cargado. No sirven ni para autocompletar el
+// formulario ni para mostrárselos al cliente, así que entran a la app como si el campo
+// viniera vacío. Las etiquetas se quedan en el tablero tal cual, esto es solo de este lado.
+const AUTODATA_SIN_DATO = new Set(['sin motor', 'sin tipo', 'sin datos'])
+const esSinDato = (texto) => AUTODATA_SIN_DATO.has((texto ?? '').trim().toLowerCase())
+const datoRealONull = (texto) => (texto && !esSinDato(texto) ? texto : null)
+
 function mapAutodataItem(item, board) {
   const cv = Object.fromEntries(item.column_values.map((c) => [c.id, c.text]))
+  const combustible = cv[board.combustibleColumnId] || null
+  const tipo = cv[board.tipoColumnId] || null
   return {
     id: item.id,
     name: item.name,
-    combustible: cv[board.combustibleColumnId] || null,
-    tipo: cv[board.tipoColumnId] || null,
+    combustible: datoRealONull(combustible),
+    tipo: datoRealONull(tipo),
+    // Una ficha con los DOS campos en "sin dato" no es un vehículo cotizable (remolques,
+    // casas rodantes): se excluye de la búsqueda por Año+Marca, ver más abajo.
+    sinDatos: esSinDato(combustible) && esSinDato(tipo),
   }
 }
 
@@ -434,10 +447,8 @@ export async function fetchAutodataModelosByAnioMarca(anio, marca) {
   const results = await queryAutodataBoards(buildRules, 'and', 500)
   // A pedido: fichas con Combustible "Sin motor" y Tipo "Sin tipo" no son modelos
   // reales elegibles (remolques, casos sin datos cargados en Autodata) — se excluyen
-  // de la búsqueda de modelo.
-  return results.filter(
-    (r) => !(r.combustible?.toLowerCase() === 'sin motor' && r.tipo?.toLowerCase() === 'sin tipo')
-  )
+  // de la búsqueda de modelo (ver mapAutodataItem#sinDatos).
+  return results.filter((r) => !r.sinDatos)
 }
 
 // Tablero "PANEL": tarifario de recargos por compañía + cantidad de cuotas, textos
