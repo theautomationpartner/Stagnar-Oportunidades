@@ -39,11 +39,18 @@ function buildRecargoLookup(items) {
   return lookup
 }
 
-// { [compania]: { [cobertura]: textoIncluye } } — texto "base" tal cual se cargó en
-// PANEL, sin las partes que arma pricingEngine.js en código (auxilio mecánico +
-// cantidad de servicios de SANCOR, viñeta de REPUESTOS ORIGINALES).
+// Texto "base" tal cual se cargó en PANEL, sin las partes que arma pricingEngine.js en
+// código (auxilio mecánico + cantidad de servicios de SANCOR, viñeta de REPUESTOS
+// ORIGINALES). Devuelve:
+//   porCobertura: { [compania]: { [cobertura]: texto } }
+//   porCompania:  { [compania]: texto }
+// MON-08: una fila con compañía pero SIN cobertura son los beneficios diferenciales de esa
+// aseguradora, que valen para todas sus coberturas (auto de cortesía de SURA, talleres
+// acreditados de PORTO, etc.). Van en una sola fila y no repetidos en cada cobertura, que
+// es lo que obligaría a editarlos en cinco lugares cada vez que cambian.
 function buildIncluyeLookup(items) {
-  const lookup = {}
+  const porCobertura = {}
+  const porCompania = {}
 
   for (const item of items) {
     const cv = item.column_values
@@ -52,13 +59,17 @@ function buildIncluyeLookup(items) {
     const compania = textOf(cv, 'dropdown_mm52feqr')
     const cobertura = textOf(cv, 'dropdown_mm5frxag')
     const texto = textOf(cv, 'text_mm5f1wnh')
-    if (!compania || !cobertura) continue
+    if (!compania) continue
 
-    if (!lookup[compania]) lookup[compania] = {}
-    lookup[compania][cobertura] = texto
+    if (!cobertura) {
+      porCompania[compania] = texto
+      continue
+    }
+    if (!porCobertura[compania]) porCobertura[compania] = {}
+    porCobertura[compania][cobertura] = texto
   }
 
-  return lookup
+  return { porCobertura, porCompania }
 }
 
 // Valores de configuración sueltos (Grupo = "Configuracion"): años mínimos de las

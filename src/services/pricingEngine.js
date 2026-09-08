@@ -224,13 +224,16 @@ function buildIncluyeBullets(eff, panelContext) {
     preciosOpcionales,
   } = panelContext
 
-  const baseText = incluyeLookup?.[eff.compania]?.[eff.cobertura]
+  const baseText = incluyeLookup?.porCobertura?.[eff.compania]?.[eff.cobertura]
   if (!baseText) return []
 
-  const bullets = baseText
-    .split('●')
-    .map((s) => s.trim())
-    .filter(Boolean)
+  const enViñetas = (texto) =>
+    (texto ?? '')
+      .split('●')
+      .map((s) => s.trim())
+      .filter(Boolean)
+
+  const bullets = enViñetas(baseText)
 
   if (eff.compania === 'SANCOR') {
     bullets.unshift(sancorAuxilioMecanico(eff))
@@ -254,6 +257,10 @@ function buildIncluyeBullets(eff, panelContext) {
       bullets.push('REPUESTOS ORIGINALES')
     }
   }
+
+  // MON-08: beneficios diferenciales de la aseguradora — valen para todas sus coberturas,
+  // así que viven en una sola fila de PANEL (compañía sin cobertura) y se suman acá.
+  bullets.push(...enViñetas(incluyeLookup?.porCompania?.[eff.compania]))
 
   bullets.push(...opcionalesBullets(eff, preciosOpcionales))
 

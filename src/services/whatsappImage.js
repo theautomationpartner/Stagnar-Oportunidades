@@ -602,7 +602,12 @@ function drawContent(ctx, opportunity, raw, quote, canvasHeight, logos, layout =
 // contenido es más corto, la tarjeta de beneficios se estira para llenar; si es más
 // largo, primero se compacta la letra de los beneficios (15 → 12px) y, solo si ni así
 // entra, la imagen crece lo justo (caso raro).
-const FIXED_HEIGHT = 1240
+// Alto fijo para que todas las cotizaciones de un mismo envío lleguen del mismo tamaño
+// (si el contenido no entra, el lienzo se agranda y se pierde esa uniformidad).
+// MON-08: pasó de 1240 a 1400 al sumar los beneficios diferenciales de cada aseguradora —
+// con ellos, PORTO (7 viñetas propias) llegaba a 1400 y BSE a 1240, y las imágenes salían
+// de alto distinto. Si se agregan más beneficios, este número hay que volver a subirlo.
+const FIXED_HEIGHT = 1400
 
 // Dos pasadas: la primera sobre un canvas descartable para medir hasta dónde llega el
 // contenido (el nombre del vehículo y los beneficios varían de alto), la segunda sobre
