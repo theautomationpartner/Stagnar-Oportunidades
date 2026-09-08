@@ -616,11 +616,18 @@ export async function setConnectedColumnValue(itemId, columnId, linkedItemIds) {
 // change_column_value con un JSON {"checked":"true"|"false"} contra el tablero de
 // subitems (no el de oportunidades).
 export async function setSubitemCheckboxValue(subitemId, columnId, checked) {
+  return setSubitemColumnValue(subitemId, columnId, { checked: checked ? 'true' : 'false' })
+}
+
+// Igual que la de arriba pero para cualquier columna del subitem que necesite un JSON
+// propio — la usa "Auto extra" (estado con la duración elegida: { label: "15 días" }, o
+// {} para dejarla vacía). Ver OpportunityDetail#handleAutoExtraChange.
+export async function setSubitemColumnValue(subitemId, columnId, value) {
   const data = await callMondayApi(CHANGE_COLUMN_VALUE_MUTATION, {
     boardId: SUBITEMS_BOARD_ID,
     itemId: subitemId,
     columnId,
-    value: JSON.stringify({ checked: checked ? 'true' : 'false' }),
+    value: JSON.stringify(value),
   })
   return data.change_column_value
 }

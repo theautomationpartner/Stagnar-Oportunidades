@@ -263,3 +263,15 @@
   margin-top: 16px;
 }
 
+
+/* LOG-07: campo obligatorio todavía vacío dentro del popup de edición — mismo resaltado
+   amarillo que usa el alta para lo que la lectura automática no pudo completar (ver
+   .crear-op__field--missing en CrearOportunidadForm.css), en vez de un "Sin definir"
+   mudo que se veía igual que un campo opcional. */
+.cotizar-step__field--missing {
+  padding: 8px;
+  margin: -8px;
+  background: #fffbea;
+  border: 1px solid #fdd776;
+  border-radius: 8px;
+}

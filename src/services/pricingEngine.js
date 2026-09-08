@@ -1,4 +1,5 @@
-import { formatMoney } from './format'
+import { formatMoney, formatUsd } from './format'
+import { coberturaGroupOf } from './coberturaGroups'
 
 // Reimplementacion en JS de las formulas reales del tablero "Subelementos de Oportunidades"
 // (columnas formula_... del board 18420863061). No leemos el texto ya calculado por monday
@@ -20,10 +21,6 @@ const BSE_TRIPLE_COBERTURAS = ['TRIPLE - anual', 'TRIPLE - 3X2']
 const SURA_TOTAL_FAMILY = ['TOTAL PLUS', 'TOTAL c/ Mov', 'TOTAL', 'TRIPLE']
 const SANCOR_STANDARD_FAMILY = ['TOTAL 600', 'TOTAL 800', 'PARCIAL', 'TOTAL 1500', 'TOTAL 2500']
 const PORTO_FAMILY = ['GLOBAL', 'GLOBAL ded Alto', 'TRIPLE']
-// GLOBAL y GLOBAL ded Alto comparten texto INCLUYE (solo cambia deducible/precio, no el
-// texto) y son las únicas que ofrecen los 3 opcionales (Granizo/Cristales/Coche
-// Cortesía) — TRIPLE (RC+Hurto+Incendio, nivel más bajo de PORTO) no los ofrece.
-const PORTO_GLOBAL_FAMILY = ['GLOBAL', 'GLOBAL ded Alto']
 
 // Promo "N cuotas SIN RECARGO" por débito automático — verificado contra el Excel de
 // referencia (hoja WHATS): BSE/SURA ofrecen 10, SANCOR 2, PORTO 5. Es el total (sin
@@ -83,25 +80,121 @@ function portoAuxilioMecanico(eff, serviciosIlimitadosPortoMinYear) {
   }`
 }
 
-// Opcionales de PORTO - TOTAL (Granizo/Cristales/Coche Cortesía): en el Excel son 3
-// celdas SI/NO que la persona que cotiza carga a mano por cotización (WHATS!AV88/AV90/
-// AV92) — acá son los checkboxes reales del subitem (raw.granizo/cristales/cocheCortesia,
-// ver quoteMapper.js), porque es un dato real de la cotización, no un ajuste de prueba
-// (a diferencia de Bonificación/Descuento en QuoteCard, esto se persiste en monday apenas
-// se tilda). Si está tildado, la viñeta dice "INCLUYE ..."; si no, "OPCIONAL: ... + $N"
-// con el precio que carga el precioOpcionalesPorto (PANEL, Grupo=Configuracion).
-const PORTO_OPCIONALES = [
-  { field: 'granizo', precioKey: 'granizo', label: 'GRANIZO SIN DEDUCIBLE' },
-  { field: 'cocheCortesia', precioKey: 'cocheCortesia', label: 'COCHE CORTESÍA (15 DÍAS)' },
-  { field: 'cristales', precioKey: 'cristales', label: 'VIDRIOS HASTA U$S 200 SIN DEDUCIBLE' },
-]
+// Opcionales por compañía. Cada uno es una columna real del subitem (ver quoteMapper.js),
+// porque es un dato de la cotización que se persiste en monday apenas se tilda — a
+// diferencia de Bonificación/Descuento en QuoteCard, que son ajustes de prueba.
+// `precioKey` es el NOMBRE de la fila en PANEL (Grupo=Configuracion) de esa compañía, ver
+// recargoPanel.js#buildConfiguracion.
+//
+// LOG-14/LOG-15: hasta ahora esto solo cambiaba el texto de la viñeta y el precio nunca
+// se movía. Ahora los opcionales SUMAN al total (ver computeAdicionales), salvo el AP de
+// SURA, que ya viene adentro del contado que trae el portal: ese arranca tildado y, al
+// destildarlo, se RESTA.
+const OPCIONALES = {
+  PORTO: [
+    { field: 'granizo', precioKey: 'Granizo', label: 'GRANIZO SIN DEDUCIBLE' },
+    { field: 'cristales', precioKey: 'Cristales', label: 'VIDRIOS HASTA U$S 200 SIN DEDUCIBLE' },
+    { field: 'usoRural', precioKey: 'Uso rural', label: 'USO RURAL' },
+  ],
+  SURA: [
+    { field: 'granizo', precioKey: 'Granizo', label: 'GRANIZO SIN DEDUCIBLE' },
+    { field: 'suraTeLleva', precioKey: 'SURA te lleva', label: 'SURA TE LLEVA' },
+    // Incluido en el precio del portal: destildarlo descuenta.
+    { field: 'ap', precioKey: 'AP', label: 'ACCIDENTES PERSONALES', incluidoPorDefecto: true },
+  ],
+}
 
-function portoOpcionalesBullets(eff, preciosOpcionalesPorto) {
-  return PORTO_OPCIONALES.map(({ field, precioKey, label }) => {
-    if (eff[field]) return `INCLUYE ${label}`
-    const precio = preciosOpcionalesPorto?.[precioKey]
-    return `OPCIONAL: ${label} + ${formatMoney(precio)}`
-  })
+// "Auto extra" no es un tilde sino una duración elegida (7/15/30 días en PORTO, solo 15
+// en SURA): cada opción tiene su propia fila de precio en PANEL.
+const AUTO_EXTRA_LABEL = 'AUTO EXTRA'
+const autoExtraPrecioKey = (dias) => `Auto extra ${dias}`
+
+function preciosDe(eff, preciosOpcionales) {
+  return preciosOpcionales?.[eff.compania] ?? {}
+}
+
+// LOG-15: qué coberturas ofrecen opcionales. "Todo riesgo" y "parcial" no son nombres de
+// cobertura sino las 2 familias que la app ya usa para las solapas del paso Comparar —
+// GLOBAL es todo riesgo y TRIPLE es parcial (ver coberturaGroups.js).
+//  - Los opcionales que se tildan van solo en TODO RIESGO.
+//  - "Auto extra" es la excepción: va en todo riesgo Y en parcial (ver autoExtraDisponible).
+//  - SURA es más restrictivo por encima de eso: solo TOTAL (y TOTAL PLUS, que ya los trae
+//    todos incluidos), más Granizo en 4 EN 1.
+function opcionalesDisponibles(eff) {
+  const delaCompania = OPCIONALES[eff.compania]
+  if (!delaCompania) return []
+  if (eff.compania === 'SURA') {
+    if (eff.cobertura === 'TOTAL' || eff.cobertura === 'TOTAL PLUS') return delaCompania
+    if (eff.cobertura === '4 EN 1') return delaCompania.filter((o) => o.field === 'granizo')
+    return []
+  }
+  return coberturaGroupOf(eff.cobertura) === 'GLOBAL' ? delaCompania : []
+}
+
+// Auto extra: única opción que también se ofrece en cobertura parcial (familia TRIPLE),
+// no solo en todo riesgo. En SURA sigue mandando la regla propia de la compañía: solo
+// TOTAL (TOTAL PLUS ya lo trae incluido, ver todosIncluidos).
+function autoExtraDisponible(eff) {
+  if (todosIncluidos(eff) || !OPCIONALES[eff.compania]) return false
+  if (eff.compania === 'SURA') return eff.cobertura === 'TOTAL'
+  const familia = coberturaGroupOf(eff.cobertura)
+  return familia === 'GLOBAL' || familia === 'TRIPLE'
+}
+
+// SURA TOTAL PLUS ya viene con todos los opcionales adentro: se muestran como incluidos y
+// no suman ni restan nada.
+const todosIncluidos = (eff) => eff.compania === 'SURA' && eff.cobertura === 'TOTAL PLUS'
+
+// Qué opcionales puede tocar el usuario en esta cotización — lo usa QuoteCard para no
+// mostrar controles que no harían nada (ej. PORTO TRIPLE no ofrece ninguno). Es la misma
+// regla que decide el precio, para que UI y cálculo no se contradigan.
+export function opcionalesEditables(raw) {
+  if (todosIncluidos(raw)) return { campos: [], autoExtra: false }
+  return { campos: opcionalesDisponibles(raw).map((o) => o.field), autoExtra: autoExtraDisponible(raw) }
+}
+
+// Lo que hay que sumarle (o restarle) al precio base por los opcionales de esta
+// cotización. Los que vienen incluidos por defecto (AP de SURA) restan cuando se
+// destildan; el resto suma cuando se tilda.
+function computeAdicionales(eff, preciosOpcionales) {
+  if (todosIncluidos(eff)) return 0
+  const precios = preciosDe(eff, preciosOpcionales)
+  let total = 0
+  for (const opc of opcionalesDisponibles(eff)) {
+    const precio = num(precios[opc.precioKey])
+    if (!precio) continue
+    if (opc.incluidoPorDefecto) {
+      if (eff[opc.field] === false) total -= precio
+    } else if (eff[opc.field]) {
+      total += precio
+    }
+  }
+  if (eff.autoExtra && autoExtraDisponible(eff)) total += num(precios[autoExtraPrecioKey(eff.autoExtra)])
+  return total
+}
+
+function opcionalesBullets(eff, preciosOpcionales) {
+  const disponibles = opcionalesDisponibles(eff)
+  if (!disponibles.length) return []
+  const precios = preciosDe(eff, preciosOpcionales)
+  const bullets = []
+  for (const opc of disponibles) {
+    const incluido = todosIncluidos(eff) || (opc.incluidoPorDefecto ? eff[opc.field] !== false : Boolean(eff[opc.field]))
+    if (incluido) bullets.push(`INCLUYE ${opc.label}`)
+    else bullets.push(`OPCIONAL: ${opc.label} + ${formatMoney(precios[opc.precioKey])}`)
+  }
+  if (eff.autoExtra) {
+    bullets.push(`INCLUYE ${AUTO_EXTRA_LABEL} (${eff.autoExtra.toUpperCase()})`)
+  } else if (autoExtraDisponible(eff)) {
+    const preciosAutoExtra = Object.keys(precios)
+      .filter((k) => k.startsWith('Auto extra '))
+      .map((k) => num(precios[k]))
+      .filter(Boolean)
+    if (preciosAutoExtra.length) {
+      bullets.push(`OPCIONAL: ${AUTO_EXTRA_LABEL} desde ${formatMoney(Math.min(...preciosAutoExtra))}`)
+    }
+  }
+  return bullets
 }
 
 // El texto "base" (compañía+cobertura) sale de PANEL (services/recargoPanel.js#fetchPanelData,
@@ -120,7 +213,7 @@ function buildIncluyeBullets(eff, panelContext) {
     repuestosOriginalesMinYear,
     reposicion0kmMinYear,
     serviciosIlimitadosPortoMinYear,
-    preciosOpcionalesPorto,
+    preciosOpcionales,
   } = panelContext
 
   const baseText = incluyeLookup?.[eff.compania]?.[eff.cobertura]
@@ -154,9 +247,7 @@ function buildIncluyeBullets(eff, panelContext) {
     }
   }
 
-  if (eff.compania === 'PORTO' && PORTO_GLOBAL_FAMILY.includes(eff.cobertura)) {
-    bullets.push(...portoOpcionalesBullets(eff, preciosOpcionalesPorto))
-  }
+  bullets.push(...opcionalesBullets(eff, preciosOpcionales))
 
   return bullets
 }
@@ -219,7 +310,11 @@ function computeContado(eff) {
 
   if (eff.compania === 'SANCOR') {
     if (eff.cobertura === 'PARCIAL PLUS') return round(contado)
-    if (SANCOR_STANDARD_FAMILY.includes(eff.cobertura)) return round(contado * (1 - bonif))
+    // LOG-15: SANCOR no admite descuento con el titular fuera del rango de edad — la
+    // bonificación cargada se ignora (ver sancorSinDescuento y el aviso de computeWarning).
+    if (SANCOR_STANDARD_FAMILY.includes(eff.cobertura)) {
+      return round(contado * (1 - (sancorSinDescuento(eff) ? 0 : bonif)))
+    }
     return null
   }
 
@@ -238,40 +333,53 @@ function computeContado(eff) {
 // desplegar nada); "full" es la versión con el detalle completo (compañía, requisito
 // puntual), que recién se muestra al desplegar "Ver más" — y la que se manda en la
 // imagen de WhatsApp (ver whatsappImage.js), donde sí conviene el detalle completo.
+// LOG-15: SANCOR no admite descuento si el titular es menor de 25 o mayor de 70 — con la
+// edad fuera de ese rango, la bonificación y el descuento manual se ignoran en el
+// cálculo (ver computeContado y computeQuote).
+function sancorSinDescuento(eff) {
+  if (eff.compania !== 'SANCOR' || !SANCOR_STANDARD_FAMILY.includes(eff.cobertura)) return false
+  const edad = num(eff.edad)
+  return edad > 0 && (edad < 25 || edad > 70)
+}
+
 function computeWarning(eff) {
-  if (eff.compania === 'SANCOR' && SANCOR_STANDARD_FAMILY.includes(eff.cobertura)) {
+  if (sancorSinDescuento(eff)) {
     const edad = num(eff.edad)
-    if (edad > 0 && edad < 25) {
-      return {
-        short: 'Edad del titular no cumple el mínimo requerido',
-        full: 'Edad del titular no cumple el mínimo requerido por SANCOR (25 años). Cotización orientativa.',
-      }
+    // El aviso de la edad mínima ya existía; ahora también cubre el tope de 70 y aclara
+    // que por eso no se aplica ningún descuento.
+    const motivo = edad < 25 ? 'no cumple el mínimo requerido por SANCOR (25 años)' : 'supera el máximo de SANCOR (70 años)'
+    return {
+      short: edad < 25 ? 'Edad del titular no cumple el mínimo requerido' : 'Edad del titular supera el máximo permitido',
+      full: `Edad del titular ${motivo}: no se aplica bonificación ni descuento. Cotización orientativa.`,
     }
   }
   return null
 }
 
+// LOG-10: los montos en pesos salían como número pelado ("18000") — ahora todos pasan por
+// formatMoney ("$ 18.000") y los de SANCOR en dólares por formatUsd, para que no queden
+// tres formatos distintos de deducible según la compañía.
 function deducibleDisplay(eff) {
   const base = num(eff.deducibleBase)
   if (eff.compania === 'BSE') {
     if (['GLOBAL - anual', 'GLOBAL - 3x2'].includes(eff.cobertura) && eff.deducibleBSE) {
-      return `${Math.ceil(base * num(eff.deducibleBSE))} +IVA`
+      return `${formatMoney(Math.ceil(base * num(eff.deducibleBSE)))} sin IVA`
     }
-    if (BSE_TRIPLE_COBERTURAS.includes(eff.cobertura)) return `${Math.ceil(base)} +IVA`
+    if (BSE_TRIPLE_COBERTURAS.includes(eff.cobertura)) return `${formatMoney(Math.ceil(base))} sin IVA`
     return '—'
   }
   if (eff.compania === 'SURA') {
     if (SURA_TOTAL_FAMILY.includes(eff.cobertura) && eff.deducibleSURA) {
-      return `${Math.ceil(base * num(eff.deducibleSURA))}`
+      return formatMoney(Math.ceil(base * num(eff.deducibleSURA)))
     }
-    if (eff.cobertura === '4 EN 1') return `${Math.ceil(base)}`
+    if (eff.cobertura === '4 EN 1') return formatMoney(Math.ceil(base))
     return '—'
   }
   if (eff.compania === 'SANCOR') {
-    return eff.deducibleSancorUsd ? `USD ${num(eff.deducibleSancorUsd)}` : base ? `${base}` : '—'
+    return eff.deducibleSancorUsd ? formatUsd(num(eff.deducibleSancorUsd)) : base ? formatMoney(base) : '—'
   }
   if (eff.compania === 'PORTO') {
-    return base ? `${base}` : '—'
+    return base ? formatMoney(base) : '—'
   }
   return '—'
 }
@@ -291,8 +399,13 @@ export function computeQuote(raw, overrides = {}, panelContext = {}) {
     return { blocked: true, blockedReason: 'No hay fórmula definida para esta combinación de compañía y cobertura' }
   }
 
-  const descuento = num(overrides.descuento)
-  const total = round(contadoResult * (1 - descuento))
+  // LOG-14/LOG-15: los opcionales elegidos se suman DESPUÉS de los descuentos — ni la
+  // bonificación (que ya viene aplicada adentro de computeContado) ni el descuento manual
+  // los tocan. El AP de SURA es al revés: ya viene incluido en el contado del portal, así
+  // que solo mueve el precio cuando se destilda, restando.
+  const descuento = sancorSinDescuento(eff) ? 0 : num(overrides.descuento)
+  const adicionales = computeAdicionales(eff, panelContext.preciosOpcionales)
+  const total = round(contadoResult * (1 - descuento) + adicionales)
 
   const cuotas = {}
   for (const n of CUOTA_COUNTS) {

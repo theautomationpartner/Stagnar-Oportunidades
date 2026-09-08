@@ -20,6 +20,7 @@ import {
   setDropdownColumnValue,
   setConnectedColumnValue,
   setSubitemCheckboxValue,
+  setSubitemColumnValue,
   uploadFileToColumn,
   clearFileColumn,
   fetchLatestUpdate,
@@ -47,17 +48,30 @@ const LIBRETA_CONDUCIR_COLUMN_ID = 'file_mm51jy06'
 const CEDULA_COLUMN_ID = 'file_mm5pc008'
 const POLIZA_COLUMN_ID = 'file_mm5bzdd4'
 const PROPUESTA_ELEGIDA_COLUMN_ID = 'boolean_mm5bn41n'
-// Opcionales de PORTO (Granizo/Cristales/Coche Cortesía) — ver handleToggleOpcional abajo
-// y pricingEngine.js#buildIncluyeBullets.
-const OPCIONAL_PORTO_COLUMN_IDS = {
+// Columnas de los opcionales que se tildan por cotización (ver pricingEngine.js#OPCIONALES
+// y handleToggleOpcional / handleAutoExtraChange más abajo).
+// "Auto extra" no está acá porque no es un tilde sino una duración elegida — se escribe
+// como estado, ver AUTO_EXTRA_COLUMN_ID.
+const OPCIONAL_COLUMN_IDS = {
   granizo: 'boolean_mm5fsr46',
   cristales: 'boolean_mm5fqazp',
-  cocheCortesia: 'boolean_mm5fxd9x',
+  usoRural: 'boolean_mm6z3j9j',
+  suraTeLleva: 'boolean_mm6zhfhd',
+  ap: 'boolean_mm6zzwq5',
 }
+const AUTO_EXTRA_COLUMN_ID = 'color_mm6zpx3j'
 const POLL_INTERVAL_MS = 4000
 // Auditoría: cantidad de ticks seguidos fallidos tras la cual el polling se corta y
 // avisa (antes giraba para siempre si la API de monday no respondía).
 const POLL_MAX_FAILS = 3
+// LOG-05: si el robot que cotiza muere a mitad de camino, "Estado Cotización" se queda
+// pegado en "Cotizando" para siempre del lado de monday — sin este corte, el polling de
+// abajo (y la pantalla) giraban sin parar, incluso reentrando después de haber
+// abandonado la pestaña. No hay forma de saber desde acá si el proceso realmente sigue
+// vivo (para eso el robot mismo tendría que respetar un estado de cancelación, ver
+// MON-10) — este corte es solo la red de seguridad del lado del cliente: a los 5
+// minutos sin resolverse, se da por muerto y se pasa a "Error" con "Reintentar".
+const POLL_COTIZANDO_TIMEOUT_MS = 5 * 60 * 1000
 // Prefijo que cada automatización debe agregar al principio del texto del Update que
 // postea sobre el ítem cuando falla (configurar así del lado del robot de cotización y
 // del escenario de Make.com de envío por WhatsApp) — ver fetchLatestUpdate en mondayApi.js.
@@ -120,6 +134,16 @@ export default function OpportunityDetail({
   // tick del polling de abajo (antes se calculaba mid-poll y se descartaba, solo se
   // usaba una vez llegado al estado terminal).
   const [cotizarProgress, setCotizarProgress] = useState({})
+  // LOG-05: desde cuándo (Date.now()) este navegador viene polleando "Cotizando" sin
+  // corte — se pisa cada vez que arranca un polling de cotización nuevo (fresco o
+  // reanudado al reentrar, ver handleMarcarParaCotizar y el mount effect). No mide
+  // desde que el ROBOT arrancó (esa hora no la tenemos), así que si ya venía colgado de
+  // antes el corte tarda un poco más en llegar — igual corta, no queda girando para
+  // siempre.
+  const cotizarPollStartRef = useRef(null)
+  // Cantidad de subitems nuevos ya vistos en esta cotización — sirve para detectar
+  // progreso entre ticks y reiniciar el reloj de arriba (ver el tick del polling).
+  const cotizarProgresoVistoRef = useRef(0)
   // A pedido: en un RECOTIZAR, el primer paso de la automatización es BORRAR todas las
   // cotizaciones anteriores y recién después crear las nuevas desde cero — sin esto, los
   // subitems viejos (todavía sin borrar en el momento de un tick) se contarían como si
@@ -216,6 +240,8 @@ export default function OpportunityDetail({
         // Si se dejó la pantalla a mitad de una cotización automática en curso, retomamos
         // el polling en vivo al volver a entrar en vez de mostrar un estado congelado.
         if (raws.length === 0 && estadoCotizacion === 'Cotizando') {
+          cotizarPollStartRef.current = Date.now()
+          cotizarProgresoVistoRef.current = 0
           setPolling(true)
         }
         // Mismo criterio para un envío por WhatsApp que quedó "Enviando" a mitad de camino.
@@ -343,6 +369,14 @@ export default function OpportunityDetail({
         }
         setCotizarProgress(progressByCompania)
 
+        // LOG-05: el corte por tiempo mide inactividad, no duración total — mientras el
+        // robot siga creando subitems se reinicia el reloj, así una cotización lenta pero
+        // viva nunca se da por muerta.
+        if (newRaws.length > cotizarProgresoVistoRef.current) {
+          cotizarProgresoVistoRef.current = newRaws.length
+          if (cotizarPollStartRef.current) cotizarPollStartRef.current = Date.now()
+        }
+
         if (estadoCotizacion === 'Cotizado (Subitems)' && estadoOportunidad === 'Cotizacion Emitida') {
           setRawQuotes(raws)
           setSelectedIds(new Set(raws.filter((r) => r.incluirPropuesta).map((r) => r.id)))
@@ -354,6 +388,32 @@ export default function OpportunityDetail({
             'La cotización automática terminó en estado "Error". Revisá la oportunidad en monday e intentá nuevamente.'
           )
           setCotizarErrorDetail(await loadErrorUpdate(ERROR_UPDATE_TAG_COTIZAR))
+        } else if (
+          estadoCotizacion === 'Cotizando' &&
+          cotizarPollStartRef.current &&
+          Date.now() - cotizarPollStartRef.current > POLL_COTIZANDO_TIMEOUT_MS
+        ) {
+          // LOG-05: sigue en "Cotizando" después de POLL_COTIZANDO_TIMEOUT_MS — se da por
+          // muerto del lado del cliente (ver el comentario de la constante) y se pasa a
+          // "Error" con la misma UI que un error real del robot, en vez de seguir
+          // girando para siempre.
+          cotizarPollStartRef.current = null
+          setPolling(false)
+          setMarkError(
+            'La cotización no respondió a tiempo — es posible que el proceso se haya interrumpido. Podés reintentar.'
+          )
+          try {
+            await setSimpleColumnValue(opportunityId, ESTADO_COTIZACION_COLUMN_ID, 'Error')
+            setItem((prev) => ({
+              ...prev,
+              column_values: prev.column_values.map((cv) =>
+                cv.id === ESTADO_COTIZACION_COLUMN_ID ? { ...cv, text: 'Error' } : cv
+              ),
+            }))
+          } catch {
+            // Si ni este chequeo se pudo escribir, igual el polling ya se cortó de este
+            // lado — el próximo tick no lo va a reintentar.
+          }
         }
       }
 
@@ -432,7 +492,14 @@ export default function OpportunityDetail({
   const handleRetryPolling = () => {
     const flags = stalledFlagsRef.current ?? {}
     setPollStalled(false)
-    if (flags.polling) setPolling(true)
+    if (flags.polling) {
+      // El reloj del corte por tiempo (LOG-05) arranca de nuevo acá: si se reusara el de
+      // antes del corte por red, el timeout podría saltar en el primer tick del
+      // reintento y mandar la oportunidad a "Error" sin haberle dado tiempo.
+      cotizarPollStartRef.current = Date.now()
+      cotizarProgresoVistoRef.current = 0
+      setPolling(true)
+    }
     if (flags.sendPolling) setSendPolling(true)
     if (flags.polizaPolling) setPolizaPolling(true)
     if (flags.lecturaPolling) setLecturaPolling(true)
@@ -481,7 +548,7 @@ export default function OpportunityDetail({
       repuestosOriginalesMinYear: schema?.repuestosOriginalesMinYear,
       reposicion0kmMinYear: schema?.reposicion0kmMinYear,
       serviciosIlimitadosPortoMinYear: schema?.serviciosIlimitadosPortoMinYear,
-      preciosOpcionalesPorto: schema?.preciosOpcionalesPorto ?? {},
+      preciosOpcionales: schema?.preciosOpcionales ?? {},
     }
     const withQuotes = rawQuotes.map((raw) => {
       const effectiveRaw = { ...raw, uso: opportunity?.uso ?? '', anioVehiculo: opportunity?.anio ?? '' }
@@ -507,11 +574,55 @@ export default function OpportunityDetail({
   // sin importar la compañía (ver coberturaGroups.js — las 2 familias ya cubren todas
   // las coberturas reales, no dependen de qué compañía sea).
   const activeCoberturaTab = COBERTURA_TABS[coberturaTabIndex]?.key ?? 'general'
+  // Tarjetas con el panel de "Parámetros" abierto y, mientras haya alguna, la foto del
+  // orden en el que estaban al abrir el primero (ver visibleQuoteEntries).
+  const [tarjetasEditando, setTarjetasEditando] = useState(() => new Set())
+  const [ordenCongelado, setOrdenCongelado] = useState(null)
+  const ordenActualRef = useRef([])
+  const handlePanelChange = (rawId, panel) => {
+    setTarjetasEditando((prev) => {
+      const next = new Set(prev)
+      if (panel === 'params') next.add(rawId)
+      else next.delete(rawId)
+      return next
+    })
+  }
   const visibleQuoteEntries = useMemo(() => {
     const flat = groups.flatMap((g) => g.entries.map((e) => ({ ...e, compania: g.compania })))
-    if (activeCoberturaTab === 'general') return flat
-    return flat.filter((e) => coberturaGroupOf(e.raw.cobertura) === activeCoberturaTab)
-  }, [groups, activeCoberturaTab])
+    const deLaSolapa =
+      activeCoberturaTab === 'general'
+        ? flat
+        : flat.filter((e) => coberturaGroupOf(e.raw.cobertura) === activeCoberturaTab)
+    // LOG-12: antes salían en el orden en que la automatización creó los subitems (que no
+    // significa nada para quien compara). Ahora, de la más barata a la más cara dentro de
+    // la solapa. Las que no se pueden elegir (sin fórmula o COSTO TOTAL en 0, ver
+    // isQuoteSelectable) van al final: si no, un total 0 encabezaría la lista.
+    const total = (e) => Number(e.quote.total) || 0
+    const ordenadas = [...deLaSolapa].sort((a, b) => {
+      const aSel = isQuoteSelectable(a.quote)
+      const bSel = isQuoteSelectable(b.quote)
+      if (aSel !== bSel) return aSel ? -1 : 1
+      return total(a) - total(b)
+    })
+    // A pedido: con un panel de parámetros abierto el orden queda congelado. Los
+    // opcionales cambian el precio en vivo, así que sin esto la tarjeta que estás
+    // editando se te escapa de lugar en medio de la edición. Al cerrar el panel se
+    // reordena. Una tarjeta que no estaba en la foto congelada (dato nuevo) va al final.
+    if (!ordenCongelado) return ordenadas
+    const posicion = new Map(ordenCongelado.map((id, i) => [id, i]))
+    return ordenadas.sort(
+      (a, b) => (posicion.get(a.raw.id) ?? Number.MAX_SAFE_INTEGER) - (posicion.get(b.raw.id) ?? Number.MAX_SAFE_INTEGER)
+    )
+  }, [groups, activeCoberturaTab, ordenCongelado])
+
+  useEffect(() => {
+    ordenActualRef.current = visibleQuoteEntries.map((e) => e.raw.id)
+  }, [visibleQuoteEntries])
+
+  useEffect(() => {
+    if (tarjetasEditando.size > 0) setOrdenCongelado((prev) => prev ?? ordenActualRef.current)
+    else setOrdenCongelado(null)
+  }, [tarjetasEditando])
 
   // A pedido: solo cuentan (y se envían) las seleccionadas que además son
   // seleccionables (COSTO TOTAL > 0 y con fórmula) — una marcada en monday con total 0
@@ -558,9 +669,23 @@ export default function OpportunityDetail({
     // desincronizado en silencio (promesa rechazada sin capturar).
     setRawQuotes((prev) => prev.map((r) => (r.id === rawId ? { ...r, [field]: checked } : r)))
     try {
-      await setSubitemCheckboxValue(rawId, OPCIONAL_PORTO_COLUMN_IDS[field], checked)
+      await setSubitemCheckboxValue(rawId, OPCIONAL_COLUMN_IDS[field], checked)
     } catch (err) {
       setRawQuotes((prev) => prev.map((r) => (r.id === rawId ? { ...r, [field]: !checked } : r)))
+      setElegidaError(err.message)
+    }
+  }
+
+  // "Auto extra" es la única opción con duración (7/15/30 días) en vez de un tilde: se
+  // guarda como estado en el subitem. `dias` vacío = sin auto extra.
+  const handleAutoExtraChange = async (rawId, dias) => {
+    onOpportunityAction?.()
+    const anterior = rawQuotes.find((r) => r.id === rawId)?.autoExtra ?? ''
+    setRawQuotes((prev) => prev.map((r) => (r.id === rawId ? { ...r, autoExtra: dias } : r)))
+    try {
+      await setSubitemColumnValue(rawId, AUTO_EXTRA_COLUMN_ID, dias ? { label: dias } : {})
+    } catch (err) {
+      setRawQuotes((prev) => prev.map((r) => (r.id === rawId ? { ...r, autoExtra: anterior } : r)))
       setElegidaError(err.message)
     }
   }
@@ -581,6 +706,8 @@ export default function OpportunityDetail({
       oldSubitemIdsRef.current = new Set(rawQuotes.map((r) => r.id))
       setCotizarProgress({})
       setCotizandoModalDismissed(false)
+      cotizarPollStartRef.current = Date.now()
+      cotizarProgresoVistoRef.current = 0
       setPolling(true)
     } catch (err) {
       setMarkError(err.message)
@@ -827,6 +954,12 @@ export default function OpportunityDetail({
 
   const handleSaveCotizarFields = async (formValues) => {
     onOpportunityAction?.()
+    // LOG-04: si la última cotización terminó en "Error", corregir un dato acá (ej. el
+    // Modelo) dejaba el aviso rojo pegado en pantalla — el error real ya no aplica al
+    // intento siguiente, así que se descarta apenas se guarda una corrección, en vez de
+    // esperar a un nuevo intento de Cotizar para que se pise solo.
+    setMarkError(null)
+    setCotizarErrorDetail(null)
     for (const field of COTIZAR_FIELDS) {
       if (field.kind === 'connected' || field.kind === 'autodata') continue
       const newValue = formValues[field.key] ?? ''
@@ -1206,6 +1339,8 @@ export default function OpportunityDetail({
                         onApplyOverrides={(values) => handleApplyQuoteOverrides(raw.id, values)}
                         onResetOverrides={() => handleResetQuoteOverrides(raw.id)}
                         onToggleOpcional={(field, checked) => handleToggleOpcional(raw.id, field, checked)}
+                        onAutoExtraChange={(dias) => handleAutoExtraChange(raw.id, dias)}
+                        onPanelChange={(panel) => handlePanelChange(raw.id, panel)}
                         rcOptions={rcOptions}
                       />
                     ))}

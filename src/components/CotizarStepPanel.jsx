@@ -3,7 +3,7 @@ import { MdAutorenew, MdArrowForward, MdCheckCircle, MdWarningAmber } from 'reac
 import { Button, Dropdown, AttentionBox, TextField, NumberField, Modal, ModalContent, ModalFooter } from '@vibe/core'
 import { COTIZAR_FIELDS, getMissingCotizarFields } from '../services/cotizarFields'
 import { fetchAutodataModelosByAnioMarca } from '../services/mondayApi'
-import { matchesSearchQuery } from '../services/format'
+import { matchesSearchQuery, matchOption } from '../services/format'
 import AutodataModeloPorAnioMarca from './AutodataModeloPorAnioMarca'
 import AlertModal from './AlertModal'
 import ErrorDetailBox from './ErrorDetailBox'
@@ -54,7 +54,11 @@ function buildInitialForm(opportunity, dropdownOptions) {
   for (const field of COTIZAR_FIELDS) {
     if (field.kind !== 'connected') continue
     const options = dropdownOptions[field.optionsKey] ?? []
-    const current = options.find((o) => o.name === opportunity[field.key])
+    // El nombre guardado en la oportunidad se busca ignorando casing/acentos/espacios
+    // (matchOption): con comparación exacta, una diferencia mínima dejaba el id vacío y
+    // el campo aparecía como "falta completar" aunque la oportunidad sí lo tuviera.
+    const nombreReal = matchOption(options.map((o) => o.name), opportunity[field.key])
+    const current = options.find((o) => o.name === nombreReal)
     form[field.key] = opportunity[field.key]
     form[field.idKey] = current?.id ?? ''
   }
@@ -68,7 +72,7 @@ function buildInitialForm(opportunity, dropdownOptions) {
 // strings/ids comunes (mismo patrón ya usado en FilterPanel.jsx). `searchable` +
 // filterOption (matchesSearchQuery, ver services/format.js) en los 3 primeros — a
 // pedido, antes no se podía filtrar tipeando en ninguno de estos.
-function FieldControl({ field, value, onChange, options, anio, marca, tipo, combustible }) {
+function FieldControl({ field, value, onChange, options, anio, marca, tipo, combustible, placeholder = 'Sin definir' }) {
   if (field.kind === 'text') {
     return <TextField size="small" value={value} onChange={(newValue) => onChange(newValue)} />
   }
@@ -93,7 +97,7 @@ function FieldControl({ field, value, onChange, options, anio, marca, tipo, comb
       <Dropdown
         options={dropdownOptions}
         value={selected}
-        placeholder="Sin definir"
+        placeholder={placeholder}
         searchable
         filterOption={(option, inputValue) => matchesSearchQuery(option.label, inputValue)}
         clearable
@@ -112,7 +116,7 @@ function FieldControl({ field, value, onChange, options, anio, marca, tipo, comb
       <Dropdown
         options={connectedOptions}
         value={selected}
-        placeholder="Sin definir"
+        placeholder={placeholder}
         searchable
         filterOption={(option, inputValue) => matchesSearchQuery(option.label, inputValue)}
         clearable
@@ -168,6 +172,10 @@ export default function CotizarStepPanel({
   // (la automatización de monday que genera los subitems necesita todos estos datos).
   const missingFields = getMissingCotizarFields(opportunity)
   const canCotizar = missingFields.length === 0
+  // LOG-07: lo mismo pero sobre lo que se está editando AHORA (no sobre la oportunidad
+  // guardada), para resaltar en vivo lo que falta dentro del popup y que el resaltado se
+  // apague apenas se completa, sin esperar a "Guardar cambios".
+  const faltantesEnEdicion = new Set(getMissingCotizarFields(form).map((f) => f.key))
 
   // A pedido: antes de mandar a cotizar/recotizar se avisa en 2 pasos. 1) Si falta algún
   // dato base, un popup tipo "Faltan datos requeridos" (mismo patrón que
@@ -417,15 +425,23 @@ export default function CotizarStepPanel({
                   3 juntos al final. */}
               {(editingSection === 'vehiculo' ? VEHICULO_FIELD_LAYOUT : PERSONAL_FIELD_LAYOUT).map(({ key, span }) => {
                 const f = COTIZAR_FIELDS.find((field) => field.key === key)
+                // LOG-07: un campo obligatorio vacío (típico: Localidad, cuando el
+                // cliente traía Departamento pero no Localidad) se veía igual que uno
+                // opcional, con un "Sin definir" mudo que no daba ninguna pista de que
+                // faltaba completarlo. Ahora se resalta en amarillo y lo dice, mismo
+                // lenguaje visual que los campos faltantes del alta (ver
+                // .crear-op__field--missing en CrearOportunidadForm.css).
+                const falta = faltantesEnEdicion.has(f.key)
                 return (
                   <label
-                    className="cotizar-step__field cotizar-step__field--edit"
+                    className={`cotizar-step__field cotizar-step__field--edit${falta ? ' cotizar-step__field--missing' : ''}`}
                     style={{ gridColumn: `span ${span}` }}
                     key={f.key}
                   >
                     <span className="cotizar-step__field-label">{f.label}</span>
                     <FieldControl
                       field={f}
+                      placeholder={falta ? `Falta completar ${f.label}` : 'Sin definir'}
                       value={
                         f.kind === 'connected'
                           ? form[f.idKey]
@@ -451,8 +467,21 @@ export default function CotizarStepPanel({
                           // (getMissingCotizarFields) mira `form.modelo`, que nunca se
                           // actualizaba — daba "Modelo" como campo faltante aunque ya
                           // estuviera elegido. Ahora se pisan los 2 juntos.
+                          // LOG-01: acá tampoco se refrescaban Combustible/Tipo con los del
+                          // modelo nuevo — quedaban los del modelo anterior, así que monday
+                          // mostraba el modelo recién elegido pero cotizaba con el
+                          // combustible/tipo de otro. Se pisan siempre con los del modelo
+                          // elegido (igual que CrearOportunidadForm.jsx#handleModeloChange),
+                          // aunque el modelo no tenga el dato en Autodata (queda vacío,
+                          // marcado como faltante, en vez de arrastrar uno que ya no aplica).
                           setSaveError(null)
-                          setForm((prev) => ({ ...prev, modeloSeleccion: v, modelo: v?.name ?? prev.modelo }))
+                          setForm((prev) => ({
+                            ...prev,
+                            modeloSeleccion: v,
+                            modelo: v?.name ?? prev.modelo,
+                            combustible: matchOption(dropdownOptions.combustibles ?? [], v?.combustible),
+                            tipo: matchOption(dropdownOptions.tipo ?? [], v?.tipo),
+                          }))
                           return
                         }
                         return handleFieldChange(f.key, v)

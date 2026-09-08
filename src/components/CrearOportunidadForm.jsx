@@ -22,7 +22,7 @@ import {
   TextField,
 } from '@vibe/core'
 import PersonaFicha from './crear/PersonaFicha'
-import { modeloSinMarca } from '../services/format'
+import { modeloSinMarca, matchOption } from '../services/format'
 import { useSchema, useMondayUser } from '../context/AppContext'
 import Stepper from './Stepper'
 import StatusBadge from './StatusBadge'
@@ -34,7 +34,6 @@ import GuardandoOportunidadModal from './GuardandoOportunidadModal'
 import {
   createOpportunityItem,
   setMultipleColumnValues,
-  setConnectedColumnValue,
   uploadFileToColumn,
   dropdownColumnValue,
   leerCartaAutomovil,
@@ -183,6 +182,12 @@ export default function CrearOportunidadForm({
   // un archivo nuevo (ver handleCartaAutomovilChange) para no arrancar la lectura
   // siguiente ya en modo edición.
   const [editingLeidos, setEditingLeidos] = useState(false)
+  // Combustible/Tipo que de verdad vinieron de la lectura de la Carta Automóvil (LOG-03)
+  // — captado UNA sola vez cuando termina la lectura, no derivado de `form` (que cambia
+  // con cada Modelo elegido). handleModeloChangeConOcr lo usa en vez de `prev.combustible`
+  // porque `prev` ya viene "contaminado" por el modelo anterior: si se usara `prev`, el
+  // primer modelo fija el valor y ningún modelo siguiente (misma marca) puede corregirlo.
+  const [ocrVehiculo, setOcrVehiculo] = useState({ combustible: '', tipo: '' })
   // A pedido: marca si el archivo actual de Cédula Identidad vino del autocompletado
   // (ver handleAutofillCedula) en vez de elegido a mano — gatea el recubrimiento verde
   // de FileField (highlighted). Se apaga solo si el usuario cambia o quita el archivo
@@ -707,14 +712,6 @@ export default function CrearOportunidadForm({
   const usoOptions = (schema?.uso?.options ?? []).map((opt) => ({ value: opt, label: opt }))
   const tipoOptions = (schema?.tipo ?? []).map((opt) => ({ value: opt, label: opt }))
 
-  // Matchea sin distinguir mayúsculas — el dato real de Autodata a veces difiere en
-  // casing de nuestra opción real (ej. "Diesel" vs nuestro "DIesel"). Si no hay dato o
-  // no matchea ninguna opción real, devuelve vacío en vez de forzar un valor inventado.
-  const matchOption = (options, rawValue) => {
-    if (!rawValue) return ''
-    return options.find((o) => o.value.toLowerCase() === rawValue.toLowerCase())?.value ?? ''
-  }
-
   // Al elegir un Modelo (Autodata), autocompleta Combustible y Tipo del formulario con
   // lo que sepa ese ítem — si no tiene el dato, o no coincide con ninguna de nuestras
   // opciones reales, se deja vacío (se avisa en el campo, ver JSX) en vez de forzar
@@ -733,13 +730,16 @@ export default function CrearOportunidadForm({
   // handleCartaAutomovilChange más abajo) — a diferencia de handleModeloChange (que
   // siempre pisa con lo que sepa el modelo elegido), acá el dato leído automáticamente
   // tiene prioridad y el del modelo de Autodata solo se usa como respaldo si ese campo
-  // vino vacío.
+  // vino vacío. Usa ocrVehiculo (fijo desde que terminó la lectura) en vez de
+  // `prev.combustible`/`prev.tipo` — ver LOG-01/LOG-03: `prev` ya trae pisado lo que dejó
+  // el modelo anterior, así que un segundo cambio de modelo (misma marca) nunca lograba
+  // corregirlo.
   const handleModeloChangeConOcr = (modelo) => {
     setForm((prev) => ({
       ...prev,
       modeloSeleccion: modelo,
-      combustible: prev.combustible || matchOption(combustibleOptions, modelo?.combustible),
-      tipo: prev.tipo || matchOption(tipoOptions, modelo?.tipo),
+      combustible: ocrVehiculo.combustible || matchOption(combustibleOptions, modelo?.combustible),
+      tipo: ocrVehiculo.tipo || matchOption(tipoOptions, modelo?.tipo),
     }))
   }
 
@@ -874,6 +874,7 @@ export default function CrearOportunidadForm({
   const handleCartaAutomovilChange = async (file) => {
     handleChange('cartaAutomovil', file)
     setEditingLeidos(false)
+    setOcrVehiculo({ combustible: '', tipo: '' })
     if (!file) {
       setLecturaEstado('')
       setLecturaError(null)
@@ -906,14 +907,25 @@ export default function CrearOportunidadForm({
         setLecturaError(errorMsg)
         return
       }
+      // LOG-02: Marca/Año/Tipo se guardaban CRUDOS como los devolvía la lectura, a
+      // diferencia de Combustible/Uso (que ya pasaban por matchOption). Un valor que no
+      // sea exactamente una opción real ("SUV", "Renault" en vez de "RENAULT") no lo
+      // matchea el Dropdown, así que el campo se veía VACÍO — pero como el string no
+      // estaba vacío, vehiculoLeidoCompleto lo daba por completo y dejaba avanzar y
+      // guardar (y monday, con create_labels_if_missing en false, tampoco lo aceptaba).
+      // Normalizados: si coinciden con una opción real queda la opción real; si no,
+      // quedan vacíos y el paso se bloquea con el campo resaltado, como corresponde.
+      const combustibleLeido = matchOption(combustibleOptions, pick('combustible', 'Combustible'))
+      const tipoLeido = matchOption(tipoOptions, pick('tipo', 'Tipo'))
       setForm((prev) => ({
         ...prev,
-        marca: pick('marca', 'Marca'),
-        anio: pick('anio', 'año', 'Anio', 'Año'),
-        tipo: pick('tipo', 'Tipo'),
-        combustible: matchOption(combustibleOptions, pick('combustible', 'Combustible')),
+        marca: matchOption(marcaOptions, pick('marca', 'Marca')),
+        anio: matchOption(anioOptions, pick('anio', 'año', 'Anio', 'Año')),
+        tipo: tipoLeido,
+        combustible: combustibleLeido,
         uso: matchOption(usoOptions, pick('uso', 'Uso')) || prev.uso,
       }))
+      setOcrVehiculo({ combustible: combustibleLeido, tipo: tipoLeido })
       setLecturaEstado('Leidos')
     } catch (err) {
       setLecturaEstado('Error')
@@ -1021,10 +1033,11 @@ export default function CrearOportunidadForm({
   // (Tipo de Riesgo Automóvil, y/o algún archivo elegido), para no prometer un paso que
   // handleGuardar ni siquiera va a correr.
   const guardarSteps = [
-    { key: 'item', label: 'Creando la oportunidad' },
-    { key: 'contacto', label: 'Vinculando con el cliente' },
-    ...(esAutomovil ? [{ key: 'vehiculo', label: 'Guardando los datos del vehículo' }] : []),
-    ...(form.cedulaIdentidad || form.cartaAutomovil ? [{ key: 'archivos', label: 'Subiendo los documentos' }] : []),
+    { key: 'item', label: 'Creando la oportunidad y el cliente' },
+    { key: 'datos', label: esAutomovil ? 'Guardando los datos y el vehículo' : 'Guardando los datos' },
+    ...(form.cedulaIdentidad || form.cartaAutomovil || form.archivosCliente.length
+      ? [{ key: 'archivos', label: 'Subiendo los documentos' }]
+      : []),
   ]
 
   // A pedido: "Guardar" es atómico — se hace todo, o no queda nada (antes, si fallaba a
@@ -1040,52 +1053,73 @@ export default function CrearOportunidadForm({
     let createdOpportunityId = null
     let createdContactoId = null
     try {
+      // LOG-22: esto eran 8 llamadas ENCADENADAS a monday (crear ítem → columnas base →
+      // crear Cliente → conectar Cliente → archivos del Cliente → columnas del vehículo →
+      // cédula → carta), y cada ida y vuelta contra la API son ~2 segundos: de ahí los
+      // ~20 s. Ninguna de esas esperas era necesaria en ese orden. Ahora son 3 tandas.
+
+      // Tanda 1: los 2 ítems se crean EN PARALELO (no dependen entre sí). allSettled y no
+      // all: si uno falla queremos saber igual el id del otro para poder borrarlo en el
+      // rollback — con Promise.all ese id se perdía y quedaba un huérfano en monday.
       setGuardarStepKey('item')
-      const itemId = await ensureItemId()
-      createdOpportunityId = itemId
-      await setMultipleColumnValues(itemId, buildBaseColumnValues())
-
-      setGuardarStepKey('contacto')
       const yaExistiaContacto = Boolean(resultadoSeleccionado?.id)
-      const contactoId = await ensureContactoId()
-      if (!yaExistiaContacto) createdContactoId = contactoId
-      await setConnectedColumnValue(itemId, OPORTUNIDAD_CONTACTO_COLUMN_ID, [Number(contactoId)])
-      // Documentos genéricos elegidos para un Lead nuevo (ver ClienteArchivos): recién
-      // ahora existe el ítem del Cliente al que subirlos. Para un Cliente/Lead ya
-      // existente ClienteArchivos los sube directo y esta lista queda vacía.
-      for (const file of form.archivosCliente) {
-        await uploadFileToColumn(contactoId, CONTACTO_ARCHIVOS_COLUMN_ID, file)
-      }
+      const [resItem, resContacto] = await Promise.allSettled([ensureItemId(), ensureContactoId()])
+      if (resItem.status === 'fulfilled') createdOpportunityId = resItem.value
+      if (resContacto.status === 'fulfilled' && !yaExistiaContacto) createdContactoId = resContacto.value
+      if (resItem.status === 'rejected') throw resItem.reason
+      if (resContacto.status === 'rejected') throw resContacto.reason
+      const itemId = resItem.value
+      const contactoId = resContacto.value
 
+      // Tanda 2: TODAS las columnas de la Oportunidad en una sola mutation — las básicas,
+      // la conexión con el Cliente y (si aplica) las del vehículo. Antes eran 3 llamadas
+      // separadas sobre el mismo ítem. Sigue pasando después del create_item pelado, que
+      // es lo que necesitan las automatizaciones de monday (ver ensureItemId).
+      setGuardarStepKey('datos')
+      const columnValues = {
+        ...buildBaseColumnValues(),
+        [OPORTUNIDAD_CONTACTO_COLUMN_ID]: { item_ids: [Number(contactoId)] },
+      }
       if (esAutomovil) {
-        setGuardarStepKey('vehiculo')
-        const extra = {
-          board_relation_mm5422v9: { item_ids: [Number(form.modeloSeleccion.id)] },
-          // El paso Cotizar muestra el Modelo desde text_mm54fb7m, no desde la conexión
-          // (que la automatización de "Cotizar" vacía después de usarla) — como en este
-          // punto todavía no se cotizó nada, si no escribimos esto acá el campo queda en
-          // "—" hasta la primera cotización.
-          text_mm54fb7m: form.modeloSeleccion.name,
-        }
-        if (form.combustible) extra.dropdown_mm52jp01 = dropdownColumnValue(form.combustible)
-        if (form.tipo) extra.dropdown_mm5jqdk = dropdownColumnValue(form.tipo)
-        extra.dropdown_mm51ykrd = dropdownColumnValue(form.marca)
+        columnValues.board_relation_mm5422v9 = { item_ids: [Number(form.modeloSeleccion.id)] }
+        // El paso Cotizar muestra el Modelo desde text_mm54fb7m, no desde la conexión
+        // (que la automatización de "Cotizar" vacía después de usarla) — como en este
+        // punto todavía no se cotizó nada, si no escribimos esto acá el campo queda en
+        // "—" hasta la primera cotización.
+        columnValues.text_mm54fb7m = form.modeloSeleccion.name
+        if (form.combustible) columnValues.dropdown_mm52jp01 = dropdownColumnValue(form.combustible)
+        if (form.tipo) columnValues.dropdown_mm5jqdk = dropdownColumnValue(form.tipo)
+        columnValues.dropdown_mm51ykrd = dropdownColumnValue(form.marca)
         // Año es un label puramente numérico ("2006") — mandarlo como string pelado
         // hace que monday lo confunda con un ID de label interno y lo descarte en
         // silencio (ver dropdownColumnValue en mondayApi.js).
-        extra.dropdown_mm51mdmq = dropdownColumnValue(form.anio)
-        extra.color_mm52ey1d = form.uso
-        await setMultipleColumnValues(itemId, extra)
+        columnValues.dropdown_mm51mdmq = dropdownColumnValue(form.anio)
+        columnValues.color_mm52ey1d = form.uso
       }
+      await setMultipleColumnValues(itemId, columnValues)
 
-      // El ítem no existía cuando se eligieron estos archivos (ver
-      // handleCedulaIdentidadChange/handleCartaAutomovilChange/handleCartaAutomovilManualChange
-      // — ninguno de los 3 sube nada, solo guardan el File en memoria), así que se suben
-      // recién acá, ya con item_id.
-      if (form.cedulaIdentidad || form.cartaAutomovil) {
+      // Tanda 3: los archivos. Ninguno existía en monday hasta ahora (ver
+      // handleCedulaIdentidadChange/handleCartaAutomovilChange — solo guardan el File en
+      // memoria). Se suben en paralelo ENTRE columnas distintas, pero en serie dentro de
+      // una misma columna: dos add_file_to_column simultáneos sobre la misma columna se
+      // pueden pisar. Los archivosCliente (documentos genéricos de un Lead nuevo, ver
+      // ClienteArchivos) van todos a la misma columna del Cliente; para un Cliente ya
+      // existente esa lista viene vacía porque ClienteArchivos ya los subió.
+      const subidas = []
+      if (form.archivosCliente.length) {
+        subidas.push(
+          (async () => {
+            for (const file of form.archivosCliente) {
+              await uploadFileToColumn(contactoId, CONTACTO_ARCHIVOS_COLUMN_ID, file)
+            }
+          })()
+        )
+      }
+      if (form.cedulaIdentidad) subidas.push(uploadFileToColumn(itemId, 'file_mm5pc008', form.cedulaIdentidad))
+      if (form.cartaAutomovil) subidas.push(uploadFileToColumn(itemId, 'file_mm51jy06', form.cartaAutomovil))
+      if (subidas.length) {
         setGuardarStepKey('archivos')
-        if (form.cedulaIdentidad) await uploadFileToColumn(itemId, 'file_mm5pc008', form.cedulaIdentidad)
-        if (form.cartaAutomovil) await uploadFileToColumn(itemId, 'file_mm51jy06', form.cartaAutomovil)
+        await Promise.all(subidas)
       }
 
       clearPersistedSearch()

@@ -32,11 +32,18 @@ export function mapSubitemToRawQuote(subitem) {
     recargo10: textOf(cv, 'numeric_mm52bnpa'),
     incluirPropuesta: boolOf(cv, 'boolean_mm4wjdnw'),
     propuestaElegida: boolOf(cv, 'boolean_mm5bn41n'),
-    // Opcionales de PORTO (Granizo/Cristales/Coche Cortesía) — ver
-    // pricingEngine.js#buildIncluyeBullets y /logica-monday-vibe.md.
+    // Opcionales de la cotización — ver pricingEngine.js#OPCIONALES. Granizo lo comparten
+    // PORTO y SURA (el precio lo pone la compañía de la cotización, ver PANEL); el resto
+    // es de una sola. "Auto extra" no es un tilde sino la duración elegida ("7 días" /
+    // "15 días" / "30 días"), vacío si no se eligió ninguna.
     granizo: boolOf(cv, 'boolean_mm5fsr46'),
     cristales: boolOf(cv, 'boolean_mm5fqazp'),
-    cocheCortesia: boolOf(cv, 'boolean_mm5fxd9x'),
+    usoRural: boolOf(cv, 'boolean_mm6z3j9j'),
+    suraTeLleva: boolOf(cv, 'boolean_mm6zhfhd'),
+    // El AP de SURA viene incluido en el precio del portal: sin dato cargado se asume
+    // tildado, y solo cuenta como "sacado" cuando está explícitamente destildado.
+    ap: textOf(cv, 'boolean_mm6zzwq5') === '' ? true : boolOf(cv, 'boolean_mm6zzwq5'),
+    autoExtra: textOf(cv, 'color_mm6zpx3j'),
   }
 }
 

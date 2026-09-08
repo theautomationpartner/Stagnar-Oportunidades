@@ -3,6 +3,14 @@ export function formatMoney(value) {
   return `$ ${Number(value).toLocaleString('es-UY')}`
 }
 
+// LOG-10: mismo separador de miles que formatMoney pero en dólares, con un único prefijo
+// para toda la app (antes el deducible de SANCOR era el único monto en USD y lo armaba a
+// mano, sin formato).
+export function formatUsd(value) {
+  if (value == null || Number.isNaN(value)) return '—'
+  return `USD ${Number(value).toLocaleString('es-UY')}`
+}
+
 // Las columnas "date" de monday devuelven texto tipo "2026-08-11" o, si la columna
 // tiene hora habilitada, "2026-08-11 11:39:00" — acá se corta a dd/mm/aa siempre,
 // sin hora, sin importar cuál de los 2 formatos llegó (ver opportunityMapper.js,
@@ -39,6 +47,32 @@ export function matchesSearchQuery(label, query) {
   if (!words.length) return true
   const haystack = label.toLowerCase()
   return words.every((word) => haystack.includes(word))
+}
+
+// Matchea sin distinguir mayúsculas — el dato real de Autodata a veces difiere en
+// casing de nuestra opción real (ej. "Diesel" vs nuestro "DIesel"). Si no hay dato o no
+// coincide con ninguna opción real, devuelve vacío en vez de forzar un valor inventado.
+// Compartido entre CrearOportunidadForm.jsx (elegir Modelo), que pasa las opciones ya
+// como {value,label} del Dropdown, y CotizarStepPanel.jsx (editar Vehículo de una
+// oportunidad ya creada), que las pasa como strings sueltos del schema — de ahí que
+// tanto la comparación como el valor devuelto acepten las dos formas.
+// LOG-23: además del casing, se ignoran acentos y espacios de más — "CAMIONETAS FURGON"
+// y "CAMIONETAS FURGÓN" (o un doble espacio de tipeo) son el mismo tipo, y antes
+// cualquiera de esas diferencias dejaba el campo vacío como si el dato no existiera.
+const normalizarParaMatch = (texto) =>
+  String(texto)
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim()
+    .toLowerCase()
+
+export function matchOption(options, rawValue) {
+  if (!rawValue) return ''
+  const buscado = normalizarParaMatch(rawValue)
+  const found = options.find((o) => normalizarParaMatch(o?.value ?? o) === buscado)
+  if (found == null) return ''
+  return found.value ?? found
 }
 
 // El nombre de un modelo de Autodata ya trae la marca adelante ("PEUGEOT - 206 1.6

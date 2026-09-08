@@ -8,7 +8,7 @@ import {
 } from 'react-icons/md'
 import { Button, IconButton, Dropdown, Checkbox, NumberField } from '@vibe/core'
 import { formatMoney, CUOTA_COUNTS, toPercentString } from '../services/format'
-import { isQuoteSelectable } from '../services/pricingEngine'
+import { isQuoteSelectable, opcionalesEditables } from '../services/pricingEngine'
 import { accentForCompania } from '../services/companyColors'
 import './QuoteCard.css'
 
@@ -16,15 +16,28 @@ const BSE_DEDUCIBLE_OPTIONS = ['0.5', '1', '1.5', '2', '2.5', '3']
 const BSE_EDAD_OPTIONS = ['No', '35 a 75', '56 a 75']
 const SURA_DEDUCIBLE_OPTIONS = ['1', '1.3', '2']
 
-// Opcionales de PORTO - TOTAL (Granizo/Cristales/Coche Cortesía): a diferencia de los
-// "Parámetros ajustables" de abajo (locales hasta apretar "Aplicar"), estos checkboxes
-// escriben directo en monday apenas se tildan (onToggleOpcional), porque es un dato real
-// de la cotización, no un ajuste de prueba. Ver pricingEngine.js#buildIncluyeBullets.
-const PORTO_OPCIONALES = [
-  { field: 'granizo', label: 'Granizo' },
-  { field: 'cocheCortesia', label: 'Coche Cortesía' },
-  { field: 'cristales', label: 'Cristales' },
-]
+// Opcionales por compañía: a diferencia de los "Parámetros ajustables" de abajo (locales
+// hasta apretar "Aplicar"), estos escriben directo en monday apenas se tocan
+// (onToggleOpcional), porque son un dato real de la cotización, no un ajuste de prueba.
+// Tienen que coincidir con pricingEngine.js#OPCIONALES, que es quien decide el precio y
+// si esta cobertura puntual los ofrece.
+const OPCIONALES_POR_COMPANIA = {
+  PORTO: [
+    { field: 'granizo', label: 'Granizo' },
+    { field: 'cristales', label: 'Cristales' },
+    { field: 'usoRural', label: 'Uso rural' },
+  ],
+  SURA: [
+    { field: 'granizo', label: 'Granizo' },
+    { field: 'suraTeLleva', label: 'SURA te lleva' },
+    { field: 'ap', label: 'Accidentes Personales' },
+  ],
+}
+// "Auto extra" se elige por duración, no se tilda: PORTO ofrece las 3, SURA solo 15 días.
+const AUTO_EXTRA_OPCIONES = {
+  PORTO: ['7 días', '15 días', '30 días'],
+  SURA: ['15 días'],
+}
 
 // Datos "de tarifa" — vienen fijos de monday y no se editan por cotización: el Contado
 // base y el Deducible general son parte de la tarifa cargada, no un parámetro que el
@@ -149,6 +162,8 @@ function QuoteCard({
   onApplyOverrides,
   onResetOverrides,
   onToggleOpcional,
+  onAutoExtraChange,
+  onPanelChange,
   rcOptions,
 }) {
   // A pedido, estética tipo mockup: 2 botones separados ("Parámetros"/"Coberturas") que
@@ -172,11 +187,32 @@ function QuoteCard({
   const hasCustomOverrides = Object.keys(overrides).length > 0
   const accent = accentForCompania(raw.compania)
 
+  // Qué opcionales ofrece esta cotización lo decide pricingEngine (la misma regla que
+  // define el precio), no la tarjeta: así no se muestran controles que no harían nada —
+  // ej. PORTO TRIPLE no ofrece ninguno, y SURA TOTAL PLUS ya los trae todos incluidos.
+  const editables = opcionalesEditables(raw)
+  const opcionalesDeLaCompania = (OPCIONALES_POR_COMPANIA[raw.compania] ?? []).filter((o) =>
+    editables.campos.includes(o.field)
+  )
+  const autoExtraOpciones = editables.autoExtra ? AUTO_EXTRA_OPCIONES[raw.compania] ?? [] : []
+
   const handleToggleOpcional = async (field, checked) => {
     setSavingOpcional(field)
     setOpcionalError(null)
     try {
       await onToggleOpcional(field, checked)
+    } catch (err) {
+      setOpcionalError(err.message)
+    } finally {
+      setSavingOpcional(null)
+    }
+  }
+
+  const handleAutoExtraChange = async (dias) => {
+    setSavingOpcional('autoExtra')
+    setOpcionalError(null)
+    try {
+      await onAutoExtraChange(dias)
     } catch (err) {
       setOpcionalError(err.message)
     } finally {
@@ -217,11 +253,21 @@ function QuoteCard({
   // no queremos mostrar un valor viejo de una apertura anterior).
   const handleToggleParams = () => {
     if (openPanel !== 'params') setForm(buildInitialForm(raw, overrides, fields))
-    setOpenPanel((prev) => (prev === 'params' ? null : 'params'))
+    setOpenPanel((prev) => {
+      const siguiente = prev === 'params' ? null : 'params'
+      onPanelChange?.(siguiente)
+      return siguiente
+    })
   }
 
   const handleToggleCoberturas = () => {
-    setOpenPanel((prev) => (prev === 'coberturas' ? null : 'coberturas'))
+    setOpenPanel((prev) => {
+      const siguiente = prev === 'coberturas' ? null : 'coberturas'
+      // Avisa igual al salir de "Parámetros": el orden de la lista se descongela cuando ya
+      // no queda ningún panel de parámetros abierto (ver OpportunityDetail).
+      onPanelChange?.(siguiente)
+      return siguiente
+    })
   }
 
   const handleReset = () => {
@@ -378,8 +424,7 @@ function QuoteCard({
               </span>
             )
           })}
-          {raw.compania === 'PORTO' &&
-            PORTO_OPCIONALES.map((opt) => {
+          {opcionalesDeLaCompania.map((opt) => {
               const active = Boolean(raw[opt.field])
               return (
                 <span
@@ -481,11 +526,11 @@ function QuoteCard({
             </Button>
           </div>
 
-          {raw.compania === 'PORTO' && (
+          {opcionalesDeLaCompania.length > 0 && (
             <>
-              <div className="quote-card__params-subtitle">Opcionales PORTO</div>
+              <div className="quote-card__params-subtitle">Opcionales {raw.compania}</div>
               <div className="quote-card__params-grid">
-                {PORTO_OPCIONALES.map((opt) => (
+                {opcionalesDeLaCompania.map((opt) => (
                   <Checkbox
                     key={opt.field}
                     className="quote-card__params-field--checkbox"
@@ -495,6 +540,20 @@ function QuoteCard({
                     onChange={(e) => handleToggleOpcional(opt.field, e.target.checked)}
                   />
                 ))}
+                {autoExtraOpciones.length > 0 && (
+                  <label className="quote-card__params-field">
+                    <span>Auto extra</span>
+                    <Dropdown
+                      size="small"
+                      options={autoExtraOpciones.map((d) => ({ value: d, label: d }))}
+                      value={raw.autoExtra ? { value: raw.autoExtra, label: raw.autoExtra } : null}
+                      placeholder="Sin auto extra"
+                      clearable
+                      onClear={() => handleAutoExtraChange('')}
+                      onChange={(option) => handleAutoExtraChange(option?.value ?? '')}
+                    />
+                  </label>
+                )}
               </div>
               {opcionalError && <p className="quote-card__warning">{opcionalError}</p>}
             </>

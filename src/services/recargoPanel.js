@@ -61,19 +61,31 @@ function buildIncluyeLookup(items) {
   return lookup
 }
 
-// Valores de configuración sueltos (Grupo = "Configuracion"): año mínimo para
-// "REPUESTOS ORIGINALES" y los 3 precios de opcionales de PORTO (Granizo/Cristales/
-// Coche Cortesía) comparten la misma columna `numeric_mm5fmjh0` — se distinguen por el
-// NOMBRE del ítem, no por columna. { [nombreDelItem]: numero }
+// Valores de configuración sueltos (Grupo = "Configuracion"): años mínimos de las
+// viñetas y precios de opcionales, todos en la misma columna `numeric_mm5fmjh0` — se
+// distinguen por el NOMBRE del ítem, no por columna.
+// MON-06: los precios ahora se separan además por compañía, porque el mismo concepto
+// tiene precio distinto según la aseguradora ("Granizo" son $1.279 en PORTO y $1.250 en
+// SURA). Las filas sin compañía siguen siendo globales (los años mínimos).
+// Devuelve { globales: {nombre: numero}, porCompania: {COMPANIA: {nombre: numero}} }
 function buildConfiguracion(items) {
-  const config = {}
+  const globales = {}
+  const porCompania = {}
   for (const item of items) {
     const cv = item.column_values
     if (grupoOf(cv) !== 'Configuracion') continue
     const valor = Number(textOf(cv, 'numeric_mm5fmjh0'))
-    if (Number.isFinite(valor)) config[item.name.trim()] = valor
+    if (!Number.isFinite(valor)) continue
+    const nombre = item.name.trim()
+    const compania = (textOf(cv, 'dropdown_mm52feqr') ?? '').trim()
+    if (compania) {
+      if (!porCompania[compania]) porCompania[compania] = {}
+      porCompania[compania][nombre] = valor
+    } else {
+      globales[nombre] = valor
+    }
   }
-  return config
+  return { globales, porCompania }
 }
 
 // Un solo fetch a PANEL para las cuatro cosas — se pide una vez al cargar la app
@@ -84,20 +96,17 @@ export async function fetchPanelData() {
   return {
     recargoLookup: buildRecargoLookup(items),
     incluyeLookup: buildIncluyeLookup(items),
-    repuestosOriginalesMinYear: configuracion['Año mínimo Repuestos Originales'] ?? null,
+    repuestosOriginalesMinYear: configuracion.globales['Año mínimo Repuestos Originales'] ?? null,
     // Los siguientes 2 son específicos de PORTO (ver pricingEngine.js#buildIncluyeBullets):
     // año mínimo para la viñeta "REPOSICIÓN 0KM EL PRIMER AÑO DE EMPADRONADO", y año
     // mínimo para que el auxilio mecánico de GLOBAL/GLOBAL ded Alto diga "SERVICIOS
     // ILIMITADOS" en vez de "5 SERVICIOS POR AÑO".
-    reposicion0kmMinYear: configuracion['Año mínimo Reposición 0km'] ?? null,
-    serviciosIlimitadosPortoMinYear: configuracion['Antigüedad servicios ilimitados PORTO'] ?? null,
-    // Precios de los opcionales de PORTO (viñeta "OPCIONAL: ... + $N" en
-    // pricingEngine.js#buildIncluyeBullets si el checkbox del subitem no está tildado).
-    preciosOpcionalesPorto: {
-      granizo: configuracion['Granizo'] ?? null,
-      cristales: configuracion['Cristales'] ?? null,
-      cocheCortesia: configuracion['Coche Cortesía'] ?? null,
-    },
+    reposicion0kmMinYear: configuracion.globales['Año mínimo Reposición 0km'] ?? null,
+    serviciosIlimitadosPortoMinYear: configuracion.globales['Antigüedad servicios ilimitados PORTO'] ?? null,
+    // MON-06: precios de los opcionales por compañía, tal cual están cargados en PANEL
+    // ({ PORTO: { Granizo: 1279, ... }, SURA: { ... } }). pricingEngine los usa tanto para
+    // la viñeta "OPCIONAL: ... + $N" como para sumarlos al total cuando están tildados.
+    preciosOpcionales: configuracion.porCompania,
   }
 }
 
