@@ -400,6 +400,11 @@ function QuoteCard({
           {quote.promo && (
             <span className="quote-card__cuotas-label">
               ➜ {quote.promo.count} cuotas SIN RECARGO de {formatMoney(quote.promo.valor)}
+              {/* LOG-16: la condición (BSE/SURA) viaja pegada a la promo — sin esto se
+                  leía como si fuera una forma de pago más, disponible siempre. */}
+              {quote.promo.condicion && (
+                <em className="quote-card__cuotas-condicion">{quote.promo.condicion}</em>
+              )}
             </span>
           )}
         </div>

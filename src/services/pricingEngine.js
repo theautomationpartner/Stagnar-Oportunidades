@@ -27,6 +27,11 @@ const PORTO_FAMILY = ['GLOBAL', 'GLOBAL ded Alto', 'TRIPLE']
 // ningún recargo) dividido en N, no la fila "10 CTAS" de la tabla de cuotas (esa sí
 // tiene recargo). Ver /logica-monday-vibe.md.
 const PROMO_CUOTAS_SIN_RECARGO = { BSE: 10, SURA: 10, SANCOR: 2, PORTO: 5 }
+// LOG-16: condición para acceder a esas cuotas sin recargo. Solo BSE y SURA la tienen.
+const PROMO_CONDICION = {
+  BSE: 'Pagando con tarjeta o débito en cuenta',
+  SURA: 'Pagando con tarjeta o débito en cuenta',
+}
 
 const CUOTA_COUNTS = [3, 6, 8, 10]
 
@@ -415,7 +420,16 @@ export function computeQuote(raw, overrides = {}, panelContext = {}) {
   }
 
   const promoCount = PROMO_CUOTAS_SIN_RECARGO[eff.compania] ?? null
-  const promo = promoCount ? { count: promoCount, valor: roundUpCents(total / promoCount) } : null
+  const promo = promoCount
+    ? {
+        count: promoCount,
+        valor: roundUpCents(total / promoCount),
+        // LOG-16: en BSE y SURA las cuotas sin recargo no son para cualquier forma de
+        // pago, y eso no se aclaraba en ningún lado — se mostraban como si fueran la
+        // oferta normal. SANCOR y PORTO no tienen esta condición.
+        condicion: PROMO_CONDICION[eff.compania] ?? null,
+      }
+    : null
 
   return {
     blocked: false,

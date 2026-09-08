@@ -461,9 +461,17 @@ function drawPriceBand(ctx, quote, y) {
     ctx.font = `bold 24px ${FONT}`
     const aw = ctx.measureText(amount).width
     const startX = bx + bw / 2 - (pw + aw) / 2
-    text(ctx, prefix, startX, y + 56, { size: 20, color: C.blanco })
-    text(ctx, amount, startX + pw, y + 56, { size: 24, weight: 'bold', color: C.blanco })
-    text(ctx, 'SIN RECARGO', bx + bw / 2, y + 88, { size: 20, weight: 'bold', color: C.blanco, align: 'center' })
+    // LOG-16: con condición (BSE/SURA) entran 3 renglones en la misma caja, así que se
+    // compacta un poco; sin condición (SANCOR/PORTO) queda igual que siempre.
+    const conCondicion = Boolean(quote.promo.condicion)
+    const yMonto = conCondicion ? y + 50 : y + 56
+    const ySinRecargo = conCondicion ? y + 76 : y + 88
+    text(ctx, prefix, startX, yMonto, { size: 20, color: C.blanco })
+    text(ctx, amount, startX + pw, yMonto, { size: 24, weight: 'bold', color: C.blanco })
+    text(ctx, 'SIN RECARGO', bx + bw / 2, ySinRecargo, { size: 20, weight: 'bold', color: C.blanco, align: 'center' })
+    if (conCondicion) {
+      text(ctx, quote.promo.condicion, bx + bw / 2, y + 96, { size: 13, color: '#cfe6e4', align: 'center' })
+    }
   } else {
     text(ctx, 'Precio de contado', bx + bw / 2, y + 62, { size: 20, weight: 'bold', color: C.blanco, align: 'center' })
     text(ctx, 'Consultá planes de pago', bx + bw / 2, y + 88, { size: 15, color: '#cfe6e4', align: 'center' })
@@ -476,43 +484,22 @@ function drawPaymentOptions(ctx, quote, y) {
   text(ctx, 'FORMAS DE PAGO', PAD + 34, y + 14, { size: 16, weight: 'bold', color: C.verdeOscuro })
   y += 34
 
-  // Cuotas: 3/6/8/10 (siempre) + la promo sin recargo (si su cantidad no está ya).
-  const options = [3, 6, 8, 10].map((n) => ({ n, valor: quote.cuotas[n]?.valor, promo: false }))
-  if (quote.promo && !options.some((o) => o.n === quote.promo.count)) {
-    options.push({ n: quote.promo.count, valor: quote.promo.valor, promo: true })
-  } else if (quote.promo) {
-    const o = options.find((x) => x.n === quote.promo.count)
-    o.promo = true
-    o.valor = quote.promo.valor
-  }
-  options.sort((a, b) => a.n - b.n)
+  // LOG-16: acá van SOLO las formas de pago reales (3/6/8/10, con su recargo). Antes la
+  // promo sin recargo se metía en esta misma fila y, cuando su cantidad coincidía con una
+  // de estas (BSE y SURA promocionan 10, que ya está en la lista), le PISABA el valor: la
+  // tarjeta decía "10 cuotas" pero mostraba el precio sin recargo, y el precio real no
+  // aparecía por ningún lado. La promo ahora vive aparte, en la banda verde de arriba,
+  // con su condición (ver drawPriceBand).
+  const options = [3, 6, 8, 10].map((n) => ({ n, valor: quote.cuotas[n]?.valor }))
 
   const gap = 12
   const cw = (INNER - gap * (options.length - 1)) / options.length
   const ch = 96
   options.forEach((o, i) => {
     const x = PAD + i * (cw + gap)
-    card(ctx, x, y, cw, ch, {
-      fill: o.promo ? C.tinteSuave : C.blanco,
-      stroke: o.promo ? C.verde : C.borde,
-      radius: 12,
-    })
-    if (o.promo) {
-      ctx.fillStyle = C.verde
-      ctx.beginPath()
-      ctx.arc(x + cw - 16, y + 16, 12, 0, Math.PI * 2)
-      ctx.fill()
-      iconStar(ctx, x + cw - 16, y + 16, 7, C.blanco)
-    }
-    text(ctx, `${o.n} cuotas`, x + cw / 2, y + 32, { size: 16, color: o.promo ? C.verdeOscuro : C.texto, align: 'center' })
-    text(ctx, formatMoney(o.valor), x + cw / 2, y + 62, { size: 22, weight: 'bold', color: o.promo ? C.verdeOscuro : C.texto, align: 'center' })
-    if (o.promo) {
-      const pw = 104
-      roundedRectPath(ctx, x + cw / 2 - pw / 2, y + 70, pw, 20, 10)
-      ctx.fillStyle = C.verdeOscuro
-      ctx.fill()
-      text(ctx, 'SIN RECARGO', x + cw / 2, y + 84, { size: 11, weight: 'bold', color: C.blanco, align: 'center' })
-    }
+    card(ctx, x, y, cw, ch, { fill: C.blanco, stroke: C.borde, radius: 12 })
+    text(ctx, `${o.n} cuotas`, x + cw / 2, y + 32, { size: 16, color: C.texto, align: 'center' })
+    text(ctx, formatMoney(o.valor), x + cw / 2, y + 62, { size: 22, weight: 'bold', color: C.texto, align: 'center' })
   })
   return y + ch
 }

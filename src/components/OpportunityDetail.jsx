@@ -198,7 +198,7 @@ export default function OpportunityDetail({
         if (cancelled || !data) return
         setItem(data)
         const mapped = (data.subitems ?? []).map(mapSubitemToRawQuote)
-        const raws = applyRecargoLookup(mapped, schema?.recargoLookup ?? {})
+        const raws = mapped
         setRawQuotes(raws)
         setSelectedIds(new Set(raws.filter((r) => r.incluirPropuesta).map((r) => r.id)))
 
@@ -356,7 +356,7 @@ export default function OpportunityDetail({
         const estadoCotizacion = textOf(data.column_values, ESTADO_COTIZACION_COLUMN_ID)
         const estadoOportunidad = textOf(data.column_values, ESTADO_OPORTUNIDAD_COLUMN_ID)
         const mapped = (data.subitems ?? []).map(mapSubitemToRawQuote)
-        const raws = applyRecargoLookup(mapped, schema?.recargoLookup ?? {})
+        const raws = mapped
 
         // Progreso en vivo por compañía (ver CotizandoModal) — se actualiza en CADA
         // tick. Se excluyen los subitems que YA existían antes de arrancar
@@ -550,7 +550,14 @@ export default function OpportunityDetail({
       serviciosIlimitadosPortoMinYear: schema?.serviciosIlimitadosPortoMinYear,
       preciosOpcionales: schema?.preciosOpcionales ?? {},
     }
-    const withQuotes = rawQuotes.map((raw) => {
+    // Los recargos por cuota se aplican ACÁ y no al traer las cotizaciones: este memo
+    // depende de `schema`, así que si PANEL llega después que el detalle (pasa siempre
+    // que se entra por URL directa o se recarga la página: el detalle es un solo fetch y
+    // el schema son cinco en paralelo) las cuotas se recalculan solas. Antes el recargo
+    // se horneaba en el fetch con el schema todavía vacío y quedaba en 0 para siempre:
+    // las cuotas se mostraban SIN recargo, más baratas que el precio real.
+    const conRecargos = applyRecargoLookup(rawQuotes, schema?.recargoLookup ?? {})
+    const withQuotes = conRecargos.map((raw) => {
       const effectiveRaw = { ...raw, uso: opportunity?.uso ?? '', anioVehiculo: opportunity?.anio ?? '' }
       return {
         raw: effectiveRaw,

@@ -499,3 +499,12 @@
   min-width: 0;
   overflow: visible;
 }
+
+/* LOG-16: la condición de las cuotas sin recargo (BSE/SURA) va debajo de la promo, en
+   cursiva y más chica — es una aclaración, no otra forma de pago. */
+.quote-card__cuotas-condicion {
+  display: block;
+  font-style: italic;
+  font-size: 11px;
+  opacity: 0.85;
+}
