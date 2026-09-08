@@ -217,28 +217,45 @@ function computeAdicionales(eff, preciosOpcionales) {
   return total
 }
 
-function opcionalesBullets(eff, preciosOpcionales) {
+// LOG-18: los opcionales dejan de ser viñetas mezcladas adentro del INCLUYE. Salen como
+// lista propia y con los datos crudos (contratado o no, y a qué precio) para que la
+// tarjeta y la imagen los muestren en su propio cuadro: "lo que ya viene con la
+// cobertura" y "lo que se cotiza aparte" son 2 cosas distintas y se leían igual.
+//
+// `contratado` incluye los que ya vienen adentro de la cobertura (SURA TOTAL PLUS) y el
+// AP de SURA, que arranca tildado. `desde` marca el caso de Auto extra sin duración
+// elegida: el precio es el de la opción más barata, no el final.
+function buildOpcionales(eff, preciosOpcionales) {
   const disponibles = opcionalesDisponibles(eff)
-  if (!disponibles.length) return []
   const precios = preciosDe(eff, preciosOpcionales)
-  const bullets = []
+  const items = []
   for (const opc of disponibles) {
-    const incluido = todosIncluidos(eff) || (opc.incluidoPorDefecto ? eff[opc.field] !== false : Boolean(eff[opc.field]))
-    if (incluido) bullets.push(`INCLUYE ${opc.label}`)
-    else bullets.push(`OPCIONAL: ${opc.label} + ${formatMoney(precios[opc.precioKey])}`)
+    const contratado =
+      todosIncluidos(eff) || (opc.incluidoPorDefecto ? eff[opc.field] !== false : Boolean(eff[opc.field]))
+    items.push({
+      label: opc.label,
+      contratado,
+      precio: contratado ? null : num(precios[opc.precioKey]) || null,
+      desde: false,
+    })
   }
-  if (eff.autoExtra) {
-    bullets.push(`INCLUYE ${AUTO_EXTRA_LABEL} (${eff.autoExtra.toUpperCase()})`)
+  if (eff.autoExtra && autoExtraDisponible(eff)) {
+    items.push({
+      label: `${AUTO_EXTRA_LABEL} (${eff.autoExtra.toUpperCase()})`,
+      contratado: true,
+      precio: null,
+      desde: false,
+    })
   } else if (autoExtraDisponible(eff)) {
     const preciosAutoExtra = Object.keys(precios)
       .filter((k) => k.startsWith('Auto extra '))
       .map((k) => num(precios[k]))
       .filter(Boolean)
     if (preciosAutoExtra.length) {
-      bullets.push(`OPCIONAL: ${AUTO_EXTRA_LABEL} desde ${formatMoney(Math.min(...preciosAutoExtra))}`)
+      items.push({ label: AUTO_EXTRA_LABEL, contratado: false, precio: Math.min(...preciosAutoExtra), desde: true })
     }
   }
-  return bullets
+  return items
 }
 
 // El texto "base" (compañía+cobertura) sale de PANEL (services/recargoPanel.js#fetchPanelData,
@@ -257,7 +274,6 @@ function buildIncluyeBullets(eff, panelContext) {
     repuestosOriginalesMinYear,
     reposicion0kmMinYear,
     serviciosIlimitadosPortoMinYear,
-    preciosOpcionales,
   } = panelContext
 
   const baseText = incluyeLookup?.porCobertura?.[eff.compania]?.[eff.cobertura]
@@ -298,7 +314,9 @@ function buildIncluyeBullets(eff, panelContext) {
   // así que viven en una sola fila de PANEL (compañía sin cobertura) y se suman acá.
   bullets.push(...enViñetas(incluyeLookup?.porCompania?.[eff.compania]))
 
-  bullets.push(...opcionalesBullets(eff, preciosOpcionales))
+  // LOG-18: los opcionales salían acá mismo, como una viñeta más ("OPCIONAL: … + $N")
+  // entre los beneficios — se leían como si vinieran incluidos. Ahora van aparte, en
+  // quote.opcionales (ver buildOpcionales).
 
   return bullets
 }
@@ -500,6 +518,8 @@ export function computeQuote(raw, overrides = {}, panelContext = {}) {
     deducibleDisplay: deducibleDisplay(eff),
     warning: computeWarning(eff),
     incluye: buildIncluyeBullets(eff, panelContext),
+    // LOG-18: aparte de los beneficios — se muestran en su propio cuadro.
+    opcionales: buildOpcionales(eff, panelContext.preciosOpcionales),
     rc: eff.rc || '',
   }
 }

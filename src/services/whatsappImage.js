@@ -545,6 +545,45 @@ function drawBenefits(ctx, incluye, y, { fontSize = 15, extraH = 0 } = {}) {
   return y + h
 }
 
+// LOG-18: cuadro propio para los opcionales, separado de "BENEFICIOS INCLUIDOS" — antes
+// se colaban ahí adentro como una viñeta más ("OPCIONAL: … + $N") y el cliente los leía
+// como si vinieran con la cobertura. Los contratados van con tilde (ya están adentro del
+// costo total de arriba); los demás, con el precio al que se agregarían.
+function drawOpcionales(ctx, opcionales, y, { fontSize = 15 } = {}) {
+  const itemFont = `${fontSize}px ${FONT}`
+  const lineH = Math.round(fontSize * 1.5)
+  const precioDe = (o) =>
+    o.contratado ? 'CONTRATADO' : o.precio ? `${o.desde ? 'DESDE ' : '+ '}${formatMoney(o.precio)}` : 'CONSULTAR'
+  const h = 48 + opcionales.length * lineH + 10
+  card(ctx, PAD, y, INNER, h, { fill: C.blanco, stroke: C.borde, radius: 14 })
+  text(ctx, 'OPCIONALES (SE COTIZAN APARTE)', PAD + 24, y + 32, {
+    size: 16,
+    weight: 'bold',
+    color: C.verdeOscuro,
+  })
+
+  let ry = y + 54
+  for (const opc of opcionales) {
+    const precio = precioDe(opc)
+    // measureText usa la fuente que esté puesta en el contexto: hay que fijarla antes.
+    ctx.font = `bold ${fontSize}px ${FONT}`
+    const precioW = ctx.measureText(precio).width
+    // El precio se ancla a la derecha; la etiqueta se recorta a lo que sobra para que
+    // nunca se pisen (los nombres de PORTO son largos).
+    const [linea] = wrapLines(ctx, opc.label, INNER - 60 - precioW - 20, itemFont)
+    if (opc.contratado) iconCircleCheck(ctx, PAD + 33, ry - 5, 9)
+    text(ctx, linea, PAD + (opc.contratado ? 50 : 24), ry, { size: fontSize })
+    text(ctx, precio, PAD + INNER - 24, ry, {
+      size: fontSize,
+      weight: 'bold',
+      align: 'right',
+      color: opc.contratado ? C.verdeOscuro : C.texto,
+    })
+    ry += lineH
+  }
+  return y + h
+}
+
 function drawWarning(ctx, warning, y) {
   const lines = wrapLines(ctx, `⚠ ${warning.full}`, INNER - 48, `bold 15px ${FONT}`)
   const h = 24 + lines.length * 21 + 8
@@ -593,6 +632,11 @@ function drawContent(ctx, opportunity, raw, quote, canvasHeight, logos, layout =
   if (quote.incluye?.length) {
     y = drawBenefits(ctx, quote.incluye, y + 18, { fontSize: layout.benefitsFont, extraH: layout.benefitsExtra })
   }
+  // LOG-18: debajo de los beneficios y en su propio cuadro. Achica la letra junto con
+  // ellos (misma pasada de ajuste) para no romper el alto fijo de la imagen.
+  if (quote.opcionales?.length) {
+    y = drawOpcionales(ctx, quote.opcionales, y + 14, { fontSize: layout.benefitsFont })
+  }
   if (quote.warning) y = drawWarning(ctx, quote.warning, y + 16)
   return y + 22
 }
@@ -607,7 +651,11 @@ function drawContent(ctx, opportunity, raw, quote, canvasHeight, logos, layout =
 // MON-08: pasó de 1240 a 1400 al sumar los beneficios diferenciales de cada aseguradora —
 // con ellos, PORTO (7 viñetas propias) llegaba a 1400 y BSE a 1240, y las imágenes salían
 // de alto distinto. Si se agregan más beneficios, este número hay que volver a subirlo.
-const FIXED_HEIGHT = 1400
+// LOG-18: pasó de 1400 a 1480 al sacar los opcionales de la tarjeta de beneficios y
+// darles cuadro propio — PORTO (4 opcionales) se iba a 1478 y salía más alta que las
+// demás. Medido con las 4 compañías; si se agregan más beneficios u opcionales hay que
+// volver a subirlo.
+const FIXED_HEIGHT = 1480
 
 // Dos pasadas: la primera sobre un canvas descartable para medir hasta dónde llega el
 // contenido (el nombre del vehículo y los beneficios varían de alto), la segunda sobre

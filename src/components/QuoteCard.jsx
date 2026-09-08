@@ -553,6 +553,29 @@ function QuoteCard({
               <strong>Contado base (sin ajustes):</strong> {formatMoney(Number(raw.contado))}
             </div>
           </div>
+          {/* LOG-18: cuadro propio, separado de "Incluye" — antes los opcionales eran
+              una viñeta más ahí adentro ("OPCIONAL: … + $N") y se leían como si vinieran
+              con la cobertura. Los que están contratados llevan tilde (ya están sumados
+              en el COSTO TOTAL de arriba); los que no, el precio al que se agregarían. */}
+          {quote.opcionales?.length > 0 && (
+            <div className="quote-card__opcionales">
+              <strong>Opcionales:</strong>
+              <ul>
+                {quote.opcionales.map((opt, i) => (
+                  <li key={i} className={opt.contratado ? 'quote-card__opcional--contratado' : undefined}>
+                    <span className="quote-card__opcional-label">{opt.label}</span>
+                    <span className="quote-card__opcional-precio">
+                      {opt.contratado
+                        ? 'contratado'
+                        : opt.precio
+                          ? `${opt.desde ? 'desde ' : '+ '}${formatMoney(opt.precio)}`
+                          : 'consultar'}
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          )}
           {quote.incluye.length > 0 && (
             <div className="quote-card__incluye">
               <strong>Incluye:</strong>
