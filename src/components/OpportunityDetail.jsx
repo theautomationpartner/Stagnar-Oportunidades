@@ -31,6 +31,7 @@ import { mapOpportunityItem } from '../services/opportunityMapper'
 import { textOf } from '../services/mondayColumns'
 import { useSchema } from '../context/AppContext'
 import { mapSubitemToRawQuote, groupQuotesByCompania } from '../services/quoteMapper'
+import { renderQuoteText } from '../services/whatsappText'
 import { computeQuote, isQuoteSelectable } from '../services/pricingEngine'
 import { applyRecargoLookup } from '../services/recargoPanel'
 import { COTIZAR_FIELDS, getMissingCotizarFields } from '../services/cotizarFields'
@@ -1119,6 +1120,9 @@ export default function OpportunityDetail({
         raw: e.raw,
         quote: e.quote,
         imageDataUrl: await renderQuoteImageDataUrl(opportunity, e.raw, e.quote),
+        // LOG-17: la misma cotización en texto. Se arma siempre (es un string, no cuesta
+        // nada al lado del canvas) — el formato se elige después, adentro del popup.
+        texto: renderQuoteText(opportunity, e.raw, e.quote),
       }))
     )
     setWaModalImages(images)

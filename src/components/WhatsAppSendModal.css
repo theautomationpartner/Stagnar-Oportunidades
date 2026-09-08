@@ -163,3 +163,52 @@
   max-height: 200px;
   overflow-y: auto;
 }
+
+/* LOG-17: selector de formato (Imagen / Texto / Ambos) arriba de la previsualización. */
+.wa-modal__formato {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 14px;
+}
+
+.wa-modal__formato-label {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-gray);
+}
+
+/* Previsualización del texto: se ve tal cual va a llegar el mensaje (mismos saltos de
+   línea), con scroll propio para no estirar el popup cuando hay varias cotizaciones. */
+.wa-modal__preview-texts {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-height: 320px;
+  overflow-y: auto;
+}
+
+.wa-modal__preview-text {
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 10px 12px;
+  background: var(--bg-subtle);
+}
+
+.wa-modal__preview-text-title {
+  display: block;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 6px;
+}
+
+.wa-modal__preview-text pre {
+  margin: 0;
+  font-family: inherit;
+  font-size: 12px;
+  line-height: 1.45;
+  color: var(--text-dark);
+  white-space: pre-wrap;
+  word-break: break-word;
+}

@@ -44,13 +44,17 @@ async function dataUrlToBlob(dataUrl) {
 // mismo flag que usan las solapas del paso "Comparar y enviar" (coberturaGroupOf) — si
 // una cobertura no cae en ninguna familia, se manda "SIN-FAMILIA" en vez de un segmento
 // vacío (un "____" ambiguo al hacer split() del lado de Make).
-function buildFilename(raw, opportunity) {
+function buildFilename(raw, opportunity, ext = 'png') {
   const cobertura = raw.cobertura || raw.name
   const tipo = coberturaGroupOf(raw.cobertura) ?? 'SIN-FAMILIA'
-  return `${raw.compania}__${cobertura}__${tipo}__${opportunity.oppNumber}.png`
+  return `${raw.compania}__${cobertura}__${tipo}__${opportunity.oppNumber}.${ext}`
 }
 
-export async function sendQuotesToWhatsApp({ phone, opportunity, images }) {
+// LOG-17: qué se le manda al cliente. "imagen" es lo de siempre; "texto" manda la misma
+// cotización escrita (ver whatsappText.js) y "ambos", las dos cosas.
+export const FORMATOS_ENVIO = ['imagen', 'texto', 'ambos']
+
+export async function sendQuotesToWhatsApp({ phone, opportunity, images, formato = 'imagen' }) {
   const url = getMakeWebhookUrl()
   if (!url) {
     throw new Error(
@@ -63,10 +67,26 @@ export async function sendQuotesToWhatsApp({ phone, opportunity, images }) {
   formData.append('opportunityId', opportunity.id)
   formData.append('oppNumber', opportunity.oppNumber)
   formData.append('clienteNombre', opportunity.clienteNombre)
+  // LOG-17: el escenario de Make lee esto para decidir qué mandar. Igual solo viajan los
+  // campos que correspondan al formato elegido, así que un escenario que itere lo que
+  // llega ya se comporta bien sin mirarlo.
+  formData.append('formato', formato)
 
-  for (const { raw, imageDataUrl } of images) {
-    const blob = await dataUrlToBlob(imageDataUrl)
-    formData.append('images', blob, buildFilename(raw, opportunity))
+  const mandaImagen = formato === 'imagen' || formato === 'ambos'
+  const mandaTexto = formato === 'texto' || formato === 'ambos'
+
+  for (const { raw, imageDataUrl, texto } of images) {
+    if (mandaImagen && imageDataUrl) {
+      const blob = await dataUrlToBlob(imageDataUrl)
+      formData.append('images', blob, buildFilename(raw, opportunity))
+    }
+    // El texto viaja como archivo .txt bajo el campo "texts" — mismo esquema que las
+    // imágenes (un solo campo repetido, con compañía/cobertura/familia codificadas en el
+    // "name") para que del lado de Make se itere igual, con el mismo split(), y no haya
+    // que correlacionar dos arrays sueltos por índice. Ver el comentario grande de arriba.
+    if (mandaTexto && texto) {
+      formData.append('texts', new Blob([texto], { type: 'text/plain' }), buildFilename(raw, opportunity, 'txt'))
+    }
   }
 
   // Ojo: no seteamos Content-Type a mano — el navegador arma el boundary de

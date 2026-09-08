@@ -10,7 +10,7 @@
 // incluye, warning. Devuelve un data URL PNG listo para previsualizar o mandar a Make.
 import { formatMoney, modeloSinMarca } from './format'
 import { BRAND_COLORS } from './companyColors'
-import { coberturaGroupOf } from './coberturaGroups'
+import { coberturaGroupOf, SUBTITULO_POR_FAMILIA } from './coberturaGroups'
 // A pedido: logo del header desde logo-blanco-.png con el fondo blanco recortado.
 import stagnariLogo from '../assets/stagnari-logo-header.png'
 import stagnariLogoSimple from '../assets/stagnari-logo-simple.png'
@@ -53,10 +53,8 @@ const INSURER_LOGOS = {
 // Subtítulo corto por familia de cobertura (ver coberturaGroups.js). Es texto
 // descriptivo genérico, no una condición contractual — el detalle real va en
 // "Beneficios incluidos" (quote.incluye) y en la advertencia (quote.warning).
-const SUBTITLE_BY_GROUP = {
-  GLOBAL: 'Cobertura completa del vehículo y responsabilidad civil.',
-  TRIPLE: 'Responsabilidad civil, hurto e incendio.',
-}
+// Compartido con la versión en texto (ver coberturaGroups.js).
+const SUBTITLE_BY_GROUP = SUBTITULO_POR_FAMILIA
 
 const imageCache = new Map()
 function loadImage(src) {

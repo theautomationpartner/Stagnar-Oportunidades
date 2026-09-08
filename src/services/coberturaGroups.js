@@ -34,3 +34,11 @@ export function coberturaGroupOf(cobertura) {
   if (TRIPLE_COBERTURAS.has(normalized)) return 'TRIPLE'
   return null
 }
+
+// Descripción en una línea de cada familia — la usan la imagen de WhatsApp y la versión
+// en texto (LOG-17), que tienen que decir lo mismo del mismo plan. Si la cobertura no
+// cae en ninguna familia, quien la muestre arma un texto genérico con su nombre.
+export const SUBTITULO_POR_FAMILIA = {
+  GLOBAL: 'Cobertura completa del vehículo y responsabilidad civil.',
+  TRIPLE: 'Responsabilidad civil, hurto e incendio.',
+}
