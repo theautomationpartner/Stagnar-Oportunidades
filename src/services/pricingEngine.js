@@ -342,21 +342,24 @@ function computeContado(eff) {
 // imagen de WhatsApp (ver whatsappImage.js), donde sí conviene el detalle completo.
 // LOG-15: SANCOR no admite descuento si el titular es menor de 25 o mayor de 70 — con la
 // edad fuera de ese rango la bonificación se ignora (ver bonificacionAplicable).
+// Vale para TODAS las coberturas de SANCOR, no solo la familia estándar: es una condición
+// del titular, no del producto. Antes daba igual porque PARCIAL PLUS no tomaba
+// bonificación; ahora que la Bonificación se aplica siempre (LOG-11), sin esto un titular
+// de 75 años recibía descuento en PARCIAL PLUS y no en el resto.
 function sancorSinDescuento(eff) {
-  if (eff.compania !== 'SANCOR' || !SANCOR_STANDARD_FAMILY.includes(eff.cobertura)) return false
+  if (eff.compania !== 'SANCOR') return false
   const edad = num(eff.edad)
   return edad > 0 && (edad < 25 || edad > 70)
 }
 
-// Coberturas cuya fórmula real nunca tomó bonificación: el precio sale tal cual lo cotizó
-// el portal. Se respeta lo que hacían las fórmulas de monday — si alguna de estas sí
-// admite bonificación, se saca de esta lista y listo.
-const COBERTURAS_SIN_BONIFICACION = new Set(['GLOBAL - 3x2', '4 EN 1', 'PARCIAL PLUS'])
-
-// LOG-11: cuánta bonificación entra en el cálculo, como fracción. 0 cuando la cobertura no
-// la admite o cuando SANCOR la bloquea por la edad del titular (LOG-15).
+// LOG-11: cuánta bonificación entra en el cálculo, como fracción.
+// Aplica en TODAS las coberturas. Antes había dos ideas separadas: la "bonificación", que
+// la fórmula de cada compañía aplicaba o no (BSE GLOBAL - 3x2, SURA 4 EN 1 y SANCOR
+// PARCIAL PLUS no la tomaban), y un "descuento" suelto que sí se aplicaba a todas. Al
+// unirse en una sola, la Bonificación ocupa el lugar del descuento: se aplica siempre.
+// La única excepción es la de SANCOR por edad del titular (LOG-15).
 function bonificacionAplicable(eff) {
-  if (COBERTURAS_SIN_BONIFICACION.has(eff.cobertura) || sancorSinDescuento(eff)) return 0
+  if (sancorSinDescuento(eff)) return 0
   return num(eff.bonif) / 100
 }
 
