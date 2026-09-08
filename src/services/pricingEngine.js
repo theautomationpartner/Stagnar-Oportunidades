@@ -61,6 +61,16 @@ const REPUESTOS_ORIGINALES_COBERTURAS = new Set([
   'GLOBAL ded Alto', // PORTO
 ])
 
+// MON-07: SANCOR presta auxilio mecánico solo en vehículos de menos de 25 años. Con un
+// vehículo más viejo la viñeta no va — prometería un servicio que la compañía no da. Si no
+// se sabe el año del vehículo se muestra igual: no hay motivo para ocultar un beneficio
+// por un dato que falta.
+function sancorTieneAuxilio(eff) {
+  const anio = Number(eff.anioVehiculo)
+  if (!Number.isFinite(anio) || anio <= 0) return true
+  return new Date().getFullYear() - anio < 25
+}
+
 // SANCOR "PARCIAL" siempre dice 3 servicios (no depende del Uso); las demás coberturas
 // SANCOR (TOTAL 600/800/1500/2500 y PARCIAL PLUS) sí varían según Uso = PARTICULAR.
 function sancorAuxilioMecanico(eff) {
@@ -235,7 +245,7 @@ function buildIncluyeBullets(eff, panelContext) {
 
   const bullets = enViñetas(baseText)
 
-  if (eff.compania === 'SANCOR') {
+  if (eff.compania === 'SANCOR' && sancorTieneAuxilio(eff)) {
     bullets.unshift(sancorAuxilioMecanico(eff))
   }
   if (eff.compania === 'PORTO') {
