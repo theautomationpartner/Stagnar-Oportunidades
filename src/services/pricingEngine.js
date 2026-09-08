@@ -520,6 +520,17 @@ export function computeQuote(raw, overrides = {}, panelContext = {}) {
     incluye: buildIncluyeBullets(eff, panelContext),
     // LOG-18: aparte de los beneficios — se muestran en su propio cuadro.
     opcionales: buildOpcionales(eff, panelContext.preciosOpcionales),
+    // LOG-19: los valores con los que REALMENTE se calculó — el dato de monday ya
+    // pisado por los ajustes de "Parámetros" (ver mergeRawWithOverrides) — más el
+    // contado base y la bonificación efectivamente aplicada (que puede ser 0 aunque haya
+    // un porcentaje cargado, ver sancorSinDescuento). Es lo que se exporta a planilla
+    // para poder cotejar contra los portales.
+    efectivo: {
+      ...eff,
+      contadoCalculado: contadoResult,
+      bonifAplicada: bonif,
+      adicionales,
+    },
     rc: eff.rc || '',
   }
 }

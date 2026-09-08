@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react'
-import { MdSend, MdAutorenew, MdArrowBack } from 'react-icons/md'
+import { MdSend, MdAutorenew, MdArrowBack, MdDownload } from 'react-icons/md'
 import { Button, EmptyState, AttentionBox, Loader } from '@vibe/core'
 import QuoteCard from './QuoteCard'
 import StatusBadge from './StatusBadge'
@@ -32,6 +32,7 @@ import { textOf } from '../services/mondayColumns'
 import { useSchema } from '../context/AppContext'
 import { mapSubitemToRawQuote, groupQuotesByCompania } from '../services/quoteMapper'
 import { renderQuoteText } from '../services/whatsappText'
+import { buildQuotesCsv, descargarCsv, nombreArchivoCotizaciones } from '../services/quotesExport'
 import { computeQuote, isQuoteSelectable } from '../services/pricingEngine'
 import { applyRecargoLookup } from '../services/recargoPanel'
 import { COTIZAR_FIELDS, getMissingCotizarFields } from '../services/cotizarFields'
@@ -1098,6 +1099,14 @@ export default function OpportunityDetail({
     }))
   }
 
+  // LOG-19: la planilla sale de `groups`, o sea de lo mismo que se está viendo en
+  // pantalla (con los ajustes de "Parámetros" ya aplicados), pero sin filtrar por solapa
+  // ni por selección: el punto es poder cotejar TODAS las opciones contra los portales.
+  const handleDescargarPlanilla = () => {
+    const entries = groups.flatMap((g) => g.entries)
+    descargarCsv(nombreArchivoCotizaciones(opportunity), buildQuotesCsv(opportunity, entries))
+  }
+
   const [preparingWaImages, setPreparingWaImages] = useState(false)
   const handleOpenWhatsAppModal = async () => {
     // Auditoría: antes el botón quedaba "muerto" (sin spinner ni disabled) mientras se
@@ -1444,6 +1453,12 @@ export default function OpportunityDetail({
                 {/* A pedido: se puede pasar a "Confirmar" sin haber enviado nada por
                     WhatsApp — útil cuando el cliente ya eligió la propuesta por otro
                     medio (llamada, presencial) y no hace falta mandarle nada más. */}
+                {/* LOG-19: baja TODAS las cotizaciones de la oportunidad (no solo las
+                    seleccionadas ni las de la solapa activa) con los parámetros con los
+                    que se calculó cada una, para cotejarlas a mano contra los portales. */}
+                <Button kind="tertiary" onClick={handleDescargarPlanilla}>
+                  <MdDownload /> Descargar detalle
+                </Button>
                 <Button kind="secondary" onClick={() => setActiveStep('confirmar')}>
                   Continuar sin enviar
                 </Button>
