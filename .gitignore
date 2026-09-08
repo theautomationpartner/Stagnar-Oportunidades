@@ -4,3 +4,6 @@ dist
 vite-dev.log
 panel_incluye.json
 testwebhook.txt
+scripts/log-*.txt
+scripts/errores-*.json
+scripts/sin-match-*.txt
