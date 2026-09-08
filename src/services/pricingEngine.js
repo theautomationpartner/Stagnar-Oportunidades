@@ -10,8 +10,11 @@ import { coberturaGroupOf } from './coberturaGroups'
 // "overrides" usa los MISMOS nombres de campo que "raw" (contado, bonif, edad, deducibleBase,
 // deducibleBSE, edadBSE, deducibleSURA, deducibleSancorUsd, recargo3/6/8/10) — son, literalmente,
 // todos los datos fijos con los que se calcula la cotización, editables uno por uno, con el
-// valor real cargado en monday como default. La única excepción es "descuento", que no es una
-// columna real de monday: es un ajuste manual extra que se suma por arriba.
+// valor real cargado en monday como default.
+//
+// LOG-11: antes había además un "descuento" suelto (sin columna real) que se multiplicaba
+// después de la bonificación, así que cargar 10 y 10 no daba 20% sino 19%. Quedó una sola
+// palanca: la Bonificación, aplicada una vez sobre el total (ver computeQuote).
 
 const BSE_DEDUCIBLE_DISCOUNT = { '1': 0, '0.5': -0.16, '1.5': 0.07, '2': 0.13, '2.5': 0.18, '3': 0.23 }
 const BSE_EDAD_DISCOUNT = { '35 a 75': 0.06, '56 a 75': 0.08 }
@@ -87,7 +90,7 @@ function portoAuxilioMecanico(eff, serviciosIlimitadosPortoMinYear) {
 
 // Opcionales por compañía. Cada uno es una columna real del subitem (ver quoteMapper.js),
 // porque es un dato de la cotización que se persiste en monday apenas se tilda — a
-// diferencia de Bonificación/Descuento en QuoteCard, que son ajustes de prueba.
+// diferencia de la Bonificación en QuoteCard, que es un ajuste de prueba.
 // `precioKey` es el NOMBRE de la fila en PANEL (Grupo=Configuracion) de esa compañía, ver
 // recargoPanel.js#buildConfiguracion.
 //
@@ -293,38 +296,37 @@ function mergeRawWithOverrides(raw, overrides) {
 // Calcula el total "contado" base de un subitem segun compañia + cobertura.
 // Devuelve null si la combinacion compañia/cobertura no tiene formula definida
 // (mismo comportamiento que las formulas de monday, que devuelven "" en ese caso).
+// LOG-11: la bonificación ya NO se aplica acá. Esto devuelve el precio base con los
+// descuentos propios de cada compañía (deducible y edad en BSE, deducible en SURA); la
+// bonificación se aplica una sola vez sobre ese total, en computeQuote.
 function computeContado(eff) {
   const contado = num(eff.contado)
-  const bonif = num(eff.bonif) / 100
 
   if (eff.compania === 'BSE') {
     const dtoDed = BSE_DEDUCIBLE_DISCOUNT[eff.deducibleBSE] ?? 0
     const dtoEdad = BSE_EDAD_DISCOUNT[eff.edadBSE] ?? 0
-    if (eff.cobertura === 'GLOBAL - anual') return round(contado * (1 - bonif) * (1 - dtoEdad) * (1 - dtoDed))
-    if (eff.cobertura === 'GLOBAL - 3x2') return round(contado * (1 - dtoEdad) * (1 - dtoDed))
-    if (BSE_TRIPLE_COBERTURAS.includes(eff.cobertura)) return round(contado * (1 - bonif))
+    if (eff.cobertura === 'GLOBAL - anual' || eff.cobertura === 'GLOBAL - 3x2') {
+      return round(contado * (1 - dtoEdad) * (1 - dtoDed))
+    }
+    if (BSE_TRIPLE_COBERTURAS.includes(eff.cobertura)) return round(contado)
     return null
   }
 
   if (eff.compania === 'SURA') {
     const dtoDed = SURA_DEDUCIBLE_DISCOUNT[eff.deducibleSURA] ?? 0
-    if (SURA_TOTAL_FAMILY.includes(eff.cobertura)) return round(contado * (1 - dtoDed) * (1 - bonif))
+    if (SURA_TOTAL_FAMILY.includes(eff.cobertura)) return round(contado * (1 - dtoDed))
     if (eff.cobertura === '4 EN 1') return round(contado)
     return null
   }
 
   if (eff.compania === 'SANCOR') {
     if (eff.cobertura === 'PARCIAL PLUS') return round(contado)
-    // LOG-15: SANCOR no admite descuento con el titular fuera del rango de edad — la
-    // bonificación cargada se ignora (ver sancorSinDescuento y el aviso de computeWarning).
-    if (SANCOR_STANDARD_FAMILY.includes(eff.cobertura)) {
-      return round(contado * (1 - (sancorSinDescuento(eff) ? 0 : bonif)))
-    }
+    if (SANCOR_STANDARD_FAMILY.includes(eff.cobertura)) return round(contado)
     return null
   }
 
   if (eff.compania === 'PORTO') {
-    if (PORTO_FAMILY.includes(eff.cobertura)) return round(contado * (1 - bonif))
+    if (PORTO_FAMILY.includes(eff.cobertura)) return round(contado)
     return null
   }
 
@@ -339,23 +341,34 @@ function computeContado(eff) {
 // puntual), que recién se muestra al desplegar "Ver más" — y la que se manda en la
 // imagen de WhatsApp (ver whatsappImage.js), donde sí conviene el detalle completo.
 // LOG-15: SANCOR no admite descuento si el titular es menor de 25 o mayor de 70 — con la
-// edad fuera de ese rango, la bonificación y el descuento manual se ignoran en el
-// cálculo (ver computeContado y computeQuote).
+// edad fuera de ese rango la bonificación se ignora (ver bonificacionAplicable).
 function sancorSinDescuento(eff) {
   if (eff.compania !== 'SANCOR' || !SANCOR_STANDARD_FAMILY.includes(eff.cobertura)) return false
   const edad = num(eff.edad)
   return edad > 0 && (edad < 25 || edad > 70)
 }
 
+// Coberturas cuya fórmula real nunca tomó bonificación: el precio sale tal cual lo cotizó
+// el portal. Se respeta lo que hacían las fórmulas de monday — si alguna de estas sí
+// admite bonificación, se saca de esta lista y listo.
+const COBERTURAS_SIN_BONIFICACION = new Set(['GLOBAL - 3x2', '4 EN 1', 'PARCIAL PLUS'])
+
+// LOG-11: cuánta bonificación entra en el cálculo, como fracción. 0 cuando la cobertura no
+// la admite o cuando SANCOR la bloquea por la edad del titular (LOG-15).
+function bonificacionAplicable(eff) {
+  if (COBERTURAS_SIN_BONIFICACION.has(eff.cobertura) || sancorSinDescuento(eff)) return 0
+  return num(eff.bonif) / 100
+}
+
 function computeWarning(eff) {
   if (sancorSinDescuento(eff)) {
     const edad = num(eff.edad)
     // El aviso de la edad mínima ya existía; ahora también cubre el tope de 70 y aclara
-    // que por eso no se aplica ningún descuento.
+    // que por eso no se aplica la bonificación.
     const motivo = edad < 25 ? 'no cumple el mínimo requerido por SANCOR (25 años)' : 'supera el máximo de SANCOR (70 años)'
     return {
       short: edad < 25 ? 'Edad del titular no cumple el mínimo requerido' : 'Edad del titular supera el máximo permitido',
-      full: `Edad del titular ${motivo}: no se aplica bonificación ni descuento. Cotización orientativa.`,
+      full: `Edad del titular ${motivo}: no se aplica bonificación. Cotización orientativa.`,
     }
   }
   return null
@@ -390,8 +403,8 @@ function deducibleDisplay(eff) {
 }
 
 // overrides: mismos campos que "raw" (contado, bonif, edad, deducibleBase, deducibleBSE,
-// edadBSE, deducibleSURA, deducibleSancorUsd, recargo3/6/8/10) + "descuento" (fracción, sin
-// columna real). Todos opcionales — un campo ausente o vacío usa el valor real del subitem.
+// edadBSE, deducibleSURA, deducibleSancorUsd, recargo3/6/8/10). Todos opcionales — un
+// campo ausente o vacío usa el valor real del subitem.
 // panelContext: { incluyeLookup, repuestosOriginalesMinYear, reposicion0kmMinYear,
 // serviciosIlimitadosPortoMinYear, preciosOpcionalesPorto } — de
 // recargoPanel.js#fetchPanelData (schema cargado una vez al iniciar la app), no un dato
@@ -404,13 +417,15 @@ export function computeQuote(raw, overrides = {}, panelContext = {}) {
     return { blocked: true, blockedReason: 'No hay fórmula definida para esta combinación de compañía y cobertura' }
   }
 
-  // LOG-14/LOG-15: los opcionales elegidos se suman DESPUÉS de los descuentos — ni la
-  // bonificación (que ya viene aplicada adentro de computeContado) ni el descuento manual
-  // los tocan. El AP de SURA es al revés: ya viene incluido en el contado del portal, así
-  // que solo mueve el precio cuando se destilda, restando.
-  const descuento = sancorSinDescuento(eff) ? 0 : num(overrides.descuento)
+  // LOG-11: una sola palanca comercial (Bonificación), aplicada siempre sobre el total.
+  // Antes eran dos (Bonificación y Descuento) que se multiplicaban una tras otra, así que
+  // "10 y 10" no daba 20% sino 19%.
+  // LOG-14/LOG-15: los opcionales se suman DESPUÉS de la bonificación — no los toca. El AP
+  // de SURA es al revés: ya viene incluido en el contado del portal, así que solo mueve el
+  // precio cuando se destilda, restando.
+  const bonif = bonificacionAplicable(eff)
   const adicionales = computeAdicionales(eff, panelContext.preciosOpcionales)
-  const total = round(contadoResult * (1 - descuento) + adicionales)
+  const total = round(contadoResult * (1 - bonif) + adicionales)
 
   const cuotas = {}
   for (const n of CUOTA_COUNTS) {

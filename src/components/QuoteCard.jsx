@@ -50,8 +50,8 @@ const FIXED_FIELDS = [
   { key: 'uso', label: 'Uso', kind: 'text' },
 ]
 
-// Únicos campos editables por cotización: Bonificación/Descuento son palancas
-// comerciales de verdad, RC es una selección de nivel de cobertura común a las 4
+// Únicos campos editables por cotización: Bonificación es la palanca comercial (LOG-11:
+// antes eran dos, Bonificación y Descuento, que se multiplicaban entre sí), RC es una selección de nivel de cobertura común a las 4
 // compañías (columna dropdown_mm5954ma, opciones reales traídas por boardSchema.js —
 // no impacta el cálculo de precio, es solo el nivel de RC que se le muestra al
 // cliente), y el deducible/edad específico de cada compañía es otra selección de nivel
@@ -59,7 +59,6 @@ const FIXED_FIELDS = [
 function fieldsForRaw(raw, rcOptions) {
   const common = [
     { key: 'bonif', label: 'Bonificación (%)', kind: 'number' },
-    { key: 'descuento', label: 'Descuento (%)', kind: 'percent-only' },
     { key: 'rc', label: 'RC', kind: 'select', options: rcOptions },
   ]
 
@@ -108,7 +107,7 @@ function buildInitialForm(raw, overrides, fields) {
 }
 
 // A pedido: se muestran TODAS las etiquetas posibles para esta compañía (Bonificación,
-// Descuento, RC, y las específicas de cada una — Deducible/Edad BSE, Deducible SURA,
+// RC, y las específicas de cada una — Deducible/Edad BSE, Deducible SURA,
 // Deducible SANCOR), no solo las que tengan un override activo — en gris mientras no
 // tengan valor, coloreadas con el valor ya puesto apenas lo tienen (override, o el dato
 // real que ya traía el subitem de monday). displayValue ya resuelve esa prioridad
@@ -227,10 +226,6 @@ function QuoteCard({
     const nextOverrides = {}
     for (const field of fields) {
       const formValue = formValues[field.key]
-      if (field.key === 'descuento') {
-        if (formValue !== '0' && formValue !== '') nextOverrides.descuento = fromPercentString(formValue)
-        continue
-      }
       if (field.kind === 'percent') {
         if (formValue !== toPercentString(raw[field.key])) nextOverrides[field.key] = fromPercentString(formValue)
         continue
