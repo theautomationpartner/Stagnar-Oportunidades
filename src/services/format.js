@@ -59,7 +59,7 @@ export function matchesSearchQuery(label, query) {
 // LOG-23: además del casing, se ignoran acentos y espacios de más — "CAMIONETAS FURGON"
 // y "CAMIONETAS FURGÓN" (o un doble espacio de tipeo) son el mismo tipo, y antes
 // cualquiera de esas diferencias dejaba el campo vacío como si el dato no existiera.
-const normalizarParaMatch = (texto) =>
+export const normalizarParaMatch = (texto) =>
   String(texto)
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
