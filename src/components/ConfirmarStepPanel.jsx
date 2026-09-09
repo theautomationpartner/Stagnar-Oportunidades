@@ -3,7 +3,13 @@ import { MdCheckCircle, MdChatBubbleOutline } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
 import { Button, Checkbox, Dropdown, NumberField, TextField } from '@vibe/core'
 import { formatMoney, CUOTA_COUNTS, toPercentString } from '../services/format'
-import { autoExtraOpciones, isQuoteSelectable, opcionalesDeCompania, opcionesDePago } from '../services/pricingEngine'
+import {
+  autoExtraOpciones,
+  CUOTAS_SIN_CONFIRMAR,
+  isQuoteSelectable,
+  opcionalesDeCompania,
+  opcionesDePago,
+} from '../services/pricingEngine'
 import { accentForCompania, badgeForCompania } from '../services/companyColors'
 import { coberturaGroupOf, FAMILIA_LABEL } from '../services/coberturaGroups'
 import FileUploadField from './FileUploadField'
@@ -284,7 +290,7 @@ function AjustesElegida({ entry, onSetBonif, onToggleOpcional, onAutoExtraChange
                   aria-pressed={elegida}
                   disabled={savingOpcional === 'cuotas'}
                   className={elegida ? 'confirmar-step__pago confirmar-step__pago--activo' : 'confirmar-step__pago'}
-                  onClick={() => correr('cuotas', () => onSetCuotas(elegida ? '' : p.label))}
+                  onClick={() => correr('cuotas', () => onSetCuotas(elegida ? CUOTAS_SIN_CONFIRMAR : p.label))}
                 >
                   <span className="confirmar-step__pago-label">{p.label}</span>
                   <strong>{formatMoney(p.valor)}</strong>
@@ -488,6 +494,11 @@ export default function ConfirmarStepPanel({
       if (!Number(elegida.raw.contado)) missingLabels.push('Contado')
       if (elegida.quote.deducibleDisplay === '—') missingLabels.push('Deducible')
       if (!elegida.quote.rc) missingLabels.push('RC')
+      // LOG-13: con qué forma de pago se cierra es parte de la decisión de este paso, no
+      // un dato de la cotización — se avisa si quedó sin elegir. Como todo lo de acá,
+      // avisa y deja seguir.
+      const pagoElegido = (opportunity.cuotasElegidas ?? '').trim()
+      if (!pagoElegido || pagoElegido === CUOTAS_SIN_CONFIRMAR) missingLabels.push('Forma de pago')
     }
     if (missingLabels.length > 0) {
       setValidationError(missingLabels)

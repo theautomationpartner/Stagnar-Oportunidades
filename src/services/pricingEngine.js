@@ -197,6 +197,12 @@ export function autoExtraOpciones(raw) {
   return opcionalesEditables(raw).autoExtra ? AUTO_EXTRA_DIAS[raw.compania] ?? [] : []
 }
 
+// LOG-13: etiqueta de "todavía nadie eligió" de la columna "Cuotas elegidas". Existe como
+// estado explícito y no como celda vacía (a pedido) para que en el tablero se distinga
+// "falta decidirlo" de "nunca se tocó" y se pueda filtrar por eso. La app la trata igual
+// que vacío: ninguna opción queda marcada.
+export const CUOTAS_SIN_CONFIRMAR = 'Sin confirmar'
+
 // LOG-13: las formas de pago reales de ESTA cotización, para elegir con cuántas cuotas se
 // cierra. `label` tiene que coincidir con una etiqueta de la columna "Cuotas elegidas" del
 // tablero (ver scripts/log-13-columna-cuotas.mjs) — de ahí que sea el mismo texto y no

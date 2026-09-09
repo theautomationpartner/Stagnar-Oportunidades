@@ -24,7 +24,11 @@ const APLICAR = process.argv.includes('--apply')
 const OPORTUNIDADES_BOARD = '18420863013'
 const TITULO = 'Cuotas elegidas'
 
+// "Sin confirmar" es un estado explícito y no una celda vacía (a pedido): en el tablero
+// se distingue "falta decidirlo" de "nunca se tocó", y se puede filtrar por eso. La app
+// lo trata igual que vacío (ninguna opción marcada) y lo reclama al confirmar.
 const ETIQUETAS = [
+  'Sin confirmar',
   'Contado',
   '3 cuotas',
   '6 cuotas',
