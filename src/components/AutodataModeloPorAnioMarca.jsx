@@ -12,6 +12,10 @@ import { matchesSearchQuery, modeloSinMarca } from '../services/format'
 // Año+Marca (mejor mostrar de más que dejar el dropdown vacío por un dato que no
 // coincide exacto). Compartido entre CrearOportunidadForm.jsx (paso 2, alta de una
 // oportunidad nueva) y CotizarStepPanel.jsx (edición del paso "Cotizar").
+// Valor ficticio para pintar el modelo YA guardado cuando en esta edición todavía no se
+// eligió ninguno: no puede colisionar con un id real de Autodata (todos numéricos).
+const MODELO_ACTUAL = '__modelo-actual__'
+
 export default function AutodataModeloPorAnioMarca({
   anio,
   marca,
@@ -21,6 +25,9 @@ export default function AutodataModeloPorAnioMarca({
   onChange,
   placeholder,
   disabled: forceDisabled = false,
+  // Modelo que la oportunidad YA tiene guardado (texto). Solo para mostrarlo mientras no
+  // se elija otro — ver `selected` más abajo.
+  currentName,
 }) {
   const [options, setOptions] = useState([])
   const [loading, setLoading] = useState(false)
@@ -52,7 +59,19 @@ export default function AutodataModeloPorAnioMarca({
     }
   }, [anio, marca, tipo, combustible])
 
-  const selected = value ? { value: value.id, label: value.name } : null
+  // Bug reportado: al abrir "Editar vehículo" de una oportunidad que YA tenía modelo, el
+  // campo aparecía vacío ("Selecciona un modelo"), como si se hubiera perdido.
+  // `value` es la elección de ESTA edición y arranca en null a propósito: null significa
+  // "no se tocó, se conserva el modelo que ya está guardado" (ver buildInitialForm en
+  // CotizarStepPanel.jsx, y el guardado en OpportunityDetail.jsx, que solo reescribe la
+  // conexión de Autodata si de verdad se eligió uno nuevo). Lo que faltaba era MOSTRARLO.
+  // Se pinta como valor seleccionado sin tocar `value`, así el campo dice la verdad y la
+  // edición sigue sin quedar marcada como "modelo cambiado".
+  const selected = value
+    ? { value: value.id, label: value.name }
+    : currentName
+      ? { value: MODELO_ACTUAL, label: currentName }
+      : null
   const disabled = forceDisabled || !anio || !marca
 
   return (

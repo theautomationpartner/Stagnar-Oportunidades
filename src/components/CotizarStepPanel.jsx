@@ -72,7 +72,7 @@ function buildInitialForm(opportunity, dropdownOptions) {
 // strings/ids comunes (mismo patrón ya usado en FilterPanel.jsx). `searchable` +
 // filterOption (matchesSearchQuery, ver services/format.js) en los 3 primeros — a
 // pedido, antes no se podía filtrar tipeando en ninguno de estos.
-function FieldControl({ field, value, onChange, options, anio, marca, tipo, combustible, placeholder = 'Sin definir' }) {
+function FieldControl({ field, value, onChange, options, anio, marca, tipo, combustible, currentName, placeholder = 'Sin definir' }) {
   if (field.kind === 'text') {
     return <TextField size="small" value={value} onChange={(newValue) => onChange(newValue)} />
   }
@@ -130,7 +130,15 @@ function FieldControl({ field, value, onChange, options, anio, marca, tipo, comb
     // una búsqueda libre por texto sin acotar, mismo componente que ya usa
     // CrearOportunidadForm.jsx para lo mismo).
     return (
-      <AutodataModeloPorAnioMarca anio={anio} marca={marca} tipo={tipo} combustible={combustible} value={value} onChange={onChange} />
+      <AutodataModeloPorAnioMarca
+        anio={anio}
+        marca={marca}
+        tipo={tipo}
+        combustible={combustible}
+        value={value}
+        onChange={onChange}
+        currentName={currentName}
+      />
     )
   }
   return null
@@ -465,6 +473,9 @@ export default function CotizarStepPanel({
                             ? form.modeloSeleccion
                             : form[f.key]
                       }
+                      // Modelo ya guardado: se muestra mientras no se elija otro, para
+                      // que el campo no parezca vacío (ver AutodataModeloPorAnioMarca).
+                      currentName={f.key === 'modelo' ? form.modelo : undefined}
                       onChange={(v) => {
                         // A pedido: al cambiar el Departamento se limpia la Localidad
                         // elegida — puede ya no pertenecer al departamento nuevo (ver
