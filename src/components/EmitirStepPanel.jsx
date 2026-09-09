@@ -6,6 +6,7 @@ import { badgeForCompania } from '../services/companyColors'
 import { fetchFileColumnAsFile } from '../services/mondayApi'
 import { getMissingLabels as getMissingLabelsByStage } from '../services/requiredFields'
 import { compararPoliza } from '../services/polizaCheck'
+import { revisarIdentificacion } from '../services/vehiculoIdentificacion'
 import FileUploadField from './FileUploadField'
 import StepFooter from './StepFooter'
 import StatusBadge from './StatusBadge'
@@ -69,6 +70,17 @@ export default function EmitirStepPanel({
   // hay vehículo vinculado todavía (póliza sin crear) no hay nada que comparar y no se
   // muestra nada.
   const diferenciasPoliza = compararPoliza(opportunity, opportunity.vehiculoAsegurado)
+
+  // Red distinta de la de arriba: acá no se comparan los dos lados, se mira si cada valor
+  // PUEDE ser lo que dice ser (un chasis de 5 caracteres no es un chasis). Un dato mal
+  // leído de origen coincide con sí mismo y por eso el contraste no lo ve — esto sí.
+  const reparosFormato = [
+    ...revisarIdentificacion(opportunity, opportunity.anio).map((r) => ({ ...r, lado: 'lo cotizado' })),
+    ...revisarIdentificacion(opportunity.vehiculoAsegurado ?? {}, opportunity.anio).map((r) => ({
+      ...r,
+      lado: 'la póliza',
+    })),
+  ]
 
   // A pedido: cerrar el popup de "Creando póliza..." es solo visual, no corta el
   // polling de fondo — mismo criterio que CotizandoModal (ver su comentario). Se
@@ -134,6 +146,24 @@ export default function EmitirStepPanel({
             ))}
           </ul>
           Revisá la póliza antes de darla por buena. Este aviso no bloquea la emisión.
+        </AttentionBox>
+      )}
+
+      {/* Reparos de formato: el dato no puede ser lo que dice ser. Va en su propio aviso
+          y no mezclado con el de arriba porque piden cosas distintas — "no coincide"
+          manda a revisar la emisión, "no parece un chasis" manda a revisar la lectura del
+          documento. */}
+      {reparosFormato.length > 0 && (
+        <AttentionBox type="warning" title="Hay un dato del vehículo que no parece válido">
+          <ul className="emitir-step__poliza-check">
+            {reparosFormato.map((r, i) => (
+              <li key={i}>
+                <strong>{r.campo}</strong> en {r.lado}: {r.motivo}
+              </li>
+            ))}
+          </ul>
+          Puede ser un error de lectura del documento. Conviene corregirlo a mano antes de
+          archivar la póliza.
         </AttentionBox>
       )}
 

@@ -65,6 +65,7 @@ import {
   CONTACTO_NACIONALIDAD_COLUMN_ID,
 } from '../services/mondayApi'
 import { mapOpportunities } from '../services/opportunityMapper'
+import { revisarIdentificacion } from '../services/vehiculoIdentificacion'
 import { ciError, fechaError, fieldStateClass, maxFechaNacimiento, NACIONALIDAD_URUGUAY, normalizeFechaIA, splitNombreApellido, splitTelefono, stripCi, telefonoError, buildMondayPhone, emailError, buildMondayEmail } from '../services/personaFields'
 import { clearPersistedSearch, loadPersistedSearch, savePersistedSearch } from '../services/persistedSearch'
 import { DocumentChoiceToggle, ExtranjeroFields, Required, RequiredDropdown, SectionTitle, StepHeading, TelefonoField } from './crear/FormPrimitives'
@@ -772,6 +773,9 @@ export default function CrearOportunidadForm({
   // "completo" se chequea de verdad (mismos campos que exige el fallback de Error) para
   // saber si corresponde mostrar el resumen compacto o los campos editables con lo que
   // falte resaltado en amarillo.
+  // Reparos de formato sobre lo que leyó la Carta (ver vehiculoIdentificacion.js).
+  const reparosIdentificacion = revisarIdentificacion(form, form.anio)
+
   const vehiculoLeidoCompleto = Boolean(
     form.marca && form.anio && form.modeloSeleccion && form.combustible && form.uso && form.tipo
   )
@@ -2044,6 +2048,28 @@ export default function CrearOportunidadForm({
                       Editar datos <MdEdit />
                     </button>
                   </div>
+                )}
+
+                {/* Red temprana (LOG-21): la matrícula y el chasis que leyó la Carta se
+                    revisan contra reglas de formato acá mismo, apenas se leen — es el
+                    único momento en que un error de lectura se puede corregir ANTES de
+                    cotizar y emitir. Un chasis de 5 caracteres no es un chasis, y eso se
+                    sabe sin comparar contra nada. Avisa, no bloquea: el parque uruguayo
+                    tiene autos viejos e importados y una regla que corte el paso frenaría
+                    datos buenos. Los valores no se muestran en el formulario (no hacen
+                    falta para cotizar), así que este aviso es lo único que los delata. */}
+                {lecturaEstado === 'Leidos' && reparosIdentificacion.length > 0 && (
+                  <AttentionBox type="warning" className="crear-op__lectura-reparos">
+                    <strong>Revisá el documento:</strong>
+                    <ul>
+                      {reparosIdentificacion.map((r, i) => (
+                        <li key={i}>{r.motivo}</li>
+                      ))}
+                    </ul>
+                    Se guarda igual, pero conviene corregirlo en el documento o a mano en
+                    monday — es el dato con el que después se controla que la póliza se
+                    haya emitido sobre este auto.
+                  </AttentionBox>
                 )}
 
                 {/* A pedido: si la lectura ("Leidos") no completó TODOS los campos —

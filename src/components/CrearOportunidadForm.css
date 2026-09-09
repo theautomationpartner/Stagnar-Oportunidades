@@ -1294,3 +1294,14 @@
   box-shadow: none;
   outline: none;
 }
+
+/* Red temprana (LOG-21): reparos de formato sobre la matrícula/chasis leídos de la Carta,
+   debajo del resumen de la lectura. */
+.crear-op__lectura-reparos {
+  margin-top: 10px;
+}
+
+.crear-op__lectura-reparos ul {
+  margin: 4px 0 6px;
+  padding-left: 18px;
+}
