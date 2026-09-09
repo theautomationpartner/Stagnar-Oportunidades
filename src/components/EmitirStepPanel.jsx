@@ -2,9 +2,10 @@ import { useEffect, useState } from 'react'
 import { MdCheckCircle, MdHome } from 'react-icons/md'
 import { AttentionBox, Button, Modal, ModalContent } from '@vibe/core'
 import { formatMoney } from '../services/format'
-import { accentForCompania } from '../services/companyColors'
+import { badgeForCompania } from '../services/companyColors'
 import { fetchFileColumnAsFile } from '../services/mondayApi'
 import { getMissingLabels as getMissingLabelsByStage } from '../services/requiredFields'
+import { compararPoliza } from '../services/polizaCheck'
 import FileUploadField from './FileUploadField'
 import StepFooter from './StepFooter'
 import StatusBadge from './StatusBadge'
@@ -50,7 +51,9 @@ export default function EmitirStepPanel({
   onGoHome,
 }) {
   const elegida = groups.flatMap((g) => g.entries).find((e) => e.raw.propuestaElegida)
-  const accent = elegida ? accentForCompania(elegida.raw.compania) : null
+  // EST-02: el globito de la compañía elegida con SU color de fondo, no el celeste fijo
+  // que tenían las cuatro (ver badgeForCompania en companyColors.js).
+  const badge = elegida ? badgeForCompania(elegida.raw.compania) : null
   // A pedido, estética tipo mockup: mientras no esté "Creada" (la automatización de
   // creación de póliza, ver handleConfirmarEmision en OpportunityDetail.jsx, todavía
   // corriendo o sin arrancar) se muestra el botón "Concretar Oportunidad" + la cruz para
@@ -59,6 +62,13 @@ export default function EmitirStepPanel({
   const polizaSubida = Boolean(polizaFileName)
   const polizaBusy = uploading || deleting
   const showConfirmarAction = polizaSubida && !polizaBusy && estadoCreacion !== 'Creada'
+
+  // LOG-21: red de seguridad. La automatización de emisión crea el ítem de 🚘 Vehículos
+  // con la matrícula/chasis/motor que leyó del PDF y lo vincula acá ("Bien Asegurado") —
+  // se contrasta contra lo que se había leído de la Carta Automóvil al cotizar. Si no
+  // hay vehículo vinculado todavía (póliza sin crear) no hay nada que comparar y no se
+  // muestra nada.
+  const diferenciasPoliza = compararPoliza(opportunity, opportunity.vehiculoAsegurado)
 
   // A pedido: cerrar el popup de "Creando póliza..." es solo visual, no corta el
   // polling de fondo — mismo criterio que CotizandoModal (ver su comentario). Se
@@ -109,6 +119,24 @@ export default function EmitirStepPanel({
         </AttentionBox>
       )}
 
+      {/* LOG-21: aviso NO bloqueante — la póliza ya está cargada y puede estar bien
+          igual (la IA lee mal un chasis más seguido de lo que uno quisiera). Lo que hace
+          falta es que la diferencia se vea, no impedir el paso: se muestran los dos
+          valores enfrentados para que la persona decida en el momento, que es cuando
+          todavía es barato corregirlo. */}
+      {diferenciasPoliza.length > 0 && (
+        <AttentionBox type="warning" title="La póliza no coincide con el vehículo cotizado">
+          <ul className="emitir-step__poliza-check">
+            {diferenciasPoliza.map((d) => (
+              <li key={d.key}>
+                <strong>{d.label}:</strong> se cotizó «{d.oportunidad}» y la póliza dice «{d.poliza}»
+              </li>
+            ))}
+          </ul>
+          Revisá la póliza antes de darla por buena. Este aviso no bloquea la emisión.
+        </AttentionBox>
+      )}
+
       {/* A pedido: con la oportunidad ya concretada, ofrecer crear el contacto del
           Cliente/Lead en el tablero Contactos si todavía no tiene (ver CrearContactoCard). */}
       {concretada && opportunity.clienteId && <CrearContactoCard opportunity={opportunity} />}
@@ -133,7 +161,7 @@ export default function EmitirStepPanel({
                 Propuesta elegida:{' '}
                 <span
                   className="emitir-step__chosen-badge"
-                  style={{ color: accent, borderColor: accent }}
+                  style={{ color: badge.fg, background: badge.bg, borderColor: badge.border }}
                 >
                   {elegida.raw.compania} {elegida.raw.cobertura || elegida.raw.name}
                 </span>

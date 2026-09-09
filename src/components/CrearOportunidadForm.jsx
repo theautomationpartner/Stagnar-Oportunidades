@@ -146,6 +146,12 @@ function buildInitialForm() {
     combustible: '',
     uso: '',
     tipo: '',
+    // LOG-21: identificación del vehículo (matrícula/chasis/motor). No se piden ni se
+    // muestran en el formulario — los completa la lectura de la Carta Automóvil y se
+    // guardan para contrastarlos después contra la póliza emitida.
+    matricula: '',
+    chasis: '',
+    motor: '',
   }
 }
 
@@ -641,7 +647,7 @@ export default function CrearOportunidadForm({
     setShowDuplicadoModal(false)
   }
 
-  // "Confirmar" — aplica directo los datos de ese Contacto (mismo circuito que elegir un
+  // "Usar el cliente existente" — aplica directo los datos de ese Contacto (mismo circuito que elegir un
   // resultado en "Buscar Persona", ver handleSearchPreview/handleResultadoSeleccionado)
   // en vez de solo avisar: pisa los datos personales con los reales del Contacto
   // encontrado (ya viene completo — CI/Fecha Nacimiento/Teléfono/Departamento/
@@ -991,6 +997,14 @@ export default function CrearOportunidadForm({
         tipo: tipoLeido,
         combustible: combustibleLeido,
         uso: matchOption(usoOptions, pick('uso', 'Uso')) || prev.uso,
+        // LOG-21: identificación del vehículo. No se muestran ni se editan en el
+        // formulario (no hacen falta para cotizar) — se guardan para poder contrastarlos
+        // después contra la póliza emitida (ver services/polizaCheck.js). Van tal cual
+        // los leyó la IA: son códigos, no etiquetas de un catálogo, así que no pasan por
+        // matchOption.
+        matricula: pick('matricula', 'Matricula', 'Matrícula'),
+        chasis: pick('chasis', 'Chasis'),
+        motor: pick('motor', 'Motor'),
       }))
       setOcrVehiculo({ combustible: combustibleLeido, tipo: tipoLeido })
       setLecturaEstado('Leidos')
@@ -1175,6 +1189,13 @@ export default function CrearOportunidadForm({
         // silencio (ver dropdownColumnValue en mondayApi.js).
         columnValues.dropdown_mm51mdmq = dropdownColumnValue(form.anio)
         columnValues.color_mm52ey1d = form.uso
+        // LOG-21: identificación del vehículo leída de la Carta Automóvil. Solo se
+        // escriben si la lectura las trajo — un valor vacío no aporta nada y encima
+        // haría que el contraste con la póliza no pueda hacerse (solo compara cuando los
+        // dos lados tienen dato).
+        if (form.matricula) columnValues.text_mm71dyf0 = form.matricula
+        if (form.chasis) columnValues.text_mm711jjs = form.chasis
+        if (form.motor) columnValues.text_mm711cng = form.motor
       }
       await setMultipleColumnValues(itemId, columnValues)
 
@@ -1385,12 +1406,16 @@ export default function CrearOportunidadForm({
             ) : (
               <div className="crear-op__data-screen" key="data-screen">
                 {/* A pedido: estética tipo mockup para los popups de confirmación — ícono en
-                    círculo celeste, título y descripción en el cuerpo, "Cancelar" +
+                    círculo celeste, título y descripción en el cuerpo, acción secundaria +
                     acción primaria abajo a la derecha. Solo corre si no hay un resultado ya
                     elegido a propósito en "Buscar Persona" (ver el useEffect debounced,
                     solo activo en esta pantalla porque busquedaResuelta ya es true acá).
-                    "Cancelar" cierra sin tocar nada; "Confirmar" aplica directo los datos de
-                    ese Contacto (ver handleConfirmDuplicadoContacto). */}
+                    EST-05: los dos botones dicen qué cliente queda elegido, que es lo único
+                    que decide este popup — con "Cancelar"/"Confirmar" no se entendía cuál
+                    era cuál. "Seguir con el cliente nuevo" cierra sin tocar nada (los datos
+                    que se venían cargando quedan como están); "Usar el cliente existente"
+                    aplica directo los datos del Contacto encontrado (ver
+                    handleConfirmDuplicadoContacto). */}
                 {!resultadoSeleccionado && showDuplicadoModal && duplicadoCheck?.contacto && (
                   <AlertModal
                     id="duplicado-cedula-modal"
@@ -1428,12 +1453,12 @@ export default function CrearOportunidadForm({
                         )}
                         <br />
                         <br />
-                        ¿Deseás continuar con la información de este registro?
+                        ¿Con cuál de los dos seguís?
                       </>
                     }
                     onClose={handleCancelDuplicadoModal}
-                    secondaryButton={{ text: 'Cancelar', onClick: handleCancelDuplicadoModal }}
-                    primaryButton={{ text: 'Confirmar', onClick: handleConfirmDuplicadoContacto }}
+                    secondaryButton={{ text: 'Seguir con el cliente nuevo', onClick: handleCancelDuplicadoModal }}
+                    primaryButton={{ text: 'Usar el cliente existente', onClick: handleConfirmDuplicadoContacto }}
                   />
                 )}
 

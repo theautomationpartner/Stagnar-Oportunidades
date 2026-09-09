@@ -54,9 +54,10 @@
 }
 
 /* A pedido, estética tipo mockup: compañía/cobertura como una insignia sola al lado del
-   título de la sección (reemplaza la tarjeta con encabezado propio de antes). Mismo
-   color que accentForCompania (viene inline vía style), fondo siempre celeste clarito —
-   no cambia según la compañía, solo el texto/borde. */
+   título de la sección (reemplaza la tarjeta con encabezado propio de antes).
+   EST-02: fondo, texto y borde salen del color de la compañía (badgeForCompania, ver
+   companyColors.js) y vienen inline vía style — antes el fondo era el mismo celeste
+   clarito para las cuatro y solo cambiaba el texto/borde. */
 .emitir-step__chosen-label {
   display: flex;
   align-items: center;
@@ -69,7 +70,6 @@
   font-weight: 700;
   text-transform: none;
   letter-spacing: normal;
-  background: var(--tint-info);
   border: 1px solid;
   border-radius: 12px;
   padding: 3px 10px;
@@ -196,4 +196,15 @@
    resumen; ahora el cliente va en la barra compacta ClientContextBar). */
 .emitir-step__chosen-card {
   margin-top: 12px;
+}
+
+/* LOG-21: lista de diferencias entre la póliza y el vehículo cotizado, adentro del
+   AttentionBox de aviso. */
+.emitir-step__poliza-check {
+  margin: 6px 0 8px;
+  padding-left: 18px;
+}
+
+.emitir-step__poliza-check li {
+  margin-bottom: 3px;
 }
