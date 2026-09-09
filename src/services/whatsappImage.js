@@ -120,6 +120,32 @@ function wrapLines(ctx, str, maxWidth, font) {
   return lines
 }
 
+// EST-04: recorta con "…" lo que no entre en maxWidth, en vez de dejarlo desbordar.
+function ellipsize(ctx, str, maxWidth, font) {
+  ctx.font = font
+  const texto = String(str ?? '')
+  if (ctx.measureText(texto).width <= maxWidth) return texto
+  let corte = texto.length
+  while (corte > 1 && ctx.measureText(`${texto.slice(0, corte).trimEnd()}…`).width > maxWidth) corte -= 1
+  return `${texto.slice(0, corte).trimEnd()}…`
+}
+
+// EST-04: texto que SIEMPRE ocupa una sola línea — se prueban los tamaños de `sizes` de
+// mayor a menor y se usa el primero que entre; si no entra ni el más chico, se recorta.
+// A diferencia de wrapLines (que envuelve y devuelve N líneas), acá el alto del bloque
+// es fijo por construcción: es lo que hace que un modelo de nombre largo no le robe
+// renglones al resto de la imagen.
+function fitOneLine(ctx, str, maxWidth, { sizes, weight = '' }) {
+  const texto = String(str ?? '')
+  const fontDe = (size) => `${weight} ${size}px ${FONT}`.trim()
+  for (const size of sizes) {
+    ctx.font = fontDe(size)
+    if (ctx.measureText(texto).width <= maxWidth) return { texto, size }
+  }
+  const size = sizes[sizes.length - 1]
+  return { texto: ellipsize(ctx, texto, maxWidth, fontDe(size)), size }
+}
+
 function drawImageFit(ctx, img, x, y, maxW, maxH, align = 'left') {
   if (!img) return 0
   const ratio = img.naturalWidth / img.naturalHeight
@@ -325,11 +351,19 @@ function drawVehicleCard(ctx, opportunity, raw, quote, y) {
   const { title: vehTitle, detail: vehDetail } = splitVehicleName(opportunity)
   const anio = raw.anioVehiculo || opportunity.anio || '—'
 
-  // Medir alto: nombre (bold) + descripción (gris) + grilla
-  const nameFont = `bold 24px ${FONT}`
-  const nameLines = wrapLines(ctx, vehTitle || '—', w - 260, nameFont)
-  const detailLines = vehDetail ? wrapLines(ctx, vehDetail, w - 260, `17px ${FONT}`) : []
-  const headH = 28 + nameLines.length * 30 + detailLines.length * 22 + 4
+  // EST-04: nombre y descripción del vehículo en UNA línea cada uno, achicando la letra
+  // (24→18 el nombre, 17→15 la descripción) y recortando con "…" si ni así entran. Antes
+  // los dos envolvían en tantas líneas como hiciera falta: con un modelo de nombre largo
+  // (reportado con el Kangoo) este bloque crecía 30-50px, y como el alto total de la
+  // imagen es fijo (FIXED_HEIGHT), esos píxeles se los terminaba sacando la tarjeta de
+  // beneficios — que se compacta bajando su propia letra de 15 a 11px. De ahí el
+  // síntoma: el mismo texto se veía de otro tamaño según el modelo cotizado. Con el alto
+  // de este bloque fijo (headH), el resto de la imagen ya no depende del largo del nombre.
+  const nameFit = fitOneLine(ctx, vehTitle || '—', w - 260, { sizes: [24, 22, 20, 18], weight: 'bold' })
+  const detailFit = vehDetail ? fitOneLine(ctx, vehDetail, w - 260, { sizes: [17, 15] }) : null
+  // Fijo: el renglón de la descripción se reserva aunque el modelo no tenga (los nombres
+  // de Autodata sin coma), así todas las cotizaciones tienen la misma geometría acá.
+  const headH = 28 + 30 + 22 + 4
   const gridH = 3 * 44 + 16
   const h = headH + 16 + gridH + 8
   card(ctx, x, y, w, h, { radius: 16 })
@@ -340,15 +374,8 @@ function drawVehicleCard(ctx, opportunity, raw, quote, y) {
   ctx.arc(x + 46, y + headH / 2 + 4, 30, 0, Math.PI * 2)
   ctx.fill()
   iconCar(ctx, x + 46, y + headH / 2 + 4, 40)
-  let ny = y + 40
-  for (const line of nameLines) {
-    text(ctx, line, x + 92, ny, { size: 24, weight: 'bold' })
-    ny += 30
-  }
-  for (const line of detailLines) {
-    text(ctx, line, x + 92, ny - 6, { size: 17, color: C.gris })
-    ny += 22
-  }
+  text(ctx, nameFit.texto, x + 92, y + 40, { size: nameFit.size, weight: 'bold' })
+  if (detailFit) text(ctx, detailFit.texto, x + 92, y + 64, { size: detailFit.size, color: C.gris })
   const pillW = 96
   roundedRectPath(ctx, x + w - 20 - pillW, y + 22, pillW, 40, 10)
   ctx.fillStyle = C.verdeOscuro
@@ -425,10 +452,17 @@ function strokeShield(ctx, cx, cy, size) {
 }
 
 function drawPriceBand(ctx, quote, y) {
-  const h = 120
+  // EST-06: con condición (BSE/SURA) la banda crece 22px en vez de apretar tres renglones
+  // en el alto de dos — así la condición entra a un tamaño que se lee (14px, en crema
+  // sobre el verde) y no como letra chica pegada al borde de la caja.
+  const conCondicion = Boolean(quote.promo?.condicion)
+  const h = conCondicion ? 142 : 120
+  // Con la banda más alta, el precio de la izquierda se baja otro tanto para no quedar
+  // pegado arriba con un hueco debajo.
+  const shift = conCondicion ? 10 : 0
   card(ctx, PAD, y, INNER, h, { fill: C.verdeOscuro, stroke: null, radius: 16 })
-  text(ctx, 'PRECIO ANUAL', PAD + 28, y + 36, { size: 16, weight: 'bold', color: '#cfe6e4' })
-  text(ctx, formatMoney(quote.total), PAD + 26, y + 92, { size: 52, weight: 'bold', color: C.blanco })
+  text(ctx, 'PRECIO ANUAL', PAD + 28, y + 36 + shift, { size: 16, weight: 'bold', color: '#cfe6e4' })
+  text(ctx, formatMoney(quote.total), PAD + 26, y + 92 + shift, { size: 52, weight: 'bold', color: C.blanco })
 
   // Separador vertical
   ctx.strokeStyle = 'rgba(255,255,255,0.35)'
@@ -451,7 +485,6 @@ function drawPriceBand(ctx, quote, y) {
     ctx.arc(bx, y + 30, 16, 0, Math.PI * 2)
     ctx.fill()
     iconStar(ctx, bx, y + 30, 9, C.verdeOscuro)
-    ctx.font = `20px ${FONT}`
     const prefix = `${quote.promo.count} cuotas de `
     const amount = formatMoney(quote.promo.valor)
     ctx.font = `20px ${FONT}`
@@ -459,16 +492,21 @@ function drawPriceBand(ctx, quote, y) {
     ctx.font = `bold 24px ${FONT}`
     const aw = ctx.measureText(amount).width
     const startX = bx + bw / 2 - (pw + aw) / 2
-    // LOG-16: con condición (BSE/SURA) entran 3 renglones en la misma caja, así que se
-    // compacta un poco; sin condición (SANCOR/PORTO) queda igual que siempre.
-    const conCondicion = Boolean(quote.promo.condicion)
-    const yMonto = conCondicion ? y + 50 : y + 56
-    const ySinRecargo = conCondicion ? y + 76 : y + 88
-    text(ctx, prefix, startX, yMonto, { size: 20, color: C.blanco })
-    text(ctx, amount, startX + pw, yMonto, { size: 24, weight: 'bold', color: C.blanco })
-    text(ctx, 'SIN RECARGO', bx + bw / 2, ySinRecargo, { size: 20, weight: 'bold', color: C.blanco, align: 'center' })
+    text(ctx, prefix, startX, y + 56, { size: 20, color: C.blanco })
+    text(ctx, amount, startX + pw, y + 56, { size: 24, weight: 'bold', color: C.blanco })
+    text(ctx, 'SIN RECARGO', bx + bw / 2, y + 84, { size: 20, weight: 'bold', color: C.blanco, align: 'center' })
+    // EST-06: la condición va en su propia píldora adentro de la caja — antes era un
+    // renglón de 13px en el mismo tono que el resto de la letra chica y se leía como un
+    // pie de página, cuando en realidad es lo que hay que cumplir para pagar ese precio.
     if (conCondicion) {
-      text(ctx, quote.promo.condicion, bx + bw / 2, y + 96, { size: 13, color: '#cfe6e4', align: 'center' })
+      const pillFont = `bold 14px ${FONT}`
+      ctx.font = pillFont
+      const condicion = ellipsize(ctx, quote.promo.condicion, bw - 44, pillFont)
+      const pillW = ctx.measureText(condicion).width + 28
+      roundedRectPath(ctx, bx + bw / 2 - pillW / 2, y + 94, pillW, 26, 13)
+      ctx.fillStyle = 'rgba(255,255,255,0.18)'
+      ctx.fill()
+      text(ctx, condicion, bx + bw / 2, y + 112, { size: 14, weight: 'bold', color: C.crema, align: 'center' })
     }
   } else {
     text(ctx, 'Precio de contado', bx + bw / 2, y + 62, { size: 20, weight: 'bold', color: C.blanco, align: 'center' })
@@ -639,7 +677,7 @@ function drawContent(ctx, opportunity, raw, quote, canvasHeight, logos, layout =
   return y + 22
 }
 
-// A pedido: TODAS las cotizaciones salen del mismo tamaño (900 × 1200) — en un chat se
+// A pedido: TODAS las cotizaciones salen del mismo tamaño (900 × FIXED_HEIGHT) — en un chat se
 // ven parejas, sin importar cuántos beneficios traiga cada compañía/cobertura. Si el
 // contenido es más corto, la tarjeta de beneficios se estira para llenar; si es más
 // largo, primero se compacta la letra de los beneficios (15 → 12px) y, solo si ni así
@@ -653,7 +691,12 @@ function drawContent(ctx, opportunity, raw, quote, canvasHeight, logos, layout =
 // darles cuadro propio — PORTO (4 opcionales) se iba a 1478 y salía más alta que las
 // demás. Medido con las 4 compañías; si se agregan más beneficios u opcionales hay que
 // volver a subirlo.
-const FIXED_HEIGHT = 1480
+// EST-06: +22 al crecer la banda de precio cuando la promo tiene condición (BSE/SURA,
+// ver drawPriceBand). Sin esta holgura, esos 22px se los tenía que sacar la tarjeta de
+// beneficios bajando su letra — o sea, se arreglaba la condición y se rompía lo mismo
+// que arregla EST-04. El alto sigue siendo el mismo para las 4 compañías: las que no
+// tienen condición reparten la holgura estirando la tarjeta de beneficios (benefitsExtra).
+const FIXED_HEIGHT = 1502
 
 // Dos pasadas: la primera sobre un canvas descartable para medir hasta dónde llega el
 // contenido (el nombre del vehículo y los beneficios varían de alto), la segunda sobre

@@ -4,7 +4,8 @@ import { FaWhatsapp } from 'react-icons/fa'
 import { Button, Checkbox, Dropdown, NumberField, TextField } from '@vibe/core'
 import { formatMoney, CUOTA_COUNTS, toPercentString } from '../services/format'
 import { autoExtraOpciones, isQuoteSelectable, opcionalesDeCompania } from '../services/pricingEngine'
-import { accentForCompania } from '../services/companyColors'
+import { accentForCompania, badgeForCompania } from '../services/companyColors'
+import { coberturaGroupOf, FAMILIA_LABEL } from '../services/coberturaGroups'
 import FileUploadField from './FileUploadField'
 import StepFooter from './StepFooter'
 import AlertModal from './AlertModal'
@@ -29,6 +30,12 @@ const CHOSEN_TRANSITION_MS = 300
 function QuoteChoiceCard({ entry, selected, onSelect, selecting }) {
   const { raw, quote } = entry
   const accent = accentForCompania(raw.compania)
+  // EST-01/EST-02: mismo tratamiento que la tarjeta del paso 2 (ver QuoteCard.jsx) —
+  // badge con el color de la compañía y chip de familia de cobertura. Los dos pasos
+  // muestran las mismas cotizaciones: si se distinguen distinto, se leen como cosas
+  // distintas.
+  const badge = badgeForCompania(raw.compania)
+  const familiaKey = coberturaGroupOf(raw.cobertura)
   // A pedido: COSTO TOTAL en 0 → atenuada, no se puede marcar como elegida.
   const selectable = isQuoteSelectable(quote)
   return (
@@ -55,14 +62,24 @@ function QuoteChoiceCard({ entry, selected, onSelect, selecting }) {
                 <FaWhatsapp />
               </span>
             )}
-            <span className="confirmar-step__card-compania" style={{ color: accent }}>
+            <span
+              className="confirmar-step__card-compania"
+              style={{ color: badge.fg, background: badge.bg, borderColor: badge.border }}
+            >
               {raw.compania}
             </span>
             <span className="confirmar-step__card-cobertura">{raw.cobertura || raw.name}</span>
           </div>
-          {!quote.blocked && (
-            <span className="confirmar-step__card-deducible">Deduc.: {quote.deducibleDisplay}</span>
-          )}
+          <div className="confirmar-step__card-meta-line">
+            {familiaKey && (
+              <span className={`confirmar-step__card-familia confirmar-step__card-familia--${familiaKey.toLowerCase()}`}>
+                {FAMILIA_LABEL[familiaKey]}
+              </span>
+            )}
+            {!quote.blocked && (
+              <span className="confirmar-step__card-deducible">Deduc.: {quote.deducibleDisplay}</span>
+            )}
+          </div>
         </div>
         <div className="confirmar-step__card-total-block">
           <span className="confirmar-step__card-total-label">COSTO TOTAL</span>
@@ -92,10 +109,20 @@ function QuoteChoiceCard({ entry, selected, onSelect, selecting }) {
               ))}
             </tbody>
           </table>
+          {/* EST-06: mismo destacado que en el paso 2 (ver .quote-card__promo), con la
+              condición de BSE/SURA a la vista — acá se elige la cobertura que se va a
+              emitir, así que la forma de pago que se prometió tiene que estar dicha con
+              todas las letras también en esta pantalla. */}
           {quote.promo && (
-            <span className="confirmar-step__card-promo">
-              ➜ {quote.promo.count} cuotas SIN RECARGO de {formatMoney(quote.promo.valor)}
-            </span>
+            <div className="confirmar-step__card-promo">
+              <span className="confirmar-step__card-promo-main">
+                {quote.promo.count} cuotas de {formatMoney(quote.promo.valor)}
+                <strong className="confirmar-step__card-promo-flag">SIN RECARGO</strong>
+              </span>
+              {quote.promo.condicion && (
+                <span className="confirmar-step__card-promo-condicion">{quote.promo.condicion}</span>
+              )}
+            </div>
           )}
         </div>
       )}

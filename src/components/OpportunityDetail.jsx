@@ -111,9 +111,10 @@ export default function OpportunityDetail({
   const [overridesByQuoteId, setOverridesByQuoteId] = useState({})
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [activeStep, setActiveStep] = useState('cotizar')
-  // Solapas "GLOBAL / TRIPLE / General" del paso "Comparar y enviar" — índice de
+  // Solapas "Todo Riesgo / Parcial / General" del paso "Comparar y enviar" — índice de
   // COBERTURA_TABS, no el texto (así matchea directo con TabList/Tab de @vibe/core). En
-  // 0 arranca en GLOBAL (a pedido, la solapa que se ve primero al entrar), no en
+  // 0 arranca en Todo Riesgo (clave GLOBAL, a pedido la solapa que se ve primero al
+  // entrar), no en
   // "General" — ver el orden del array en coberturaGroups.js.
   const [coberturaTabIndex, setCoberturaTabIndex] = useState(0)
   const [marking, setMarking] = useState(false)
@@ -591,18 +592,19 @@ export default function OpportunityDetail({
   // sin importar la compañía (ver coberturaGroups.js — las 2 familias ya cubren todas
   // las coberturas reales, no dependen de qué compañía sea).
   const activeCoberturaTab = COBERTURA_TABS[coberturaTabIndex]?.key ?? 'general'
-  // Tarjetas con el panel de "Parámetros" abierto y, mientras haya alguna, la foto del
-  // orden en el que estaban al abrir el primero (ver visibleQuoteEntries).
-  const [tarjetasEditando, setTarjetasEditando] = useState(() => new Set())
+  // Foto del orden de las tarjetas en el momento en que se abrió el primer panel (ver
+  // visibleQuoteEntries).
   const [ordenCongelado, setOrdenCongelado] = useState(null)
   const ordenActualRef = useRef([])
-  const handlePanelChange = (rawId, panel) => {
-    setTarjetasEditando((prev) => {
-      const next = new Set(prev)
-      if (panel === 'params') next.add(rawId)
-      else next.delete(rawId)
-      return next
-    })
+  // Bug reportado: marcar un opcional (ej. Granizo en PORTO) sube el precio y la tarjeta
+  // se corría de lugar en la grilla. Antes el orden se congelaba solo mientras hubiera un
+  // panel de "Parámetros" abierto y se soltaba al cerrarlo — o sea que el salto no se
+  // evitaba, se posponía al cierre del panel, que es igual de desconcertante porque pasa
+  // solo (sin que uno vuelva a tocar nada). Ahora alcanza con abrir CUALQUIER panel para
+  // congelar, y el orden se mantiene hasta que cambia lo que se está mirando: otra solapa
+  // de cobertura, o cotizaciones nuevas (recotizar). Ver los dos efectos de abajo.
+  const handlePanelChange = (panel) => {
+    if (panel) setOrdenCongelado((prev) => prev ?? ordenActualRef.current)
   }
   const visibleQuoteEntries = useMemo(() => {
     const flat = groups.flatMap((g) => g.entries.map((e) => ({ ...e, compania: g.compania })))
@@ -621,10 +623,9 @@ export default function OpportunityDetail({
       if (aSel !== bSel) return aSel ? -1 : 1
       return total(a) - total(b)
     })
-    // A pedido: con un panel de parámetros abierto el orden queda congelado. Los
-    // opcionales cambian el precio en vivo, así que sin esto la tarjeta que estás
-    // editando se te escapa de lugar en medio de la edición. Al cerrar el panel se
-    // reordena. Una tarjeta que no estaba en la foto congelada (dato nuevo) va al final.
+    // Con el orden congelado (ver handlePanelChange) manda la foto: los opcionales
+    // cambian el precio en vivo y, sin esto, la tarjeta que estás tocando se te escapa de
+    // lugar. Una tarjeta que no estaba en la foto (dato nuevo) va al final.
     if (!ordenCongelado) return ordenadas
     const posicion = new Map(ordenCongelado.map((id, i) => [id, i]))
     return ordenadas.sort(
@@ -636,10 +637,27 @@ export default function OpportunityDetail({
     ordenActualRef.current = visibleQuoteEntries.map((e) => e.raw.id)
   }, [visibleQuoteEntries])
 
+  // Se descongela al cambiar de solapa: ahí la lista se rearma entera, no hay ninguna
+  // tarjeta "abajo del mouse" que pueda saltar, y corresponde volver a mostrarlas de la
+  // más barata a la más cara.
   useEffect(() => {
-    if (tarjetasEditando.size > 0) setOrdenCongelado((prev) => prev ?? ordenActualRef.current)
-    else setOrdenCongelado(null)
-  }, [tarjetasEditando])
+    setOrdenCongelado(null)
+  }, [activeCoberturaTab])
+
+  // Y también cuando cambian las cotizaciones en sí (recotizar borra y vuelve a crear los
+  // subitems): la foto vieja ya no describe nada. Un cambio de PRECIO no cuenta como
+  // cambio acá — de eso se trata justamente el congelado.
+  const idsDeCotizaciones = useMemo(
+    () =>
+      groups
+        .flatMap((g) => g.entries.map((e) => e.raw.id))
+        .sort()
+        .join(','),
+    [groups]
+  )
+  useEffect(() => {
+    setOrdenCongelado(null)
+  }, [idsDeCotizaciones])
 
   // A pedido: solo cuentan (y se envían) las seleccionadas que además son
   // seleccionables (COSTO TOTAL > 0 y con fórmula) — una marcada en monday con total 0
@@ -1374,7 +1392,7 @@ export default function OpportunityDetail({
             <>
               <div className="opp-detail__body">
                 {/* Solapas por familia de cobertura (a pedido) — "General" muestra todo,
-                    como antes; "GLOBAL"/"TRIPLE" filtran sin importar la compañía. Sin
+                    como antes; "Todo Riesgo"/"Parcial" filtran sin importar la compañía. Sin
                     solapas/acordeón POR COMPAÑÍA: todas las cotizaciones de la solapa
                     activa van en una sola grilla de a 2 por renglón, con la compañía de
                     cada una mostrada adentro de su propia tarjeta (ver QuoteCard).
@@ -1404,7 +1422,7 @@ export default function OpportunityDetail({
                 {visibleQuoteEntries.length === 0 ? (
                   <EmptyState
                     title="Sin cotizaciones en esta familia"
-                    description="No hay cotizaciones con cobertura GLOBAL o TRIPLE (según corresponda) para esta oportunidad."
+                    description="No hay cotizaciones de Todo Riesgo o Parcial (según corresponda) para esta oportunidad."
                   />
                 ) : (
                   <div className="opp-detail__quotes">
@@ -1420,7 +1438,7 @@ export default function OpportunityDetail({
                         onResetOverrides={() => handleResetQuoteOverrides(raw.id)}
                         onToggleOpcional={(field, checked) => handleToggleOpcional(raw.id, field, checked)}
                         onAutoExtraChange={(dias) => handleAutoExtraChange(raw.id, dias)}
-                        onPanelChange={(panel) => handlePanelChange(raw.id, panel)}
+                        onPanelChange={handlePanelChange}
                         rcOptions={rcOptions}
                       />
                     ))}

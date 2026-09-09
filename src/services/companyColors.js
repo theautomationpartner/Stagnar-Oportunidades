@@ -14,6 +14,42 @@ export function accentForCompania(compania) {
   return ACCENT_BY_COMPANIA[compania] ?? DEFAULT_ACCENT
 }
 
+// EST-02: el badge/globito de cada compañía se pinta con SU color, no con un gris o un
+// celeste igual para todas. Los dos tonos se DERIVAN del acento de arriba (fondo = el
+// acento lavado con blanco, texto = el mismo acento oscurecido) en vez de ser una
+// segunda paleta escrita a mano: agregar una compañía a ACCENT_BY_COMPANIA alcanza para
+// que su badge salga solo, y nunca pueden quedar desfasados. El acento puro NO sirve
+// como fondo con texto blanco — el naranja de SURA y el verde de SANCOR no llegan al
+// contraste mínimo para texto chico (el badge se dibuja a 10-12px), el azul de BSE y el
+// rojo de PORTO sí: con el par lavado/oscurecido las cuatro quedan parejas y legibles.
+function hexToRgb(hex) {
+  const clean = hex.replace('#', '')
+  return [0, 2, 4].map((i) => parseInt(clean.slice(i, i + 2), 16))
+}
+
+function rgbToHex(rgb) {
+  return `#${rgb.map((v) => Math.round(Math.min(255, Math.max(0, v))).toString(16).padStart(2, '0')).join('')}`
+}
+
+// amount = cuánto blanco se mezcla (0 = el color tal cual, 1 = blanco puro).
+function lighten(hex, amount) {
+  return rgbToHex(hexToRgb(hex).map((v) => v * (1 - amount) + 255 * amount))
+}
+
+// amount = cuánto se oscurece (0 = el color tal cual, 1 = negro).
+function darken(hex, amount) {
+  return rgbToHex(hexToRgb(hex).map((v) => v * (1 - amount)))
+}
+
+export function badgeForCompania(compania) {
+  const accent = accentForCompania(compania)
+  return {
+    bg: lighten(accent, 0.88),
+    fg: darken(accent, 0.35),
+    border: lighten(accent, 0.68),
+  }
+}
+
 // Cantidad fija de subitems (opciones/coberturas) que la automatización de cotizar
 // SIEMPRE crea para cada compañía, sin importar el vehículo — confirmado a pedido, no
 // se deriva de ningún dato en vivo. Usado por CotizandoModal para saber cuándo una

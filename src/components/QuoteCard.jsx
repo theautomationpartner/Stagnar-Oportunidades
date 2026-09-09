@@ -9,7 +9,8 @@ import {
 import { Button, IconButton, Dropdown, Checkbox, NumberField } from '@vibe/core'
 import { formatMoney, CUOTA_COUNTS, toPercentString } from '../services/format'
 import { autoExtraOpciones, isQuoteSelectable, opcionalesDeCompania } from '../services/pricingEngine'
-import { accentForCompania } from '../services/companyColors'
+import { accentForCompania, badgeForCompania } from '../services/companyColors'
+import { coberturaGroupOf, FAMILIA_LABEL } from '../services/coberturaGroups'
 import './QuoteCard.css'
 
 const BSE_DEDUCIBLE_OPTIONS = ['0.5', '1', '1.5', '2', '2.5', '3']
@@ -168,6 +169,15 @@ function QuoteCard({
 
   const hasCustomOverrides = Object.keys(overrides).length > 0
   const accent = accentForCompania(raw.compania)
+  // EST-02: fondo y texto del badge derivados del color de la compañía (ver
+  // companyColors.js) — antes el globito era gris para las cuatro y el color solo
+  // aparecía en el texto y en el filo izquierdo de la tarjeta.
+  const badge = badgeForCompania(raw.compania)
+  // EST-01/EST-03: la familia de cobertura ("Todo Riesgo"/"Parcial") como chip propio.
+  // Es el segundo eje por el que se distinguen dos tarjetas de un vistazo: el color dice
+  // de qué compañía es, el chip dice de qué tipo de cobertura. Puede ser null (cobertura
+  // que no cae en ninguna familia — solo aparece en la solapa "General").
+  const familiaKey = coberturaGroupOf(raw.cobertura)
 
   // Qué opcionales ofrece esta cotización lo decide pricingEngine (la misma regla que
   // define el precio), no la tarjeta: así no se muestran controles que no harían nada —
@@ -226,23 +236,20 @@ function QuoteCard({
   // Al abrir "Parámetros" se refresca el form con los valores reales vigentes (mismo
   // motivo que antes: si se cerró con "Restablecer" pendiente o cambió algo por fuera,
   // no queremos mostrar un valor viejo de una apertura anterior).
+  // onPanelChange se llama FUERA del updater de setOpenPanel: adentro es un efecto
+  // secundario en medio de un update (React lo corre dos veces en StrictMode, y encima
+  // termina siendo un setState del padre mientras se renderiza este componente).
   const handleToggleParams = () => {
-    if (openPanel !== 'params') setForm(buildInitialForm(raw, overrides, fields))
-    setOpenPanel((prev) => {
-      const siguiente = prev === 'params' ? null : 'params'
-      onPanelChange?.(siguiente)
-      return siguiente
-    })
+    const siguiente = openPanel === 'params' ? null : 'params'
+    if (siguiente === 'params') setForm(buildInitialForm(raw, overrides, fields))
+    setOpenPanel(siguiente)
+    onPanelChange?.(siguiente)
   }
 
   const handleToggleCoberturas = () => {
-    setOpenPanel((prev) => {
-      const siguiente = prev === 'coberturas' ? null : 'coberturas'
-      // Avisa igual al salir de "Parámetros": el orden de la lista se descongela cuando ya
-      // no queda ningún panel de parámetros abierto (ver OpportunityDetail).
-      onPanelChange?.(siguiente)
-      return siguiente
-    })
+    const siguiente = openPanel === 'coberturas' ? null : 'coberturas'
+    setOpenPanel(siguiente)
+    onPanelChange?.(siguiente)
   }
 
   const handleReset = () => {
@@ -309,12 +316,26 @@ function QuoteCard({
               disabled={!selectable}
               aria-label={selectable ? 'Seleccionar opción' : 'No seleccionable: sin costo total'}
             />
-            <span className="quote-card__company" style={{ color: accent }}>
+            <span
+              className="quote-card__company"
+              style={{ color: badge.fg, background: badge.bg, borderColor: badge.border }}
+            >
               {raw.compania}
             </span>
             <span className="quote-card__title">{raw.cobertura || raw.name}</span>
           </div>
-          <span className="quote-card__deducible-line">Deduc.: {quote.deducibleDisplay}</span>
+          {/* EST-01: el chip de familia va acá, en el mismo renglón del deducible (que se
+              dibuja siempre), y no arriba junto al título — ese renglón envuelve cuando
+              no entra y una tarjeta con una línea de más rompe la altura pareja de todo
+              el renglón de tarjetas. */}
+          <div className="quote-card__meta-line">
+            {familiaKey && (
+              <span className={`quote-card__familia quote-card__familia--${familiaKey.toLowerCase()}`}>
+                {FAMILIA_LABEL[familiaKey]}
+              </span>
+            )}
+            <span className="quote-card__deducible-line">Deduc.: {quote.deducibleDisplay}</span>
+          </div>
         </div>
 
         <div className="quote-card__total">
@@ -372,16 +393,6 @@ function QuoteCard({
               ))}
             </tbody>
           </table>
-          {quote.promo && (
-            <span className="quote-card__cuotas-label">
-              ➜ {quote.promo.count} cuotas SIN RECARGO de {formatMoney(quote.promo.valor)}
-              {/* LOG-16: la condición (BSE/SURA) viaja pegada a la promo — sin esto se
-                  leía como si fuera una forma de pago más, disponible siempre. */}
-              {quote.promo.condicion && (
-                <em className="quote-card__cuotas-condicion">{quote.promo.condicion}</em>
-              )}
-            </span>
-          )}
         </div>
 
         {/* A pedido: TODAS las etiquetas posibles para esta compañía (Bonificación,
@@ -417,6 +428,24 @@ function QuoteCard({
             })}
         </div>
       </div>
+
+      {/* EST-06: la promo es un destacado con recuadro propio — es la forma de pago que
+          se termina vendiendo — y va a lo ANCHO de la tarjeta, debajo de las dos
+          columnas. Adentro de la columna de cuotas quedaba un recuadro angosto con el
+          texto arriba y aire muerto abajo (la columna de al lado es más alta), que es
+          justo lo que se veía roto. A lo ancho, el recuadro mide lo que mide su
+          contenido y la condición (BSE/SURA) entra en el mismo renglón, a la derecha. */}
+      {quote.promo && (
+        <div className="quote-card__promo">
+          <span className="quote-card__promo-main">
+            {quote.promo.count} cuotas de {formatMoney(quote.promo.valor)}
+            <strong className="quote-card__promo-flag">SIN RECARGO</strong>
+          </span>
+          {quote.promo.condicion && (
+            <span className="quote-card__promo-condicion">{quote.promo.condicion}</span>
+          )}
+        </div>
+      )}
 
       {/* A pedido, estética tipo mockup: 2 botones separados en vez de un solo "Ver
           más" — Parámetros abre datos fijos + ajustables (+ opcionales PORTO si es

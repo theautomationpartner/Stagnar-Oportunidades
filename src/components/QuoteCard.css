@@ -1,6 +1,10 @@
 /* border-left-color se pisa inline por tarjeta (accentForCompania) — mismo criterio de
-   color por compañía que el paso 3 "Confirmar" (ver companyColors.js), pero más fina
-   (2px vs. 4px) y con el borde redondeado en vez de a filo recto.
+   color por compañía que el paso 3 "Confirmar" (ver companyColors.js), con el borde
+   redondeado en vez de a filo recto.
+   EST-01: el filo pasó de 2px a 4px. Con 3 tarjetas por renglón, 2px de color era
+   demasiado sutil para separar de un vistazo una opción de otra — junto con el badge de
+   compañía a todo color (EST-02) y el chip de familia (.quote-card__familia), la
+   compañía y el tipo de cobertura ahora se leen sin llegar a leer el título.
    A pedido, estética tipo mockup: layout VERTICAL (columna) en vez de las 3 columnas
    lado a lado de antes — con 3 tarjetas por renglón (ver .opp-detail__quotes, ahora CSS
    Grid en vez de "columns") no entraba ancho para eso; ver .quote-card__header más
@@ -11,7 +15,7 @@
   gap: 12px;
   padding: 16px 20px;
   border: 1px solid var(--border);
-  border-left-width: 2px;
+  border-left-width: 4px;
   border-radius: 8px;
   background: #fff;
 }
@@ -30,9 +34,48 @@
   min-width: 0;
 }
 
+/* EST-01: renglón fijo debajo del título con el chip de familia + el deducible. Los dos
+   son cortos, así que siempre entra en una sola línea: la altura de la tarjeta no
+   depende de si la cobertura cae o no en una familia. */
+.quote-card__meta-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
 .quote-card__deducible-line {
   font-size: 12px;
   color: var(--text-gray);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* EST-01/EST-03: familia de cobertura. Todo Riesgo va lleno (es la cobertura completa,
+   la que primero se ofrece) y Parcial va calado — la diferencia de PESO, no solo de
+   texto, es lo que hace que se distingan de reojo entre tarjetas apiladas. Verde de
+   marca en las dos: el color de compañía ya está tomado por el badge de al lado y dos
+   escalas de color compitiendo en el mismo renglón se leen peor que una. */
+.quote-card__familia {
+  flex-shrink: 0;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  border-radius: 10px;
+  padding: 2px 8px;
+  border: 1px solid var(--color-verde);
+}
+
+.quote-card__familia--global {
+  background: var(--color-verde);
+  color: #fff;
+}
+
+.quote-card__familia--triple {
+  background: transparent;
+  color: var(--color-verde-cta);
 }
 
 @media (max-width: 480px) {
@@ -87,11 +130,15 @@
 
 /* Sin acordeón por compañía (ver .opp-detail__quotes), la compañía de cada
    cotización se muestra acá adentro de la tarjeta en vez de en un encabezado
-   de grupo aparte. */
+   de grupo aparte.
+   EST-02: background/color/border-color vienen inline por tarjeta (badgeForCompania,
+   ver companyColors.js) — antes el fondo era el mismo gris para las cuatro compañías y
+   el color propio solo se usaba en el texto. */
 .quote-card__company {
   font-size: 10px;
   font-weight: 700;
   background: var(--bg-subtle);
+  border: 1px solid transparent;
   border-radius: 10px;
   padding: 2px 8px;
   text-transform: uppercase;
@@ -134,13 +181,51 @@
   font-size: 14px;
 }
 
-/* La promo "N cuotas SIN RECARGO" ahora va DEBAJO de la tabla (a pedido) — margin-top en
-   vez de margin-bottom. */
-.quote-card__cuotas-label {
-  display: block;
+/* EST-06: recuadro propio en vez de un renglón gris suelto. Fondo verde muy lavado +
+   filo verde a la izquierda: se lee como el destacado que es (la forma de pago que se
+   ofrece primero), sin competir con el COSTO TOTAL, que sigue siendo lo más grande de
+   la tarjeta. Va a lo ancho de la tarjeta, debajo de las 2 columnas (ver el JSX): el
+   monto a la izquierda y la condición a la derecha, en el mismo renglón mientras entre.
+   Sin min-height de ninguno de los dos — el recuadro tiene fondo propio, así que
+   cualquier alto reservado de más se ve como un hueco vacío adentro de una caja de
+   color (era el bug reportado), a diferencia de un renglón de texto suelto donde no se
+   notaba. Las tarjetas no necesitan medir lo mismo: .opp-detail__quotes es grid con
+   align-items:start y cada una mide su propio contenido. */
+.quote-card__promo {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: space-between;
+  column-gap: 12px;
+  row-gap: 2px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border-left: 3px solid var(--color-verde);
+  background: var(--tint-success);
+}
+
+.quote-card__promo-main {
   font-size: 12px;
+  color: var(--text-dark);
+}
+
+.quote-card__promo-flag {
+  margin-left: 6px;
+  font-size: 10px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  color: var(--green-dark);
+}
+
+/* EST-06 (parte visual de LOG-16): la condición dejó la cursiva chiquita al 85% de
+   opacidad y pasó a leerse como el resto de la letra chica de la tarjeta — es una
+   condición para acceder al precio, no una nota al pie. Solo BSE y SURA la tienen; en
+   SANCOR/PORTO el elemento directamente no se dibuja. */
+.quote-card__promo-condicion {
+  font-size: 11px;
+  line-height: 15px;
   color: var(--text-gray);
-  margin-top: 8px;
 }
 
 .quote-card__cuotas-table {
@@ -200,42 +285,22 @@
 }
 
 /* Tags de qué parámetros tiene esta cotización puntual — columna propia al lado de la
-   tabla de cuotas (ver .quote-card__body más arriba), apiladas en vertical. flex:1
-   reparte el ancho mitad y mitad con .quote-card__cuotas (la otra columna del mismo
-   body). Cada compañía trae una cantidad distinta de tags (BSE 5, SURA/SANCOR 4, PORTO
-   6 — 3 comunes + sus 3 opcionales propios, ver PORTO_OPCIONALES en QuoteCard.jsx):
-   apiladas en columna, cada tarjeta terminaba con una altura distinta de esta zona y
-   rompía la alineación entre vecinas del mismo renglón. `height` FIJO (no max-height)
-   — con max-height, una tarjeta con menos tags que el techo (ej. SANCOR, 4) mide su
-   alto real (más bajo) mientras una que sí llega al techo (BSE/PORTO) queda recortada
-   justo en el límite: dos alturas reales distintas, aunque las dos respeten el mismo
-   techo. Con height fijo, TODAS miden exactamente lo mismo acá sea cual sea la
-   cantidad de tags — de menos, sobra aire abajo; de más, scrollea adentro de su propia
-   columna en vez de empujar el resto de la tarjeta.
-   Ojo: NO se usa align-items:stretch en .opp-detail__quotes (el grid que contiene estas
-   tarjetas) a propósito — ver el comentario en OpportunityDetail.css: con stretch, abrir
-   "Parámetros"/"Coberturas" en UNA tarjeta estira TODO el renglón a esa altura y las
-   vecinas cerradas quedan con un hueco vacío enorme debajo de sus botones. Achicar la
-   causa puntual (esta columna) es más seguro que volver a prender stretch.
-   A pedido: antes, más de ~5 tags (PORTO, 6 en total con sus 3 opcionales) scrolleaban
-   verticalmente dentro de esta columna — ahora, con la misma altura fija de 120px,
-   flex-wrap arma una 2da columna a la derecha en vez de scrollear (mismo criterio que
-   una lista en "flujo de diario"/newspaper columns, pero con flexbox column + wrap en
-   vez de CSS columns, que no deja controlar bien el orden vertical-antes-que-horizontal
-   que se necesita acá). overflow:hidden (no auto/visible) como techo de seguridad: si
-   alguna vez hay tantos tags que ni 2 columnas entran en el ancho disponible, se
-   recortan en vez de desbordar la tarjeta — no debería pasar en la práctica (6 tags como
-   máximo hoy, ver PORTO_OPCIONALES en QuoteCard.jsx), pero es más seguro que dejarlo
-   "visible" y arriesgar que se superponga con la tabla de cuotas de al lado. */
+   tabla de cuotas (ver .quote-card__body más arriba), en flujo de FILA que envuelve.
+   Antes esta columna tenía un alto FIJO de 120px para que todas las tarjetas midieran
+   lo mismo: con pocas etiquetas (SANCOR, 3) sobraba un hueco vacío grande debajo, y con
+   muchas (PORTO, 6) se recortaban. Ya no hace falta reservar nada — .opp-detail__quotes
+   es un grid con align-items:start, así que cada tarjeta mide su propio contenido y
+   ninguna estira a sus vecinas (ver el comentario en OpportunityDetail.css: es
+   justamente por eso que NO se usa stretch ahí). */
 .quote-card__override-tags {
   flex: 1;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   flex-wrap: wrap;
   align-content: flex-start;
-  gap: 6px 12px;
-  height: 120px;
-  overflow: hidden;
+  align-items: flex-start;
+  gap: 6px 8px;
+  min-width: 0;
 }
 
 /* A pedido: todas las etiquetas posibles (Bonificación, Descuento, RC, Deducible/Edad
@@ -417,6 +482,10 @@
 .quote-card__params-field {
   display: flex;
   flex-direction: column;
+  /* El control alineado al FONDO de la celda: en la grilla todas las celdas miden lo
+     que la más alta (un label de 2 líneas, ej. "Deducible SANCOR (USD)") y sin esto
+     los inputs de los campos con label de 1 línea quedaban más arriba que el resto. */
+  justify-content: flex-end;
   gap: 4px;
   font-size: 11px;
   font-weight: 600;
@@ -470,10 +539,7 @@
   flex-wrap: wrap;
 }
 
-/* La promo "➜ N cuotas SIN RECARGO de $X" ocupa 1 o 2 líneas según el monto; se
-   reserva el alto de 2 para que las tarjetas de un mismo renglón midan igual. */
-.quote-card__cuotas-label {
-  min-height: calc(2 * 1.4em);
+.quote-card__promo-main {
   line-height: 1.4;
 }
 
@@ -482,31 +548,6 @@
 .quote-card__meta-warning {
   min-height: 20px;
   line-height: 20px;
-}
-
-/* Etiquetas en flujo de FILA (antes columna con alto fijo 120px + overflow hidden: al
-   ceder ancho a la tabla de montos, la 2ª columna de etiquetas quedaba recortada). Con
-   filas que envuelven, ninguna etiqueta se corta; min-height mantiene la altura base
-   pareja entre tarjetas. */
-.quote-card__override-tags {
-  flex-direction: row;
-  flex-wrap: wrap;
-  align-content: flex-start;
-  align-items: flex-start;
-  gap: 6px 8px;
-  height: auto;
-  min-height: 120px;
-  min-width: 0;
-  overflow: visible;
-}
-
-/* LOG-16: la condición de las cuotas sin recargo (BSE/SURA) va debajo de la promo, en
-   cursiva y más chica — es una aclaración, no otra forma de pago. */
-.quote-card__cuotas-condicion {
-  display: block;
-  font-style: italic;
-  font-size: 11px;
-  opacity: 0.85;
 }
 
 /* LOG-18: "Opcionales" como cuadro propio, arriba de "Incluye" — lo que se cotiza aparte
