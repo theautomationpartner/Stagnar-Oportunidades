@@ -518,3 +518,64 @@
   font-size: 12px;
   color: var(--text-gray);
 }
+
+/* LOG-13: selector de forma de pago. Botones y no un dropdown a propósito — hay que ver
+   los montos de todas las opciones al mismo tiempo para poder elegir, que es justo la
+   conversación que se está teniendo con el cliente en ese momento. */
+.confirmar-step__pagos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.confirmar-step__pago {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-width: 132px;
+  padding: 8px 12px;
+  border: 1px solid var(--border-input);
+  border-radius: 10px;
+  background: var(--bg-card, #fff);
+  cursor: pointer;
+  text-align: left;
+  transition: border-color 0.15s ease, background 0.15s ease;
+}
+
+.confirmar-step__pago:hover:not(:disabled) {
+  border-color: var(--primary-blue);
+}
+
+.confirmar-step__pago:disabled {
+  cursor: default;
+  opacity: 0.6;
+}
+
+.confirmar-step__pago--activo {
+  border-color: var(--primary-blue);
+  background: var(--tint-primary, #eaf1ff);
+  box-shadow: inset 0 0 0 1px var(--primary-blue);
+}
+
+.confirmar-step__pago-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-gray);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.confirmar-step__pago strong {
+  font-size: 15px;
+  color: var(--text-dark);
+}
+
+/* La condición (BSE/SURA) es lo que hace válida a esa forma de pago: va pegada a la
+   opción, no en una nota al pie que se lee después de haber elegido. */
+.confirmar-step__pago-condicion {
+  font-size: 10px;
+  line-height: 1.25;
+  color: var(--text-gray);
+  max-width: 160px;
+}

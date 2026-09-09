@@ -197,6 +197,32 @@ export function autoExtraOpciones(raw) {
   return opcionalesEditables(raw).autoExtra ? AUTO_EXTRA_DIAS[raw.compania] ?? [] : []
 }
 
+// LOG-13: las formas de pago reales de ESTA cotización, para elegir con cuántas cuotas se
+// cierra. `label` tiene que coincidir con una etiqueta de la columna "Cuotas elegidas" del
+// tablero (ver scripts/log-13-columna-cuotas.mjs) — de ahí que sea el mismo texto y no
+// algo armado para la pantalla.
+//
+// La promo va aparte y con su propio label aunque su cantidad coincida con una de la
+// tabla (BSE y SURA promocionan 10 cuotas, que también existen con recargo): mismo
+// número, precio distinto, y confundirlas es exactamente el bug que arregló LOG-16.
+export function opcionesDePago(quote) {
+  if (!quote || quote.blocked) return []
+  const opciones = [{ label: 'Contado', valor: quote.total, recargo: 0 }]
+  for (const n of CUOTA_COUNTS) {
+    const cuota = quote.cuotas?.[n]
+    if (cuota?.valor) opciones.push({ label: `${n} cuotas`, valor: cuota.valor, total: cuota.total })
+  }
+  if (quote.promo) {
+    opciones.push({
+      label: `${quote.promo.count} cuotas sin recargo`,
+      valor: quote.promo.valor,
+      total: quote.total,
+      condicion: quote.promo.condicion,
+    })
+  }
+  return opciones
+}
+
 // Lo que hay que sumarle (o restarle) al precio base por los opcionales de esta
 // cotización. Los que vienen incluidos por defecto (AP de SURA) restan cuando se
 // destildan; el resto suma cuando se tilda.

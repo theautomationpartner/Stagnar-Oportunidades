@@ -124,6 +124,8 @@ export function mapOpportunityItem(item, statusColors = {}) {
     chasis: textOf(cv, 'text_mm711jjs'),
     motor: textOf(cv, 'text_mm711cng'),
     vehiculoAsegurado,
+    // LOG-13: forma de pago con la que se cierra (etiqueta de color_mm71kfpr).
+    cuotasElegidas: textOf(cv, 'color_mm71kfpr'),
     libretaConducir: textOf(cv, 'file_mm51jy06'),
     cedula: textOf(cv, 'file_mm5pc008'),
     poliza: textOf(cv, 'file_mm5bzdd4'),

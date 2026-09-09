@@ -61,6 +61,8 @@ const OPPORTUNITY_COLUMN_IDS = [
   // con lo que leyó del PDF emitido. En el detalle trae sus datos (linked_items, ver
   // OPPORTUNITY_DETAIL_QUERY): ese es el lado "lo que se emitió".
   'board_relation_mm4pngbs',
+  // LOG-13: con cuántas cuotas se cierra la venta, elegido en el paso "Confirmar".
+  'color_mm71kfpr', // Cuotas elegidas
 ]
 
 const ITEMS_QUERY = `

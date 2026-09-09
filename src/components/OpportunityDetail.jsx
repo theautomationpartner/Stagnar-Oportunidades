@@ -65,6 +65,9 @@ const AUTO_EXTRA_COLUMN_ID = 'color_mm6zpx3j'
 // LOG-13: la Bonificación (columna "Bonif" del subitem) se puede guardar de verdad desde
 // el paso "Confirmar" — en "Comparar y enviar" sigue siendo un ajuste de prueba local.
 const BONIF_COLUMN_ID = 'numeric_mm52ey7f'
+// LOG-13: forma de pago elegida. Vive en la Oportunidad, no en el subitem — es una
+// decisión de la venta, y así se puede filtrar por ella en el tablero.
+const CUOTAS_ELEGIDAS_COLUMN_ID = 'color_mm71kfpr'
 const POLL_INTERVAL_MS = 4000
 // Auditoría: cantidad de ticks seguidos fallidos tras la cual el polling se corta y
 // avisa (antes giraba para siempre si la API de monday no respondía).
@@ -730,6 +733,31 @@ export default function OpportunityDetail({
       await setSubitemColumnValue(rawId, BONIF_COLUMN_ID, bonif)
     } catch (err) {
       setRawQuotes((prev) => prev.map((r) => (r.id === rawId ? { ...r, bonif: anterior } : r)))
+      throw err
+    }
+  }
+
+  // LOG-13: con cuántas cuotas se cierra la venta. Va en la OPORTUNIDAD y no en el
+  // subitem (a pedido): es una decisión de la venta, no un dato de la tarifa de cada
+  // cotización. `label` vacío = destildar la opción elegida.
+  const handleSetCuotas = async (label) => {
+    onOpportunityAction?.()
+    const anterior = opportunity?.cuotasElegidas ?? ''
+    setItem((prev) => ({
+      ...prev,
+      column_values: prev.column_values.map((cv) =>
+        cv.id === CUOTAS_ELEGIDAS_COLUMN_ID ? { ...cv, text: label } : cv
+      ),
+    }))
+    try {
+      await setSimpleColumnValue(opportunityId, CUOTAS_ELEGIDAS_COLUMN_ID, label)
+    } catch (err) {
+      setItem((prev) => ({
+        ...prev,
+        column_values: prev.column_values.map((cv) =>
+          cv.id === CUOTAS_ELEGIDAS_COLUMN_ID ? { ...cv, text: anterior } : cv
+        ),
+      }))
       throw err
     }
   }
@@ -1520,6 +1548,7 @@ export default function OpportunityDetail({
               onSetBonif={handleSetBonif}
               onToggleOpcional={handleToggleOpcional}
               onAutoExtraChange={handleAutoExtraChange}
+              onSetCuotas={handleSetCuotas}
               documentos={[
                 {
                   key: 'libretaConducir',

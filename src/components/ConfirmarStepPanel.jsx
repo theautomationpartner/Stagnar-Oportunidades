@@ -3,7 +3,7 @@ import { MdCheckCircle, MdChatBubbleOutline } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
 import { Button, Checkbox, Dropdown, NumberField, TextField } from '@vibe/core'
 import { formatMoney, CUOTA_COUNTS, toPercentString } from '../services/format'
-import { autoExtraOpciones, isQuoteSelectable, opcionalesDeCompania } from '../services/pricingEngine'
+import { autoExtraOpciones, isQuoteSelectable, opcionalesDeCompania, opcionesDePago } from '../services/pricingEngine'
 import { accentForCompania, badgeForCompania } from '../services/companyColors'
 import { coberturaGroupOf, FAMILIA_LABEL } from '../services/coberturaGroups'
 import FileUploadField from './FileUploadField'
@@ -157,8 +157,10 @@ function QuoteChoiceCard({ entry, selected, onSelect, selecting }) {
 // lo que se toca acá se escribe en monday: es la decisión final y tiene que llegarle a
 // quien emite la póliza. Solo se ofrece sobre la cotización YA elegida — el resto se
 // siguen comparando como estaban.
-function AjustesElegida({ entry, onSetBonif, onToggleOpcional, onAutoExtraChange }) {
+function AjustesElegida({ entry, onSetBonif, onToggleOpcional, onAutoExtraChange, onSetCuotas, cuotasElegidas }) {
   const { raw } = entry
+  // Formas de pago de ESTA cotización (ver opcionesDePago) — con sus montos reales.
+  const pagos = opcionesDePago(entry.quote)
   const bonifReal = String(raw.bonif ?? '')
   const [bonifDraft, setBonifDraft] = useState(bonifReal)
   const [savingBonif, setSavingBonif] = useState(false)
@@ -264,6 +266,36 @@ function AjustesElegida({ entry, onSetBonif, onToggleOpcional, onAutoExtraChange
         </p>
       )}
 
+      {/* LOG-13: con cuántas cuotas se cierra. Se guarda en la Oportunidad (no en la
+          cotización): es una decisión de la venta, no un dato de la tarifa. Las opciones
+          salen de ESTA cotización, así que cada una muestra su monto real y la promo sin
+          recargo aparece solo si la compañía la tiene — con su condición, que es la que
+          la hace válida (LOG-16). */}
+      {pagos.length > 0 && (
+        <div className="confirmar-step__ajustes-opcionales">
+          <span className="confirmar-step__ajustes-label">Forma de pago elegida</span>
+          <div className="confirmar-step__pagos">
+            {pagos.map((p) => {
+              const elegida = p.label === cuotasElegidas
+              return (
+                <button
+                  key={p.label}
+                  type="button"
+                  aria-pressed={elegida}
+                  disabled={savingOpcional === 'cuotas'}
+                  className={elegida ? 'confirmar-step__pago confirmar-step__pago--activo' : 'confirmar-step__pago'}
+                  onClick={() => correr('cuotas', () => onSetCuotas(elegida ? '' : p.label))}
+                >
+                  <span className="confirmar-step__pago-label">{p.label}</span>
+                  <strong>{formatMoney(p.valor)}</strong>
+                  {p.condicion && <em className="confirmar-step__pago-condicion">{p.condicion}</em>}
+                </button>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
       {error && (
         <p className="confirmar-step__error" role="alert">
           Error: {error}
@@ -276,7 +308,7 @@ function AjustesElegida({ entry, onSetBonif, onToggleOpcional, onAutoExtraChange
 // Al cambiar cuál es la propuesta elegida, en vez de saltar directo del detalle viejo al
 // nuevo, mostramos un instante con guiones ("—") en el medio — a pedido, para que se note
 // visualmente que los datos están cambiando y no que quedó pegado el valor anterior.
-function ChosenProposal({ elegida, onSetBonif, onToggleOpcional, onAutoExtraChange }) {
+function ChosenProposal({ elegida, onSetBonif, onToggleOpcional, onAutoExtraChange, onSetCuotas, cuotasElegidas }) {
   const elegidaId = elegida?.raw.id ?? null
   // Se retiene CUÁL es la elegida, no sus datos: lo que se muestra es siempre el objeto
   // vigente. Antes se guardaba la cotización entera en el estado y quedaba congelada en
@@ -375,6 +407,8 @@ function ChosenProposal({ elegida, onSetBonif, onToggleOpcional, onAutoExtraChan
           onSetBonif={onSetBonif}
           onToggleOpcional={onToggleOpcional}
           onAutoExtraChange={onAutoExtraChange}
+          onSetCuotas={onSetCuotas}
+          cuotasElegidas={cuotasElegidas}
         />
       )}
     </div>
@@ -391,6 +425,7 @@ export default function ConfirmarStepPanel({
   onSetBonif,
   onToggleOpcional,
   onAutoExtraChange,
+  onSetCuotas,
   documentos,
   uploadingDoc,
   deletingDoc,
@@ -609,6 +644,8 @@ export default function ConfirmarStepPanel({
         onSetBonif={onSetBonif}
         onToggleOpcional={onToggleOpcional}
         onAutoExtraChange={onAutoExtraChange}
+        onSetCuotas={onSetCuotas}
+        cuotasElegidas={opportunity.cuotasElegidas}
       />
 
       {/* A pedido: se saca el texto fijo de acá (se repetía siempre, complete o no) —
