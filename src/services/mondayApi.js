@@ -51,6 +51,16 @@ const OPPORTUNITY_COLUMN_IDS = [
   'color_mm5ejysv', // Crear Poliza (estado)
   'color_mm51n4j', // Posee Vehiculo?
   'color_mm5rzrhk', // Leer Cedula y Archivo Automovil
+  // LOG-21: identificación del vehículo COTIZADO, leída de la Carta Automóvil al crear la
+  // oportunidad. Es el lado "lo que se cotizó" del contraste contra la póliza emitida
+  // (el otro lado es el Vehículo vinculado, ver más abajo).
+  'text_mm71dyf0', // Matrícula
+  'text_mm711jjs', // Chasis
+  'text_mm711cng', // Motor
+  // LOG-21: "Bien Asegurado" — el ítem de 🚘 Vehículos que crea el escenario de póliza
+  // con lo que leyó del PDF emitido. En el detalle trae sus datos (linked_items, ver
+  // OPPORTUNITY_DETAIL_QUERY): ese es el lado "lo que se emitió".
+  'board_relation_mm4pngbs',
 ]
 
 const ITEMS_QUERY = `
@@ -127,10 +137,14 @@ const OPPORTUNITY_DETAIL_QUERY = `
           # Las demás conexiones (Departamento, Localidad, Modelo...) no tienen estas
           # columnas y devuelven column_values vacío — opportunityMapper solo lee la del
           # Cliente.
+          # LOG-21: los 5 últimos ids son del tablero 🚘 Vehículos (Matrícula, Chasis,
+          # Motor, Marca y Año del vehículo realmente asegurado, ver "Bien Asegurado"). Viajan en la
+          # misma lista porque monday pide un solo set de ids para todos los linked_items;
+          # cada tablero devuelve los suyos y el resto vacío.
           linked_items {
             id
             name
-            column_values(ids: ["long_text_mm6m7d8c", "board_relation_mm65e7he", "board_relation_mm657jse", "text_mm6mrx0a", "text_mm6mx38p", "color_mm6570m0", "email_mm6539g3"]) {
+            column_values(ids: ["long_text_mm6m7d8c", "board_relation_mm65e7he", "board_relation_mm657jse", "text_mm6mrx0a", "text_mm6mx38p", "color_mm6570m0", "email_mm6539g3", "text_mm4pj3gx", "text_mm4pwdp3", "text_mm4pygkk", "text_mm4pj57", "numeric_mm4p20j9"]) {
               id
               text
               ... on BoardRelationValue {

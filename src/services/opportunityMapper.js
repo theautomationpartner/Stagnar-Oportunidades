@@ -77,6 +77,25 @@ export function mapOpportunityItem(item, statusColors = {}) {
   // Email del Cliente/Lead (columna email_mm6539g3 de Clientes) — solo lectura acá.
   const clienteEmail = textOf(ccv, 'email_mm6539g3')
 
+  // LOG-21: el vehículo REALMENTE asegurado — el ítem de 🚘 Vehículos que crea el
+  // escenario de póliza con lo que leyó del PDF, vinculado en "Bien Asegurado". Igual que
+  // el Cliente de arriba, solo llega en el detalle. Es lo que se contrasta contra la
+  // matrícula/chasis/motor que se leyeron de la Carta Automóvil al crear la oportunidad
+  // (ver services/polizaCheck.js).
+  const vehiculoItem = cv.find((c) => c.id === 'board_relation_mm4pngbs')?.linked_items?.[0] ?? null
+  const vcv = vehiculoItem?.column_values ?? []
+  const vehiculoAsegurado = vehiculoItem
+    ? {
+        id: vehiculoItem.id,
+        nombre: vehiculoItem.name,
+        matricula: textOf(vcv, 'text_mm4pj3gx'),
+        chasis: textOf(vcv, 'text_mm4pwdp3'),
+        motor: textOf(vcv, 'text_mm4pygkk'),
+        marca: textOf(vcv, 'text_mm4pj57'),
+        anio: textOf(vcv, 'numeric_mm4p20j9'),
+      }
+    : null
+
   return {
     id: item.id,
     oppNumber: `ID-${item.id}`,
@@ -100,6 +119,11 @@ export function mapOpportunityItem(item, statusColors = {}) {
     fechaNacimiento: textOf(cv, 'date_mm516agw'),
     departamento: boardRelationDisplayOf(cv, 'board_relation_mm54tq30'),
     zonaCirculacion: boardRelationDisplayOf(cv, 'board_relation_mm5sqf8t'),
+    // LOG-21: identificación del vehículo cotizado (la lee la Carta Automóvil al crear).
+    matricula: textOf(cv, 'text_mm71dyf0'),
+    chasis: textOf(cv, 'text_mm711jjs'),
+    motor: textOf(cv, 'text_mm711cng'),
+    vehiculoAsegurado,
     libretaConducir: textOf(cv, 'file_mm51jy06'),
     cedula: textOf(cv, 'file_mm5pc008'),
     poliza: textOf(cv, 'file_mm5bzdd4'),

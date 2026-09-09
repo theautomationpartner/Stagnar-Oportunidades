@@ -3,10 +3,12 @@
 // contrasta contra lo que la oportunidad ya sabía, para avisar (sin bloquear) si se
 // emitió sobre un vehículo distinto del que se cotizó.
 //
-// Alcance de hoy: Marca y Año. La lectura de la Carta Automóvil devuelve solo
-// Año/Marca/Combustible/Tipo/Uso, así que matrícula, chasis y motor no existen del lado
-// de la oportunidad y no hay contra qué compararlos. Cuando ese escenario también los
-// devuelva, se agregan a CAMPOS_POLIZA y el resto sigue funcionando igual.
+// Los dos lados:
+//  - Lo COTIZADO: matrícula/chasis/motor que la lectura de la Carta Automóvil dejó en la
+//    Oportunidad al crearla (más marca y año, que ya estaban).
+//  - Lo EMITIDO: el ítem de 🚘 Vehículos que crea el escenario de póliza con lo leído del
+//    PDF, vinculado en "Bien Asegurado" (ver vehiculoAsegurado en opportunityMapper.js).
+// Agregar un campo nuevo es agregar una entrada a CAMPOS_POLIZA; no hay un if por dato.
 import { normalizarParaMatch } from './format'
 
 // `enOportunidad` / `enPoliza` leen cada lado del mismo dato. `numerico` es para los
@@ -15,19 +17,18 @@ import { normalizarParaMatch } from './format'
 // chasis y motor NO son numéricos aunque parezcan: son códigos, y ahí un cero adelante
 // o una letra cambian el dato.)
 export const CAMPOS_POLIZA = [
-  {
-    key: 'marca',
-    label: 'Marca',
-    enOportunidad: (o) => o?.marca,
-    enPoliza: (p) => p?.marca,
-  },
-  {
-    key: 'anio',
-    label: 'Año',
-    enOportunidad: (o) => o?.anio,
-    enPoliza: (p) => p?.anio,
-    numerico: true,
-  },
+  // Los 3 que de verdad salen del PDF: son los que pueden delatar que se emitió sobre
+  // otro auto. Se comparan como TEXTO aunque parezcan números — son códigos, y un cero
+  // adelante o una letra de más cambian el dato.
+  { key: 'matricula', label: 'Matrícula', enOportunidad: (o) => o?.matricula, enPoliza: (p) => p?.matricula },
+  { key: 'chasis', label: 'Chasis', enOportunidad: (o) => o?.chasis, enPoliza: (p) => p?.chasis },
+  { key: 'motor', label: 'Motor', enOportunidad: (o) => o?.motor, enPoliza: (p) => p?.motor },
+  // Marca y Año hoy no van a saltar nunca: el escenario los copia de la propia
+  // oportunidad al crear el Vehículo, así que se comparan contra sí mismos. Se dejan
+  // igual porque cuestan 2 ids en una consulta que ya se hace, y cubren el día que el
+  // escenario los lea del PDF o que alguien edite el Vehículo a mano.
+  { key: 'marca', label: 'Marca', enOportunidad: (o) => o?.marca, enPoliza: (p) => p?.marca },
+  { key: 'anio', label: 'Año', enOportunidad: (o) => o?.anio, enPoliza: (p) => p?.anio, numerico: true },
 ]
 
 function comparable(valor, campo) {
