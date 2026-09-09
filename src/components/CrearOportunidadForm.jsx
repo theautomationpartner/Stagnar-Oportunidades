@@ -2063,7 +2063,7 @@ export default function CrearOportunidadForm({
                     <strong>Revisá el documento:</strong>
                     <ul>
                       {reparosIdentificacion.map((r, i) => (
-                        <li key={i}>{r.motivo}</li>
+                        <li key={i}>{r.campo} «{r.valor}» {r.motivo}.</li>
                       ))}
                     </ul>
                     Se guarda igual, pero conviene corregirlo en el documento o a mano en

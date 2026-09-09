@@ -6,7 +6,7 @@ import { badgeForCompania } from '../services/companyColors'
 import { fetchFileColumnAsFile } from '../services/mondayApi'
 import { getMissingLabels as getMissingLabelsByStage } from '../services/requiredFields'
 import { compararPoliza } from '../services/polizaCheck'
-import { revisarIdentificacion } from '../services/vehiculoIdentificacion'
+import { revisarCampo, revisarIdentificacion } from '../services/vehiculoIdentificacion'
 import FileUploadField from './FileUploadField'
 import StepFooter from './StepFooter'
 import StatusBadge from './StatusBadge'
@@ -139,11 +139,29 @@ export default function EmitirStepPanel({
       {diferenciasPoliza.length > 0 && (
         <AttentionBox type="warning" title="La póliza no coincide con el vehículo cotizado">
           <ul className="emitir-step__poliza-check">
-            {diferenciasPoliza.map((d) => (
-              <li key={d.key}>
-                <strong>{d.label}:</strong> se cotizó «{d.oportunidad}» y la póliza dice «{d.poliza}»
-              </li>
-            ))}
+            {diferenciasPoliza.map((d) => {
+              // A pedido: ante una diferencia, se aclara cuál de los dos valores tiene
+              // formato válido. Si uno pasa la regla y el otro no, el mal leído queda
+              // señalado y no hay que adivinar cuál ir a corregir. Si los dos pasan (o
+              // los dos fallan) no se dice nada: ahí el formato no distingue y afirmar
+              // algo sería inventar.
+              const malCotizado = revisarCampo(d.key, d.oportunidad, opportunity.anio)
+              const malPoliza = revisarCampo(d.key, d.poliza, opportunity.anio)
+              const sospechoso =
+                malCotizado && !malPoliza
+                  ? { lado: 'cotizado', motivo: malCotizado }
+                  : malPoliza && !malCotizado
+                    ? { lado: 'de la póliza', motivo: malPoliza }
+                    : null
+              return (
+                <li key={d.key}>
+                  <strong>{d.label}:</strong> se cotizó «{d.oportunidad}» y la póliza dice «{d.poliza}»
+                  {sospechoso && (
+                    <> — el {sospechoso.lado} {sospechoso.motivo}, así que es el que conviene revisar</>
+                  )}
+                </li>
+              )
+            })}
           </ul>
           Revisá la póliza antes de darla por buena. Este aviso no bloquea la emisión.
         </AttentionBox>
@@ -158,7 +176,7 @@ export default function EmitirStepPanel({
           <ul className="emitir-step__poliza-check">
             {reparosFormato.map((r, i) => (
               <li key={i}>
-                <strong>{r.campo}</strong> en {r.lado}: {r.motivo}
+                <strong>{r.campo}</strong> en {r.lado}: «{r.valor}» {r.motivo}.
               </li>
             ))}
           </ul>
