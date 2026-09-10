@@ -1,15 +1,51 @@
-/* Pantallas de autenticación.
+/* Pantallas de autenticación, con la identidad Stagnari.
    Usa los tokens de index.css (--text-dark, --border, --tint-danger…) en vez de colores
    sueltos: ahí están anotados los contrastes que ya se verificaron contra AA, y volver a
-   elegir un gris a ojo acá desharía ese trabajo. */
+   elegir un gris a ojo acá desharía ese trabajo.
+   El acento de estas pantallas es el verde de marca (--color-verde, el del logo) y no el
+   azul de la app: es la puerta de entrada y acá la marca pesa más que la convención
+   azul-para-CTA interna. Para texto chico sobre verde se usa --color-verde-cta (#00706d),
+   que sí pasa AA con blanco — el verde puro da 4.49:1 y falla (ver index.css). */
 
 .auth-pantalla {
+  /* Los Button de @vibe/core (kind="primary") pintan con estas variables del tema de
+     monday. Re-declararlas acá los pasa al verde de marca en todas las pantallas de auth
+     sin tocar JSX ni depender de las clases hasheadas de la librería. */
+  --primary-color: var(--color-verde-cta);
+  --primary-hover-color: #005a57;
+  --primary-selected-color: #004f4c;
+  --text-color-on-primary: #fff;
+
+  /* Tinte de marca para fondos suaves (verde al ~8% sobre blanco) y su borde. Locales a
+     auth porque el resto de la app usa los tintes semánticos de index.css. */
+  --auth-tint-verde: #e9f5f4;
+  --auth-tint-verde-bd: #bcdedc;
+
   min-height: 100vh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 20px;
   padding: 24px;
-  background: var(--bg-subtle);
+  /* Fondo de marca: gradiente construido sobre el verde del logo (#008581 =
+     --color-verde) con un brillo suave arriba. Hexas literales porque los extremos son
+     variaciones decorativas del mismo tono, no colores nuevos del sistema. */
+  background:
+    radial-gradient(ellipse at 20% -10%, rgb(255 255 255 / 14%), transparent 55%),
+    linear-gradient(155deg, #00615e 0%, #008581 55%, #009d97 100%);
+}
+
+/* El eslogan de la marca, debajo de la tarjeta. Decorativo (por eso vive en CSS y no en
+   cada componente): si un lector de pantalla lo anuncia no molesta, y si se pierde no se
+   pierde información. */
+.auth-pantalla::after {
+  content: 'Tu tranquilidad, nuestra prioridad. Siempre.';
+  font-size: 0.9rem;
+  font-style: italic;
+  text-align: center;
+  color: #fff;
+  text-shadow: 0 1px 8px rgb(0 60 58 / 45%);
 }
 
 .auth-card {
@@ -22,7 +58,22 @@
   background: var(--bg);
   border: 1px solid var(--border);
   border-radius: 12px;
-  box-shadow: 0 4px 20px rgb(0 0 0 / 6%);
+  /* Sombra más presente que en el resto de la app: la tarjeta flota sobre el fondo verde
+     oscuro y con la sombrita sutil de antes parecía pegada. */
+  box-shadow: 0 12px 36px rgb(0 34 33 / 30%);
+}
+
+/* Logo Stagnari arriba de cada tarjeta. Pseudo-elemento a propósito: las tarjetas se
+   arman en cinco componentes distintos (login, perfiles, enrolamiento, código, estados
+   del gate) y así la marca aparece en todas sin repetir un <img> en cada JSX. Vite
+   resuelve y versiona la url() igual que un import. */
+.auth-card::before {
+  content: '';
+  flex: none;
+  width: 100%;
+  height: 42px;
+  margin-bottom: 4px;
+  background: url('../assets/stagnari-logo.png') center / contain no-repeat;
 }
 
 .auth-card--centrado {
@@ -87,11 +138,13 @@
   background: var(--bg);
 }
 
+/* Foco en verde de marca: sobre blanco da 4.49:1, sobrado para el 3:1 que pide AA en
+   indicadores no textuales. */
 .auth-codigo:focus,
 .auth-input:focus {
-  outline: 2px solid var(--primary-blue);
+  outline: 2px solid var(--color-verde);
   outline-offset: 1px;
-  border-color: var(--primary-blue);
+  border-color: var(--color-verde);
 }
 
 .auth-input {
@@ -114,6 +167,16 @@
   background: var(--bg-subtle);
   border: 1px solid var(--border);
   border-radius: 6px;
+  /* Aparece al abrir el disclosure; el fade corto ancla la mirada en lo que se desplegó.
+     La regla global de prefers-reduced-motion (index.css) lo apaga sola. */
+  animation: auth-aparecer 0.18s ease;
+}
+
+@keyframes auth-aparecer {
+  from {
+    opacity: 0;
+    transform: translateY(-4px);
+  }
 }
 
 .auth-codigos {
@@ -159,8 +222,8 @@
 }
 
 .auth-perfil:hover:not(:disabled) {
-  border-color: var(--primary-blue);
-  background: var(--tint-info);
+  border-color: var(--color-verde);
+  background: var(--auth-tint-verde);
 }
 
 .auth-perfil:disabled {
@@ -187,20 +250,25 @@
   height: 14px;
   margin-top: -7px;
   border: 2px solid var(--border);
-  border-top-color: var(--primary-blue);
+  border-top-color: var(--color-verde);
   border-radius: 50%;
   animation: auth-girar 0.8s linear infinite;
 }
 
-/* Con qué perfil se está enrolando o verificando. */
+/* Con qué perfil se está enrolando o verificando. En tinte de marca (antes azul info):
+   --color-verde-cta sobre el tinte da ≈4.9:1, pasa AA para este cuerpo de texto. */
 .auth-perfil-activo {
   margin: 0;
   padding: 6px 10px;
   font-size: 0.8125rem;
-  color: var(--tint-info-text);
-  background: var(--tint-info);
-  border: 1px solid var(--tint-info-bd);
+  color: var(--color-verde-cta);
+  background: var(--auth-tint-verde);
+  border: 1px solid var(--auth-tint-verde-bd);
   border-radius: 6px;
+}
+
+.auth-perfil-activo strong {
+  color: var(--text-dark);
 }
 
 .auth-acciones-secundarias {
@@ -221,23 +289,97 @@
 .auth-check input {
   width: 16px;
   height: 16px;
-  accent-color: var(--primary-blue);
+  accent-color: var(--color-verde);
   cursor: pointer;
 }
 
+/* Enlaces en el verde CTA (no el verde puro): son texto chico y necesitan los 5.3:1.
+   El subrayado queda pero en un tono suave (la posición centrada ya dice "acción"); al
+   hover toma el color del texto, que junto con el cambio de color es el cue de que se
+   puede clickear. */
 .auth-enlace {
   align-self: center;
   padding: 0;
   font-size: 0.8125rem;
-  color: var(--primary-blue);
+  color: var(--color-verde-cta);
   background: none;
   border: none;
   cursor: pointer;
   text-decoration: underline;
+  text-decoration-color: var(--auth-tint-verde-bd);
+  text-underline-offset: 3px;
 }
 
 .auth-enlace:hover {
-  color: var(--primary-blue-hover);
+  color: #005a57;
+  text-decoration-color: currentColor;
+}
+
+/* Botón secundario de las pantallas de auth: para la acción que avanza el flujo cuando
+   el botón primario (el vibe verde) todavía no aplica — p. ej. "ya escaneé el QR". Borde
+   --color-verde-cta sobre blanco: 5.3:1, sobrado para el 3:1 de componentes de UI. */
+.auth-btn-secundario {
+  width: 100%;
+  padding: 9px 14px;
+  font-size: 0.9375rem;
+  font-weight: 500;
+  line-height: 1.3;
+  color: var(--color-verde-cta);
+  background: var(--bg);
+  border: 1px solid var(--color-verde-cta);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: background-color 0.12s ease;
+}
+
+.auth-btn-secundario:hover:not(:disabled) {
+  background: var(--auth-tint-verde);
+}
+
+.auth-btn-secundario:active:not(:disabled) {
+  background: #d9ecea;
+}
+
+.auth-btn-secundario:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+/* Disclosure: acción que despliega contenido en el lugar (el secreto manual del QR). El
+   chevron —que rota al abrir— es lo que la distingue de un enlace que navega. */
+.auth-desplegable {
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 4px 10px;
+  font-size: 0.8125rem;
+  color: var(--color-verde-cta);
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.auth-desplegable:hover {
+  color: #005a57;
+  background: var(--auth-tint-verde);
+}
+
+.auth-desplegable::after {
+  content: '';
+  width: 6px;
+  height: 6px;
+  margin-top: -3px; /* óptico: el vértice del chevron cae bajo el centro de la caja */
+  border-right: 1.5px solid currentColor;
+  border-bottom: 1.5px solid currentColor;
+  transform: rotate(45deg);
+  transition: transform 0.15s ease;
+}
+
+.auth-desplegable[aria-expanded='true']::after {
+  margin-top: 3px;
+  transform: rotate(-135deg);
 }
 
 .auth-error {
@@ -263,7 +405,7 @@
   width: 28px;
   height: 28px;
   border: 3px solid var(--border);
-  border-top-color: var(--primary-blue);
+  border-top-color: var(--color-verde);
   border-radius: 50%;
   animation: auth-girar 0.8s linear infinite;
 }

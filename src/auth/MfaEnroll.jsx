@@ -221,20 +221,30 @@ export default function MfaEnroll() {
             <div className="auth-qr auth-qr--vacio">{error ? 'No disponible' : 'Generando…'}</div>
           )}
 
-          <button type="button" className="auth-enlace" onClick={() => setVerSecreto((v) => !v)}>
+          {/* Disclosure y no enlace: es una salida alternativa que despliega contenido acá
+              mismo (el secreto manual), y el chevron adelanta ese comportamiento. */}
+          <button
+            type="button"
+            className="auth-desplegable"
+            aria-expanded={verSecreto}
+            aria-controls="auth-secreto-manual"
+            onClick={() => setVerSecreto((v) => !v)}
+          >
             {verSecreto ? 'Ocultar el código manual' : 'No puedo escanear el QR'}
           </button>
           {verSecreto && (
             // Para quien tiene la app de autenticación en la computadora, o una cámara que
             // no funciona. Es el mismo secreto que codifica el QR, escrito.
-            <code className="auth-secreto">{secretoManual}</code>
+            <code id="auth-secreto-manual" className="auth-secreto">{secretoManual}</code>
           )}
 
           {/* Lo que pidieron: una vez escaneado, no volver a ver el QR. Se recuerda en este
-              navegador, así que al volver la pantalla arranca directamente en el código. */}
+              navegador, así que al volver la pantalla arranca directamente en el código.
+              Botón secundario y no enlace: de todo lo que hay bajo el QR es la única acción
+              que AVANZA el flujo, y tiene que pesar más que las salidas alternativas. */}
           <button
             type="button"
-            className="auth-enlace"
+            className="auth-btn-secundario"
             onClick={() => {
               recordarEscaneo(cuenta, true)
               setVista('codigo')
