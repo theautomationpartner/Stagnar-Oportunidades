@@ -124,6 +124,22 @@ export function AuthProvider({ children }) {
     [seleccion, aplicarRespuesta]
   )
 
+  // Volver al selector de perfil desde el 2FA, para quien eligió mal.
+  //
+  // En un asiento compartido los nombres se parecen ("Santi TAP", "Martin Tap", "Pamela
+  // Tap"), y sin salida quedabas trabado en la pantalla del código de un perfil que no es
+  // tuyo. No hace falta pedir nada al servidor: la lista y su token siguen en memoria, y el
+  // token de selección todavía vale. Si venció, elegir de nuevo devuelve 401 y el flujo se
+  // reinicia solo, que es transparente.
+  const volverAPerfiles = useCallback(() => {
+    if (!seleccion) return
+    setPreAuthToken(null)
+    setPerfil(null)
+    setEtiquetaTotp(null)
+    setMensaje(null)
+    setEstado(ESTADOS.ELEGIR_PERFIL)
+  }, [seleccion])
+
   const ingresar = useCallback(async () => {
     if (enCurso.current) return
     enCurso.current = true
@@ -221,6 +237,7 @@ export function AuthProvider({ children }) {
       PERMISOS,
       aplicarRespuesta,
       seleccionarPerfil,
+      volverAPerfiles,
       reintentar: ingresar,
       salir,
     }),
@@ -236,6 +253,7 @@ export function AuthProvider({ children }) {
       puede,
       aplicarRespuesta,
       seleccionarPerfil,
+      volverAPerfiles,
       ingresar,
       salir,
     ]

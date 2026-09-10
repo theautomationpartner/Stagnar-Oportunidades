@@ -19,7 +19,7 @@ import CampoCodigo from './CampoCodigo'
 //   solo esperando. Confundirlos hace que alguien reintente quince veces y se bloquee más.
 
 export default function MfaChallenge() {
-  const { preAuthToken, usuario, perfil, aplicarRespuesta, reintentar } = useAuth()
+  const { preAuthToken, usuario, perfil, seleccion, aplicarRespuesta, reintentar, volverAPerfiles } = useAuth()
   const [codigo, setCodigo] = useState('')
   const [error, setError] = useState(null)
   const [bloqueado, setBloqueado] = useState(false)
@@ -138,6 +138,14 @@ export default function MfaChallenge() {
       >
         Perdí el celular
       </button>
+
+      {/* Salida para quien eligió el perfil equivocado. En un asiento compartido los
+          nombres se parecen, y sin esto quedaba trabado pidiendo un código que no tiene. */}
+      {seleccion?.perfiles?.length > 1 && (
+        <button type="button" className="auth-enlace" onClick={volverAPerfiles} disabled={enviando}>
+          Este no soy yo, cambiar de perfil
+        </button>
+      )}
     </div>
   )
 }

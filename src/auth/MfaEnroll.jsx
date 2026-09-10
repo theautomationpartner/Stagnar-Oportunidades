@@ -37,7 +37,7 @@ function recordarEscaneo(cuenta, escaneado) {
 }
 
 export default function MfaEnroll() {
-  const { preAuthToken, aplicarRespuesta, perfil } = useAuth()
+  const { preAuthToken, aplicarRespuesta, perfil, seleccion, volverAPerfiles } = useAuth()
   const [qr, setQr] = useState(null)
   const [secretoManual, setSecretoManual] = useState('')
   const [cuenta, setCuenta] = useState('')
@@ -271,6 +271,15 @@ export default function MfaEnroll() {
       <button type="button" className="auth-enlace" onClick={generarNuevo} disabled={enviando}>
         Generar un código QR nuevo
       </button>
+
+      {/* Importante acá: enrolar el perfil equivocado ata el teléfono de uno al perfil de
+          otro, y esa persona después no puede entrar. La salida tiene que estar a la vista
+          ANTES de escanear, no después. */}
+      {seleccion?.perfiles?.length > 1 && (
+        <button type="button" className="auth-enlace" onClick={volverAPerfiles} disabled={enviando}>
+          Este no soy yo, cambiar de perfil
+        </button>
+      )}
     </div>
   )
 }
