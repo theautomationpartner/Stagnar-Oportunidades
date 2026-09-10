@@ -140,7 +140,14 @@ export default async function handler(req, res) {
     })
   } catch (err) {
     if (modo === 'shadow') {
-      return enSombra('RECHAZADO', { motivo: err.motivo ?? err.codigo ?? err.message })
+      // El detalle del error va entero, no solo el motivo. Sin eso, un rechazo por
+      // "app_incorrecta" registra que falló pero no CUÁL era el app_id que traía el token —
+      // que es el único dato con el que se corrige la configuración. Un diagnóstico que no
+      // dice el valor esperado obliga a adivinar, y adivinar acá deja a todos afuera.
+      return enSombra('RECHAZADO', {
+        motivo: err.motivo ?? err.codigo ?? err.message,
+        ...(err.detalle ?? {}),
+      })
     }
     if (err instanceof NoAutorizado) {
       await audit.registrar(req, audit.ACCIONES.NO_AUTORIZADO, {
