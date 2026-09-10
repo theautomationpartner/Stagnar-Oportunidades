@@ -4,7 +4,10 @@
 // le pegue directo a monday.com (la URL "protected_static" que trae `text` exige sesión
 // logueada) ni a un bucket S3 ajeno. assetId se valida numérico antes de interpolarlo en
 // la query — llega como query param, no como variable GraphQL.
-export default async function handler(req, res) {
+import { protegerEndpoint } from './_auth/guard.js'
+import { PERMISOS } from './_auth/permisos.js'
+
+async function handler(req, res) {
   if (req.method !== 'GET') {
     res.status(405).json({ error: 'Method not allowed' })
     return
@@ -41,3 +44,9 @@ export default async function handler(req, res) {
     res.status(502).json({ error: String(err) })
   }
 }
+
+// Protegido: la descarga de adjuntos no puede quedar abierto.
+// Sin este envoltorio, cualquiera que descubra la URL puede pegarle directo sin pasar
+// por la interfaz, y bloquear la pantalla no sirve de nada. Con AUTH_ENFORCE=off se
+// comporta exactamente como antes (ver api/_auth/env.js).
+export default protegerEndpoint(handler, { metodos: ['GET'], requierePermiso: PERMISOS.VER })

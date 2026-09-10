@@ -239,3 +239,44 @@
     padding: 0;
   }
 }
+
+/* La puerta de salida: línea propia al pie de la barra, debajo del usuario.
+   Colapsada es solo el ícono centrado; expandida suma el texto y se alinea con el resto
+   de los ítems. Separada del bloque del avatar por un borde suave, para que se lea como
+   una acción y no como parte de la identidad. */
+.sidebar__salir {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  margin-top: 8px;
+  padding: 10px 0;
+  font-size: 18px;
+  color: var(--text-gray);
+  background: none;
+  border: none;
+  border-top: 1px solid var(--border);
+  cursor: pointer;
+}
+
+.sidebar--expanded .sidebar__salir {
+  justify-content: flex-start;
+  padding: 10px 14px;
+}
+
+.sidebar__salir:hover:not(:disabled) {
+  color: var(--red);
+  background: var(--tint-danger);
+}
+
+.sidebar__salir:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.sidebar__salir-label {
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+}

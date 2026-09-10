@@ -1,7 +1,10 @@
 node_modules
 dist
 .env
+.env.backup*
+secret/
 vite-dev.log
+vite-dev-run.log
 panel_incluye.json
 testwebhook.txt
 scripts/log-*.txt

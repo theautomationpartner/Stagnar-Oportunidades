@@ -1,9 +1,10 @@
 import { useEffect, useState } from 'react'
-import { MdPersonAddAlt, MdMenu, MdMenuOpen } from 'react-icons/md'
+import { MdPersonAddAlt, MdMenu, MdMenuOpen, MdLogout } from 'react-icons/md'
 import stagnariLogo from '../assets/stagnari-logo.png'
 import stagnariLogoSimple from '../assets/stagnari-logo-simple.png'
 import { initialsOf } from '../services/personaFields'
 import { useMondayUser } from '../context/AppContext'
+import { useAuth } from '../auth/AuthContext'
 import './Sidebar.css'
 
 // A pedido: barra lateral desplegable — colapsada (default, angosta, mismo look de
@@ -20,6 +21,17 @@ export default function Sidebar({ active = true, onNavigateOportunidades, defaul
   const ctxUser = useMondayUser()
   const user = userProp ?? ctxUser
   const [expanded, setExpanded] = useState(defaultExpanded)
+
+  // Sesión propia de la app (ver src/auth). `deshabilitada` es true cuando el backend corre
+  // con AUTH_ENFORCE=off: ahí no hay sesión que cerrar y el botón no tiene sentido.
+  const { usuario, deshabilitada, salir } = useAuth()
+  const [saliendo, setSaliendo] = useState(false)
+  const puedeSalir = !deshabilitada && Boolean(usuario)
+
+  // En un asiento de monday compartido, el nombre de monday es el del asiento ("The
+  // Automation Partner") y no el de la persona que eligió el perfil. Ahí hay que mostrar el
+  // del perfil, o cuatro personas verían el mismo nombre y ninguna sabría con cuál entró.
+  const nombreSesion = usuario?.asientoCompartido ? usuario.nombre : (user?.name ?? usuario?.nombre)
 
   useEffect(() => {
     setExpanded(defaultExpanded)
@@ -63,17 +75,46 @@ export default function Sidebar({ active = true, onNavigateOportunidades, defaul
           la barra directamente no se renderiza en ese caso. `title` para ver el
           nombre completo pasando el mouse, sin importar si está expandida o no —
           colapsada solo se ve el avatar. */}
-      {user?.name && (
+      {nombreSesion && (
         <div className="sidebar__footer">
-          <span className="sidebar__avatar" title={user.name}>
-            {user.photo ? <img className="sidebar__avatar-img" src={user.photo} alt="" /> : initialsOf(user.name)}
+          <span className="sidebar__avatar" title={nombreSesion}>
+            {user?.photo ? (
+              <img className="sidebar__avatar-img" src={user.photo} alt="" />
+            ) : (
+              initialsOf(nombreSesion)
+            )}
           </span>
           {expanded && (
-            <span className="sidebar__user-name" title={user.name}>
-              {user.name}
+            <span className="sidebar__user-name" title={usuario?.email ?? nombreSesion}>
+              {nombreSesion}
             </span>
           )}
         </div>
+      )}
+
+      {/* La puerta de salida, en su propia línea debajo del usuario.
+          Cerrar sesión olvida además este dispositivo confiable — si no, al salir la app
+          volvería a entrar sola por el "no preguntar por 30 días" y el botón parecería no
+          hacer nada. */}
+      {puedeSalir && (
+        <button
+          type="button"
+          className="sidebar__salir"
+          disabled={saliendo}
+          title={'Cerrar sesión' + (usuario?.email ? ' (' + usuario.email + ')' : '')}
+          aria-label="Cerrar sesión"
+          onClick={async () => {
+            setSaliendo(true)
+            try {
+              await salir()
+            } finally {
+              setSaliendo(false)
+            }
+          }}
+        >
+          <MdLogout />
+          {expanded && <span className="sidebar__salir-label">{saliendo ? 'Saliendo…' : 'Cerrar sesión'}</span>}
+        </button>
       )}
     </aside>
   )

@@ -1,5 +1,6 @@
 import { memoAsync, invalidate as invalidateCache } from './cache'
 import mondaySdk from 'monday-sdk-js'
+import { fetchProtegido } from '../auth/fetchProtegido'
 
 // SDK cliente de monday (no confundir con `callMondayApi` de acá abajo, que pega
 // contra /api/monday con la API key del servidor) — se usa solo para lo que hace
@@ -536,8 +537,13 @@ const FILE_COLUMN_VALUE_QUERY = `
   }
 `
 
+// fetchProtegido agrega la sesión (header + cookie) y convierte un 401/403 en la vuelta a
+// la pantalla de ingreso. Antes de esto el header Authorization iba declarado y vacío: el
+// backend no tenía forma de saber quién preguntaba, y cualquiera que descubriera la URL
+// podía hacer un POST a /api/monday con la query GraphQL que se le ocurriera, sin abrir
+// siquiera la interfaz. Ver src/auth/fetchProtegido.js y api/_auth/guard.js.
 async function callMondayApi(query, variables) {
-  const response = await fetch('/api/monday', {
+  const response = await fetchProtegido('/api/monday', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, variables }),
@@ -676,7 +682,7 @@ export async function uploadFileToColumn(itemId, columnId, file) {
   )
   formData.append('variables[file]', file, file.name)
 
-  const response = await fetch('/api/monday-file', { method: 'POST', body: formData })
+  const response = await fetchProtegido('/api/monday-file', { method: 'POST', body: formData })
   const payload = await response.json()
   if (payload.errors?.length) {
     throw new Error(payload.errors[0].message)
@@ -701,7 +707,7 @@ export async function uploadFileToColumn(itemId, columnId, file) {
 export async function leerCartaAutomovil(file) {
   const formData = new FormData()
   formData.append('file', file, file.name)
-  const response = await fetch('/api/leer-carta-automovil', { method: 'POST', body: formData })
+  const response = await fetchProtegido('/api/leer-carta-automovil', { method: 'POST', body: formData })
   if (!response.ok) {
     throw new Error(`El escenario de Make devolvió un error (${response.status})`)
   }
@@ -722,7 +728,7 @@ export async function leerCartaAutomovil(file) {
 export async function leerCedula(file) {
   const formData = new FormData()
   formData.append('file', file, file.name)
-  const response = await fetch('/api/leer-cedula', { method: 'POST', body: formData })
+  const response = await fetchProtegido('/api/leer-cedula', { method: 'POST', body: formData })
   if (!response.ok) {
     throw new Error(`El escenario de Make devolvió un error (${response.status})`)
   }
@@ -783,7 +789,7 @@ export async function removeFileFromColumn(itemId, columnId, boardId, keepFiles)
 // Descarga un asset puntual (por id) como File — variante de fetchFileColumnAsFile para
 // columnas con varios archivos, donde ya se sabe cuál se quiere ver.
 export async function fetchAssetAsFile(assetId, name) {
-  const response = await fetch(`/api/monday-asset?assetId=${assetId}`)
+  const response = await fetchProtegido(`/api/monday-asset?assetId=${assetId}`)
   if (!response.ok) return null
   const blob = await response.blob()
   return new File([blob], name || 'archivo', { type: blob.type })
@@ -814,7 +820,7 @@ export async function fetchFileColumnAsset(itemId, columnId) {
 export async function fetchFileColumnAsFile(itemId, columnId) {
   const asset = await fetchFileColumnAsset(itemId, columnId)
   if (!asset) return null
-  const response = await fetch(`/api/monday-asset?assetId=${asset.assetId}`)
+  const response = await fetchProtegido(`/api/monday-asset?assetId=${asset.assetId}`)
   if (!response.ok) return null
   const blob = await response.blob()
   return new File([blob], asset.name, { type: blob.type })

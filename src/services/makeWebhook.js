@@ -27,6 +27,7 @@
 // sin depender de correlacionar dos arrays por índice. Del lado de Make se sacan con un
 // split() sobre "name" dentro de la misma iteración.
 // Ver /logica-monday-vibe.md.
+import { fetchProtegido } from '../auth/fetchProtegido'
 import { coberturaGroupOf } from './coberturaGroups'
 
 export function getMakeWebhookUrl() {
@@ -99,7 +100,7 @@ export async function sendQuotesToWhatsApp({ phone, opportunity, images, formato
   // recibiendo el WhatsApp igual (Make sí procesaba el POST) pero tirando "Failed to
   // fetch" del lado del cliente antes de poder confirmar el envío, y por eso nunca se
   // marcaba "Incluir Propuesta" en monday.
-  const response = await fetch('/api/make-webhook', {
+  const response = await fetchProtegido('/api/make-webhook', {
     method: 'POST',
     body: formData,
   })

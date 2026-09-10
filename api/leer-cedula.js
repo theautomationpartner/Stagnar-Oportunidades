@@ -4,11 +4,14 @@
 // La URL real vive en MAKE_LEER_CEDULA_WEBHOOK_URL (sin prefijo VITE_ a propósito: no
 // debe llegar nunca al bundle del cliente). bodyParser:false porque necesitamos los
 // bytes crudos del multipart, no un req.body parseado.
+import { protegerEndpoint } from './_auth/guard.js'
+import { PERMISOS } from './_auth/permisos.js'
+
 export const config = {
   api: { bodyParser: false },
 }
 
-export default async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'POST') {
     res.status(405).json({ error: 'Method not allowed' })
     return
@@ -37,3 +40,9 @@ export default async function handler(req, res) {
     res.status(502).json({ error: String(err) })
   }
 }
+
+// Protegido: el escenario de Make que lee la Cédula no puede quedar abierto.
+// Sin este envoltorio, cualquiera que descubra la URL puede pegarle directo sin pasar
+// por la interfaz, y bloquear la pantalla no sirve de nada. Con AUTH_ENFORCE=off se
+// comporta exactamente como antes (ver api/_auth/env.js).
+export default protegerEndpoint(handler, { metodos: ['POST'], requierePermiso: PERMISOS.LEER_DOCUMENTOS })

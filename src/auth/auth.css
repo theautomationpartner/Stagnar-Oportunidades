@@ -1,0 +1,281 @@
+/* Pantallas de autenticación.
+   Usa los tokens de index.css (--text-dark, --border, --tint-danger…) en vez de colores
+   sueltos: ahí están anotados los contrastes que ya se verificaron contra AA, y volver a
+   elegir un gris a ojo acá desharía ese trabajo. */
+
+.auth-pantalla {
+  min-height: 100vh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: var(--bg-subtle);
+}
+
+.auth-card {
+  width: 100%;
+  max-width: 380px;
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  padding: 32px;
+  background: var(--bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 4px 20px rgb(0 0 0 / 6%);
+}
+
+.auth-card--centrado {
+  text-align: center;
+  align-items: center;
+}
+
+.auth-card h1 {
+  margin: 0;
+  font-size: 1.25rem;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.auth-sub {
+  margin: 0;
+  font-size: 0.875rem;
+  line-height: 1.5;
+  color: var(--text-gray);
+}
+
+.auth-nota {
+  margin: 0;
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.auth-qr {
+  align-self: center;
+  width: 200px;
+  height: 200px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  /* El QR es un PNG en blanco y negro: el fondo blanco explícito lo protege de cualquier
+     tema oscuro que se herede, porque un QR invertido no lo lee ningún lector. */
+  background: #fff;
+  padding: 8px;
+}
+
+.auth-qr--vacio {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.8125rem;
+  color: var(--text-muted);
+  background: var(--bg-subtle);
+}
+
+/* El campo de los 6 dígitos: monoespaciado y con separación entre caracteres, para que
+   quien lo tipea pueda contar de un vistazo cuántos van. */
+.auth-codigo {
+  width: 100%;
+  padding: 14px 12px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 1.75rem;
+  letter-spacing: 0.4em;
+  text-align: center;
+  text-indent: 0.4em; /* compensa el letter-spacing del último carácter, que descentra */
+  color: var(--text-dark);
+  border: 1px solid var(--border-input);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.auth-codigo:focus,
+.auth-input:focus {
+  outline: 2px solid var(--primary-blue);
+  outline-offset: 1px;
+  border-color: var(--primary-blue);
+}
+
+.auth-input {
+  width: 100%;
+  padding: 10px 12px;
+  font-size: 0.9375rem;
+  color: var(--text-dark);
+  border: 1px solid var(--border-input);
+  border-radius: 8px;
+  background: var(--bg);
+}
+
+.auth-secreto {
+  display: block;
+  padding: 10px;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8125rem;
+  word-break: break-all;
+  color: var(--text-dark);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}
+
+.auth-codigos {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 12px;
+  margin: 0;
+  padding: 14px;
+  list-style: none;
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.8125rem;
+  color: var(--text-dark);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  /* Que se puedan seleccionar con el mouse es parte de la función: mucha gente los va a
+     copiar a mano a un gestor de contraseñas. */
+  user-select: all;
+}
+
+/* Selector de perfil (asiento de monday compartido) */
+.auth-perfiles {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.auth-perfil {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  width: 100%;
+  padding: 12px 14px;
+  text-align: left;
+  background: var(--bg);
+  border: 1px solid var(--border-input);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.auth-perfil:hover:not(:disabled) {
+  border-color: var(--primary-blue);
+  background: var(--tint-info);
+}
+
+.auth-perfil:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.auth-perfil__nombre {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.auth-perfil__meta {
+  font-size: 0.75rem;
+  color: var(--text-gray);
+}
+
+.auth-perfil__cargando {
+  position: absolute;
+  top: 50%;
+  right: 14px;
+  width: 14px;
+  height: 14px;
+  margin-top: -7px;
+  border: 2px solid var(--border);
+  border-top-color: var(--primary-blue);
+  border-radius: 50%;
+  animation: auth-girar 0.8s linear infinite;
+}
+
+/* Con qué perfil se está enrolando o verificando. */
+.auth-perfil-activo {
+  margin: 0;
+  padding: 6px 10px;
+  font-size: 0.8125rem;
+  color: var(--tint-info-text);
+  background: var(--tint-info);
+  border: 1px solid var(--tint-info-bd);
+  border-radius: 6px;
+}
+
+.auth-acciones-secundarias {
+  display: flex;
+  gap: 16px;
+  justify-content: center;
+}
+
+.auth-check {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 0.8125rem;
+  color: var(--text-gray);
+  cursor: pointer;
+}
+
+.auth-check input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary-blue);
+  cursor: pointer;
+}
+
+.auth-enlace {
+  align-self: center;
+  padding: 0;
+  font-size: 0.8125rem;
+  color: var(--primary-blue);
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-decoration: underline;
+}
+
+.auth-enlace:hover {
+  color: var(--primary-blue-hover);
+}
+
+.auth-error {
+  margin: 0;
+  padding: 8px 12px;
+  font-size: 0.8125rem;
+  color: var(--tint-danger-text);
+  background: var(--tint-danger);
+  border: 1px solid var(--tint-danger-bd);
+  border-radius: 6px;
+}
+
+/* "Demasiados intentos" no es el mismo problema que "código incorrecto": el primero no se
+   arregla tipeando mejor, solo esperando. Se distingue en color para que el usuario no
+   siga probando y se bloquee más tiempo. */
+.auth-error--espera {
+  color: var(--text-warning);
+  background: var(--tint-warning);
+  border-color: var(--tint-warning-bd);
+}
+
+.auth-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid var(--border);
+  border-top-color: var(--primary-blue);
+  border-radius: 50%;
+  animation: auth-girar 0.8s linear infinite;
+}
+
+@keyframes auth-girar {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .auth-spinner {
+    animation-duration: 2.4s;
+  }
+}
