@@ -37,7 +37,7 @@ function recordarEscaneo(cuenta, escaneado) {
 }
 
 export default function MfaEnroll() {
-  const { preAuthToken, aplicarRespuesta, perfil, seleccion, volverAPerfiles } = useAuth()
+  const { preAuthToken, aplicarRespuesta, perfil, seleccion, volverAPerfiles, porRecuperacion } = useAuth()
   const [qr, setQr] = useState(null)
   const [secretoManual, setSecretoManual] = useState('')
   const [cuenta, setCuenta] = useState('')
@@ -199,7 +199,19 @@ export default function MfaEnroll() {
 
   return (
     <div className="auth-card">
-      <h1>Configurá el segundo factor</h1>
+      <h1>{porRecuperacion ? 'Configurá un segundo factor nuevo' : 'Configurá el segundo factor'}</h1>
+
+      {/* Sin esta explicación, alguien que entró con un código de recuperación se encuentra
+          un QR donde esperaba entrar y listo, y no entiende si funcionó o si falló algo. */}
+      {porRecuperacion && (
+        <p className="auth-error auth-error--espera">
+          Entraste con un código de recuperación, así que desvinculamos el segundo factor
+          anterior — si perdiste el teléfono, el código que estaba ahí ya no sirve.
+          Configurá uno nuevo para continuar.
+          {typeof porRecuperacion.codigosRestantes === 'number' &&
+            ' Te quedan ' + porRecuperacion.codigosRestantes + ' códigos de recuperación; se reemplazan al terminar.'}
+        </p>
+      )}
       {/* En un asiento compartido hay que dejar clarísimo QUÉ perfil se está enrolando: el
           código que se guarde acá va a ser el que pida este perfil de ahí en adelante, y
           enrolar el de un compañero por error deja a esa persona sin poder entrar. */}

@@ -56,6 +56,9 @@ export function AuthProvider({ children }) {
   const [perfil, setPerfil] = useState(null)
   // Lo que va a aparecer en Google Authenticator al escanear el QR.
   const [etiquetaTotp, setEtiquetaTotp] = useState(null)
+  // El enrolamiento llega después de usar un código de recuperación: la pantalla tiene que
+  // explicar por qué aparece un QR cuando la persona esperaba entrar y listo.
+  const [porRecuperacion, setPorRecuperacion] = useState(null)
   // Cuando el backend corre con la autenticación apagada (AUTH_ENFORCE=off), la app se
   // comporta igual que antes de todo esto. Se guarda para no mostrar el botón de cerrar
   // sesión, que no tendría sentido.
@@ -85,6 +88,7 @@ export function AuthProvider({ children }) {
       setPreAuthToken(datos.preAuthToken)
       setPerfil(datos.perfil ?? null)
       setEtiquetaTotp(datos.etiquetaTotp ?? null)
+      setPorRecuperacion(datos.porRecuperacion ? { codigosRestantes: datos.codigosRestantes ?? null } : null)
       setEstado(ESTADOS.ENROLAR)
       return
     }
@@ -231,6 +235,7 @@ export function AuthProvider({ children }) {
       seleccion,
       perfil,
       etiquetaTotp,
+      porRecuperacion,
       deshabilitada,
       passwordLoginHabilitado: PASSWORD_LOGIN_HABILITADO,
       puede,
@@ -249,6 +254,7 @@ export function AuthProvider({ children }) {
       seleccion,
       perfil,
       etiquetaTotp,
+      porRecuperacion,
       deshabilitada,
       puede,
       aplicarRespuesta,

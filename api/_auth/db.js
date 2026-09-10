@@ -283,6 +283,21 @@ export async function borrarMfa(usuarioId) {
   await sql`DELETE FROM mfa_codigos_recuperacion WHERE usuario_id = ${usuarioId}`
 }
 
+// Borra SOLO el secreto TOTP y deja vivos los códigos de recuperación que queden.
+//
+// Es lo que hace falta al entrar con un código de recuperación: el motivo casi siempre es
+// "perdí el teléfono", y entonces el secreto que vive en ese teléfono está en manos de otro
+// y tiene que morir en el acto.
+//
+// Pero borrar también los códigos —como hace borrarMfa— dejaría a esa persona sin secreto
+// Y sin códigos: si en ese momento no tiene con qué escanear un QR nuevo, queda afuera del
+// todo. Los códigos restantes son justamente la red que le permite volver a entrar mientras
+// consigue un dispositivo. Se reemplazan solos al confirmar el enrolamiento nuevo (ver
+// reemplazarCodigosRecuperacion).
+export async function borrarSecretoConservandoCodigos(usuarioId) {
+  await sql`DELETE FROM mfa_usuarios WHERE usuario_id = ${usuarioId}`
+}
+
 // --- códigos de recuperación --------------------------------------------------
 
 export async function reemplazarCodigosRecuperacion(usuarioId, hashes) {
