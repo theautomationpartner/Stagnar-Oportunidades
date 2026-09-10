@@ -38,8 +38,26 @@ export default async function handler(req, res) {
   // Con la autenticación apagada, este endpoint contesta que sí a todo. Así el frontend
   // puede llamarlo siempre, sin ramas por entorno, y la app funciona igual que hoy mientras
   // la infraestructura no esté lista.
-  if (modoAuth() === 'off') {
+  const modo = modoAuth()
+  if (modo === 'off') {
     return res.status(200).json({ estado: 'OK', authDeshabilitado: true, usuario: null })
+  }
+
+  // En modo sombra el ingreso se evalúa entero y se registra el resultado, pero la app se
+  // abre igual.
+  //
+  // Sin esto, "shadow" no cumplía lo que promete. Los endpoints de datos dejaban pasar
+  // todo (ver protegerEndpoint), pero este devolvía MFA_ENROLAMIENTO_REQUERIDO y la
+  // pantalla de ingreso bloqueaba la app: el día del despliegue, las siete personas se
+  // encontraban con un QR obligatorio. Justo lo que el modo sombra existe para evitar.
+  //
+  // Lo que sí se conserva es el diagnóstico: queda en auditoría qué habría pasado con cada
+  // persona, que es para lo que se usa esta etapa.
+  const enSombra = async (habriaPasado, detalle) => {
+    await audit.registrar(req, audit.ACCIONES.BLOQUEADO_SHADOW, {
+      detalle: { endpoint: 'session', habriaPasado, ...detalle },
+    })
+    return res.status(200).json({ estado: 'OK', authDeshabilitado: true, modoSombra: true })
   }
 
   try {
@@ -65,6 +83,9 @@ export default async function handler(req, res) {
       // Higiene sin cron: una de cada cincuenta veces se barren las filas vencidas. En un
       // proyecto de este tamaño no justifica un Cron Job de Vercel aparte.
       if (Math.random() < 0.02) await db.limpiarVencidos().catch(() => {})
+      if (modo === 'shadow' && cuerpo.estado !== 'OK') {
+        return enSombra(cuerpo.estado, { email: usuario.email, perfil: usuario.nombre })
+      }
       return res.status(200).json(cuerpo)
     }
 
@@ -82,7 +103,11 @@ export default async function handler(req, res) {
 
       if (sigueOfrecido) {
         const usuario = await activarPerfil(sesionMonday, local.monday_item_id)
-        return res.status(200).json(await continuarSegunMfa(req, res, usuario, contexto))
+        const cuerpo = await continuarSegunMfa(req, res, usuario, contexto)
+        if (modo === 'shadow' && cuerpo.estado !== 'OK') {
+          return enSombra(cuerpo.estado, { email: usuario.email, perfil: usuario.nombre })
+        }
+        return res.status(200).json(cuerpo)
       }
     }
 
@@ -94,6 +119,8 @@ export default async function handler(req, res) {
       mondayUserId: sesionMonday.userId,
       detalle: { perfiles: perfiles.map((p) => p.itemId) },
     })
+
+    if (modo === 'shadow') return enSombra('ELEGIR_PERFIL', { perfiles: perfiles.length })
 
     return res.status(200).json({
       estado: 'ELEGIR_PERFIL',
@@ -112,6 +139,9 @@ export default async function handler(req, res) {
       })),
     })
   } catch (err) {
+    if (modo === 'shadow') {
+      return enSombra('RECHAZADO', { motivo: err.motivo ?? err.codigo ?? err.message })
+    }
     if (err instanceof NoAutorizado) {
       await audit.registrar(req, audit.ACCIONES.NO_AUTORIZADO, {
         detalle: { motivo: err.motivo, endpoint: 'session', ...(err.detalle ?? {}) },
