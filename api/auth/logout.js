@@ -4,7 +4,7 @@
 //
 //   { }                        cierra esta sesión y olvida ESTE dispositivo.
 //   { todas: true }            cierra todas las sesiones vivas de la persona en todos sus
-//                              dispositivos, y borra todos los "confiar por 30 días".
+//                              dispositivos, y borra todos los "no volver a preguntar".
 //
 // El segundo es el que hay que ofrecer en la interfaz con un texto claro tipo "cerrar
 // sesión en todos los dispositivos": es la única acción que le sirve a alguien al que le

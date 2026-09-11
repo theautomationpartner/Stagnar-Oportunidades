@@ -76,7 +76,7 @@ export function igualSeguro(a, b) {
 
 // Token opaco para "confiar en este dispositivo": 32 bytes de aleatoriedad real. No es un
 // JWT ni lleva información adentro a propósito — lo único que puede hacer quien lo tenga
-// es presentarlo, y la base decide si sigue vivo. Un JWT de 30 días no se podría revocar.
+// es presentarlo, y la base decide si sigue vivo. Un JWT no se podría revocar antes de que venza.
 export function generarTokenOpaco(bytes = 32) {
   return randomBytes(bytes).toString('base64url')
 }

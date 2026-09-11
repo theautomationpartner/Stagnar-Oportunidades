@@ -33,10 +33,10 @@ export async function contextoPreAuth(req) {
 }
 
 // Cierra el ingreso: emite la sesión completa y, si se pidió, deja el dispositivo
-// confiable por 30 días.
+// confiable por 24 horas (AUTH_DEVICE_TTL_DIAS).
 //
-// El token de dispositivo es opaco y aleatorio, no un JWT. La diferencia importa para
-// algo que dura 30 días: de un JWT no se puede echar atrás la confianza sin esperar a que
+// El token de dispositivo es opaco y aleatorio, no un JWT. La diferencia importa
+// aunque dure un día: de un JWT no se puede echar atrás la confianza sin esperar a que
 // venza, mientras que de este basta con borrar la fila. En la base va solo su HMAC, así
 // que un volcado de la tabla no le sirve a nadie para presentarse como ese dispositivo.
 export async function finalizarIngreso(req, res, usuario, payload, { recordarDispositivo, via }) {
@@ -127,7 +127,7 @@ export async function leerJson(req) {
   }
 }
 
-// ¿Este navegador ya pasó el 2FA hace menos de 30 días? Se usa al ingresar, para decidir
+// ¿Este navegador ya pasó el 2FA en las últimas 24 horas? Se usa al ingresar, para decidir
 // si hay que pedir el código o no.
 export async function dispositivoEsConfiable(req, usuarioId) {
   const token = leerTokenDispositivo(req)
@@ -138,7 +138,7 @@ export async function dispositivoEsConfiable(req, usuarioId) {
 // ¿A qué perfil corresponde el dispositivo confiable de este navegador? Devuelve el
 // usuario_id local, o null. Se usa en el asiento compartido para saltear el selector: si
 // este navegador ya pasó el segundo factor de "Martin Tap" y sigue vigente, se entra
-// directo con ese perfil en vez de volver a preguntar todos los días.
+// directo con ese perfil en vez de volver a preguntar en cada ingreso.
 export async function perfilDelDispositivo(req) {
   const token = leerTokenDispositivo(req)
   if (!token) return null
@@ -172,7 +172,7 @@ export async function continuarSegunMfa(req, res, usuario, { mondayUserId, monda
     }
   }
 
-  // "No preguntar por 30 días": el dispositivo se confía DESPUÉS de haber pasado el 2FA una
+  // "No preguntar por 24 horas": el dispositivo se confía DESPUÉS de haber pasado el 2FA una
   // vez, y la confianza se revoca borrando la fila o cerrando sesión en todos lados.
   if (await dispositivoEsConfiable(req, usuario.id)) {
     return {

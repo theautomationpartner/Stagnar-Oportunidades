@@ -8,11 +8,10 @@ import CampoCodigo from './CampoCodigo'
 //
 // Dos detalles de experiencia que son también decisiones de seguridad:
 //
-//   "Confiar en este dispositivo por 30 días" viene marcado. Baja muchísimo la resistencia
-//   al cambio sin bajar la seguridad de forma significativa: el dispositivo solo se marca
-//   confiable DESPUÉS de haber pasado el segundo factor, y la confianza se revoca desde el
-//   panel de administración o cerrando sesión en todos lados. La alternativa —pedir el
-//   código todos los días— es la que hace que la gente busque cómo saltearse el 2FA.
+//   "No volver a preguntar por 24 horas" viene marcado: con eso el código se pide una vez
+//   por día y por navegador, que es la frecuencia acordada con el cliente. Sin marcarlo, se
+//   pide cada vez que se abre la app. El dispositivo solo se marca confiable DESPUÉS de
+//   haber pasado el segundo factor, y la confianza se revoca cerrando sesión.
 //
 //   El error de "demasiados intentos" se muestra distinto del de "código incorrecto",
 //   porque son problemas distintos para el usuario: uno se corrige tipeando bien, el otro
@@ -118,7 +117,7 @@ export default function MfaChallenge() {
 
       <label className="auth-check">
         <input type="checkbox" checked={recordar} onChange={(e) => setRecordar(e.target.checked)} />
-        <span>No volver a preguntar en este dispositivo por 30 días</span>
+        <span>No volver a preguntar en este dispositivo por 24 horas</span>
       </label>
 
       {error && <p className={bloqueado ? 'auth-error auth-error--espera' : 'auth-error'}>{error}</p>}

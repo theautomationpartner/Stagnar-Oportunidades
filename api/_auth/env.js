@@ -57,7 +57,12 @@ export const config = {
   // todavía no): solo alcanza para llamar a los endpoints de MFA, y caduca rápido para
   // que nadie deje una pestaña abierta a mitad del login.
   preAuthTtlMinutos: Number(process.env.AUTH_PREAUTH_TTL_MINUTOS || 10),
-  deviceTtlDias: Number(process.env.AUTH_DEVICE_TTL_DIAS || 30),
+  // Cuánto dura "no volver a preguntar en este dispositivo". Esta duración, y no la de la
+  // sesión, es la que define cada cuánto se pide el código: cada vez que se abre la app el
+  // ingreso se reevalúa, y lo único que evita pedir el código es el dispositivo confiable.
+  // Un día, acordado con el cliente: el código se pide una vez por día y por navegador. Con
+  // 30 días el efecto real era un código por mes, y la sesión de 24 h pasaba a ser decorativa.
+  deviceTtlDias: Number(process.env.AUTH_DEVICE_TTL_DIAS || 1),
 
   // --- cifrado ---
   // 32 bytes en hexadecimal (64 caracteres). Generar con:

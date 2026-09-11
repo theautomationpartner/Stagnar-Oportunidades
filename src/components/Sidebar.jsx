@@ -94,7 +94,7 @@ export default function Sidebar({ active = true, onNavigateOportunidades, defaul
 
       {/* La puerta de salida, en su propia línea debajo del usuario.
           Cerrar sesión olvida además este dispositivo confiable — si no, al salir la app
-          volvería a entrar sola por el "no preguntar por 30 días" y el botón parecería no
+          volvería a entrar sola por el "no preguntar por 24 horas" y el botón parecería no
           hacer nada. */}
       {puedeSalir && (
         <button

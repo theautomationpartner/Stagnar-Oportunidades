@@ -91,8 +91,8 @@ export default async function handler(req, res) {
 
     // Asiento compartido. Antes de preguntar: si este navegador ya pasó el segundo factor
     // de uno de estos perfiles y sigue vigente, se entra directo con ese. Sin este atajo,
-    // las cuatro personas de TAP tendrían que elegir perfil todos los días aunque hayan
-    // marcado "no preguntar por 30 días", que es justamente lo que ese check promete evitar.
+    // las cuatro personas de TAP tendrían que elegir perfil en cada ingreso aunque hayan
+    // marcado "no preguntar por 24 horas", que es justamente lo que ese check promete evitar.
     const usuarioIdDelDispositivo = await perfilDelDispositivo(req)
     if (usuarioIdDelDispositivo) {
       const local = await db.buscarUsuarioPorId(usuarioIdDelDispositivo)
