@@ -81,6 +81,43 @@
   align-items: center;
 }
 
+/* Enrolamiento con QR visible: la única vista con dos pasos simultáneos (escanear y
+   escribir el código). Apilados piden ~900px de alto y obligan a scrollear en cualquier
+   notebook; en pantallas anchas la tarjeta se ensancha y los dos pasos van lado a lado,
+   con un divisor al medio. En angosto no cambia nada: .auth-enroll y sus columnas son
+   una pila con el mismo ritmo (gap) que la tarjeta. */
+.auth-enroll,
+.auth-enroll__col {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+@media (min-width: 920px) {
+  .auth-card--ancha {
+    max-width: 760px;
+  }
+
+  .auth-card--ancha .auth-enroll {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+  }
+
+  /* justify-content y no align-items: cada columna centra su contenido verticalmente
+     respecto a la más alta (la del QR), así el campo del código queda a la altura del QR
+     y no colgado arriba. El divisor va en la columna, que se estira a toda la fila. */
+  .auth-card--ancha .auth-enroll__col {
+    justify-content: center;
+    padding-right: 28px;
+  }
+
+  .auth-card--ancha .auth-enroll__col + .auth-enroll__col {
+    border-left: 1px solid var(--border);
+    padding-right: 0;
+    padding-left: 28px;
+  }
+}
+
 .auth-card h1 {
   margin: 0;
   font-size: 1.25rem;

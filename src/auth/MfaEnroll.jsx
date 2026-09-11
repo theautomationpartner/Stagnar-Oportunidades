@@ -200,8 +200,12 @@ export default function MfaEnroll() {
     )
   }
 
+  // Tarjeta ancha solo mientras se ve el QR: es la única vista con dos pasos simultáneos
+  // (escanear y escribir el código) que en desktop van lado a lado para que la pantalla
+  // entre sin scroll. Ver .auth-enroll en auth.css: en pantallas angostas se apila igual
+  // que siempre.
   return (
-    <div className="auth-card">
+    <div className={vista === 'qr' ? 'auth-card auth-card--ancha' : 'auth-card'}>
       <h1>{porRecuperacion ? 'Configurá un segundo factor nuevo' : 'Configurá el segundo factor'}</h1>
 
       {/* Sin esta explicación, alguien que entró con un código de recuperación se encuentra
@@ -223,73 +227,79 @@ export default function MfaEnroll() {
           Perfil: <strong>{perfil.nombre}</strong>
         </p>
       )}
-      {vista === 'qr' ? (
-        <>
-          <p className="auth-sub">
-            Escaneá este código con Google Authenticator, Microsoft Authenticator, Authy o 1Password.
-            Cualquiera sirve: es un estándar abierto.
-          </p>
+      <div className="auth-enroll">
+        {vista === 'qr' && (
+          <div className="auth-enroll__col">
+            <p className="auth-sub">
+              Escaneá este código con Google Authenticator, Microsoft Authenticator, Authy o 1Password.
+              Cualquiera sirve: es un estándar abierto.
+            </p>
 
-          {qr ? (
-            <img className="auth-qr" src={qr} alt="Código QR para configurar el segundo factor" />
+            {qr ? (
+              <img className="auth-qr" src={qr} alt="Código QR para configurar el segundo factor" />
+            ) : (
+              <div className="auth-qr auth-qr--vacio">{error ? 'No disponible' : 'Generando…'}</div>
+            )}
+
+            {/* Disclosure y no enlace: es una salida alternativa que despliega contenido acá
+                mismo (el secreto manual), y el chevron adelanta ese comportamiento. */}
+            <button
+              type="button"
+              className="auth-desplegable"
+              aria-expanded={verSecreto}
+              aria-controls="auth-secreto-manual"
+              onClick={() => setVerSecreto((v) => !v)}
+            >
+              {verSecreto ? 'Ocultar el código manual' : 'No puedo escanear el QR'}
+            </button>
+            {verSecreto && (
+              // Para quien tiene la app de autenticación en la computadora, o una cámara que
+              // no funciona. Es el mismo secreto que codifica el QR, escrito.
+              <code id="auth-secreto-manual" className="auth-secreto">{secretoManual}</code>
+            )}
+
+            {/* Lo que pidieron: una vez escaneado, no volver a ver el QR. Se recuerda en este
+                navegador, así que al volver la pantalla arranca directamente en el código.
+                Botón secundario y no enlace: de todo lo que hay bajo el QR es la única acción
+                que AVANZA el flujo, y tiene que pesar más que las salidas alternativas. */}
+            <button
+              type="button"
+              className="auth-btn-secundario"
+              onClick={() => {
+                recordarEscaneo(cuenta, true)
+                setVista('codigo')
+              }}
+            >
+              Ya lo escaneé, quiero escribir el código
+            </button>
+          </div>
+        )}
+
+        <div className="auth-enroll__col">
+          {vista === 'qr' ? (
+            <p className="auth-sub">Ahora escribí el código de 6 dígitos que muestra la app:</p>
           ) : (
-            <div className="auth-qr auth-qr--vacio">{error ? 'No disponible' : 'Generando…'}</div>
+            <p className="auth-sub">
+              Abrí tu app de autenticación y escribí el código de 6 dígitos de{' '}
+              <strong>{cuenta}</strong>.
+            </p>
           )}
 
-          {/* Disclosure y no enlace: es una salida alternativa que despliega contenido acá
-              mismo (el secreto manual), y el chevron adelanta ese comportamiento. */}
-          <button
-            type="button"
-            className="auth-desplegable"
-            aria-expanded={verSecreto}
-            aria-controls="auth-secreto-manual"
-            onClick={() => setVerSecreto((v) => !v)}
-          >
-            {verSecreto ? 'Ocultar el código manual' : 'No puedo escanear el QR'}
-          </button>
-          {verSecreto && (
-            // Para quien tiene la app de autenticación en la computadora, o una cámara que
-            // no funciona. Es el mismo secreto que codifica el QR, escrito.
-            <code id="auth-secreto-manual" className="auth-secreto">{secretoManual}</code>
+          <CampoCodigo valor={codigo} onChange={setCodigo} onEnter={confirmar} deshabilitado={enviando} />
+
+          {error && <p className="auth-error">{error}</p>}
+
+          <Button disabled={codigo.length !== 6 || enviando} onClick={() => confirmar(codigo)}>
+            {enviando ? 'Verificando…' : 'Confirmar'}
+          </Button>
+
+          {vista === 'codigo' && (
+            <button type="button" className="auth-btn-terciario" onClick={() => setVista('qr')}>
+              Ver el código QR otra vez
+            </button>
           )}
-
-          {/* Lo que pidieron: una vez escaneado, no volver a ver el QR. Se recuerda en este
-              navegador, así que al volver la pantalla arranca directamente en el código.
-              Botón secundario y no enlace: de todo lo que hay bajo el QR es la única acción
-              que AVANZA el flujo, y tiene que pesar más que las salidas alternativas. */}
-          <button
-            type="button"
-            className="auth-btn-secundario"
-            onClick={() => {
-              recordarEscaneo(cuenta, true)
-              setVista('codigo')
-            }}
-          >
-            Ya lo escaneé, quiero escribir el código
-          </button>
-        </>
-      ) : (
-        <p className="auth-sub">
-          Abrí tu app de autenticación y escribí el código de 6 dígitos de{' '}
-          <strong>{cuenta}</strong>.
-        </p>
-      )}
-
-      {vista === 'qr' && <p className="auth-sub">Ahora escribí el código de 6 dígitos que muestra la app:</p>}
-
-      <CampoCodigo valor={codigo} onChange={setCodigo} onEnter={confirmar} deshabilitado={enviando} />
-
-      {error && <p className="auth-error">{error}</p>}
-
-      <Button disabled={codigo.length !== 6 || enviando} onClick={() => confirmar(codigo)}>
-        {enviando ? 'Verificando…' : 'Confirmar'}
-      </Button>
-
-      {vista === 'codigo' && (
-        <button type="button" className="auth-btn-terciario" onClick={() => setVista('qr')}>
-          Ver el código QR otra vez
-        </button>
-      )}
+        </div>
+      </div>
 
       {/* Salida para el caso feo: lo escaneó en el teléfono que no era, y ahora ningún
           código le va a funcionar nunca. Sin esto quedaría trabado sin entender por qué. */}
