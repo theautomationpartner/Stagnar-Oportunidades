@@ -1306,8 +1306,8 @@
   padding-left: 18px;
 }
 
-/* A pedido: selector de "Asignado" en el pie del último paso, a la izquierda de "Crear
-   Oportunidad" — mismo renglón, porque es parte de crearla. */
+/* A pedido: el "Asignado" visible en el pie de TODOS los pasos, a la izquierda del botón
+   de avanzar/crear — chip con avatar y nombre que abre el modal (ver AsignadoPicker). */
 .crear-op__asignado {
   display: flex;
   align-items: center;
@@ -1320,8 +1320,4 @@
   font-weight: 600;
   color: var(--text-gray);
   white-space: nowrap;
-}
-
-.crear-op__asignado > div {
-  min-width: 200px;
 }

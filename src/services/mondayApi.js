@@ -911,6 +911,7 @@ const MONDAY_USERS_QUERY = `
       name
       enabled
       is_guest
+      photo_thumb_small
     }
   }
 `
@@ -921,7 +922,7 @@ export function fetchMondayUsers() {
       .then((data) =>
         (data.users ?? [])
           .filter((u) => u.enabled !== false && !u.is_guest)
-          .map((u) => ({ id: String(u.id), name: u.name }))
+          .map((u) => ({ id: String(u.id), name: u.name, photo: u.photo_thumb_small || null }))
           .sort((a, b) => a.name.localeCompare(b.name, 'es'))
       )
       .catch((err) => {

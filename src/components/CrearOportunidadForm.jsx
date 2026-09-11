@@ -25,7 +25,7 @@ import PersonaFicha from './crear/PersonaFicha'
 import { modeloSinMarca, matchOption } from '../services/format'
 import { useSchema, useMondayUser } from '../context/AppContext'
 import { useAuth } from '../auth/AuthContext'
-import AsignadoSelect from './AsignadoSelect'
+import AsignadoPicker from './AsignadoPicker'
 import Stepper from './Stepper'
 import StatusBadge from './StatusBadge'
 import ClienteArchivos from './ClienteArchivos'
@@ -171,7 +171,7 @@ export default function CrearOportunidadForm({
   const ctxSchema = useSchema()
   const schema = schemaProp ?? ctxSchema
   // "Asignado" (deal_owner): arranca en quien está creando la oportunidad y se puede
-  // cambiar por otra persona antes de crearla (ver AsignadoSelect en el pie).
+  // cambiar por otra persona antes de crearla (ver AsignadoPicker en el pie).
   //
   // Quién crea sale de la SESIÓN de autenticación (usuario.mondayUserId, verificado por el
   // backend), no de monday.get('context'): el contexto solo responde dentro del iframe de
@@ -2185,15 +2185,13 @@ export default function CrearOportunidadForm({
             </Button>
           )}
           <div className="crear-op__footer-actions">
-            {/* A pedido: se puede elegir otra persona como Asignado. Va en el último paso,
-                al lado de "Crear Oportunidad", porque es parte de crearla: arranca en quien
-                la está creando y se cambia ahí mismo si corresponde. */}
-            {isLastStep && (
-              <label className="crear-op__asignado">
-                <span>Asignado</span>
-                <AsignadoSelect value={asignadoId} onChange={setAsignadoElegido} disabled={saving} />
-              </label>
-            )}
+            {/* A pedido: el Asignado se ve desde el primer paso —no solo al final— como un
+                chip con avatar y nombre que abre el modal con todas las personas
+                asignables (ver AsignadoPicker). Arranca en quien la está creando. */}
+            <div className="crear-op__asignado">
+              <span>Asignado</span>
+              <AsignadoPicker value={asignadoId} creadorId={creadorId} onChange={setAsignadoElegido} disabled={saving} />
+            </div>
             <Button
               kind="primary"
               onClick={isLastStep ? handleGuardar : handleContinuar}

@@ -1,0 +1,233 @@
+/* Selector de "Asignado" con avatar (ver AsignadoPicker.jsx). El tinte verde suave es el
+   mismo #e9f5f4 elegido en auth.css (verde de marca al ~8% sobre blanco); ahí está la
+   nota de contraste: --color-verde-cta encima da ≈4.9:1, pasa AA. */
+
+/* Disparador: chip con el avatar y el nombre de la persona asignada. Pill y no botón
+   cuadrado para que en el pie del formulario se lea como un dato clickeable, no como una
+   acción más al lado de "Crear Oportunidad". */
+.asignado-picker__trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px 4px 4px;
+  background: var(--bg);
+  border: 1px solid var(--border-input);
+  border-radius: 999px;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background-color 0.12s ease;
+}
+
+.asignado-picker__trigger:hover:not(:disabled) {
+  border-color: var(--color-verde);
+  background: #e9f5f4;
+}
+
+.asignado-picker__trigger:disabled {
+  opacity: 0.55;
+  cursor: default;
+}
+
+.asignado-picker__trigger-nombre {
+  max-width: 160px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.asignado-picker__trigger-icono {
+  flex: none;
+  font-size: 16px;
+  color: var(--text-muted);
+}
+
+.asignado-picker__avatar {
+  flex: none;
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.asignado-picker__avatar--chico {
+  width: 24px;
+  height: 24px;
+}
+
+.asignado-picker__avatar--iniciales {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--color-verde-cta);
+  background: #e9f5f4;
+}
+
+.asignado-picker__avatar--chico.asignado-picker__avatar--iniciales {
+  font-size: 10px;
+}
+
+.asignado-picker__overlay {
+  position: fixed;
+  inset: 0;
+  z-index: var(--z-modal);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 24px;
+  background: rgb(23 30 41 / 55%);
+}
+
+.asignado-picker__dialog {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  width: 100%;
+  max-width: 440px;
+  /* La lista scrollea adentro (ver __lista): el diálogo nunca supera la ventana. */
+  max-height: min(600px, calc(100vh - 48px));
+  padding: 20px;
+  background: var(--bg);
+  border-radius: 12px;
+  box-shadow: 0 16px 48px rgb(0 0 0 / 28%);
+}
+
+.asignado-picker__titulo {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+
+.asignado-picker__sub {
+  margin: 0;
+  font-size: 13px;
+  line-height: 1.45;
+  color: var(--text-gray);
+}
+
+.asignado-picker__buscar {
+  width: 100%;
+  padding: 8px 12px;
+  font-size: 14px;
+  color: var(--text-dark);
+  border: 1px solid var(--border-input);
+  border-radius: 8px;
+}
+
+.asignado-picker__lista {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 2px;
+  list-style: none;
+}
+
+.asignado-picker__persona {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.asignado-picker__persona:hover {
+  background: #f2f9f8;
+}
+
+/* La elegida se marca doble (borde + fondo + check): el color solo no alcanza para
+   distinguirla en una lista donde todas las filas se parecen. */
+.asignado-picker__persona--elegida {
+  border-color: var(--color-verde);
+  background: #e9f5f4;
+}
+
+.asignado-picker__persona-nombre {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-size: 14px;
+  font-weight: 500;
+  color: var(--text-dark);
+}
+
+.asignado-picker__vos {
+  flex: none;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--color-verde-cta);
+  background: #e9f5f4;
+  border: 1px solid #bcdedc;
+  border-radius: 999px;
+}
+
+.asignado-picker__persona--elegida .asignado-picker__vos {
+  background: var(--bg);
+}
+
+.asignado-picker__check {
+  flex: none;
+  font-size: 18px;
+  color: var(--color-verde-cta);
+}
+
+.asignado-picker__vacio {
+  padding: 14px 10px;
+  font-size: 13px;
+  color: var(--text-muted);
+  text-align: center;
+}
+
+.asignado-picker__error {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 12px;
+  font-size: 13px;
+  color: var(--tint-danger-text);
+  background: var(--tint-danger);
+  border: 1px solid var(--tint-danger-bd);
+  border-radius: 8px;
+}
+
+.asignado-picker__error p {
+  margin: 0;
+}
+
+.asignado-picker__reintentar,
+.asignado-picker__cancelar {
+  align-self: flex-start;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--color-verde-cta);
+  background: var(--bg);
+  border: 1px solid var(--color-verde-cta);
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.asignado-picker__reintentar:hover,
+.asignado-picker__cancelar:hover {
+  background: #e9f5f4;
+}
+
+.asignado-picker__pie {
+  display: flex;
+  justify-content: flex-end;
+}
