@@ -345,3 +345,29 @@
     max-width: 100%;
   }
 }
+
+/* A pedido: "Asignado" editable en el encabezado de la oportunidad —se ve en los 4
+   pasos— empujado a la derecha del título. */
+.opp-detail__asignado {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.opp-detail__asignado > span:first-child {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-gray);
+  white-space: nowrap;
+}
+
+.opp-detail__asignado > div {
+  min-width: 180px;
+}
+
+.opp-detail__asignado-error {
+  margin: 0 0 4px;
+  font-size: 12px;
+  color: var(--tint-danger-text);
+}

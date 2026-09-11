@@ -132,6 +132,15 @@ const OPPORTUNITY_DETAIL_QUERY = `
       column_values(ids: $columnIds) {
         id
         text
+        # "Asignado" (deal_owner, columna people): el id de la persona además del nombre,
+        # para que el selector del detalle la marque por id (ver asignadoId en
+        # opportunityMapper.js).
+        ... on PeopleValue {
+          persons_and_teams {
+            id
+            kind
+          }
+        }
         ... on BoardRelationValue {
           display_value
           # A pedido: datos del Cliente/Lead vinculado (board_relation_mm4qg1n2) para
@@ -888,6 +897,55 @@ export async function fetchCurrentMondayUser() {
   } catch {
     return null
   }
+}
+
+// Personas a las que se le puede asignar una oportunidad ("Asignado", deal_owner). Son las
+// mismas que monday ofrece en su propio selector de la columna people: los miembros de la
+// cuenta, sin invitados ni cuentas deshabilitadas. Se piden una vez por sesión y se
+// comparten entre el alta y el detalle — cambian muy de vez en cuando. Si el pedido falla
+// se descarta la promesa, para que el próximo intento vuelva a preguntar.
+const MONDAY_USERS_QUERY = `
+  query GetMondayUsers {
+    users(limit: 200) {
+      id
+      name
+      enabled
+      is_guest
+    }
+  }
+`
+let usuariosMondayPromesa = null
+export function fetchMondayUsers() {
+  if (!usuariosMondayPromesa) {
+    usuariosMondayPromesa = callMondayApi(MONDAY_USERS_QUERY, {})
+      .then((data) =>
+        (data.users ?? [])
+          .filter((u) => u.enabled !== false && !u.is_guest)
+          .map((u) => ({ id: String(u.id), name: u.name }))
+          .sort((a, b) => a.name.localeCompare(b.name, 'es'))
+      )
+      .catch((err) => {
+        usuariosMondayPromesa = null
+        throw err
+      })
+  }
+  return usuariosMondayPromesa
+}
+
+// Cambia el "Asignado" de una oportunidad ya creada. deal_owner es una columna people: se
+// escribe con change_column_value y {personsAndTeams}, no con un string. Sin id = dejarla
+// sin asignar.
+export async function setAsignado(itemId, mondayUserId) {
+  const value = {
+    personsAndTeams: mondayUserId ? [{ id: Number(mondayUserId), kind: 'person' }] : [],
+  }
+  const data = await callMondayApi(CHANGE_COLUMN_VALUE_MUTATION, {
+    boardId: OPPORTUNITIES_BOARD_ID,
+    itemId,
+    columnId: 'deal_owner',
+    value: JSON.stringify(value),
+  })
+  return data.change_column_value
 }
 
 export async function fetchPanelItems() {

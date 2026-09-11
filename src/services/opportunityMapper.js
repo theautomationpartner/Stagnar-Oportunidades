@@ -49,6 +49,13 @@ export function mapOpportunityItem(item, statusColors = {}) {
   const ultimaCotizacion = formatShortDate(textOf(cv, 'date_mm52w0h8') || textOf(cv, 'date__1'))
   const recotizaciones = Number(textOf(cv, 'numeric_mm658a9j')) || 0
   const asignado = textOf(cv, 'deal_owner')
+  // Además del nombre (text), el id de la persona asignada — para que el selector de
+  // "Asignado" del detalle arranque marcado por id y no comparando nombres. Solo llega en
+  // el detalle (ver PeopleValue en OPPORTUNITY_DETAIL_QUERY); en el listado queda null.
+  const asignadoPersona = cv
+    .find((c) => c.id === 'deal_owner')
+    ?.persons_and_teams?.find((p) => p.kind === 'person')
+  const asignadoId = asignadoPersona?.id != null ? String(asignadoPersona.id) : null
 
   const estadoCotizacion = textOf(cv, 'color_mm51n7aa')
   const estadoCotizacionColor = statusColors.estadoCotizacion?.[estadoCotizacion] ?? DEFAULT_COLOR
@@ -148,6 +155,7 @@ export function mapOpportunityItem(item, statusColors = {}) {
     recotizaciones,
     asignado,
     asignadoIniciales: initialsOf(asignado),
+    asignadoId,
   }
 }
 

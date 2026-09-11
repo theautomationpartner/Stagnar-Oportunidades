@@ -9,6 +9,7 @@ import CotizandoModal from './CotizandoModal'
 import ConfirmarStepPanel from './ConfirmarStepPanel'
 import EmitirStepPanel from './EmitirStepPanel'
 import WhatsAppSendModal from './WhatsAppSendModal'
+import AsignadoSelect from './AsignadoSelect'
 import ErrorDetailBox from './ErrorDetailBox'
 import ClientContextBar from './ClientContextBar'
 import StepFooter from './StepFooter'
@@ -25,6 +26,8 @@ import {
   clearFileColumn,
   fetchLatestUpdate,
   setContactoColumnValues,
+  setAsignado,
+  fetchMondayUsers,
   CONTACTO_DIRECCION_COLUMN_ID,
 } from '../services/mondayApi'
 import { mapOpportunityItem } from '../services/opportunityMapper'
@@ -1158,6 +1161,37 @@ export default function OpportunityDetail({
     descargarCsv(nombreArchivoCotizaciones(opportunity), buildQuotesCsv(opportunity, entries))
   }
 
+  // A pedido: reasignar la oportunidad a otra persona desde el detalle (deal_owner).
+  // Optimista con vuelta atrás, igual que el resto de las escrituras de acá: se ve al
+  // instante y, si monday la rechaza, vuelve a quien estaba y se avisa.
+  const [asignadoError, setAsignadoError] = useState(null)
+  const handleAsignadoChange = async (mondayUserId) => {
+    if (!mondayUserId || mondayUserId === opportunity?.asignadoId) return
+    onOpportunityAction?.()
+    setAsignadoError(null)
+    const anterior = item?.column_values.find((cv) => cv.id === 'deal_owner')
+    // El nombre sale de la misma lista del selector (ya cacheada): sin él, la tabla y el
+    // avatar mostrarían al anterior hasta el próximo refresco.
+    const usuarios = await fetchMondayUsers().catch(() => [])
+    const nombre = usuarios.find((u) => u.id === mondayUserId)?.name ?? ''
+    const aplicar = (cvDealOwner) =>
+      setItem((prev) => ({
+        ...prev,
+        column_values: prev.column_values.map((cv) => (cv.id === 'deal_owner' ? cvDealOwner : cv)),
+      }))
+    aplicar({
+      ...(anterior ?? { id: 'deal_owner' }),
+      text: nombre,
+      persons_and_teams: [{ id: Number(mondayUserId), kind: 'person' }],
+    })
+    try {
+      await setAsignado(opportunityId, mondayUserId)
+    } catch (err) {
+      if (anterior) aplicar(anterior)
+      setAsignadoError(err.message)
+    }
+  }
+
   const [preparingWaImages, setPreparingWaImages] = useState(false)
   const handleOpenWhatsAppModal = async () => {
     // Auditoría: antes el botón quedaba "muerto" (sin spinner ni disabled) mientras se
@@ -1322,7 +1356,20 @@ export default function OpportunityDetail({
             <div className="opp-detail__title-row">
               <span className="opp-detail__title-badge">{activeStepIndex + 1}</span>
               <h1 className="opp-detail__title">{steps[activeStepIndex]?.label}</h1>
+              {/* A pedido: el Asignado se cambia desde cualquiera de los 4 pasos. Va acá y
+                  no en la barra del cliente porque esa barra no se muestra en Cotizar ni
+                  en Emitir — y Cotizar es justo donde aterriza una oportunidad recién
+                  creada. Además es un dato de la oportunidad, no del cliente. */}
+              <label className="opp-detail__asignado">
+                <span>Asignado</span>
+                <AsignadoSelect value={opportunity.asignadoId} onChange={handleAsignadoChange} />
+              </label>
             </div>
+            {asignadoError && (
+              <p className="opp-detail__asignado-error" role="alert">
+                No se pudo cambiar el asignado: {asignadoError}
+              </p>
+            )}
             <p className="opp-detail__subtitle">{steps[activeStepIndex]?.subtitle}</p>
           </div>
 

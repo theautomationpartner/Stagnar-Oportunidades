@@ -24,6 +24,8 @@ import {
 import PersonaFicha from './crear/PersonaFicha'
 import { modeloSinMarca, matchOption } from '../services/format'
 import { useSchema, useMondayUser } from '../context/AppContext'
+import { useAuth } from '../auth/AuthContext'
+import AsignadoSelect from './AsignadoSelect'
 import Stepper from './Stepper'
 import StatusBadge from './StatusBadge'
 import ClienteArchivos from './ClienteArchivos'
@@ -168,10 +170,24 @@ export default function CrearOportunidadForm({
   // `schema` por prop (compatibilidad) o del contexto global (ver AppContext).
   const ctxSchema = useSchema()
   const schema = schemaProp ?? ctxSchema
-  // Persona de monday que está creando la oportunidad (ver fetchCurrentMondayUser) —
-  // null fuera del iframe real de monday (dev local, preview suelta): en ese caso
-  // buildBaseColumnValues() abajo simplemente omite deal_owner y "Asignado" queda vacío.
+  // "Asignado" (deal_owner): arranca en quien está creando la oportunidad y se puede
+  // cambiar por otra persona antes de crearla (ver AsignadoSelect en el pie).
+  //
+  // Quién crea sale de la SESIÓN de autenticación (usuario.mondayUserId, verificado por el
+  // backend), no de monday.get('context'): el contexto solo responde dentro del iframe de
+  // monday —en local y en una preview suelta nunca llega, y por eso "Asignado" quedaba
+  // vacío en todas las oportunidades— y en un asiento compartido devuelve la cuenta, no la
+  // persona. El contexto queda solo de respaldo para cuando la autenticación está apagada
+  // (AUTH_ENFORCE=off), que es cuando la sesión no trae usuario.
   const mondayUser = useMondayUser()
+  const { usuario: usuarioSesion } = useAuth()
+  const creadorId =
+    usuarioSesion?.mondayUserId ?? (mondayUser?.id != null ? String(mondayUser.id) : null)
+  // null = todavía no se eligió a mano: sigue a quien crea. Es derivado y no un estado
+  // inicializado una vez porque el respaldo (el contexto de monday) llega tarde: con un
+  // useState(creadorId) quedaría fijo en null.
+  const [asignadoElegido, setAsignadoElegido] = useState(null)
+  const asignadoId = asignadoElegido ?? creadorId
   // Calculado una sola vez, al montar (ver loadPersistedSearch) — de acá salen los
   // valores iniciales de stepIndex/form/resultadoSeleccionado/searchPreview/
   // busquedaResuelta más abajo, para que la Oportunidad anterior a medio cargar (si hay
@@ -916,7 +932,7 @@ export default function CrearOportunidadForm({
       board_relation_mm54tq30: { item_ids: [Number(form.departamentoId)] },
     }
     if (esAutomovil) columnValues.color_mm51n4j = form.poseeVehiculo
-    if (mondayUser?.id) columnValues.deal_owner = { personsAndTeams: [{ id: Number(mondayUser.id), kind: 'person' }] }
+    if (asignadoId) columnValues.deal_owner = { personsAndTeams: [{ id: Number(asignadoId), kind: 'person' }] }
     return columnValues
   }
 
@@ -2169,6 +2185,15 @@ export default function CrearOportunidadForm({
             </Button>
           )}
           <div className="crear-op__footer-actions">
+            {/* A pedido: se puede elegir otra persona como Asignado. Va en el último paso,
+                al lado de "Crear Oportunidad", porque es parte de crearla: arranca en quien
+                la está creando y se cambia ahí mismo si corresponde. */}
+            {isLastStep && (
+              <label className="crear-op__asignado">
+                <span>Asignado</span>
+                <AsignadoSelect value={asignadoId} onChange={setAsignadoElegido} disabled={saving} />
+              </label>
+            )}
             <Button
               kind="primary"
               onClick={isLastStep ? handleGuardar : handleContinuar}

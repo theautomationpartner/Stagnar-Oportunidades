@@ -98,6 +98,12 @@ export function perfilPublico(usuario) {
     // a una persona de otra, así que la interfaz lo necesita para poder mostrar con qué
     // perfil se está trabajando.
     nombre: usuario.nombre ?? null,
+    // El id de monday de quien entró. La interfaz lo necesita para asignarle las
+    // oportunidades que crea (columna people "Asignado"): antes lo sacaba de
+    // monday.get('context'), que solo responde dentro del iframe de monday y, en un asiento
+    // compartido, devuelve la cuenta y no la persona. Acá el dato ya está verificado — es
+    // el mismo con el que se la dejó entrar. No es sensible: es su propio id.
+    mondayUserId: usuario.monday_user_id != null ? String(usuario.monday_user_id) : null,
     rol: usuario.rol,
     teams: usuario.teams ?? [],
     permisos: usuario.permisos ?? [],

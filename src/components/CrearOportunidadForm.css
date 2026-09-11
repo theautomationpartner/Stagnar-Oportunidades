@@ -1305,3 +1305,23 @@
   margin: 4px 0 6px;
   padding-left: 18px;
 }
+
+/* A pedido: selector de "Asignado" en el pie del último paso, a la izquierda de "Crear
+   Oportunidad" — mismo renglón, porque es parte de crearla. */
+.crear-op__asignado {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-right: 12px;
+}
+
+.crear-op__asignado > span {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-gray);
+  white-space: nowrap;
+}
+
+.crear-op__asignado > div {
+  min-width: 200px;
+}
