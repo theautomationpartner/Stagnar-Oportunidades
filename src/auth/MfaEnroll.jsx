@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@vibe/core'
+import { MdCheck, MdContentCopy, MdFileDownload } from 'react-icons/md'
 import { useAuth } from './AuthContext'
 import * as api from './authClient'
 import CampoCodigo from './CampoCodigo'
@@ -162,14 +163,16 @@ export default function MfaEnroll() {
         </ul>
 
         <div className="auth-acciones-secundarias">
-          <button type="button" className="auth-enlace" onClick={copiar}>
-            {copiado === 'ok' ? '✓ Copiado' : 'Copiar al portapapeles'}
+          <button type="button" className="auth-btn-secundario auth-btn-secundario--compacto" onClick={copiar}>
+            {copiado === 'ok' ? <MdCheck aria-hidden="true" /> : <MdContentCopy aria-hidden="true" />}
+            {copiado === 'ok' ? 'Copiado' : 'Copiar al portapapeles'}
           </button>
           <button
             type="button"
-            className="auth-enlace"
+            className="auth-btn-secundario auth-btn-secundario--compacto"
             onClick={() => descargarComoTxt(codigosRecuperacion)}
           >
+            <MdFileDownload aria-hidden="true" />
             Descargar como archivo
           </button>
         </div>
@@ -283,14 +286,14 @@ export default function MfaEnroll() {
       </Button>
 
       {vista === 'codigo' && (
-        <button type="button" className="auth-enlace" onClick={() => setVista('qr')}>
+        <button type="button" className="auth-btn-terciario" onClick={() => setVista('qr')}>
           Ver el código QR otra vez
         </button>
       )}
 
       {/* Salida para el caso feo: lo escaneó en el teléfono que no era, y ahora ningún
           código le va a funcionar nunca. Sin esto quedaría trabado sin entender por qué. */}
-      <button type="button" className="auth-enlace" onClick={generarNuevo} disabled={enviando}>
+      <button type="button" className="auth-btn-terciario" onClick={generarNuevo} disabled={enviando}>
         Generar un código QR nuevo
       </button>
 
@@ -298,7 +301,7 @@ export default function MfaEnroll() {
           otro, y esa persona después no puede entrar. La salida tiene que estar a la vista
           ANTES de escanear, no después. */}
       {seleccion?.perfiles?.length > 1 && (
-        <button type="button" className="auth-enlace" onClick={volverAPerfiles} disabled={enviando}>
+        <button type="button" className="auth-btn-terciario" onClick={volverAPerfiles} disabled={enviando}>
           Este no soy yo, cambiar de perfil
         </button>
       )}

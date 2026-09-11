@@ -273,7 +273,8 @@
 
 .auth-acciones-secundarias {
   display: flex;
-  gap: 16px;
+  flex-wrap: wrap;
+  gap: 10px;
   justify-content: center;
 }
 
@@ -293,26 +294,36 @@
   cursor: pointer;
 }
 
-/* Enlaces en el verde CTA (no el verde puro): son texto chico y necesitan los 5.3:1.
-   El subrayado queda pero en un tono suave (la posición centrada ya dice "acción"); al
-   hover toma el color del texto, que junto con el cambio de color es el cue de que se
-   puede clickear. */
-.auth-enlace {
+/* Botón terciario ("fantasma"): salidas alternativas y navegación dentro de la pantalla
+   — perdí el celular, cambiar de perfil, volver a ver el QR. Acá NO van enlaces
+   subrayados (decisión de diseño del módulo: toda acción es un botón); esto tiene forma
+   de botón —padding, radio, hover con fondo— pero queda visualmente quieto para no
+   competir con el primario ni el secundario. */
+.auth-btn-terciario {
   align-self: center;
-  padding: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 7px 14px;
   font-size: 0.8125rem;
+  font-weight: 500;
   color: var(--color-verde-cta);
   background: none;
   border: none;
+  border-radius: 8px;
   cursor: pointer;
-  text-decoration: underline;
-  text-decoration-color: var(--auth-tint-verde-bd);
-  text-underline-offset: 3px;
+  transition: background-color 0.12s ease;
 }
 
-.auth-enlace:hover {
+.auth-btn-terciario:hover:not(:disabled) {
   color: #005a57;
-  text-decoration-color: currentColor;
+  background: var(--auth-tint-verde);
+}
+
+.auth-btn-terciario:disabled {
+  opacity: 0.55;
+  cursor: default;
 }
 
 /* Botón secundario de las pantallas de auth: para la acción que avanza el flujo cuando
@@ -343,6 +354,27 @@
 .auth-btn-secundario:disabled {
   opacity: 0.55;
   cursor: default;
+}
+
+/* Variante compacta: acciones sobre contenido (copiar / descargar los códigos de
+   recuperación). La etiqueta de un botón no se parte en dos líneas: con nowrap, cuando
+   los dos no entran lado a lado en la fila se apilan a ancho completo, cada uno con su
+   texto entero en una línea. */
+.auth-btn-secundario--compacto {
+  width: auto;
+  flex: 1 1 auto;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 12px;
+  font-size: 0.8125rem;
+  white-space: nowrap;
+}
+
+.auth-btn-secundario--compacto svg {
+  flex: none;
+  font-size: 1rem;
 }
 
 /* Disclosure: acción que despliega contenido en el lugar (el secreto manual del QR). El

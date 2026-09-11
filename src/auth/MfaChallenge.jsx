@@ -81,7 +81,7 @@ export default function MfaChallenge() {
         </Button>
         <button
           type="button"
-          className="auth-enlace"
+          className="auth-btn-terciario"
           onClick={() => {
             setModoRecuperacion(false)
             setCodigo('')
@@ -128,7 +128,7 @@ export default function MfaChallenge() {
 
       <button
         type="button"
-        className="auth-enlace"
+        className="auth-btn-terciario"
         onClick={() => {
           setModoRecuperacion(true)
           setCodigo('')
@@ -141,7 +141,7 @@ export default function MfaChallenge() {
       {/* Salida para quien eligió el perfil equivocado. En un asiento compartido los
           nombres se parecen, y sin esto quedaba trabado pidiendo un código que no tiene. */}
       {seleccion?.perfiles?.length > 1 && (
-        <button type="button" className="auth-enlace" onClick={volverAPerfiles} disabled={enviando}>
+        <button type="button" className="auth-btn-terciario" onClick={volverAPerfiles} disabled={enviando}>
           Este no soy yo, cambiar de perfil
         </button>
       )}
