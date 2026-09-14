@@ -10,7 +10,7 @@
 // incluye, warning. Devuelve un data URL PNG listo para previsualizar o mandar a Make.
 import { formatMoney, modeloSinMarca } from './format'
 import { BRAND_COLORS } from './companyColors'
-import { coberturaGroupOf, coberturaParaMostrar, SUBTITULO_POR_FAMILIA } from './coberturaGroups'
+import { coberturaGroupOf, coberturaParaMostrar, FAMILIA_LABEL, SUBTITULO_POR_FAMILIA } from './coberturaGroups'
 // A pedido: logo del header desde logo-blanco-.png con el fondo blanco recortado.
 import stagnariLogo from '../assets/stagnari-logo-header.png'
 import stagnariLogoSimple from '../assets/stagnari-logo-simple.png'
@@ -19,10 +19,13 @@ import stagnariLogoSimple from '../assets/stagnari-logo-simple.png'
 // el verde recortado, y el logo verde recoloreado a blanco).
 import stagnariMiniBlanco from '../assets/stagnari-mini-blanco.png'
 import stagnariLogoBlanco from '../assets/stagnari-logo-blanco.png'
-import logoBse from '../assets/aseguradoras/bse.png'
-import logoPorto from '../assets/aseguradoras/porto.png'
-import logoSancor from '../assets/aseguradoras/sancor.png'
-import logoSura from '../assets/aseguradoras/sura.webp'
+// Logos oficiales extraídos del PDF de marca (logo_aseguradoras/logos.pdf) — los mismos
+// que usa la UI (ver CompanyMark.jsx): sobre blanco, nunca invertidos, y con el color
+// real de cada marca (el Sancor viejo era una variante azul; la marca es magenta).
+import logoBse from '../assets/aseguradoras/oficial/bse.png'
+import logoPorto from '../assets/aseguradoras/oficial/porto.png'
+import logoSancor from '../assets/aseguradoras/oficial/sancor.png'
+import logoSura from '../assets/aseguradoras/oficial/sura.png'
 
 const WIDTH = 900
 const PAD = 36
@@ -314,9 +317,13 @@ function drawHeader(ctx, logos) {
 
 function drawCoverTitle(ctx, raw, y) {
   const group = coberturaGroupOf(raw.cobertura)
-  // Se muestra el nombre comercial; la familia de arriba se sigue calculando con el
-  // nombre real, que es el que conocen las listas de coberturas.
-  const title = (coberturaParaMostrar(raw) || 'COTIZACIÓN').toUpperCase()
+  // A pedido: el título es la familia — "TOTAL" o "PARCIAL", la misma que la solapa en la
+  // que aparece la cotización — y no el nombre de producto de cada compañía ("TOTAL 2500",
+  // "4 EN 1", "GLOBAL - anual"), que al cliente no le dice qué cubre. La familia se calcula
+  // igual que las solapas (coberturaGroupOf sobre la cobertura real). Solo si la cobertura
+  // no tiene familia (hoy "TOTAL c/ Mov" de SURA) queda su nombre, para no mandar una
+  // imagen sin título.
+  const title = (FAMILIA_LABEL[group] || coberturaParaMostrar(raw) || 'COTIZACIÓN').toUpperCase()
   const subtitle = SUBTITLE_BY_GROUP[group] ?? `Cobertura ${coberturaParaMostrar(raw)}`.trim() + '.'
 
   // Escudo + título + subtítulo a la izquierda
