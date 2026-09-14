@@ -71,11 +71,27 @@ async function traerItems() {
 
 const items = await traerItems()
 
-const cambios = []
+const calculado = new Map()
 for (const it of items) {
   const texto = Object.fromEntries(it.column_values.map((c) => [c.id, c.text || '']))
   const datos = Object.fromEntries(Object.entries(COLS).map(([k, id]) => [k, texto[id]]))
-  const nuevo = nombreDeOportunidad(datos)
+  calculado.set(it.id, nombreDeOportunidad(datos))
+}
+
+// Dos oportunidades del mismo cliente por el mismo vehículo dan el mismo nombre — y son
+// legítimas (el mismo auto se cotiza dos veces). Cuando pasa, lo único que las distingue
+// es el número de oportunidad, así que se lo agrega SOLO a las que chocan: el resto de
+// los nombres queda limpio.
+const porNombre = new Map()
+for (const [id, nombre] of calculado) porNombre.set(nombre, [...(porNombre.get(nombre) ?? []), id])
+for (const [nombre, ids] of porNombre) {
+  if (ids.length < 2) continue
+  for (const id of ids) calculado.set(id, `${nombre} · ID-${id}`)
+}
+
+const cambios = []
+for (const it of items) {
+  const nuevo = calculado.get(it.id)
   if (nuevo !== it.name) cambios.push({ id: it.id, antes: it.name, despues: nuevo })
 }
 
@@ -89,11 +105,7 @@ for (const c of cambios) {
 // Los nombres repetidos son justamente lo que este cambio viene a sacar: si el formato
 // nuevo deja dos iguales, hay que verlo antes de escribir, no después.
 const cuenta = new Map()
-for (const it of items) {
-  const texto = Object.fromEntries(it.column_values.map((c) => [c.id, c.text || '']))
-  const n = nombreDeOportunidad(Object.fromEntries(Object.entries(COLS).map(([k, id]) => [k, texto[id]])))
-  cuenta.set(n, (cuenta.get(n) || 0) + 1)
-}
+for (const n of calculado.values()) cuenta.set(n, (cuenta.get(n) || 0) + 1)
 const repetidos = [...cuenta].filter(([, c]) => c > 1)
 if (repetidos.length) {
   console.log('\n⚠ quedarían nombres repetidos:')
@@ -109,7 +121,8 @@ if (cambios.length && !APLICAR) {
   // Los nombres viejos no se pueden recuperar de ningún lado una vez pisados, así que
   // se guardan antes de escribir. Para volver atrás: leer este archivo y mandar cada
   // "antes" con la misma mutación.
-  const respaldo = 'scripts/opp-nombres-respaldo.json'
+  const sello = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19)
+  const respaldo = `scripts/opp-nombres-respaldo-${sello}.json`
   fs.writeFileSync(respaldo, JSON.stringify(cambios, null, 1))
   console.log()
   console.log(`nombres anteriores guardados en ${respaldo}`)
