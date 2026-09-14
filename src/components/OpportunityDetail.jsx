@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useRef, useState } from 'react'
-import { MdSend, MdAutorenew, MdArrowBack, MdDownload } from 'react-icons/md'
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
+import { MdSend, MdAutorenew, MdArrowBack } from 'react-icons/md'
 import { Button, EmptyState, AttentionBox, Loader } from '@vibe/core'
 import QuoteCard from './QuoteCard'
 import StatusBadge from './StatusBadge'
@@ -36,11 +36,62 @@ import { textOf } from '../services/mondayColumns'
 import { useSchema } from '../context/AppContext'
 import { mapSubitemToRawQuote, groupQuotesByCompania } from '../services/quoteMapper'
 import { renderQuoteText } from '../services/whatsappText'
-import { buildQuotesCsv, descargarCsv, nombreArchivoCotizaciones } from '../services/quotesExport'
 import { computeQuote, isQuoteSelectable } from '../services/pricingEngine'
 import { applyRecargoLookup } from '../services/recargoPanel'
 import { COTIZAR_FIELDS, getInvalidCotizarFields, getMissingCotizarFields } from '../services/cotizarFields'
 import { COBERTURA_TABS, coberturaGroupOf } from '../services/coberturaGroups'
+
+// A pedido: órdenes disponibles para las tarjetas de "Comparar y enviar" (ver
+// ordenElegido y el selector arriba de la grilla). Las claves son las del mapa de
+// comparadores en visibleQuoteEntries.
+const ORDEN_OPCIONES = [
+  { key: 'precio-asc', label: 'Menor precio' },
+  { key: 'precio-desc', label: 'Mayor precio' },
+  { key: 'compania', label: 'Compañía' },
+]
+
+// Animación FLIP de la grilla de cotizaciones: cuando el ORDEN de las tarjetas cambia
+// (cerrar Parámetros con una Bonificación nueva y descongelarse la lista, tocar el
+// selector de orden), cada tarjeta se desliza de su posición vieja a la nueva en vez de
+// teletransportarse. First-Last-Invert-Play a mano: en cada render se guarda el rect de
+// cada tarjeta (por data-quote-id, ver QuoteCard) y, solo si la secuencia de ids cambió,
+// se anima el delta. WAAPI y no una animación CSS: la regla global de
+// prefers-reduced-motion (index.css) no alcanza a las animaciones por API, así que acá
+// se consulta el media query a mano. Sin dependencias a propósito: tiene que correr en
+// cada render para que los rects guardados nunca queden viejos (scroll mediante).
+function useFlipDeTarjetas(contenedorRef, idsEnOrden) {
+  const rectsPrevios = useRef(new Map())
+  const ordenPrevio = useRef('')
+  useLayoutEffect(() => {
+    const clave = idsEnOrden.join(',')
+    const cont = contenedorRef.current
+    if (!cont) {
+      rectsPrevios.current = new Map()
+      ordenPrevio.current = ''
+      return
+    }
+    const tarjetas = [...cont.querySelectorAll('[data-quote-id]')]
+    const nuevos = new Map(tarjetas.map((el) => [el.dataset.quoteId, el.getBoundingClientRect()]))
+    const cambioOrden = ordenPrevio.current !== '' && clave !== ordenPrevio.current
+    const reducirMovimiento = window.matchMedia?.('(prefers-reduced-motion: reduce)')?.matches
+    if (cambioOrden && !reducirMovimiento) {
+      for (const el of tarjetas) {
+        const antes = rectsPrevios.current.get(el.dataset.quoteId)
+        if (!antes) continue
+        const ahora = nuevos.get(el.dataset.quoteId)
+        const dx = antes.left - ahora.left
+        const dy = antes.top - ahora.top
+        if (Math.abs(dx) < 1 && Math.abs(dy) < 1) continue
+        el.animate(
+          [{ transform: `translate(${dx}px, ${dy}px)` }, { transform: 'translate(0, 0)' }],
+          { duration: 340, easing: 'cubic-bezier(0.2, 0.8, 0.2, 1)' }
+        )
+      }
+    }
+    rectsPrevios.current = nuevos
+    ordenPrevio.current = clave
+  })
+}
 import { nombreDeOportunidad } from '../services/nombreOportunidad'
 import './OpportunityDetail.css'
 
@@ -600,20 +651,35 @@ export default function OpportunityDetail({
   // sin importar la compañía (ver coberturaGroups.js — las 2 familias ya cubren todas
   // las coberturas reales, no dependen de qué compañía sea).
   const activeCoberturaTab = COBERTURA_TABS[coberturaTabIndex]?.key ?? 'general'
+  // A pedido: cómo se ordenan las tarjetas de la solapa activa. 'precio-asc' es el de
+  // siempre (LOG-12); ver ORDEN_OPCIONES y el selector arriba de la grilla.
+  const [ordenElegido, setOrdenElegido] = useState('precio-asc')
   // Foto del orden de las tarjetas en el momento en que se abrió el primer panel (ver
   // visibleQuoteEntries).
   const [ordenCongelado, setOrdenCongelado] = useState(null)
   const ordenActualRef = useRef([])
   // Bug reportado: marcar un opcional (ej. Granizo en PORTO) sube el precio y la tarjeta
-  // se corría de lugar en la grilla. Antes el orden se congelaba solo mientras hubiera un
-  // panel de "Parámetros" abierto y se soltaba al cerrarlo — o sea que el salto no se
-  // evitaba, se posponía al cierre del panel, que es igual de desconcertante porque pasa
-  // solo (sin que uno vuelva a tocar nada). Ahora alcanza con abrir CUALQUIER panel para
-  // congelar, y el orden se mantiene hasta que cambia lo que se está mirando: otra solapa
-  // de cobertura, o cotizaciones nuevas (recotizar). Ver los dos efectos de abajo.
-  const handlePanelChange = (panel) => {
+  // se corría de lugar en la grilla. Abrir CUALQUIER panel congela el orden — la tarjeta
+  // que estás tocando no se te escapa de abajo del mouse aunque el precio cambie en vivo.
+  //
+  // A pedido, el descongelado ya no espera al cambio de solapa: al cerrarse el ÚLTIMO
+  // panel abierto la grilla se reacomoda sola al orden elegido, y el traslado se anima
+  // (ver useFlipDeTarjetas) — la tarjeta con la Bonificación nueva se desliza a su lugar
+  // en vez de teletransportarse, que era lo desconcertante del salto seco. Se lleva el
+  // conteo por id porque puede haber más de un panel abierto a la vez.
+  const [conPanelAbierto, setConPanelAbierto] = useState(() => new Set())
+  const handlePanelChange = (id, panel) => {
+    setConPanelAbierto((prev) => {
+      const next = new Set(prev)
+      if (panel) next.add(id)
+      else next.delete(id)
+      return next
+    })
     if (panel) setOrdenCongelado((prev) => prev ?? ordenActualRef.current)
   }
+  useEffect(() => {
+    if (conPanelAbierto.size === 0) setOrdenCongelado(null)
+  }, [conPanelAbierto])
   const visibleQuoteEntries = useMemo(() => {
     const flat = groups.flatMap((g) => g.entries.map((e) => ({ ...e, compania: g.compania })))
     const deLaSolapa =
@@ -621,15 +687,22 @@ export default function OpportunityDetail({
         ? flat
         : flat.filter((e) => coberturaGroupOf(e.raw.cobertura) === activeCoberturaTab)
     // LOG-12: antes salían en el orden en que la automatización creó los subitems (que no
-    // significa nada para quien compara). Ahora, de la más barata a la más cara dentro de
-    // la solapa. Las que no se pueden elegir (sin fórmula o COSTO TOTAL en 0, ver
-    // isQuoteSelectable) van al final: si no, un total 0 encabezaría la lista.
+    // significa nada para quien compara). El orden por defecto es de la más barata a la
+    // más cara; a pedido también se puede invertir o agrupar por compañía (alfabética, y
+    // por precio adentro de cada una) — ver ordenElegido. Las que no se pueden elegir
+    // (sin fórmula o COSTO TOTAL en 0, ver isQuoteSelectable) van al final en cualquier
+    // orden: si no, un total 0 encabezaría la lista.
     const total = (e) => Number(e.quote.total) || 0
+    const comparar = {
+      'precio-asc': (a, b) => total(a) - total(b),
+      'precio-desc': (a, b) => total(b) - total(a),
+      compania: (a, b) => a.compania.localeCompare(b.compania, 'es') || total(a) - total(b),
+    }[ordenElegido]
     const ordenadas = [...deLaSolapa].sort((a, b) => {
       const aSel = isQuoteSelectable(a.quote)
       const bSel = isQuoteSelectable(b.quote)
       if (aSel !== bSel) return aSel ? -1 : 1
-      return total(a) - total(b)
+      return comparar(a, b)
     })
     // Con el orden congelado (ver handlePanelChange) manda la foto: los opcionales
     // cambian el precio en vivo y, sin esto, la tarjeta que estás tocando se te escapa de
@@ -639,18 +712,27 @@ export default function OpportunityDetail({
     return ordenadas.sort(
       (a, b) => (posicion.get(a.raw.id) ?? Number.MAX_SAFE_INTEGER) - (posicion.get(b.raw.id) ?? Number.MAX_SAFE_INTEGER)
     )
-  }, [groups, activeCoberturaTab, ordenCongelado])
+  }, [groups, activeCoberturaTab, ordenCongelado, ordenElegido])
 
   useEffect(() => {
     ordenActualRef.current = visibleQuoteEntries.map((e) => e.raw.id)
   }, [visibleQuoteEntries])
 
-  // Se descongela al cambiar de solapa: ahí la lista se rearma entera, no hay ninguna
-  // tarjeta "abajo del mouse" que pueda saltar, y corresponde volver a mostrarlas de la
-  // más barata a la más cara.
+  const quotesGridRef = useRef(null)
+  useFlipDeTarjetas(
+    quotesGridRef,
+    visibleQuoteEntries.map((e) => e.raw.id)
+  )
+
+  // Se descongela al cambiar de solapa o de orden elegido: ahí la lista se rearma
+  // entera a conciencia, no hay ninguna tarjeta "abajo del mouse" que pueda saltar, y
+  // corresponde volver a mostrarlas en el orden pedido. El conteo de paneles se limpia
+  // también: al cambiar de solapa las tarjetas se desmontan sin avisar su cierre, y un
+  // id fantasma dejaría el orden congelado para siempre.
   useEffect(() => {
     setOrdenCongelado(null)
-  }, [activeCoberturaTab])
+    setConPanelAbierto(new Set())
+  }, [activeCoberturaTab, ordenElegido])
 
   // Y también cuando cambian las cotizaciones en sí (recotizar borra y vuelve a crear los
   // subitems): la foto vieja ya no describe nada. Un cambio de PRECIO no cuenta como
@@ -665,7 +747,17 @@ export default function OpportunityDetail({
   )
   useEffect(() => {
     setOrdenCongelado(null)
+    setConPanelAbierto(new Set())
   }, [idsDeCotizaciones])
+
+  // Y al salir de "Comparar y enviar": las tarjetas se desmontan sin avisar el cierre de
+  // sus paneles, y un id fantasma en el conteo dejaría el orden congelado al volver.
+  useEffect(() => {
+    if (activeStep !== 'comparar') {
+      setOrdenCongelado(null)
+      setConPanelAbierto(new Set())
+    }
+  }, [activeStep])
 
   // A pedido: solo cuentan (y se envían) las seleccionadas que además son
   // seleccionables (COSTO TOTAL > 0 y con fórmula) — una marcada en monday con total 0
@@ -1177,14 +1269,6 @@ export default function OpportunityDetail({
     }
   }
 
-  // LOG-19: la planilla sale de `groups`, o sea de lo mismo que se está viendo en
-  // pantalla (con los ajustes de "Parámetros" ya aplicados), pero sin filtrar por solapa
-  // ni por selección: el punto es poder cotejar TODAS las opciones contra los portales.
-  const handleDescargarPlanilla = () => {
-    const entries = groups.flatMap((g) => g.entries)
-    descargarCsv(nombreArchivoCotizaciones(opportunity), buildQuotesCsv(opportunity, entries))
-  }
-
   // A pedido: reasignar la oportunidad a otra persona desde el detalle (deal_owner).
   // Optimista con vuelta atrás, igual que el resto de las escrituras de acá: se ve al
   // instante y, si monday la rechaza, vuelve a quien estaba y se avisa.
@@ -1518,13 +1602,39 @@ export default function OpportunityDetail({
                   ))}
                 </div>
 
+                {/* A pedido: ordenar las tarjetas de la solapa activa por precio (en las
+                    dos direcciones) o agrupadas por compañía. Cambiar el orden
+                    descongela la foto (ver ordenCongelado), igual que cambiar de solapa. */}
+                <div className="opp-detail__orden">
+                  <span id="opp-detail-orden-label" className="opp-detail__orden-label">
+                    Ordenar por
+                  </span>
+                  <div role="group" aria-labelledby="opp-detail-orden-label" className="opp-detail__orden-botones">
+                    {ORDEN_OPCIONES.map((o) => (
+                      <button
+                        key={o.key}
+                        type="button"
+                        aria-pressed={ordenElegido === o.key}
+                        className={
+                          ordenElegido === o.key
+                            ? 'opp-detail__orden-btn opp-detail__orden-btn--activo'
+                            : 'opp-detail__orden-btn'
+                        }
+                        onClick={() => setOrdenElegido(o.key)}
+                      >
+                        {o.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
                 {visibleQuoteEntries.length === 0 ? (
                   <EmptyState
                     title="Sin cotizaciones en esta familia"
                     description="No hay cotizaciones de Total o Parcial (según corresponda) para esta oportunidad."
                   />
                 ) : (
-                  <div className="opp-detail__quotes">
+                  <div className="opp-detail__quotes" ref={quotesGridRef}>
                     {visibleQuoteEntries.map(({ raw, quote }) => (
                       <QuoteCard
                         key={raw.id}
@@ -1537,7 +1647,7 @@ export default function OpportunityDetail({
                         onResetOverrides={() => handleResetQuoteOverrides(raw.id)}
                         onToggleOpcional={(field, checked) => handleToggleOpcional(raw.id, field, checked)}
                         onAutoExtraChange={(dias) => handleAutoExtraChange(raw.id, dias)}
-                        onPanelChange={handlePanelChange}
+                        onPanelChange={(panel) => handlePanelChange(raw.id, panel)}
                         rcOptions={rcOptions}
                       />
                     ))}
@@ -1575,12 +1685,9 @@ export default function OpportunityDetail({
                 {/* A pedido: se puede pasar a "Confirmar" sin haber enviado nada por
                     WhatsApp — útil cuando el cliente ya eligió la propuesta por otro
                     medio (llamada, presencial) y no hace falta mandarle nada más. */}
-                {/* LOG-19: baja TODAS las cotizaciones de la oportunidad (no solo las
-                    seleccionadas ni las de la solapa activa) con los parámetros con los
-                    que se calculó cada una, para cotejarlas a mano contra los portales. */}
-                <Button kind="tertiary" onClick={handleDescargarPlanilla}>
-                  <MdDownload /> Descargar detalle
-                </Button>
+                {/* LOG-19 ("Descargar detalle", la planilla CSV de todas las cotizaciones
+                    para cotejar contra los portales) se quitó a pedido — el código sigue
+                    en services/quotesExport.js por si vuelve. */}
                 <Button kind="secondary" onClick={() => setActiveStep('confirmar')}>
                   Continuar sin enviar
                 </Button>

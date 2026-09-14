@@ -96,9 +96,14 @@
    quedaban 2 líneas apretadas una al lado de la otra en el borde izquierdo. El
    border-left-color sigue siendo el de la compañía (viene inline, gana sobre este
    border-color); acá solo se resaltan los otros 3 lados + un tinte de fondo. */
+/* A pedido: la marcada se tiñe con el tono de SU compañía (fondo bien suave + borde en
+   el acento pleno) en vez del azul genérico. Las variables vienen inline desde el JSX
+   (selectionForCompania); el azul queda solo de respaldo por si faltaran. Ojo: tres
+   compañías comparten tonos parecidos (los cyan/azules) — el tinte marca EL ESTADO, la
+   identidad la sigue dando el CompanyMark con el logo. */
 .quote-card--selected {
-  border-color: var(--primary-blue);
-  background: #f7fbff;
+  border-color: var(--seleccion-bd, var(--primary-blue));
+  background: var(--seleccion-bg, #f7fbff);
 }
 
 .quote-card--blocked {
@@ -134,25 +139,16 @@
    EST-02: background/color/border-color vienen inline por tarjeta (badgeForCompania,
    ver companyColors.js) — antes el fondo era el mismo gris para las cuatro compañías y
    el color propio solo se usaba en el texto. */
-.quote-card__company {
-  font-size: 10px;
-  font-weight: 700;
-  background: var(--bg-subtle);
-  border: 1px solid transparent;
-  border-radius: 10px;
-  padding: 2px 8px;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-}
-
 /* IconButton (@vibe/core) ya pone el reset de botón/cursor/padding — acá
    solo queda el color del ícono según seleccionado o no. */
 .quote-card__radio {
   color: #c3c6d4;
 }
 
+/* El radio marcado en el tono OSCURECIDO de la compañía (--seleccion-fg): el acento puro
+   de los cyan es demasiado claro para un ícono chico. */
 .quote-card--selected .quote-card__radio {
-  color: var(--primary-blue);
+  color: var(--seleccion-fg, var(--primary-blue));
 }
 
 .quote-card__title {

@@ -1,0 +1,30 @@
+/* Identidad de compañía: [recuadro de color de marca][logotipo sobre blanco], como una
+   píldora de dos segmentos (ver CompanyMark.jsx). Fondo blanco literal y no var(--bg):
+   los PNG de los logos traen fondo blanco opaco, y con cualquier otro fondo se notaría
+   el rectángulo. */
+.company-mark {
+  display: inline-flex;
+  align-items: center;
+  height: 26px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  overflow: hidden;
+}
+
+.company-mark__cuadro {
+  flex: none;
+  width: 24px;
+  height: 100%;
+}
+
+/* Caja FIJA para el logo (no alto fijo + ancho libre): los lockups tienen proporciones
+   muy distintas (SANCOR es el doble de ancho que los demás a igual alto) y con ancho
+   libre cada tag medía distinto. Con la caja fija cada logo se escala y centra adentro
+   con object-fit, y las cuatro marcas quedan idénticas en tamaño. */
+.company-mark__logo {
+  width: 62px;
+  height: 17px;
+  margin: 0 8px;
+  object-fit: contain;
+}

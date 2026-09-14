@@ -108,9 +108,11 @@
   background: #fff;
 }
 
+/* La elegida teñida con el tono de su compañía, igual que la marcada del paso 2 (ver
+   .quote-card--selected): variables inline desde el JSX, azul solo de respaldo. */
 .confirmar-step__card--selected {
-  border-color: var(--primary-blue);
-  background: var(--tint-info);
+  border-color: var(--seleccion-bd, var(--primary-blue));
+  background: var(--seleccion-bg, var(--tint-info));
 }
 
 .confirmar-step__card-header {
@@ -146,19 +148,6 @@
   background: var(--green);
   color: #fff;
   font-size: 11px;
-  flex-shrink: 0;
-}
-
-/* EST-02: background/color/border-color vienen inline (badgeForCompania, ver
-   companyColors.js), igual que en la tarjeta del paso 2. */
-.confirmar-step__card-compania {
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.02em;
-  border: 1px solid transparent;
-  border-radius: 10px;
-  padding: 2px 8px;
   flex-shrink: 0;
 }
 

@@ -1,11 +1,18 @@
-// Color distintivo por compañía, compartido entre la imagen de WhatsApp
-// (services/whatsappImage.js) y cualquier lugar de la UI que necesite diferenciar
-// compañías de un vistazo (p. ej. el paso 3 "Confirmar"). Ver /logica-monday-vibe.md.
+// Color distintivo por compañía, para cualquier lugar de la UI que necesite diferenciar
+// compañías de un vistazo (QuoteCard, Confirmar, CotizandoModal, Emitir). La imagen de
+// WhatsApp NO los usa: está restringida a BRAND_COLORS (ver abajo).
+//
+// A pedido, son los tonos REALES de cada marca, muestreados del PDF oficial de logos
+// (logo_aseguradoras/logos.pdf): tono dominante saturado de cada logotipo. Los valores
+// anteriores estaban elegidos a ojo y tres eran directamente de otra marca (SANCOR verde
+// cuando su color es magenta, SURA naranja cuando es azul, PORTO rojo cuando es azul).
+// BSE y PORTO son casi el mismo cyan — es así en la realidad; por eso el recuadro de
+// PORTO en la UI usa su isotipo y no el color plano (ver CompanyMark.jsx).
 export const ACCENT_BY_COMPANIA = {
-  BSE: '#0057a3',
-  SANCOR: '#00a651',
-  SURA: '#f58220',
-  PORTO: '#e4032e',
+  BSE: '#009de0',
+  SANCOR: '#ac0068',
+  SURA: '#2c6cf5',
+  PORTO: '#00a0fb',
 }
 
 const DEFAULT_ACCENT = '#0073ea'
@@ -19,9 +26,10 @@ export function accentForCompania(compania) {
 // acento lavado con blanco, texto = el mismo acento oscurecido) en vez de ser una
 // segunda paleta escrita a mano: agregar una compañía a ACCENT_BY_COMPANIA alcanza para
 // que su badge salga solo, y nunca pueden quedar desfasados. El acento puro NO sirve
-// como fondo con texto blanco — el naranja de SURA y el verde de SANCOR no llegan al
-// contraste mínimo para texto chico (el badge se dibuja a 10-12px), el azul de BSE y el
-// rojo de PORTO sí: con el par lavado/oscurecido las cuatro quedan parejas y legibles.
+// como fondo con texto blanco — los cyan de BSE/PORTO no llegan al contraste mínimo
+// para texto chico (el badge se dibuja a 10-12px): con el par lavado/oscurecido las
+// cuatro quedan parejas y legibles (verificado con los tonos reales: SANCOR 9.5:1,
+// BSE 5.5:1, SURA 7.4:1, PORTO 5.3:1 — todas sobre 4.5:1 AA).
 function hexToRgb(hex) {
   const clean = hex.replace('#', '')
   return [0, 2, 4].map((i) => parseInt(clean.slice(i, i + 2), 16))
@@ -47,6 +55,21 @@ export function badgeForCompania(compania) {
     bg: lighten(accent, 0.88),
     fg: darken(accent, 0.35),
     border: lighten(accent, 0.68),
+  }
+}
+
+// A pedido: la tarjeta MARCADA se pinta con el tono de su compañía, no con el azul
+// genérico — fondo con el acento muy lavado (más suave que el del badge: es toda la
+// tarjeta, no un globito) y borde en el acento pleno. `fg` para el radio y cualquier
+// detalle chico: el acento puro de los cyan (BSE/PORTO) es demasiado claro para un
+// ícono, el oscurecido se ve en las cuatro. Derivado igual que badgeForCompania: una
+// compañía nueva en ACCENT_BY_COMPANIA sale sola.
+export function selectionForCompania(compania) {
+  const accent = accentForCompania(compania)
+  return {
+    bg: lighten(accent, 0.93),
+    border: accent,
+    fg: darken(accent, 0.35),
   }
 }
 

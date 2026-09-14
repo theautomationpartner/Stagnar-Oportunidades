@@ -9,7 +9,8 @@ import {
 import { Button, IconButton, Dropdown, Checkbox, NumberField } from '@vibe/core'
 import { formatMoney, CUOTA_COUNTS, toPercentString } from '../services/format'
 import { autoExtraOpciones, isQuoteSelectable, opcionalesDeCompania } from '../services/pricingEngine'
-import { accentForCompania, badgeForCompania } from '../services/companyColors'
+import { accentForCompania, selectionForCompania } from '../services/companyColors'
+import CompanyMark from './CompanyMark'
 import { coberturaGroupOf, coberturaParaMostrar, FAMILIA_LABEL } from '../services/coberturaGroups'
 import './QuoteCard.css'
 
@@ -169,10 +170,7 @@ function QuoteCard({
 
   const hasCustomOverrides = Object.keys(overrides).length > 0
   const accent = accentForCompania(raw.compania)
-  // EST-02: fondo y texto del badge derivados del color de la compañía (ver
-  // companyColors.js) — antes el globito era gris para las cuatro y el color solo
-  // aparecía en el texto y en el filo izquierdo de la tarjeta.
-  const badge = badgeForCompania(raw.compania)
+  const seleccion = selectionForCompania(raw.compania)
   // EST-01/EST-03: la familia de cobertura ("Total"/"Parcial") como chip propio.
   // Es el segundo eje por el que se distinguen dos tarjetas de un vistazo: el color dice
   // de qué compañía es, el chip dice de qué tipo de cobertura. Puede ser null (cobertura
@@ -272,11 +270,9 @@ function QuoteCard({
 
   if (quote.blocked) {
     return (
-      <div className="quote-card quote-card--blocked" style={{ borderLeftColor: accent }}>
+      <div className="quote-card quote-card--blocked" data-quote-id={raw.id} style={{ borderLeftColor: accent }}>
         <div className="quote-card__title-row">
-          <span className="quote-card__company" style={{ color: accent }}>
-            {raw.compania}
-          </span>
+          <CompanyMark compania={raw.compania} />
           <span className="quote-card__title">{coberturaParaMostrar(raw)}</span>
         </div>
         <p className="quote-card__blocked-msg">
@@ -297,7 +293,17 @@ function QuoteCard({
       ]
         .filter(Boolean)
         .join(' ')}
-      style={{ borderLeftColor: accent }}
+      /* Para la animación FLIP de la grilla (ver useFlipDeTarjetas en OpportunityDetail):
+         identifica esta tarjeta entre un render y el siguiente para animar su traslado. */
+      data-quote-id={raw.id}
+      /* A pedido, la selección se pinta con el tono de la compañía (ver
+         selectionForCompania): las variables las consume .quote-card--selected. */
+      style={{
+        borderLeftColor: accent,
+        '--seleccion-bg': seleccion.bg,
+        '--seleccion-bd': seleccion.border,
+        '--seleccion-fg': seleccion.fg,
+      }}
       aria-disabled={!selectable || undefined}
     >
       {/* A pedido, estética tipo mockup: layout vertical (título+deducible a la
@@ -316,12 +322,9 @@ function QuoteCard({
               disabled={!selectable}
               aria-label={selectable ? 'Seleccionar opción' : 'No seleccionable: sin costo total'}
             />
-            <span
-              className="quote-card__company"
-              style={{ color: badge.fg, background: badge.bg, borderColor: badge.border }}
-            >
-              {raw.compania}
-            </span>
+            {/* A pedido: logotipo oficial sobre blanco + recuadro con el color exacto de
+                la marca (ver CompanyMark), en lugar del globito con el nombre escrito. */}
+            <CompanyMark compania={raw.compania} />
             <span className="quote-card__title">{coberturaParaMostrar(raw)}</span>
           </div>
           {/* EST-01: el chip de familia va acá, en el mismo renglón del deducible (que se

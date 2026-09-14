@@ -10,7 +10,8 @@ import {
   opcionalesDeCompania,
   opcionesDePago,
 } from '../services/pricingEngine'
-import { accentForCompania, badgeForCompania } from '../services/companyColors'
+import { accentForCompania, selectionForCompania } from '../services/companyColors'
+import CompanyMark from './CompanyMark'
 import { coberturaGroupOf, coberturaParaMostrar, FAMILIA_LABEL } from '../services/coberturaGroups'
 import FileUploadField from './FileUploadField'
 import StepFooter from './StepFooter'
@@ -37,10 +38,10 @@ function QuoteChoiceCard({ entry, selected, onSelect, selecting }) {
   const { raw, quote } = entry
   const accent = accentForCompania(raw.compania)
   // EST-01/EST-02: mismo tratamiento que la tarjeta del paso 2 (ver QuoteCard.jsx) —
-  // badge con el color de la compañía y chip de familia de cobertura. Los dos pasos
-  // muestran las mismas cotizaciones: si se distinguen distinto, se leen como cosas
-  // distintas.
-  const badge = badgeForCompania(raw.compania)
+  // identidad de compañía (recuadro de color + logo, ver CompanyMark), chip de familia
+  // de cobertura y selección teñida con el tono de la compañía. Los dos pasos muestran
+  // las mismas cotizaciones: si se distinguen distinto, se leen como cosas distintas.
+  const seleccion = selectionForCompania(raw.compania)
   const familiaKey = coberturaGroupOf(raw.cobertura)
   // A pedido: COSTO TOTAL en 0 → atenuada, no se puede marcar como elegida.
   const selectable = isQuoteSelectable(quote)
@@ -53,7 +54,11 @@ function QuoteChoiceCard({ entry, selected, onSelect, selecting }) {
       ]
         .filter(Boolean)
         .join(' ')}
-      style={{ borderLeftColor: accent }}
+      style={{
+        borderLeftColor: accent,
+        '--seleccion-bg': seleccion.bg,
+        '--seleccion-bd': seleccion.border,
+      }}
       aria-disabled={!selectable || undefined}
     >
       <div className="confirmar-step__card-header">
@@ -68,12 +73,7 @@ function QuoteChoiceCard({ entry, selected, onSelect, selecting }) {
                 <FaWhatsapp />
               </span>
             )}
-            <span
-              className="confirmar-step__card-compania"
-              style={{ color: badge.fg, background: badge.bg, borderColor: badge.border }}
-            >
-              {raw.compania}
-            </span>
+            <CompanyMark compania={raw.compania} />
             <span className="confirmar-step__card-cobertura">{coberturaParaMostrar(raw)}</span>
           </div>
           <div className="confirmar-step__card-meta-line">
