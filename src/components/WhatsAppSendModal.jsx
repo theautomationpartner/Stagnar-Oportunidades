@@ -5,6 +5,7 @@ import { sendQuotesToWhatsApp, getMakeWebhookUrl } from '../services/makeWebhook
 import GradientSpinner from './GradientSpinner'
 import ErrorDetailBox from './ErrorDetailBox'
 import ProgressBar from './ProgressBar'
+import { coberturaParaMostrar } from '../services/coberturaGroups'
 import './PillTabs.css'
 import './WhatsAppSendModal.css'
 
@@ -173,9 +174,9 @@ export default function WhatsAppSendModal({
               <div className="wa-modal__preview-grid">
                 {images.map(({ raw, imageDataUrl }) => (
                   <div className="wa-modal__preview-item" key={raw.id}>
-                    <img src={imageDataUrl} alt={`${raw.compania} ${raw.cobertura}`} />
+                    <img src={imageDataUrl} alt={`${raw.compania} ${coberturaParaMostrar(raw)}`} />
                     <span>
-                      {raw.compania} · {raw.cobertura || raw.name}
+                      {raw.compania} · {coberturaParaMostrar(raw)}
                     </span>
                   </div>
                 ))}
@@ -186,7 +187,7 @@ export default function WhatsAppSendModal({
                 {images.map(({ raw, texto }) => (
                   <div className="wa-modal__preview-text" key={raw.id}>
                     <span className="wa-modal__preview-text-title">
-                      {raw.compania} · {raw.cobertura || raw.name}
+                      {raw.compania} · {coberturaParaMostrar(raw)}
                     </span>
                     <pre>{texto || 'Esta cotización no tiene fórmula de precio: no se puede armar el texto.'}</pre>
                   </div>

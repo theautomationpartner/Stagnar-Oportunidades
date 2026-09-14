@@ -10,7 +10,7 @@
 // incluye, warning. Devuelve un data URL PNG listo para previsualizar o mandar a Make.
 import { formatMoney, modeloSinMarca } from './format'
 import { BRAND_COLORS } from './companyColors'
-import { coberturaGroupOf, SUBTITULO_POR_FAMILIA } from './coberturaGroups'
+import { coberturaGroupOf, coberturaParaMostrar, SUBTITULO_POR_FAMILIA } from './coberturaGroups'
 // A pedido: logo del header desde logo-blanco-.png con el fondo blanco recortado.
 import stagnariLogo from '../assets/stagnari-logo-header.png'
 import stagnariLogoSimple from '../assets/stagnari-logo-simple.png'
@@ -314,8 +314,10 @@ function drawHeader(ctx, logos) {
 
 function drawCoverTitle(ctx, raw, y) {
   const group = coberturaGroupOf(raw.cobertura)
-  const title = (raw.cobertura || raw.name || 'COTIZACIÓN').toUpperCase()
-  const subtitle = SUBTITLE_BY_GROUP[group] ?? `Cobertura ${raw.cobertura || ''}`.trim() + '.'
+  // Se muestra el nombre comercial; la familia de arriba se sigue calculando con el
+  // nombre real, que es el que conocen las listas de coberturas.
+  const title = (coberturaParaMostrar(raw) || 'COTIZACIÓN').toUpperCase()
+  const subtitle = SUBTITLE_BY_GROUP[group] ?? `Cobertura ${coberturaParaMostrar(raw)}`.trim() + '.'
 
   // Escudo + título + subtítulo a la izquierda
   iconShield(ctx, PAD + 34, y + 44, 56)

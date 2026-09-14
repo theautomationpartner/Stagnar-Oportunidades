@@ -1,5 +1,5 @@
 import { formatMoney, formatUsd } from './format'
-import { coberturaGroupOf } from './coberturaGroups'
+import { coberturaGroupOf, nombreComercialCobertura } from './coberturaGroups'
 
 // Reimplementacion en JS de las formulas reales del tablero "Subelementos de Oportunidades"
 // (columnas formula_... del board 18420863061). No leemos el texto ya calculado por monday
@@ -192,7 +192,7 @@ export function opcionalesDeCompania(raw) {
 }
 
 // Duraciones de "Auto extra" que ofrece esta cotización — vacío si no aplica (ver
-// autoExtraDisponible: solo Todo Riesgo y Parcial, y en SURA solo TOTAL).
+// autoExtraDisponible: solo Total y Parcial, y en SURA solo TOTAL).
 export function autoExtraOpciones(raw) {
   return opcionalesEditables(raw).autoExtra ? AUTO_EXTRA_DIAS[raw.compania] ?? [] : []
 }
@@ -350,7 +350,11 @@ function buildIncluyeBullets(eff, panelContext) {
   // entre los beneficios — se leían como si vinieran incluidos. Ahora van aparte, en
   // quote.opcionales (ver buildOpcionales).
 
-  return bullets
+  // Los textos de PANEL están cargados con los nombres internos de cada compañía (hay uno
+  // de BSE que dice "GLOBAL (HASTA 5 AÑOS) Y TRIPLE (HASTA 2 AÑOS)"). Como estas viñetas
+  // son puro texto para mostrar, se traducen acá y no en el tablero: así PANEL se sigue
+  // cargando como habla la compañía y el cliente lee "TOTAL"/"PARCIAL" en todos lados.
+  return bullets.map(nombreComercialCobertura)
 }
 
 function num(value, fallback = 0) {

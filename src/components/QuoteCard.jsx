@@ -10,7 +10,7 @@ import { Button, IconButton, Dropdown, Checkbox, NumberField } from '@vibe/core'
 import { formatMoney, CUOTA_COUNTS, toPercentString } from '../services/format'
 import { autoExtraOpciones, isQuoteSelectable, opcionalesDeCompania } from '../services/pricingEngine'
 import { accentForCompania, badgeForCompania } from '../services/companyColors'
-import { coberturaGroupOf, FAMILIA_LABEL } from '../services/coberturaGroups'
+import { coberturaGroupOf, coberturaParaMostrar, FAMILIA_LABEL } from '../services/coberturaGroups'
 import './QuoteCard.css'
 
 const BSE_DEDUCIBLE_OPTIONS = ['0.5', '1', '1.5', '2', '2.5', '3']
@@ -173,7 +173,7 @@ function QuoteCard({
   // companyColors.js) — antes el globito era gris para las cuatro y el color solo
   // aparecía en el texto y en el filo izquierdo de la tarjeta.
   const badge = badgeForCompania(raw.compania)
-  // EST-01/EST-03: la familia de cobertura ("Todo Riesgo"/"Parcial") como chip propio.
+  // EST-01/EST-03: la familia de cobertura ("Total"/"Parcial") como chip propio.
   // Es el segundo eje por el que se distinguen dos tarjetas de un vistazo: el color dice
   // de qué compañía es, el chip dice de qué tipo de cobertura. Puede ser null (cobertura
   // que no cae en ninguna familia — solo aparece en la solapa "General").
@@ -277,7 +277,7 @@ function QuoteCard({
           <span className="quote-card__company" style={{ color: accent }}>
             {raw.compania}
           </span>
-          <span className="quote-card__title">{raw.cobertura || raw.name}</span>
+          <span className="quote-card__title">{coberturaParaMostrar(raw)}</span>
         </div>
         <p className="quote-card__blocked-msg">
           <MdWarningAmber /> {quote.blockedReason}
@@ -322,7 +322,7 @@ function QuoteCard({
             >
               {raw.compania}
             </span>
-            <span className="quote-card__title">{raw.cobertura || raw.name}</span>
+            <span className="quote-card__title">{coberturaParaMostrar(raw)}</span>
           </div>
           {/* EST-01: el chip de familia va acá, en el mismo renglón del deducible (que se
               dibuja siempre), y no arriba junto al título — ese renglón envuelve cuando

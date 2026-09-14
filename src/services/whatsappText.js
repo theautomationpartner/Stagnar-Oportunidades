@@ -8,7 +8,7 @@
 // El formato usa los marcadores de WhatsApp: *negrita* y viñetas con "•". A propósito no
 // se arma con emojis ni cajas ASCII — en un chat real se ven distinto en cada teléfono.
 import { formatMoney, CUOTA_COUNTS, modeloSinMarca } from './format'
-import { coberturaGroupOf, SUBTITULO_POR_FAMILIA } from './coberturaGroups'
+import { coberturaGroupOf, coberturaParaMostrar, SUBTITULO_POR_FAMILIA } from './coberturaGroups'
 
 // Mismo criterio que splitVehicleName en whatsappImage.js: el modelo de Autodata ya trae
 // la marca adelante, no se repite.
@@ -27,9 +27,12 @@ function lineaOpcional(opc) {
 export function renderQuoteText(opportunity, raw, quote) {
   if (quote.blocked) return ''
 
-  const cobertura = raw.cobertura || raw.name || ''
+  // Dos nombres a propósito: el real clasifica (las listas conocen "GLOBAL - anual", no
+  // "TOTAL - anual") y el comercial es el que se muestra.
+  const coberturaReal = raw.cobertura || raw.name || ''
+  const cobertura = coberturaParaMostrar(raw)
   const subtitulo =
-    SUBTITULO_POR_FAMILIA[coberturaGroupOf(cobertura)] ?? (cobertura ? `Cobertura ${cobertura}.` : '')
+    SUBTITULO_POR_FAMILIA[coberturaGroupOf(coberturaReal)] ?? (cobertura ? `Cobertura ${cobertura}.` : '')
   const anio = raw.anioVehiculo || opportunity.anio || ''
   const combustible = raw.combustibleVehiculo || opportunity.combustible || ''
   const uso = raw.uso || opportunity.uso || ''

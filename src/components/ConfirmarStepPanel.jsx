@@ -11,7 +11,7 @@ import {
   opcionesDePago,
 } from '../services/pricingEngine'
 import { accentForCompania, badgeForCompania } from '../services/companyColors'
-import { coberturaGroupOf, FAMILIA_LABEL } from '../services/coberturaGroups'
+import { coberturaGroupOf, coberturaParaMostrar, FAMILIA_LABEL } from '../services/coberturaGroups'
 import FileUploadField from './FileUploadField'
 import StepFooter from './StepFooter'
 import AlertModal from './AlertModal'
@@ -74,7 +74,7 @@ function QuoteChoiceCard({ entry, selected, onSelect, selecting }) {
             >
               {raw.compania}
             </span>
-            <span className="confirmar-step__card-cobertura">{raw.cobertura || raw.name}</span>
+            <span className="confirmar-step__card-cobertura">{coberturaParaMostrar(raw)}</span>
           </div>
           <div className="confirmar-step__card-meta-line">
             {familiaKey && (
@@ -352,7 +352,7 @@ function ChosenProposal({ elegida, onSetBonif, onToggleOpcional, onAutoExtraChan
 
   const dash = '—'
   const compania = transitioning ? dash : shown.raw.compania
-  const cobertura = transitioning ? dash : shown.raw.cobertura || shown.raw.name
+  const cobertura = transitioning ? dash : coberturaParaMostrar(shown.raw)
   const deducible = transitioning ? dash : shown.quote.deducibleDisplay
   const contado = transitioning ? dash : formatMoney(Number(shown.raw.contado) || 0)
   const cuota = (n) => (transitioning ? dash : formatMoney(shown.quote.cuotas[n].valor))

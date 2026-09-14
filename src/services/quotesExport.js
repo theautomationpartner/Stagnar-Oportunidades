@@ -51,7 +51,10 @@ const COLUMNAS = [
   { titulo: 'Departamento', valor: (_e, opp) => opp.departamento },
   { titulo: 'Zona de circulación', valor: (_e, opp) => opp.zonaCirculacion },
   { titulo: 'Compañía', valor: (e) => e.raw.compania },
-  { titulo: 'Cobertura', valor: (e) => e.raw.cobertura || e.raw.name },
+  { titulo: 'Cobertura', valor: (e) => coberturaParaMostrar(e.raw) },
+  // El nombre tal cual lo llama la compañía: esta planilla se usa para cotejar contra los
+  // portales, y ahí la cobertura figura como "GLOBAL"/"TRIPLE", no con el nombre comercial.
+  { titulo: 'Cobertura (nombre de la compañía)', valor: (e) => e.raw.cobertura || e.raw.name },
   { titulo: 'Contado (monday)', valor: (e) => numero(e.raw.contado) },
   { titulo: 'Contado calculado', valor: (e) => numero(e.quote.efectivo?.contadoCalculado) },
   { titulo: 'Bonificación %', valor: (e) => numero(e.quote.efectivo?.bonif) },
@@ -102,7 +105,8 @@ export function buildQuotesCsv(opportunity, entries) {
     if (entry.quote.blocked) {
       const fila = COLUMNAS.map((c) => {
         if (c.titulo === 'Compañía') return celda(entry.raw.compania)
-        if (c.titulo === 'Cobertura') return celda(entry.raw.cobertura || entry.raw.name)
+        if (c.titulo === 'Cobertura') return celda(coberturaParaMostrar(entry.raw))
+        if (c.titulo === 'Cobertura (nombre de la compañía)') return celda(entry.raw.cobertura || entry.raw.name)
         if (c.titulo === 'Advertencia') return celda(entry.quote.blockedReason)
         return ''
       })

@@ -15,6 +15,7 @@ import ErrorDetailBox from './ErrorDetailBox'
 import AlertModal from './AlertModal'
 import ClientContextBar from './ClientContextBar'
 import CrearContactoCard from './CrearContactoCard'
+import { coberturaParaMostrar } from '../services/coberturaGroups'
 import './EmitirStepPanel.css'
 
 // Resumen final de todos los datos con los que se cerró la oportunidad: cliente, bien
@@ -211,7 +212,7 @@ export default function EmitirStepPanel({
                   className="emitir-step__chosen-badge"
                   style={{ color: badge.fg, background: badge.bg, borderColor: badge.border }}
                 >
-                  {elegida.raw.compania} {elegida.raw.cobertura || elegida.raw.name}
+                  {elegida.raw.compania} {coberturaParaMostrar(elegida.raw)}
                 </span>
               </div>
               <div className="emitir-step__chosen-table-wrap">

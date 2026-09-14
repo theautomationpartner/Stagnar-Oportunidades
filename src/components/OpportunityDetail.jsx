@@ -117,9 +117,9 @@ export default function OpportunityDetail({
   const [overridesByQuoteId, setOverridesByQuoteId] = useState({})
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [activeStep, setActiveStep] = useState('cotizar')
-  // Solapas "Todo Riesgo / Parcial / General" del paso "Comparar y enviar" — índice de
+  // Solapas "Total / Parcial / General" del paso "Comparar y enviar" — índice de
   // COBERTURA_TABS, no el texto (así matchea directo con TabList/Tab de @vibe/core). En
-  // 0 arranca en Todo Riesgo (clave GLOBAL, a pedido la solapa que se ve primero al
+  // 0 arranca en Total (clave GLOBAL, a pedido la solapa que se ve primero al
   // entrar), no en
   // "General" — ver el orden del array en coberturaGroups.js.
   const [coberturaTabIndex, setCoberturaTabIndex] = useState(0)
@@ -1467,7 +1467,7 @@ export default function OpportunityDetail({
             <>
               <div className="opp-detail__body">
                 {/* Solapas por familia de cobertura (a pedido) — "General" muestra todo,
-                    como antes; "Todo Riesgo"/"Parcial" filtran sin importar la compañía. Sin
+                    como antes; "Total"/"Parcial" filtran sin importar la compañía. Sin
                     solapas/acordeón POR COMPAÑÍA: todas las cotizaciones de la solapa
                     activa van en una sola grilla de a 2 por renglón, con la compañía de
                     cada una mostrada adentro de su propia tarjeta (ver QuoteCard).
@@ -1497,7 +1497,7 @@ export default function OpportunityDetail({
                 {visibleQuoteEntries.length === 0 ? (
                   <EmptyState
                     title="Sin cotizaciones en esta familia"
-                    description="No hay cotizaciones de Todo Riesgo o Parcial (según corresponda) para esta oportunidad."
+                    description="No hay cotizaciones de Total o Parcial (según corresponda) para esta oportunidad."
                   />
                 ) : (
                   <div className="opp-detail__quotes">
