@@ -473,6 +473,29 @@ function computeWarning(eff) {
 // LOG-10: los montos en pesos salían como número pelado ("18000") — ahora todos pasan por
 // formatMoney ("$ 18.000") y los de SANCOR en dólares por formatUsd, para que no queden
 // tres formatos distintos de deducible según la compañía.
+// A pedido: en las coberturas parciales de SANCOR el deducible llegaba en 0, y 0 no es un
+// deducible: es el dato que no vino. Peor todavía, monday lo manda como el texto "0", que
+// en JS es verdadero, así que deducibleDisplay lo tomaba por bueno y mostraba "USD 0" en
+// vez de caer al camino de "sin dato".
+//
+// El deducible real de esas coberturas es U$S 400 fijo (el resto de las de SANCOR lo
+// llevan en el nombre: TOTAL 600 son U$S 600, TOTAL 800 U$S 800...), así que se completa
+// al leer la cotización. Se aplica al armar el `raw` (ver quoteMapper.js) y no solo acá,
+// para que el valor sea el mismo en la tarjeta, en la propuesta, en la planilla y en el
+// campo editable — si se corrigiera solo el texto que se muestra, los otros tres seguirían
+// diciendo 0.
+//
+// "Parcial" es la familia de cobertura de siempre (ver coberturaGroups.js), que en SANCOR
+// son PARCIAL y PARCIAL PLUS. Un valor real distinto de 0 se respeta tal cual, y el campo
+// sigue siendo editable por cotización.
+const SANCOR_DEDUCIBLE_PARCIAL_USD = 400
+
+export function deducibleSancorPorDefecto({ compania, cobertura, deducibleSancorUsd }) {
+  if (compania !== 'SANCOR') return deducibleSancorUsd
+  if (coberturaGroupOf(cobertura) !== 'TRIPLE') return deducibleSancorUsd
+  return num(deducibleSancorUsd) > 0 ? deducibleSancorUsd : String(SANCOR_DEDUCIBLE_PARCIAL_USD)
+}
+
 function deducibleDisplay(eff) {
   const base = num(eff.deducibleBase)
   if (eff.compania === 'BSE') {
@@ -490,7 +513,10 @@ function deducibleDisplay(eff) {
     return '—'
   }
   if (eff.compania === 'SANCOR') {
-    return eff.deducibleSancorUsd ? formatUsd(num(eff.deducibleSancorUsd)) : base ? formatMoney(base) : '—'
+    // Ojo con el 0: monday lo manda como el texto "0", que en JS es verdadero. Sin este
+    // `> 0` se mostraba "USD 0", que no es un deducible sino el dato que no vino.
+    const usd = num(eff.deducibleSancorUsd)
+    return usd > 0 ? formatUsd(usd) : base ? formatMoney(base) : '—'
   }
   if (eff.compania === 'PORTO') {
     return base ? formatMoney(base) : '—'
@@ -507,6 +533,10 @@ function deducibleDisplay(eff) {
 // del subitem.
 export function computeQuote(raw, overrides = {}, panelContext = {}) {
   const eff = mergeRawWithOverrides(raw, overrides)
+  // El deducible de las parciales de SANCOR se completa también acá, no solo al leer la
+  // cotización (ver quoteMapper.js): así ningún camino que llegue al motor puede terminar
+  // mostrando el 0 que manda el portal.
+  eff.deducibleSancorUsd = deducibleSancorPorDefecto(eff)
   const contadoResult = computeContado(eff)
 
   if (contadoResult === null) {

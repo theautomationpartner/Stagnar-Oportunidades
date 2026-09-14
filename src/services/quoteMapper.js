@@ -1,6 +1,7 @@
 // Convierte los subitems crudos de monday (Cotización por compañía/cobertura) en el
 // modelo "raw" que consume pricingEngine.computeQuote, mas metadatos de exhibicion.
 import { textOf } from './mondayColumns'
+import { deducibleSancorPorDefecto } from './pricingEngine'
 
 
 function boolOf(columnValues, columnId) {
@@ -9,7 +10,7 @@ function boolOf(columnValues, columnId) {
 
 export function mapSubitemToRawQuote(subitem) {
   const cv = subitem.column_values
-  return {
+  const raw = {
     id: subitem.id,
     name: subitem.name,
     cobertura: textOf(cv, 'dropdown_mm4w8n8p'),
@@ -45,6 +46,11 @@ export function mapSubitemToRawQuote(subitem) {
     ap: textOf(cv, 'boolean_mm6zzwq5') === '' ? true : boolOf(cv, 'boolean_mm6zzwq5'),
     autoExtra: textOf(cv, 'color_mm6zpx3j'),
   }
+  // A pedido: SANCOR manda el deducible de sus coberturas parciales en 0, que no es un
+  // deducible sino un dato que no vino. Se completa acá, al armar la cotización, para que
+  // el valor sea el mismo en todos lados (ver deducibleSancorPorDefecto en pricingEngine).
+  raw.deducibleSancorUsd = deducibleSancorPorDefecto(raw)
+  return raw
 }
 
 export function groupQuotesByCompania(rawQuotes) {
