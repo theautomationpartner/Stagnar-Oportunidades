@@ -28,6 +28,9 @@ const OPPORTUNITY_COLUMN_IDS = [
   'text_mm54fb7m', // Modelo - Autodata
   'dropdown_mm52jp01', // Combustible
   'color_mm52ey1d', // Uso
+  // Tipo de Riesgo: lo usa el nombre del ítem cuando todavía no hay vehículo cargado
+  // (ver nombreOportunidad.js).
+  'color_mm5atxav', // Tipo de Riesgo
   'deal_stage', // Estado Oportunidad
   'deal_owner', // Asignado
   'date_mm52w0h8', // Fecha Cot.
@@ -616,6 +619,30 @@ export async function fetchColumnsSettings(columnIds, boardId = OPPORTUNITIES_BO
     columnIds,
   })
   return data.boards[0]?.columns ?? []
+}
+
+// Renombrar un ítem. El nombre NO es una columna común: se escribe con el id reservado
+// "name" dentro de change_multiple_column_values (no existe una columna "name" que se
+// pueda pasar a change_simple_column_value).
+//
+// Se usa cada vez que cambian los datos que forman el nombre (ver nombreOportunidad.js),
+// para que el título del ítem no se quede con el vehículo que tenía el día que se creó.
+const CHANGE_ITEM_NAME_MUTATION = `
+  mutation RenameItem($boardId: ID!, $itemId: ID!, $columnValues: JSON!) {
+    change_multiple_column_values(board_id: $boardId, item_id: $itemId, column_values: $columnValues) {
+      id
+      name
+    }
+  }
+`
+
+export async function setItemName(itemId, nombre, boardId = OPPORTUNITIES_BOARD_ID) {
+  const data = await callMondayApi(CHANGE_ITEM_NAME_MUTATION, {
+    boardId,
+    itemId,
+    columnValues: JSON.stringify({ name: nombre }),
+  })
+  return data.change_multiple_column_values
 }
 
 export async function setSimpleColumnValue(itemId, columnId, value) {

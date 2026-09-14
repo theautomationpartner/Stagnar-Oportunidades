@@ -18,6 +18,7 @@ import './PillTabs.css'
 import {
   fetchOpportunityDetail,
   setSimpleColumnValue,
+  setItemName,
   setDropdownColumnValue,
   setConnectedColumnValue,
   setSubitemCheckboxValue,
@@ -40,6 +41,7 @@ import { computeQuote, isQuoteSelectable } from '../services/pricingEngine'
 import { applyRecargoLookup } from '../services/recargoPanel'
 import { COTIZAR_FIELDS, getInvalidCotizarFields, getMissingCotizarFields } from '../services/cotizarFields'
 import { COBERTURA_TABS, coberturaGroupOf } from '../services/coberturaGroups'
+import { nombreDeOportunidad } from '../services/nombreOportunidad'
 import './OpportunityDetail.css'
 
 const ESTADO_OPORTUNIDAD_COLUMN_ID = 'deal_stage'
@@ -1151,6 +1153,28 @@ export default function OpportunityDetail({
         return cv
       }),
     }))
+
+    // El nombre del ítem se arma con estos mismos datos, así que se rehace acá: si no,
+    // queda para siempre con el vehículo que tenía el día del alta (había ítems llamados
+    // "…-PIAGGIO-2001-Porter Furgón" cuyas columnas ya decían NISSAN Qashqai 2024).
+    // Va al final y aparte: es un dato de presentación, y si monday lo rechaza no tiene
+    // sentido desandar los valores que sí se guardaron bien.
+    const nombreNuevo = nombreDeOportunidad({
+      nombre: opportunity.clienteNombre,
+      marca: textByColumnId.dropdown_mm51ykrd,
+      modelo: textByColumnId.text_mm54fb7m,
+      anio: textByColumnId.dropdown_mm51mdmq,
+      matricula: opportunity.matricula,
+      tipoRiesgo: opportunity.tipoRiesgo,
+    })
+    if (nombreNuevo !== item?.name) {
+      try {
+        await setItemName(opportunityId, nombreNuevo)
+        setItem((prev) => ({ ...prev, name: nombreNuevo }))
+      } catch (err) {
+        console.warn('No se pudo renombrar la oportunidad', err)
+      }
+    }
   }
 
   // LOG-19: la planilla sale de `groups`, o sea de lo mismo que se está viendo en

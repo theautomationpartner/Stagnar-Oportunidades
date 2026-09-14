@@ -22,7 +22,8 @@ import {
   TextField,
 } from '@vibe/core'
 import PersonaFicha from './crear/PersonaFicha'
-import { modeloSinMarca, matchOption } from '../services/format'
+import { matchOption } from '../services/format'
+import { nombreDeOportunidad } from '../services/nombreOportunidad'
 import { useSchema, useMondayUser } from '../context/AppContext'
 import { useAuth } from '../auth/AuthContext'
 import AsignadoPicker from './AsignadoPicker'
@@ -944,15 +945,17 @@ export default function CrearOportunidadForm({
   // el ítem antes (ver comentario de createdItemId más arriba).
   const ensureItemId = async () => {
     if (createdItemId) return createdItemId
-    // A pedido: "Nombre Apellido-Marca-Año-Modelo" cuando ya se sabe el vehículo (a
-    // esta altura, adentro de handleGuardar, isStepValid ya exigió que esté completo)
-    // — sin vehículo (Tipo de Riesgo distinto de Automóvil), queda solo "Nombre
-    // Apellido".
-    const nombreCompleto = `${form.nombre} ${form.apellido}`.trim()
-    const itemName =
-      esAutomovil && form.modeloSeleccion
-        ? `${nombreCompleto}-${form.marca}-${form.anio}-${modeloSinMarca(form.marca, form.modeloSeleccion.name)}`
-        : nombreCompleto
+    // Un solo formato para toda la app, ver nombreOportunidad.js. Si todavía no hay
+    // vehículo (o el Tipo de Riesgo no es Automóvil), el nombre lo dice en vez de
+    // arrastrar separadores vacíos.
+    const itemName = nombreDeOportunidad({
+      nombre: form.nombre,
+      apellido: form.apellido,
+      marca: esAutomovil ? form.marca : '',
+      modelo: esAutomovil ? form.modeloSeleccion?.name : '',
+      anio: esAutomovil ? form.anio : '',
+      tipoRiesgo: form.tipoRiesgo,
+    })
     const created = await createOpportunityItem(itemName)
     setCreatedItemId(created.id)
     return created.id

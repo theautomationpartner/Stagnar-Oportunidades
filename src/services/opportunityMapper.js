@@ -122,6 +122,7 @@ export function mapOpportunityItem(item, statusColors = {}) {
     combustible,
     uso,
     tipo: textOf(cv, 'dropdown_mm5jqdk'),
+    tipoRiesgo: textOf(cv, 'color_mm5atxav'),
     edad: textOf(cv, 'numeric_mm527wpm'),
     fechaNacimiento: textOf(cv, 'date_mm516agw'),
     departamento: boardRelationDisplayOf(cv, 'board_relation_mm54tq30'),
