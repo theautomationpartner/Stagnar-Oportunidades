@@ -1,4 +1,4 @@
-import { Suspense, lazy, useDeferredValue, useEffect, useMemo, useRef, useState } from 'react'
+import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import LoadingScreen from './components/LoadingScreen'
 import { useHashRoute } from './hooks/useHashRoute'
 import { AppProviders } from './context/AppContext'
@@ -12,24 +12,24 @@ import OpportunitiesTable from './components/OpportunitiesTable'
 const OpportunityDetail = lazy(() => import('./components/OpportunityDetail'))
 import LandingScreen from './components/LandingScreen'
 const CrearOportunidadForm = lazy(() => import('./components/CrearOportunidadForm'))
-import { fetchOpportunities, fetchDepartamentos, fetchLocalidades, fetchCurrentMondayUser } from './services/mondayApi'
+import {
+  fetchOpportunitiesPage,
+  fetchDepartamentos,
+  fetchLocalidades,
+  fetchCurrentMondayUser,
+} from './services/mondayApi'
 import { mapOpportunities } from './services/opportunityMapper'
 import { fetchFilterAndStatusSchema } from './services/boardSchema'
 import { fetchPanelData } from './services/recargoPanel'
 import './App.css'
 
-// Techo real de la API de monday para items_page en una sola página (ver
-// fetchOpportunities en mondayApi.js) — con esto se trae el tablero completo de una,
-// nada de "solo los primeros 10" (los filtros/búsqueda de FilterPanel son client-side
-// sobre lo ya cargado, así que si no está cargado no aparece por más que matchee).
-const ITEMS_FETCH_LIMIT = 500
-
-// A pedido: la tabla de Oportunidades pagina (10 por defecto, elegible entre estas 4
-// opciones desde el propio pie de la tabla) en vez de mostrar las 500 cargadas de una
-// — el fetch de arriba (ITEMS_FETCH_LIMIT) sigue trayendo TODO el tablero igual, esto
-// es solo paginación de la vista/tabla (client-side, ver
-// filteredOpportunities/pagedOpportunities más abajo), así que la búsqueda y los
-// filtros siguen actuando sobre el universo completo, no solo sobre la página visible.
+// A pedido: la app arranca con las 10 oportunidades más nuevas y el resto se pide a
+// medida que se necesita —al pasar de página o al buscar—, en vez de bajar el tablero
+// entero (500 ítems) antes de mostrar la primera pantalla.
+//
+// Esto mueve la búsqueda y los filtros de estado AL SERVIDOR (ver
+// buildOpportunitiesQueryParams en mondayApi.js): si el filtrado siguiera siendo local,
+// buscar solo miraría las filas ya traídas y una oportunidad vieja no aparecería nunca.
 const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
 const DEFAULT_PAGE_SIZE = 10
 
@@ -53,6 +53,13 @@ export default function App() {
   const [filters, setFilters] = useState(EMPTY_FILTERS)
   const [page, setPage] = useState(1)
   const [pageSize, setPageSize] = useState(DEFAULT_PAGE_SIZE)
+  // Cursor de la API: por dónde sigue la lista. null = no hay más para traer.
+  const [cursor, setCursor] = useState(null)
+  const [loadingMore, setLoadingMore] = useState(false)
+  // Sube de número cada vez que la lista se arma de cero (otra búsqueda, otro filtro):
+  // lo que venga de una tanda anterior se descarta en vez de mezclarse.
+  const generacionRef = useRef(0)
+  const trayendoMasRef = useRef(false)
   const [route, go] = useHashRoute()
   // A pedido: el botón "Volver a Persona Seleccionada" de arriba de la Oportunidad (ver
   // OpportunityDetail.jsx) solo aparece cuando se llegó ahí apretando "Ir a esta
@@ -82,18 +89,19 @@ export default function App() {
     let cancelled = false
 
     Promise.all([
-      fetchOpportunities(ITEMS_FETCH_LIMIT),
+      fetchOpportunitiesPage({ limit: DEFAULT_PAGE_SIZE }),
       fetchFilterAndStatusSchema(),
       fetchDepartamentos(),
       fetchLocalidades(),
       fetchPanelData(),
     ])
-      .then(([{ items, totalCount }, fetchedSchema, departamentos, localidades, panelData]) => {
+      .then(([primeraPagina, fetchedSchema, departamentos, localidades, panelData]) => {
         if (cancelled) return
         setSchema({ ...fetchedSchema, departamentos, localidades, ...panelData })
-        setBoardTotalCount(totalCount)
+        setBoardTotalCount(primeraPagina.totalCount)
+        setCursor(primeraPagina.cursor)
         setOpportunities(
-          mapOpportunities(items, {
+          mapOpportunities(primeraPagina.items, {
             estadoOportunidad: fetchedSchema.estadoOportunidad.colorsByLabel,
             estadoCotizacion: fetchedSchema.estadoCotizacion.colorsByLabel,
           })
@@ -126,47 +134,101 @@ export default function App() {
     setFilters((prev) => ({ ...prev, [field]: value }))
   }
 
-  // A pedido: "una sola barra de búsqueda para todos los campos posibles" — marca/año
-  // además de lo que ya cubría bienLinea1 (marca+modelo/año). Auditoría: el texto de
-  // búsqueda de cada fila se arma UNA vez por carga (antes se concatenaba y pasaba a
-  // minúsculas para las 500 filas en cada tecla), y el término se difiere
-  // (useDeferredValue) para que el tipeo no espere al filtrado.
-  const haystacks = useMemo(
+  // La búsqueda y los estados los resuelve el servidor (ver mondayApi.js). Acá queda
+  // solo lo que la API no sabe filtrar: "Tipo de Sujeto" es una columna mirror y la
+  // rechaza. Y cuando hay término de búsqueda, los estados también se terminan de
+  // filtrar acá, porque la API no permite mezclar un "o" con un "y" en la misma consulta.
+  const hayBusqueda = searchTerm.trim() !== ''
+  const filteredOpportunities = useMemo(
     () =>
-      new Map(
-        opportunities.map((opp) => [
-          opp,
-          [opp.clienteNombre, opp.ci, opp.telefono, opp.bienLinea1, opp.companias, opp.marca, opp.anio]
-            .join(' ')
-            .toLowerCase(),
-        ])
-      ),
-    [opportunities]
+      opportunities.filter((opp) => {
+        if (filters.tipoSujeto && opp.tipoSujeto !== filters.tipoSujeto) return false
+        if (hayBusqueda) {
+          if (filters.estadoCotizacion && opp.estadoCotizacion !== filters.estadoCotizacion) return false
+          if (filters.estadoEnvio && opp.estadoEnvio !== filters.estadoEnvio) return false
+        }
+        return true
+      }),
+    [opportunities, filters, hayBusqueda]
   )
-  const deferredSearchTerm = useDeferredValue(searchTerm)
 
-  const filteredOpportunities = useMemo(() => {
-    const term = deferredSearchTerm.trim().toLowerCase()
+  // Trae la lista de cero con la búsqueda y los filtros actuales. Se usa al buscar, al
+  // cambiar un filtro y al volver a la tabla.
+  const cargarPrimeraPagina = useCallback(async () => {
+    if (!schema) return
+    generacionRef.current += 1
+    trayendoMasRef.current = false
+    setLoadingMore(true)
+    try {
+      const pagina = await fetchOpportunitiesPage({ limit: pageSize, search: searchTerm, filtros: filters })
+      setBoardTotalCount(pagina.totalCount)
+      setCursor(pagina.cursor)
+      setOpportunities(
+        mapOpportunities(pagina.items, {
+          estadoOportunidad: schema.estadoOportunidad.colorsByLabel,
+          estadoCotizacion: schema.estadoCotizacion.colorsByLabel,
+        })
+      )
+    } catch (err) {
+      setError(err.message)
+    } finally {
+      setLoadingMore(false)
+    }
+  }, [schema, pageSize, searchTerm, filters])
 
-    return opportunities.filter((opp) => {
-      if (term && !haystacks.get(opp).includes(term)) return false
-
-      if (filters.estadoCotizacion && opp.estadoCotizacion !== filters.estadoCotizacion) return false
-      if (filters.tipoSujeto && opp.tipoSujeto !== filters.tipoSujeto) return false
-      if (filters.estadoEnvio && opp.estadoEnvio !== filters.estadoEnvio) return false
-
-      return true
-    })
-  }, [opportunities, haystacks, deferredSearchTerm, filters])
-
-  // A pedido: vuelve a la página 1 en cuanto cambia la búsqueda, algún filtro, o la
-  // cantidad por página — si no, se podía quedar en una página que ya no existe (ej.
-  // estabas en la página 5 y el nuevo resultado filtrado solo tiene 2 páginas).
+  // Buscar o cambiar un filtro reinicia la lista: la consulta al servidor es otra. El
+  // primer render no cuenta — esa carga ya la hizo el efecto de arranque.
+  const primeraCargaHechaRef = useRef(false)
   useEffect(() => {
+    if (!schema) return undefined
+    if (!primeraCargaHechaRef.current) {
+      primeraCargaHechaRef.current = true
+      return undefined
+    }
     setPage(1)
-  }, [searchTerm, filters, pageSize])
+    cargarPrimeraPagina()
+    return undefined
+  }, [searchTerm, filters, schema, cargarPrimeraPagina])
 
-  const totalPages = Math.max(1, Math.ceil(filteredOpportunities.length / pageSize))
+  // Pedir la página siguiente ES pedir más datos: si para la página que se quiere ver no
+  // alcanzan las filas traídas y todavía queda cursor, se traen ahí nomás.
+  //
+  // El "ya estoy trayendo" va en una ref y no en el estado a propósito: con loadingMore
+  // entre las dependencias, prenderlo volvía a correr el efecto, la limpieza marcaba la
+  // respuesta como vieja y las filas nuevas se descartaban — se pedía la página 2 y
+  // seguían viéndose 10. Y la generación descarta lo que llegue tarde de una búsqueda
+  // anterior, que es el otro riesgo de traer en varias tandas.
+  useEffect(() => {
+    const necesarias = page * pageSize
+    if (!cursor || trayendoMasRef.current || opportunities.length >= necesarias || !schema) return undefined
+    const generacion = generacionRef.current
+    trayendoMasRef.current = true
+    setLoadingMore(true)
+    fetchOpportunitiesPage({ limit: Math.max(pageSize, necesarias - opportunities.length), cursor })
+      .then((pagina) => {
+        if (generacion !== generacionRef.current) return
+        setCursor(pagina.cursor)
+        setOpportunities((prev) => [
+          ...prev,
+          ...mapOpportunities(pagina.items, {
+            estadoOportunidad: schema.estadoOportunidad.colorsByLabel,
+            estadoCotizacion: schema.estadoCotizacion.colorsByLabel,
+          }),
+        ])
+      })
+      .catch((err) => {
+        if (generacion === generacionRef.current) setError(err.message)
+      })
+      .finally(() => {
+        trayendoMasRef.current = false
+        setLoadingMore(false)
+      })
+    return undefined
+  }, [page, pageSize, cursor, opportunities.length, schema])
+
+  // Con cursor todavía queda al menos una página más, aunque no sepamos cuántas filas
+  // trae: se habilita una página extra para que "siguiente" no quede muerto.
+  const totalPages = Math.max(1, Math.ceil(filteredOpportunities.length / pageSize) + (cursor ? 1 : 0))
   const pagedOpportunities = useMemo(
     () => filteredOpportunities.slice((page - 1) * pageSize, page * pageSize),
     [filteredOpportunities, page, pageSize]
@@ -177,19 +239,10 @@ export default function App() {
   // creada (o un cambio de estado hecho en el detalle) no aparecía al volver a la tabla
   // hasta recargar la página. Se llama al crear y cada vez que se entra a la tabla.
   const reloadOpportunities = async () => {
-    if (!schema) return
-    try {
-      const { items, totalCount } = await fetchOpportunities(ITEMS_FETCH_LIMIT)
-      setBoardTotalCount(totalCount)
-      setOpportunities(
-        mapOpportunities(items, {
-          estadoOportunidad: schema.estadoOportunidad.colorsByLabel,
-          estadoCotizacion: schema.estadoCotizacion.colorsByLabel,
-        })
-      )
-    } catch {
-      // Si falla la recarga se sigue mostrando la lista anterior (no es crítico).
-    }
+    // Vuelve a la primera página: lo recién creado o recién cambiado es lo más nuevo, y
+    // la lista viene ordenada justamente por eso.
+    setPage(1)
+    await cargarPrimeraPagina()
   }
   const isTableRoute = route.seg === 'oportunidades' && !route.id
   const tableVisitsRef = useRef(0)
@@ -275,7 +328,7 @@ export default function App() {
         <OpportunitiesTable
           opportunities={pagedOpportunities}
           totalFiltered={filteredOpportunities.length}
-          totalLoaded={opportunities.length}
+          hayBusqueda={hayBusqueda}
           boardTotalCount={boardTotalCount}
           loading={loading}
           error={error}

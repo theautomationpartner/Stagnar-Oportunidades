@@ -68,7 +68,7 @@ const PAGE_SIZE_DROPDOWN_OPTIONS_DEFAULT = [10, 25, 50, 100]
 export default function OpportunitiesTable({
   opportunities,
   totalFiltered,
-  totalLoaded,
+  hayBusqueda,
   boardTotalCount,
   loading,
   error,
@@ -82,13 +82,12 @@ export default function OpportunitiesTable({
 }) {
   // `opportunities` acá es solo la página actual (ver `pageSize`, elegible desde el pie
   // de la tabla) — `totalFiltered` es el total de resultados de la búsqueda/filtros
-  // (sobre TODO lo cargado, no solo esta página) y `totalLoaded` cuántas oportunidades
-  // se trajeron del tablero antes de filtrar. boardTotalCount es el total REAL del
-  // tablero (items_count, sin el límite de la consulta) — si es mayor a totalLoaded, se
-  // llegó al techo de la consulta (500) y hay que avisar en vez de dejar creer que se
-  // buscó sobre todo.
-  const isFiltered = totalFiltered !== totalLoaded
-  const hitFetchCap = boardTotalCount > totalLoaded
+  // (sobre TODO lo traído, no solo esta página) y boardTotalCount el total REAL del
+  // tablero (items_count, sin filtrar). Con la lista paginada, lo segundo es el universo
+  // y lo primero lo que ya está a mano.
+  // Ya no hay "techo": la lista se trae de a páginas y que falten filas por cargar es lo
+  // normal, no un aviso. Lo que importa mostrar es cuántas hay a la vista sobre el total
+  // del tablero, y cuántas encontró una búsqueda.
   const firstShown = totalFiltered === 0 ? 0 : (page - 1) * pageSize + 1
   const lastShown = totalFiltered === 0 ? 0 : firstShown + opportunities.length - 1
   const pageSizeSelected = pageSizeOptions.map((n) => ({ value: String(n), label: String(n) })).find(
@@ -99,16 +98,10 @@ export default function OpportunitiesTable({
     <section className="opps-table-wrap">
       <div className="opps-table-wrap__head">
         <span>
-          {isFiltered
-            ? `${totalFiltered} resultado${totalFiltered === 1 ? '' : 's'} de ${totalLoaded} oportunidades`
-            : `Oportunidades encontradas (${totalFiltered})`}
+          {hayBusqueda
+            ? `${totalFiltered} resultado${totalFiltered === 1 ? '' : 's'}`
+            : `Mostrando ${totalFiltered} de ${boardTotalCount || totalFiltered} oportunidades`}
         </span>
-        {hitFetchCap && (
-          <span className="opps-table-wrap__cap-warning">
-            Mostrando {totalLoaded} de {boardTotalCount} — hay más oportunidades en el
-            tablero de las que se pueden cargar de una.
-          </span>
-        )}
       </div>
 
       {/* size="large" (48px) no alcanza para 2 líneas de texto + avatar de

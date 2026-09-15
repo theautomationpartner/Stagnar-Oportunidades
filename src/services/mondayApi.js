@@ -70,35 +70,106 @@ const OPPORTUNITY_COLUMN_IDS = [
   'color_mm71kfpr', // Cuotas elegidas
 ]
 
-const ITEMS_QUERY = `
-  query GetOpportunities($boardId: ID!, $limit: Int!, $columnIds: [String!]) {
+// Los campos de cada fila de la tabla, una sola vez: los usan la primera página y las
+// siguientes (que se piden con un cursor, por otra query distinta).
+const CAMPOS_FILA = `
+  id
+  name
+  column_values(ids: $columnIds) {
+    id
+    text
+    ... on BoardRelationValue {
+      display_value
+    }
+    ... on MirrorValue {
+      display_value
+    }
+  }
+  subitems {
+    column_values(ids: ["dropdown_mm51f4va", "dropdown_mm4w8n8p"]) {
+      id
+      text
+    }
+  }
+`
+
+// Primera página. Devuelve además el cursor (para pedir la siguiente) e items_count, que
+// es el total REAL del tablero sin filtrar — sirve para poder decir "10 de 340".
+const ITEMS_PAGE_QUERY = `
+  query GetOpportunitiesPage($boardId: ID!, $limit: Int!, $columnIds: [String!], $queryParams: ItemsQuery) {
     boards(ids: [$boardId]) {
       items_count
-      items_page(limit: $limit) {
+      items_page(limit: $limit, query_params: $queryParams) {
+        cursor
         items {
-          id
-          name
-          column_values(ids: $columnIds) {
-            id
-            text
-            ... on BoardRelationValue {
-              display_value
-            }
-            ... on MirrorValue {
-              display_value
-            }
-          }
-          subitems {
-            column_values(ids: ["dropdown_mm51f4va", "dropdown_mm4w8n8p"]) {
-              id
-              text
-            }
-          }
+          ${CAMPOS_FILA}
         }
       }
     }
   }
 `
+
+// Las páginas siguientes NO repiten el filtro ni el orden: el cursor ya los lleva
+// adentro. Por eso esta query no recibe query_params.
+const NEXT_ITEMS_PAGE_QUERY = `
+  query GetNextOpportunitiesPage($limit: Int!, $cursor: String!, $columnIds: [String!]) {
+    next_items_page(limit: $limit, cursor: $cursor) {
+      cursor
+      items {
+        ${CAMPOS_FILA}
+      }
+    }
+  }
+`
+
+// Dónde busca la barra de búsqueda, del lado del servidor. "name" es el que hace el
+// trabajo pesado: desde el renombrado (ver nombreOportunidad.js) el nombre del ítem es
+// "Cliente · MARCA Modelo (Año) · Matrícula", así que una sola regla cubre cliente,
+// vehículo, año y matrícula.
+const COLUMNAS_BUSQUEDA = ['name', 'numeric_mm51mb0s', 'phone_mm519m27']
+
+// Filtros que la API puede resolver. "Tipo de Sujeto" NO está: es una columna mirror y la
+// API la rechaza con "This column type is not supported yet in the API", así que ese
+// filtro se sigue aplicando en el navegador sobre lo ya traído (ver App.jsx).
+const COLUMNA_POR_FILTRO = {
+  estadoCotizacion: 'color_mm51n7aa',
+  estadoEnvio: 'color_mm4wr1t4',
+}
+
+// Las más nuevas primero, que es como se mira la tabla.
+const ORDEN_MAS_NUEVAS = [{ column_id: '__creation_log__', direction: 'desc' }]
+
+// La API acepta UN operador para todas las reglas, no grupos anidados: no hay forma de
+// pedir "(nombre o CI o teléfono) Y estado = X". Con término de búsqueda manda la
+// búsqueda (or) y los estados se terminan de filtrar en el navegador; sin término, los
+// estados van como filtro del servidor (and).
+export function buildOpportunitiesQueryParams({ search = '', filtros = {} } = {}) {
+  const termino = search.trim()
+
+  if (termino) {
+    return {
+      operator: 'or',
+      rules: COLUMNAS_BUSQUEDA.map((columnId) => ({
+        column_id: columnId,
+        compare_value: [termino],
+        operator: 'contains_text',
+      })),
+      order_by: ORDEN_MAS_NUEVAS,
+    }
+  }
+
+  const reglas = Object.entries(COLUMNA_POR_FILTRO)
+    .filter(([clave]) => filtros[clave])
+    .map(([clave, columnId]) => ({
+      column_id: columnId,
+      compare_value: [filtros[clave]],
+      operator: 'contains_text',
+    }))
+
+  return reglas.length
+    ? { operator: 'and', rules: reglas, order_by: ORDEN_MAS_NUEVAS }
+    : { order_by: ORDEN_MAS_NUEVAS }
+}
 
 // Columnas de subitem: solo datos de entrada — el precio y los textos INCLUYE se
 // recalculan/arman en JS (pricingEngine.js) a partir de estas más el tarifario
@@ -569,19 +640,37 @@ async function callMondayApi(query, variables) {
   return payload.data
 }
 
-// 500 es el máximo real que acepta items_page por página en la API de monday — con eso
-// alcanza de sobra para el tamaño actual del tablero (una sola consulta, sin paginar por
-// cursor). Devuelve también items_count (el total REAL del tablero, sin el límite) para
-// poder avisar si algún día se llega a superar ese techo en vez de truncar en silencio
-// (ver App.jsx, boardTotalCount).
-export async function fetchOpportunities(limit = 500) {
-  const data = await callMondayApi(ITEMS_QUERY, {
+// Una página de oportunidades. Antes se traía el tablero entero de una sola vez (500) y
+// todo el filtrado y el paginado eran en el navegador: con un tablero chico daba igual,
+// pero la primera pantalla esperaba a que bajaran TODAS y eso crece con el tiempo. Ahora
+// entran las 10 más nuevas y el resto se pide cuando hace falta.
+//
+// Con `cursor` pide la página siguiente de esa misma búsqueda; sin él, arranca de cero
+// aplicando búsqueda y filtros. totalCount solo viene en la primera (la API no lo trae en
+// next_items_page).
+export async function fetchOpportunitiesPage({ limit = 10, cursor = null, search = '', filtros = {} } = {}) {
+  if (cursor) {
+    const data = await callMondayApi(NEXT_ITEMS_PAGE_QUERY, {
+      limit,
+      cursor,
+      columnIds: OPPORTUNITY_COLUMN_IDS,
+    })
+    const pagina = data.next_items_page
+    return { items: pagina?.items ?? [], cursor: pagina?.cursor ?? null, totalCount: null }
+  }
+
+  const data = await callMondayApi(ITEMS_PAGE_QUERY, {
     boardId: OPPORTUNITIES_BOARD_ID,
     limit,
     columnIds: OPPORTUNITY_COLUMN_IDS,
+    queryParams: buildOpportunitiesQueryParams({ search, filtros }),
   })
-  const board = data.boards[0]
-  return { items: board?.items_page.items ?? [], totalCount: board?.items_count ?? 0 }
+  const board = data.boards?.[0]
+  return {
+    items: board?.items_page.items ?? [],
+    cursor: board?.items_page.cursor ?? null,
+    totalCount: board?.items_count ?? 0,
+  }
 }
 
 export async function fetchOpportunityDetail(itemId) {
