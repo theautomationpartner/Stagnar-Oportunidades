@@ -17,6 +17,27 @@
   width: 100%;
 }
 
+/* El botón "Buscar" al lado de la barra, y debajo de ella cuando no entran los dos. */
+.filter-panel__search-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.filter-panel__search-btn {
+  flex: 0 0 auto;
+}
+
+@media (max-width: 640px) {
+  .filter-panel__search-row {
+    flex-wrap: wrap;
+  }
+
+  .filter-panel__search-btn {
+    width: 100%;
+  }
+}
+
 /* A pedido, estética tipo mockup: link chico en vez del Button "Ocultar/Mostrar
    filtros" de siempre — los filtros básicos (Estado cotización/Tipo sujeto/Estado
    envío) son secundarios ahora que la búsqueda hace la mayor parte del trabajo. */
