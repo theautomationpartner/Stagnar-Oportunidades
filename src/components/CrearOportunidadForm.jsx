@@ -66,6 +66,7 @@ import {
   CONTACTO_APELLIDO_COLUMN_ID,
   CONTACTO_EXTRANJERO_COLUMN_ID,
   CONTACTO_NACIONALIDAD_COLUMN_ID,
+  crearActividadesIniciales,
 } from '../services/mondayApi'
 import { mapOpportunities } from '../services/opportunityMapper'
 import { revisarIdentificacion } from '../services/vehiculoIdentificacion'
@@ -1245,6 +1246,11 @@ export default function CrearOportunidadForm({
         setGuardarStepKey('archivos')
         await Promise.all(subidas)
       }
+
+      // Actividades de seguimiento (Cotización por WhatsApp completada + Seguimiento por
+      // WhatsApp a 3 días) — no bloqueante: si falla no se cae todo el guardado, la
+      // oportunidad ya quedó bien creada (ver crearActividadesIniciales).
+      crearActividadesIniciales(itemId, asignadoId, `${form.nombre} ${form.apellido}`.trim())
 
       clearPersistedSearch()
       onCreated?.(itemId)

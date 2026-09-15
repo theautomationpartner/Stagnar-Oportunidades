@@ -1,0 +1,346 @@
+/* Gate de paso previo a la póliza (ver RequisitoPreviaPanel.jsx). */
+
+.requisito-previa {
+  margin: 20px var(--page-gutter) 32px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  padding: 24px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.requisito-previa--loading {
+  align-items: center;
+  justify-content: center;
+  min-height: 200px;
+  gap: 10px;
+}
+
+.requisito-previa__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin: 0;
+}
+
+.requisito-previa__subtitle {
+  font-size: 13px;
+  color: var(--text-gray);
+  margin: -8px 0 0;
+}
+
+.requisito-previa__opciones-lista {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.requisito-previa__opcion-btn {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  width: 100%;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  font-family: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background-color 0.12s ease;
+}
+
+.requisito-previa__opcion-btn:hover:not(:disabled) {
+  border-color: var(--primary-blue);
+}
+
+.requisito-previa__opcion-btn--activa {
+  border-color: var(--primary-blue);
+  background: var(--tint-info);
+}
+
+.requisito-previa__opcion-dot {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+  border-radius: 50%;
+  border: 2px solid var(--border-input);
+  box-sizing: border-box;
+  background: #fff;
+}
+
+.requisito-previa__opcion-btn--activa .requisito-previa__opcion-dot {
+  border-color: var(--primary-blue);
+  border-width: 5px;
+}
+
+/* Ícono de la opción en un circulito tintado — dice de un vistazo de qué trata cada una
+   (tilde = directo a póliza, planilla = inspección, escudo = autorización). */
+.requisito-previa__opcion-icono {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: var(--bg-subtle);
+  color: var(--text-gray);
+  font-size: 19px;
+}
+
+.requisito-previa__opcion-btn--activa .requisito-previa__opcion-icono {
+  background: #fff;
+  color: var(--primary-blue);
+}
+
+.requisito-previa__opcion-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.requisito-previa__opcion-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.requisito-previa__opcion-desc {
+  font-size: 12.5px;
+  line-height: 1.4;
+  color: var(--text-gray);
+}
+
+/* La fecha, indentada bajo la opción elegida (alineada con el cuerpo, pasando dot+ícono). */
+.requisito-previa__opcion-fecha {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 8px 0 0 74px;
+}
+
+.requisito-previa__opcion-fecha label {
+  font-size: 13px;
+  color: var(--text-gray);
+  white-space: nowrap;
+}
+
+.requisito-previa__fecha-input {
+  height: 36px;
+  padding: 0 10px;
+  border: 1px solid var(--border-input);
+  border-radius: 6px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text-dark);
+}
+
+/* --- Pantalla de espera --- */
+
+.requisito-previa__espera-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.requisito-previa__espera-icono {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: var(--tint-warning);
+  border: 1px solid var(--tint-warning-bd);
+  color: var(--text-warning);
+  font-size: 22px;
+}
+
+.requisito-previa__espera-head .requisito-previa__subtitle {
+  margin-top: 2px;
+}
+
+.requisito-previa__card {
+  padding: 16px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.requisito-previa__card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.requisito-previa__card-datos {
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.requisito-previa__card-title-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.requisito-previa__card-title {
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin: 0;
+}
+
+.requisito-previa__chip {
+  padding: 1px 8px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 600;
+  border: 1px solid transparent;
+}
+
+.requisito-previa__chip--warning {
+  color: var(--text-warning);
+  background: var(--tint-warning);
+  border-color: var(--tint-warning-bd);
+}
+
+.requisito-previa__chip--info {
+  color: var(--tint-info-text);
+  background: var(--tint-info);
+  border-color: var(--tint-info-bd);
+}
+
+.requisito-previa__chip--success {
+  color: var(--color-verde-cta);
+  background: var(--tint-success);
+  border-color: var(--tint-success-bd);
+}
+
+.requisito-previa__chip--danger {
+  color: var(--tint-danger-text);
+  background: var(--tint-danger);
+  border-color: var(--tint-danger-bd);
+}
+
+.requisito-previa__card-fecha {
+  font-size: 13px;
+  color: var(--text-dark);
+  margin: 0;
+}
+
+.requisito-previa__vencida {
+  color: var(--tint-danger-text);
+  font-weight: 600;
+}
+
+.requisito-previa__card-meta {
+  font-size: 12.5px;
+  color: var(--text-gray);
+  margin: 0;
+}
+
+/* Con 'ambos' marcado: aviso de que tras la inspección sigue la autorización. */
+.requisito-previa__card-siguiente {
+  margin: 6px 0 0;
+  padding: 6px 10px;
+  font-size: 12.5px;
+  line-height: 1.45;
+  color: var(--tint-info-text);
+  background: var(--tint-info);
+  border: 1px solid var(--tint-info-bd);
+  border-radius: 6px;
+}
+
+/* "Cambiar": vive en la tarjeta, pegado a lo que cambia (a pedido — antes era un segundo
+   "Volver..." en el footer y se confundía con el "Volver" de navegación). */
+.requisito-previa__cambiar {
+  flex: none;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--primary-blue);
+  background: #fff;
+  border: 1px solid var(--border-input);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.12s ease, background-color 0.12s ease;
+}
+
+.requisito-previa__cambiar:hover {
+  border-color: var(--primary-blue);
+  background: var(--tint-info);
+}
+
+.requisito-previa__error {
+  font-size: 13px;
+  color: var(--tint-danger-text);
+  margin: 0;
+}
+
+/* El aviso de fechas cruzadas, alineado con los inputs de fecha de la opción. */
+.requisito-previa__error--fecha {
+  margin: 6px 0 0 74px;
+}
+
+@media (max-width: 640px) {
+  .requisito-previa__error--fecha {
+    margin-left: 0;
+  }
+}
+
+.requisito-previa__extras {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin-top: 14px;
+  padding-top: 14px;
+  border-top: 1px solid var(--border);
+}
+
+.requisito-previa__link-label {
+  display: block;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin-bottom: 6px;
+}
+
+.requisito-previa__link-row {
+  display: flex;
+  gap: 8px;
+  align-items: flex-start;
+}
+
+.requisito-previa__link-row > *:first-child {
+  flex: 1;
+  min-width: 0;
+}
+
+@media (max-width: 640px) {
+  .requisito-previa {
+    padding: 16px;
+  }
+
+  .requisito-previa__opcion-fecha {
+    margin-left: 0;
+  }
+
+  .requisito-previa__card-head {
+    flex-direction: column;
+  }
+}

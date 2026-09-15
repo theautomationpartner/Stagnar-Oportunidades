@@ -8,6 +8,7 @@ import CotizarStepPanel from './CotizarStepPanel'
 import CotizandoModal from './CotizandoModal'
 import ConfirmarStepPanel from './ConfirmarStepPanel'
 import EmitirStepPanel from './EmitirStepPanel'
+import RequisitoPreviaPanel from './RequisitoPreviaPanel'
 import WhatsAppSendModal from './WhatsAppSendModal'
 import AsignadoSelect from './AsignadoSelect'
 import ErrorDetailBox from './ErrorDetailBox'
@@ -30,6 +31,13 @@ import {
   setAsignado,
   fetchMondayUsers,
   CONTACTO_DIRECCION_COLUMN_ID,
+  deleteItem,
+  fetchOpportunityActivities,
+  crearActividadRequisito,
+  editarActividadRequisito,
+  setActivityEstado,
+  setActivityLink,
+  ACTIVITY_COLUMN_IDS,
 } from '../services/mondayApi'
 import { mapOpportunityItem } from '../services/opportunityMapper'
 import { textOf } from '../services/mondayColumns'
@@ -96,6 +104,22 @@ import { nombreDeOportunidad } from '../services/nombreOportunidad'
 import './OpportunityDetail.css'
 
 const ESTADO_OPORTUNIDAD_COLUMN_ID = 'deal_stage'
+// Estados que ya pasaron el paso 3 (Confirmar) y caen dentro del paso 4 (Emitir) — el
+// gate/pantalla de espera de Inspección/Autorización (ver RequisitoPreviaPanel) vive dentro
+// de este paso, así que sus 2 estados transitorios cuentan como "Emitir" igual que
+// "Cotizacion aceptada" y el ya despejado "Ganada - Póliza".
+const EMITIR_ESTADOS = [
+  'Cotizacion aceptada',
+  'Ganada - Requiere Inspección',
+  'Ganada - Requiere Autorización',
+  'Ganada - Póliza',
+]
+// A qué Estado Oportunidad pasa el gate según el tipo de requisito elegido (ver
+// handleElegirRequisito, RequisitoPreviaPanel).
+const REQUISITO_A_ESTADO = {
+  Inspección: 'Ganada - Requiere Inspección',
+  Autorización: 'Ganada - Requiere Autorización',
+}
 const ESTADO_COTIZACION_COLUMN_ID = 'color_mm51n7aa'
 const ESTADO_ENVIO_COLUMN_ID = 'color_mm4wr1t4'
 const ESTADO_CREACION_COLUMN_ID = 'color_mm5ejysv'
@@ -296,7 +320,7 @@ export default function OpportunityDetail({
           setActiveStep('cotizar')
         } else if (estadoOportunidad === 'Cotizacion Enviada') {
           setActiveStep(raws.length > 0 ? 'confirmar' : 'cotizar')
-        } else if (estadoOportunidad === 'Cotizacion aceptada') {
+        } else if (EMITIR_ESTADOS.includes(estadoOportunidad)) {
           setActiveStep(raws.length > 0 ? 'emitir' : 'cotizar')
         } else {
           setActiveStep(raws.length > 0 ? 'comparar' : 'cotizar')
@@ -1118,6 +1142,192 @@ export default function OpportunityDetail({
     }
   }
 
+  // Gate/espera de Inspección-Autorización previo a cargar la póliza (ver
+  // RequisitoPreviaPanel) — las actividades viven en otro tablero (Actividades), así que
+  // se cargan aparte del resto del ítem, solo mientras hace falta (paso Emitir, todavía
+  // sin llegar a "Ganada - Póliza"/"Concretada").
+  const requisitoResuelto = ['Ganada - Póliza', 'Concretada'].includes(opportunity?.estadoLabel)
+  const [actividades, setActividades] = useState([])
+  const [actividadesLoading, setActividadesLoading] = useState(false)
+  const [requisitoBusy, setRequisitoBusy] = useState(false)
+  const [requisitoError, setRequisitoError] = useState(null)
+
+  const recargarActividades = async () => {
+    setActividadesLoading(true)
+    try {
+      const data = await fetchOpportunityActivities(opportunityId)
+      setActividades(data)
+    } catch (err) {
+      setRequisitoError(err.message)
+    } finally {
+      setActividadesLoading(false)
+    }
+  }
+
+  useEffect(() => {
+    if (activeStep !== 'emitir' || requisitoResuelto) return
+    recargarActividades()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeStep, opportunityId, requisitoResuelto])
+
+  // Escribe Estado Oportunidad en monday Y en el estado local (evita repetir el mismo
+  // patch de columna en cada handler de abajo).
+  const patchEstadoOportunidad = async (nuevoEstado) => {
+    await setSimpleColumnValue(opportunityId, ESTADO_OPORTUNIDAD_COLUMN_ID, nuevoEstado)
+    setItem((prev) => ({
+      ...prev,
+      column_values: prev.column_values.map((cv) =>
+        cv.id === ESTADO_OPORTUNIDAD_COLUMN_ID ? { ...cv, text: nuevoEstado } : cv
+      ),
+    }))
+  }
+
+  // Confirmar la selección del gate — `opcion`: 'ninguno' | 'Inspección' | 'Autorización'
+  // | 'ambos' (a pedido: puede requerirse Inspección Y Autorización, siempre en ese orden,
+  // marcadas juntas desde el inicio). `fecha` (YYYY-MM-DD) es la de la opción elegida; con
+  // 'ambos', `fecha` es la visita y `fechaAutorizacion` cuándo se espera la respuesta.
+  //
+  // Sirve tanto para la primera elección como para "Cambiar" (ver RequisitoPreviaPanel):
+  // por cada tipo se edita la actividad pendiente que ya hubiera (conserva el historial/
+  // Updates del ítem), se crea la que falte, y se borra la que sobre. El cambio de UN tipo
+  // al otro reconvierte la misma actividad en vez de borrar y crear, por el mismo motivo.
+  const handleConfirmarRequisito = async (opcion, fecha, fechaAutorizacion) => {
+    onOpportunityAction?.()
+    setRequisitoBusy(true)
+    setRequisitoError(null)
+    const pendienteDe = (tipo) => actividades.find((a) => a.tipo === tipo && a.estado !== 'Completado')
+    // Qué actividad tiene que quedar viva por tipo (y con qué fecha) según la opción.
+    const deseadas = {
+      Inspección: opcion === 'Inspección' || opcion === 'ambos' ? fecha : null,
+      Autorización: opcion === 'Autorización' ? fecha : opcion === 'ambos' ? fechaAutorizacion : null,
+    }
+    // Si se llega a crear una actividad pero falla un paso siguiente, se borra acá mismo en
+    // el catch — mismo criterio de "no dejar huérfanos" que el resto de la app (ver el
+    // rollback de handleGuardar en CrearOportunidadForm.jsx). Sin esto, reintentar creaba
+    // una segunda actividad duplicada porque nada detecta la que quedó a medias.
+    const creadas = []
+    try {
+      const TIPOS = ['Inspección', 'Autorización']
+      const tiposPendientes = TIPOS.filter((t) => pendienteDe(t))
+      const tiposDeseados = TIPOS.filter((t) => deseadas[t])
+      if (tiposPendientes.length === 1 && tiposDeseados.length === 1 && tiposPendientes[0] !== tiposDeseados[0]) {
+        // Cambio de un tipo al otro: reconvierte la MISMA actividad (tipo, medio, fecha y
+        // nombre) en vez de borrar y crear.
+        await editarActividadRequisito(
+          pendienteDe(tiposPendientes[0]).id,
+          tiposDeseados[0],
+          opportunity.clienteNombre,
+          deseadas[tiposDeseados[0]]
+        )
+      } else {
+        for (const tipo of TIPOS) {
+          const pendiente = pendienteDe(tipo)
+          const fechaDeseada = deseadas[tipo]
+          if (fechaDeseada && pendiente) {
+            await editarActividadRequisito(pendiente.id, tipo, opportunity.clienteNombre, fechaDeseada)
+          } else if (fechaDeseada) {
+            const creada = await crearActividadRequisito(
+              opportunityId,
+              opportunity.asignadoId,
+              tipo,
+              opportunity.clienteNombre,
+              fechaDeseada
+            )
+            creadas.push(creada.id)
+          } else if (pendiente) {
+            await deleteItem(pendiente.id)
+          }
+        }
+      }
+      // Con las dos marcadas manda la Inspección: es SIEMPRE el primer bloqueo (el orden
+      // Inspección → Autorización es regla del negocio).
+      const nuevoEstado = deseadas.Inspección
+        ? REQUISITO_A_ESTADO.Inspección
+        : deseadas.Autorización
+          ? REQUISITO_A_ESTADO.Autorización
+          : 'Ganada - Póliza'
+      await patchEstadoOportunidad(nuevoEstado)
+      await recargarActividades()
+    } catch (err) {
+      for (const id of creadas) {
+        try {
+          await deleteItem(id)
+        } catch {
+          // No hay mucho más para hacer acá — el mensaje de abajo ya avisa del error
+          // original; si tampoco se pudo deshacer, queda para revisar a mano en monday.
+        }
+      }
+      setRequisitoError(err.message)
+    } finally {
+      setRequisitoBusy(false)
+    }
+  }
+
+  // Al completar la actividad: Autorización siempre termina el trámite (pasa a "Ganada -
+  // Póliza"). Inspección depende de lo que venga después: si ya hay una Autorización
+  // pendiente (se marcaron las dos desde el inicio, opción 'ambos'), pasa DIRECTO a
+  // esperarla sin volver al selector; si no, vuelve al gate por si además hace falta —
+  // a pedido, puede venir Inspección y después Autorización, pero nunca al revés (ver
+  // RequisitoPreviaPanel#inspeccionCompletada, que ya no vuelve a ofrecerla una vez hecha).
+  const handleMarcarActividadCompletada = async (activity) => {
+    if (!activity) return
+    onOpportunityAction?.()
+    setRequisitoBusy(true)
+    setRequisitoError(null)
+    try {
+      await setActivityEstado(activity.id, 'Completado')
+      const autorizacionPendiente = actividades.some(
+        (a) => a.tipo === 'Autorización' && a.estado !== 'Completado' && a.id !== activity.id
+      )
+      const siguienteEstado =
+        activity.tipo === 'Autorización'
+          ? 'Ganada - Póliza'
+          : autorizacionPendiente
+            ? REQUISITO_A_ESTADO.Autorización
+            : 'Cotizacion aceptada'
+      await patchEstadoOportunidad(siguienteEstado)
+      await recargarActividades()
+    } catch (err) {
+      setRequisitoError(err.message)
+    } finally {
+      setRequisitoBusy(false)
+    }
+  }
+
+  // Archivo/Link opcionales de la actividad de Inspección/Autorización (ej. el informe
+  // de la inspección, o el link al trámite de la compañía) — se cargan desde la pantalla
+  // de espera, antes de marcarla completada. No tocan Estado Oportunidad, por eso van
+  // separados del resto de los handlers de arriba.
+  const [actividadArchivoUploading, setActividadArchivoUploading] = useState(false)
+  const [actividadArchivoError, setActividadArchivoError] = useState(null)
+  const handleUploadActividadArchivo = async (activityId, file) => {
+    setActividadArchivoUploading(true)
+    setActividadArchivoError(null)
+    try {
+      await uploadFileToColumn(activityId, ACTIVITY_COLUMN_IDS.archivo, file)
+      await recargarActividades()
+    } catch (err) {
+      setActividadArchivoError(err.message)
+    } finally {
+      setActividadArchivoUploading(false)
+    }
+  }
+
+  const [actividadLinkSaving, setActividadLinkSaving] = useState(false)
+  const [actividadLinkError, setActividadLinkError] = useState(null)
+  const handleGuardarActividadLink = async (activityId, url) => {
+    setActividadLinkSaving(true)
+    setActividadLinkError(null)
+    try {
+      await setActivityLink(activityId, url)
+      await recargarActividades()
+    } catch (err) {
+      setActividadLinkError(err.message)
+    } finally {
+      setActividadLinkSaving(false)
+    }
+  }
+
   // Botón "Confirmar" del paso 3: la validación de datos/documentación ya la hizo
   // ConfirmarStepPanel antes de llamar a esto — acá solo queda dejar registrado en
   // monday que la cotización fue aceptada (mismo estado real "Cotizacion aceptada" que
@@ -1335,15 +1545,16 @@ export default function OpportunityDetail({
   // El paso 2 se marca cumplido cuando la oportunidad ya avanzó a "Cotizacion Enviada"
   // (o a un estado posterior del mismo flujo) — no alcanza con tener cotizaciones
   // cargadas, hace falta que efectivamente ya se le hayan mandado al cliente.
-  const compararDone = ['Cotizacion Enviada', 'Cotizacion aceptada', 'Concretada', 'No Concretada'].includes(
+  const compararDone = ['Cotizacion Enviada', ...EMITIR_ESTADOS, 'Concretada', 'No Concretada'].includes(
     opportunity?.estadoLabel
   )
   const confirmarDone = tieneElegida || emitirDone
   // El paso 4 se marca cumplido recién cuando la póliza ya quedó cargada y la
-  // oportunidad pasó a "Concretada" — antes de eso, está "activo" apenas se acepta la
-  // cotización (o ya se cargó la póliza pero el estado todavía no refrescó).
+  // oportunidad pasó a "Concretada" — antes de eso, está "activo" desde que se acepta la
+  // cotización (incluye el gate/espera de Inspección-Autorización, ver EMITIR_ESTADOS, o
+  // ya se cargó la póliza pero el estado todavía no refrescó).
   const emitirActive =
-    !emitirDone && (opportunity?.estadoLabel === 'Cotizacion aceptada' || Boolean(opportunity?.poliza))
+    !emitirDone && (EMITIR_ESTADOS.includes(opportunity?.estadoLabel) || Boolean(opportunity?.poliza))
 
   // Gate previo al paso 1: solo aplica si la oportunidad "Posee Vehículo" (si no, esos
   // documentos se piden directo en el paso 3 Confirmar, sin lectura automática de por
@@ -1766,7 +1977,26 @@ export default function OpportunityDetail({
             </div>
           )}
 
-          {activeStep === 'emitir' && hasQuotes && (
+          {activeStep === 'emitir' && hasQuotes && !requisitoResuelto && (
+            <RequisitoPreviaPanel
+              estadoLabel={opportunity?.estadoLabel}
+              actividades={actividades}
+              loadingActividades={actividadesLoading}
+              busy={requisitoBusy}
+              error={requisitoError}
+              onConfirmar={handleConfirmarRequisito}
+              onMarcarCompletada={handleMarcarActividadCompletada}
+              onBack={() => setActiveStep('confirmar')}
+              onUploadArchivo={handleUploadActividadArchivo}
+              archivoUploading={actividadArchivoUploading}
+              archivoError={actividadArchivoError}
+              onGuardarLink={handleGuardarActividadLink}
+              linkSaving={actividadLinkSaving}
+              linkError={actividadLinkError}
+            />
+          )}
+
+          {activeStep === 'emitir' && hasQuotes && requisitoResuelto && (
             <EmitirStepPanel
               opportunity={opportunity}
               groups={groups}

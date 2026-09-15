@@ -1,6 +1,7 @@
 import { memoAsync, invalidate as invalidateCache } from './cache'
 import mondaySdk from 'monday-sdk-js'
 import { fetchProtegido } from '../auth/fetchProtegido'
+import { textOf } from './mondayColumns'
 
 // SDK cliente de monday (no confundir con `callMondayApi` de acá abajo, que pega
 // contra /api/monday con la API key del servidor) — se usa solo para lo que hace
@@ -1305,4 +1306,195 @@ export async function createContactoCrm({ name, phone, email, clienteId, existin
     [CLIENTE_CONTACTOS_COLUMN_ID]: { item_ids: [...existingContactIds.map(Number), Number(id)] },
   })
   return { id }
+}
+
+// ---------------------------------------------------------------------------
+// Tablero Actividades: seguimiento de contacto con el Cliente/Lead de una Oportunidad
+// (Cotización, Recotización, Seguimiento, Inspección, Autorización), conectado en los
+// dos sentidos con Oportunidades (board_relation_mm5174fw acá, board_relation_mm51kj4d
+// del lado de Oportunidades). Al crear una oportunidad se generan automáticamente 2
+// actividades (crearActividadesIniciales, llamado desde CrearOportunidadForm); marcar
+// una actividad como completada y el gate de Inspección/Autorización del paso Emitir se
+// manejan desde OpportunityDetail.
+// ---------------------------------------------------------------------------
+export const ACTIVITIES_BOARD_ID = 18390062302
+export const ACTIVITY_COLUMN_IDS = {
+  tipo: 'color_mm722yy0', // Tipo de Actividad: Cotización | Recotización | Seguimiento | Inspección | Autorización
+  medio: 'activity_type', // Medio de Comunicación: WhatsApp | Email | Llamada | Reunión presencial | Visita a campo
+  estado: 'activity_status', // Estado: Pendiente | En Proceso | Completado | Vencido
+  fecha: 'activity_start_time',
+  asignado: 'activity_owner',
+  oportunidad: 'board_relation_mm5174fw',
+  archivo: 'file_mm76vfvg',
+  link: 'link_mm769fx9',
+}
+
+async function setActivityColumnValues(itemId, columnValues) {
+  const data = await callMondayApi(CHANGE_MULTIPLE_COLUMN_VALUES_MUTATION, {
+    boardId: ACTIVITIES_BOARD_ID,
+    itemId,
+    columnValues: JSON.stringify(columnValues),
+  })
+  return data.change_multiple_column_values
+}
+
+export async function createActivityItem(itemName, columnValues) {
+  const created = await callMondayApi(CREATE_ITEM_MUTATION, { boardId: ACTIVITIES_BOARD_ID, itemName })
+  const id = created.create_item.id
+  await setActivityColumnValues(id, columnValues)
+  return { id }
+}
+
+export async function setActivityEstado(activityId, estado) {
+  return setActivityColumnValues(activityId, { [ACTIVITY_COLUMN_IDS.estado]: estado })
+}
+
+// Archivo/Link de una actividad de Inspección/Autorización — opcionales, ver
+// RequisitoPreviaPanel (pantalla de espera). uploadFileToColumn ya es genérica por
+// itemId/columnId (no hace falta boardId), sirve tal cual para un ítem de Actividades.
+export async function setActivityLink(activityId, url) {
+  return setActivityColumnValues(activityId, {
+    [ACTIVITY_COLUMN_IDS.link]: url ? { url, text: url } : { url: '', text: '' },
+  })
+}
+
+// Fecha local en formato YYYY-MM-DD — NO toISOString().slice(0,10): eso convierte a UTC,
+// así que crear/completar una actividad entre las 21 y las 23:59 hora Uruguay (UTC-3)
+// quedaba fechado un día adelantado.
+function fechaMonday(date) {
+  const y = date.getFullYear()
+  const m = String(date.getMonth() + 1).padStart(2, '0')
+  const d = String(date.getDate()).padStart(2, '0')
+  return `${y}-${m}-${d}`
+}
+
+// Al crear una oportunidad: 1) Cotización a {Nombre}, Completada, con la fecha de hoy.
+// 2) Seguimiento a {Nombre}, Pendiente, programada a 3 días. Las dos asignadas al mismo
+// responsable de la oportunidad. `nombreCompleto` va en el nombre del ítem (no alcanza
+// con la conexión a Oportunidades para identificarla de un vistazo en el tablero de
+// Actividades, ver el resto del board). No bloqueante: si falla, se loguea y sigue — la
+// oportunidad ya se guardó bien, no tiene sentido perderla por esto.
+export async function crearActividadesIniciales(opportunityId, asignadoId, nombreCompleto) {
+  const hoy = new Date()
+  const enTresDias = new Date(hoy)
+  enTresDias.setDate(enTresDias.getDate() + 3)
+
+  const base = {
+    [ACTIVITY_COLUMN_IDS.oportunidad]: { item_ids: [Number(opportunityId)] },
+    [ACTIVITY_COLUMN_IDS.medio]: 'WhatsApp',
+    ...(asignadoId
+      ? { [ACTIVITY_COLUMN_IDS.asignado]: { personsAndTeams: [{ id: Number(asignadoId), kind: 'person' }] } }
+      : {}),
+  }
+
+  try {
+    await Promise.all([
+      createActivityItem(`Cotización a ${nombreCompleto}`, {
+        ...base,
+        [ACTIVITY_COLUMN_IDS.tipo]: 'Cotización',
+        [ACTIVITY_COLUMN_IDS.estado]: 'Completado',
+        [ACTIVITY_COLUMN_IDS.fecha]: fechaMonday(hoy),
+      }),
+      createActivityItem(`Seguimiento a ${nombreCompleto}`, {
+        ...base,
+        [ACTIVITY_COLUMN_IDS.tipo]: 'Seguimiento',
+        [ACTIVITY_COLUMN_IDS.estado]: 'Pendiente',
+        [ACTIVITY_COLUMN_IDS.fecha]: fechaMonday(enTresDias),
+      }),
+    ])
+  } catch (err) {
+    console.error('No se pudieron crear las actividades iniciales de la oportunidad:', err)
+  }
+}
+
+// Medio de Comunicación por defecto según el tipo de requisito: la Inspección es una
+// visita en persona, la Autorización se resuelve revisando el portal de la compañía.
+const REQUISITO_MEDIO = {
+  Inspección: 'Reunión presencial',
+  Autorización: 'Revisar en el Portal',
+}
+
+// Actividades de Inspección/Autorización que crea el gate del paso Emitir (ver
+// OpportunityDetail). `fecha` (YYYY-MM-DD) es cuándo va a ser la visita — la elige quien
+// carga la Inspección; si no se pasa (caso Autorización, no hay "visita"), es hoy. Mismo
+// criterio de nombre que crearActividadesIniciales: "Inspección a {Nombre}" / "Autorización
+// a {Nombre}".
+export async function crearActividadRequisito(opportunityId, asignadoId, tipo, nombreCompleto, fecha) {
+  return createActivityItem(`${tipo} a ${nombreCompleto}`, {
+    [ACTIVITY_COLUMN_IDS.oportunidad]: { item_ids: [Number(opportunityId)] },
+    [ACTIVITY_COLUMN_IDS.tipo]: tipo,
+    [ACTIVITY_COLUMN_IDS.medio]: REQUISITO_MEDIO[tipo],
+    [ACTIVITY_COLUMN_IDS.estado]: 'Pendiente',
+    [ACTIVITY_COLUMN_IDS.fecha]: fecha || fechaMonday(new Date()),
+    ...(asignadoId
+      ? { [ACTIVITY_COLUMN_IDS.asignado]: { personsAndTeams: [{ id: Number(asignadoId), kind: 'person' }] } }
+      : {}),
+  })
+}
+
+// "Elegí mal, corregir" en la pantalla de espera: en vez de borrar la actividad y crear
+// una nueva, edita la MISMA (Tipo, Medio y Fecha) — conserva el historial/Updates que ya
+// pudiera tener el ítem. Le cambia también el nombre, que arrastra el tipo viejo.
+export async function editarActividadRequisito(activityId, nuevoTipo, nombreCompleto, fecha) {
+  await setItemName(activityId, `${nuevoTipo} a ${nombreCompleto}`, ACTIVITIES_BOARD_ID)
+  return setActivityColumnValues(activityId, {
+    [ACTIVITY_COLUMN_IDS.tipo]: nuevoTipo,
+    [ACTIVITY_COLUMN_IDS.medio]: REQUISITO_MEDIO[nuevoTipo],
+    [ACTIVITY_COLUMN_IDS.fecha]: fecha || fechaMonday(new Date()),
+  })
+}
+
+// Del lado de Oportunidades, la conexión a Actividades es OTRA columna
+// (board_relation_mm51kj4d, "Actividades") — no confundir con
+// ACTIVITY_COLUMN_IDS.oportunidad, que es la columna recíproca pero del lado del
+// tablero Actividades (board_relation_mm5174fw).
+const OPORTUNIDAD_ACTIVIDADES_COLUMN_ID = 'board_relation_mm51kj4d'
+
+const FETCH_OPPORTUNITY_ACTIVITIES_QUERY = `
+  query FetchOpportunityActivities($itemId: [ID!]) {
+    items(ids: $itemId) {
+      column_values(ids: ["${OPORTUNIDAD_ACTIVIDADES_COLUMN_ID}"]) {
+        ... on BoardRelationValue {
+          linked_items {
+            id
+            name
+            column_values(ids: [
+              "${ACTIVITY_COLUMN_IDS.tipo}",
+              "${ACTIVITY_COLUMN_IDS.medio}",
+              "${ACTIVITY_COLUMN_IDS.estado}",
+              "${ACTIVITY_COLUMN_IDS.fecha}",
+              "${ACTIVITY_COLUMN_IDS.asignado}",
+              "${ACTIVITY_COLUMN_IDS.archivo}",
+              "${ACTIVITY_COLUMN_IDS.link}"
+            ]) {
+              id
+              text
+            }
+          }
+        }
+      }
+    }
+  }
+`
+
+// Actividades conectadas a una Oportunidad, del lado de Oportunidades
+// (board_relation_mm51kj4d, "Actividades") — mismo par bidireccional que
+// ACTIVITY_COLUMN_IDS.oportunidad del otro lado, así que no hace falta filtrar el
+// tablero de Actividades: ya viene resuelto en linked_items.
+export async function fetchOpportunityActivities(opportunityId) {
+  const data = await callMondayApi(FETCH_OPPORTUNITY_ACTIVITIES_QUERY, { itemId: [opportunityId] })
+  const linked = data.items?.[0]?.column_values?.[0]?.linked_items ?? []
+  return linked.map((item) => ({
+    id: item.id,
+    nombre: item.name,
+    tipo: textOf(item.column_values, ACTIVITY_COLUMN_IDS.tipo),
+    medio: textOf(item.column_values, ACTIVITY_COLUMN_IDS.medio),
+    estado: textOf(item.column_values, ACTIVITY_COLUMN_IDS.estado),
+    fecha: textOf(item.column_values, ACTIVITY_COLUMN_IDS.fecha),
+    // Quién tiene que hacer el trámite — la pantalla de espera lo muestra en la tarjeta
+    // de la actividad (ver RequisitoPreviaPanel).
+    asignado: textOf(item.column_values, ACTIVITY_COLUMN_IDS.asignado),
+    archivo: textOf(item.column_values, ACTIVITY_COLUMN_IDS.archivo),
+    link: textOf(item.column_values, ACTIVITY_COLUMN_IDS.link),
+  }))
 }
