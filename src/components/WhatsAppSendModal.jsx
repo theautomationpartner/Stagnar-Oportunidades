@@ -54,8 +54,18 @@ export default function WhatsAppSendModal({
   // true, y sin esto se volvía a mostrar el formulario de teléfono en vez del estado
   // real en curso.
   const showStatus = submitted || sendPolling
+  // El estado terminal se lee de la columna, no de "ya no estamos poleando". Antes el
+  // éxito era "no polea y no dice Error", y el polling se apaga también cuando se corta
+  // por fallos de red (POLL_MAX_FAILS en OpportunityDetail.jsx): ahí el modal cantaba
+  // "¡Enviada con éxito!" y se cerraba solo con el envío todavía en curso, que es
+  // justo lo que no hay que decirle a alguien que le está mandando algo a un cliente.
   const sendFailed = showStatus && !sendPolling && opportunity.estadoEnvio === 'Error'
-  const sendSucceeded = showStatus && !sendPolling && !sendFailed
+  const sendSucceeded = showStatus && !sendPolling && opportunity.estadoEnvio === 'Enviado'
+  // Todo lo demás sigue siendo "en curso": mientras Make procesa, y también si nos
+  // quedamos sin saber. Que la pantalla de "Enviando" se quede es la lectura honesta —
+  // el envío puede terminar igual, y el aviso de que el seguimiento se cortó ya aparece
+  // detrás (pollStalled, con "Reintentar").
+  const sendInProgress = showStatus && !sendFailed && !sendSucceeded
 
   const handleSend = async () => {
     setSending(true)
@@ -96,7 +106,7 @@ export default function WhatsAppSendModal({
                 amarillo genérico de antes. La barra no mide un progreso real (no hay
                 forma de saber en qué paso puntual va Make) — un valor fijo alto alcanza
                 para transmitir "ya casi", sin inventar precisión que no existe. */}
-            {sendPolling && (
+            {sendInProgress && (
               <div className="wa-modal__sending">
                 <GradientSpinner size={48} />
                 <h2 className="wa-modal__sending-title">Enviando propuesta por WhatsApp...</h2>
@@ -203,7 +213,11 @@ export default function WhatsAppSendModal({
       {/* A pedido, estética tipo mockup: sin botones mientras se envía o tras el éxito
           (se cierra sola) — "Cerrar" solo hace falta si hay que abortar a mano, en el
           caso de error. */}
-      {sendFailed && <ModalFooter primaryButton={{ text: 'Cerrar', onClick: onClose }} />}
+      {/* También con el envío en curso: si el seguimiento se cortó, sin esto no quedaba
+          más salida que la X del modal. */}
+      {(sendFailed || sendInProgress) && (
+        <ModalFooter primaryButton={{ text: 'Cerrar', onClick: onClose }} />
+      )}
       {!showStatus && (
         <ModalFooter
           primaryButton={{
