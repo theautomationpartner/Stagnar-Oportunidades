@@ -354,7 +354,7 @@ function buildIncluyeBullets(eff, panelContext) {
   // de BSE que dice "GLOBAL (HASTA 5 AÑOS) Y TRIPLE (HASTA 2 AÑOS)"). Como estas viñetas
   // son puro texto para mostrar, se traducen acá y no en el tablero: así PANEL se sigue
   // cargando como habla la compañía y el cliente lee "TOTAL"/"PARCIAL" en todos lados.
-  return bullets.map(nombreComercialCobertura)
+  return bullets.map((b) => nombreComercialCobertura(expandirTokens(b, eff, panelContext)))
 }
 
 // Las viñetas de RC salen de PANEL con la misma convención que los textos INCLUYE: un
@@ -363,11 +363,34 @@ function rcBullets(eff, panelContext) {
   const texto = panelContext?.rcLookup?.[eff.compania]?.[eff.rc]
   return (texto ?? '')
     .split('●')
-    .map((s) => expandirUI(s.trim(), panelContext))
+    .map((s) => expandirTokens(s.trim(), eff, panelContext))
     .filter(Boolean)
 }
 
-// "{UI 5000000}" en un texto de PANEL se convierte en "5.000.000 UI ≈ US$ 825.000".
+// Los textos de PANEL pueden traer estos tokens, y se reemplazan al mostrarlos:
+//
+//   {UI 5000000}      → "5.000.000 UI ≈ US$ 825.050"   (ver expandirUI)
+//   {precio Granizo}  → "$ 1.250"                      (el precio real del opcional)
+//
+// Existen porque escribir el importe adentro de la frase envejece en silencio: el precio
+// del opcional se actualiza en su fila de PANEL y el texto que ve el cliente sigue
+// diciendo el viejo. Pasó: el granizo de SURA se cobraba $ 1.250 y la cotización decía
+// "+$ 1.200".
+//
+// Si el token no se puede resolver queda escrito tal cual, a la vista: es feo a propósito,
+// porque se nota en la tarjeta antes de mandar nada. Peor sería que desapareciera.
+function expandirTokens(texto, eff, panelContext) {
+  return expandirPrecio(expandirUI(texto, panelContext), eff, panelContext)
+}
+
+function expandirPrecio(texto, eff, panelContext) {
+  return texto.replace(/{precio ([^}]+)}/g, (todo, clave) => {
+    const precio = Number(panelContext?.preciosOpcionales?.[eff.compania]?.[clave.trim()])
+    return Number.isFinite(precio) && precio > 0 ? formatMoney(precio) : todo
+  })
+}
+
+// "{UI 5000000}" en un texto de PANEL se convierte en "5.000.000 UI ≈ US$ 825.050".
 //
 // El importe en UI es el que vale: es el que figura en la póliza. El de dólares es una
 // referencia para que el cliente dimensione, por eso va con "≈" y sin decimales. Si falta
