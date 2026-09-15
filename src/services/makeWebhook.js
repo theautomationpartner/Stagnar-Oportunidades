@@ -34,9 +34,19 @@ export function getMakeWebhookUrl() {
   return import.meta.env.VITE_MAKE_WEBHOOK_URL || ''
 }
 
-async function dataUrlToBlob(dataUrl) {
-  const response = await fetch(dataUrl)
-  return response.blob()
+// Se decodifica a mano, y NO con fetch(dataUrl) como antes: en producción el CSP
+// (ver vercel.json) limita connect-src a 'self' y monday.com, y para el navegador un
+// fetch() a una URL "data:" es una conexión más — la bloqueaba, el envío moría con
+// "Failed to fetch" ANTES de postear y a Make no le llegaba nada. En local no se veía
+// porque el dev server no manda esas cabeceras. Decodificar acá no depende del CSP ni
+// pasa por la capa de red.
+function dataUrlToBlob(dataUrl) {
+  const [encabezado, base64] = String(dataUrl).split(',')
+  const tipo = /:(.*?);/.exec(encabezado)?.[1] ?? 'image/png'
+  const binario = atob(base64)
+  const bytes = new Uint8Array(binario.length)
+  for (let i = 0; i < binario.length; i += 1) bytes[i] = binario.charCodeAt(i)
+  return new Blob([bytes], { type: tipo })
 }
 
 // "__" (doble guion bajo) como separador porque compañía/cobertura pueden traer
@@ -78,7 +88,7 @@ export async function sendQuotesToWhatsApp({ phone, opportunity, images, formato
 
   for (const { raw, imageDataUrl, texto } of images) {
     if (mandaImagen && imageDataUrl) {
-      const blob = await dataUrlToBlob(imageDataUrl)
+      const blob = dataUrlToBlob(imageDataUrl)
       formData.append('images', blob, buildFilename(raw, opportunity))
     }
     // El texto viaja como archivo .txt bajo el campo "texts" — mismo esquema que las
