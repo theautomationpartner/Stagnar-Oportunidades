@@ -165,6 +165,18 @@ export default function WhatsAppSendModal({
           </div>
         ) : (
           <>
+            {/* Un renglón rojo al pie se lee como una validación del formulario, y esto no
+                lo es: el envío se intentó y no salió. Va con el mismo cartel que cualquier
+                otro fallo de envío, y adentro el motivo tal cual lo devolvió el escenario
+                de Make (p. ej. "La persona asignada no tiene el celular permitido..."),
+                que es lo que dice qué hay que corregir. El formulario queda abajo para
+                reintentar sin volver a empezar. */}
+            {error && (
+              <AttentionBox type="negative" title="No se pudo enviar" className="wa-modal__error">
+                {error}
+              </AttentionBox>
+            )}
+
             {/* TextField nativo de @vibe/core en vez de <label>+<input> a mano. */}
             <TextField
               wrapperClassName="wa-modal__field"
@@ -224,8 +236,6 @@ export default function WhatsAppSendModal({
                 ))}
               </div>
             )}
-
-            {error && <p className="wa-modal__error">Error: {error}</p>}
           </>
         )}
       </ModalContent>
