@@ -370,10 +370,9 @@ function rcBullets(eff, panelContext) {
 // "{UI 5000000}" en un texto de PANEL se convierte en "5.000.000 UI ≈ US$ 825.000".
 //
 // El importe en UI es el que vale: es el que figura en la póliza. El de dólares es una
-// referencia para que el cliente dimensione, por eso va con "≈" y redondeado al millar —
-// dar un número exacto sería fingir una precisión que no existe, con un dólar que cambia
-// todos los días. Si falta alguno de los dos valores en PANEL, se muestra solo la UI: es
-// preferible a mostrar un dólar calculado con datos viejos.
+// referencia para que el cliente dimensione, por eso va con "≈" y sin decimales. Si falta
+// alguno de los dos valores en PANEL, se muestra solo la UI: es preferible a mostrar un
+// dólar calculado con datos viejos.
 const numeroUY = new Intl.NumberFormat('es-UY', { maximumFractionDigits: 0 })
 
 function expandirUI(texto, panelContext) {
@@ -386,7 +385,8 @@ function expandirUI(texto, panelContext) {
     const dolar = Number(panelContext?.valorDolar)
     if (!Number.isFinite(valorUI) || !Number.isFinite(dolar) || valorUI <= 0 || dolar <= 0) return enUI
 
-    const usd = Math.round((ui * valorUI) / dolar / 1000) * 1000
+    // A pedido: al entero más próximo, sin decimales.
+    const usd = Math.round((ui * valorUI) / dolar)
     return `${enUI} ≈ US$ ${numeroUY.format(usd)}`
   })
 }
