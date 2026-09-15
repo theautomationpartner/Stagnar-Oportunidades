@@ -12,6 +12,7 @@ import { autoExtraOpciones, isQuoteSelectable, opcionalesDeCompania } from '../s
 import { accentForCompania, selectionForCompania } from '../services/companyColors'
 import CompanyMark from './CompanyMark'
 import { coberturaGroupOf, coberturaParaMostrar, FAMILIA_LABEL } from '../services/coberturaGroups'
+import { opcionesRc } from '../services/rcPorCompania'
 import './QuoteCard.css'
 
 const BSE_DEDUCIBLE_OPTIONS = ['0.5', '1', '1.5', '2', '2.5', '3']
@@ -44,7 +45,7 @@ const FIXED_FIELDS = [
 function fieldsForRaw(raw, rcOptions) {
   const common = [
     { key: 'bonif', label: 'Bonificación (%)', kind: 'number' },
-    { key: 'rc', label: 'RC', kind: 'select', options: rcOptions },
+    { key: 'rc', label: 'RC', kind: 'select', options: opcionesRc(raw.compania, rcOptions) },
   ]
 
   if (raw.compania === 'BSE') {
@@ -56,9 +57,10 @@ function fieldsForRaw(raw, rcOptions) {
   if (raw.compania === 'SURA') {
     common.push({ key: 'deducibleSURA', label: 'Deducible SURA', kind: 'select', options: SURA_DEDUCIBLE_OPTIONS })
   }
-  if (raw.compania === 'SANCOR') {
-    common.push({ key: 'deducibleSancorUsd', label: 'Deducible SANCOR (USD)', kind: 'number' })
-  }
+  // SANCOR no lleva selector de deducible: sus deducibles son fijos por cobertura y no se
+  // negocian, así que poder escribirlos acá solo habilitaba mandarle al cliente un número
+  // que la compañía no va a respetar. El valor se sigue viendo (ver deducibleDisplay), lo
+  // que se sacó es la posibilidad de cambiarlo.
 
   return common
 }

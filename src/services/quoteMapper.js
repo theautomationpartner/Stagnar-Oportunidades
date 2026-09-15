@@ -2,11 +2,16 @@
 // modelo "raw" que consume pricingEngine.computeQuote, mas metadatos de exhibicion.
 import { textOf } from './mondayColumns'
 import { deducibleSancorPorDefecto } from './pricingEngine'
+import { rcPorDefecto } from './rcPorCompania'
 
 
 function boolOf(columnValues, columnId) {
   return textOf(columnValues, columnId) === 'v' || textOf(columnValues, columnId).toLowerCase() === 'true'
 }
+
+// Primera opción de cada lista de deducibles (ver QuoteCard.jsx): con qué valor arranca
+// una cotización que viene sin deducible cargado.
+const DEDUCIBLE_POR_DEFECTO = { BSE: '0.5', SURA: '1' }
 
 export function mapSubitemToRawQuote(subitem) {
   const cv = subitem.column_values
@@ -50,6 +55,12 @@ export function mapSubitemToRawQuote(subitem) {
   // deducible sino un dato que no vino. Se completa acá, al armar la cotización, para que
   // el valor sea el mismo en todos lados (ver deducibleSancorPorDefecto en pricingEngine).
   raw.deducibleSancorUsd = deducibleSancorPorDefecto(raw)
+  // A pedido: el RC arranca en el valor acordado con cada compañía (ver rcPorCompania.js).
+  raw.rc = rcPorDefecto(raw)
+  // A pedido: el deducible arranca siempre definido, en la primera opción de la lista de
+  // su compañía, en vez de quedar vacío hasta que alguien elija. Se puede cambiar igual.
+  if (raw.compania === 'BSE' && !raw.deducibleBSE) raw.deducibleBSE = DEDUCIBLE_POR_DEFECTO.BSE
+  if (raw.compania === 'SURA' && !raw.deducibleSURA) raw.deducibleSURA = DEDUCIBLE_POR_DEFECTO.SURA
   return raw
 }
 
