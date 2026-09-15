@@ -115,7 +115,33 @@ export async function sendQuotesToWhatsApp({ phone, opportunity, images, formato
     body: formData,
   })
 
+  // El escenario puede rechazar el envío por una razón de negocio y contestarla en el
+  // cuerpo, con un 200 igual: {"error":"La persona asignada no tiene el celular
+  // permitido..."}. Sin mirar el cuerpo eso pasaba por envío exitoso — la oportunidad
+  // quedaba marcada como enviada y nadie se enteraba de que el WhatsApp nunca salió.
+  const cuerpo = await response.text()
+  const errorDeMake = leerErrorDeMake(cuerpo)
+  if (errorDeMake) throw new Error(errorDeMake)
+
   if (!response.ok) {
-    throw new Error(`Make.com respondió ${response.status}`)
+    // Sin error entendible en el cuerpo queda el código, y el cuerpo crudo si lo hay:
+    // "Make.com respondió 500" a secas no le sirve a nadie para saber qué pasó.
+    const detalle = cuerpo.trim().slice(0, 300)
+    throw new Error(`Make.com respondió ${response.status}${detalle ? `: ${detalle}` : ''}`)
+  }
+}
+
+// Devuelve el mensaje de error que mandó el escenario, o null si la respuesta no es uno.
+// Solo se mira la clave "error": un cuerpo con otra forma (el "Accepted" de siempre, un
+// JSON de datos) no es un rechazo y no tiene que frenar nada.
+function leerErrorDeMake(cuerpo) {
+  const texto = (cuerpo ?? '').trim()
+  if (!texto.startsWith('{')) return null
+  try {
+    const { error } = JSON.parse(texto)
+    return typeof error === 'string' && error.trim() ? error.trim() : null
+  } catch {
+    // Cuerpo que empieza con "{" pero no es JSON válido: no es un rechazo del escenario.
+    return null
   }
 }
