@@ -138,6 +138,12 @@ export async function fetchPanelData() {
     recargoLookup: buildRecargoLookup(items),
     incluyeLookup: buildIncluyeLookup(items),
     rcLookup: buildRcLookup(items),
+    // BSE expresa sus límites de RC en Unidades Indexadas, que es lo que figura en la
+    // póliza; el equivalente en dólares se calcula con estos dos valores en vez de
+    // quedar escrito a mano en cada viñeta (la UI se ajusta todos los meses y el dólar
+    // todos los días, así que escribirlo a mano envejece mal y nadie se entera).
+    valorUI: configuracion.globales['Valor UI en pesos'] ?? null,
+    valorDolar: configuracion.globales['Dólar en pesos'] ?? null,
     repuestosOriginalesMinYear: configuracion.globales['Año mínimo Repuestos Originales'] ?? null,
     // Los siguientes 2 son específicos de PORTO (ver pricingEngine.js#buildIncluyeBullets):
     // año mínimo para la viñeta "REPOSICIÓN 0KM EL PRIMER AÑO DE EMPADRONADO", y año

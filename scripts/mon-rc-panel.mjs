@@ -40,17 +40,21 @@ const COL = {
 }
 
 const FILAS = [
-  // BSE: solo el nivel 40 tiene valores confirmados.
-  ['BSE', '40', 'Límite por personas (muerte/lesión): 5.000.000 UI ≈ US$ 825.000●Límite daños materiales: 5.000.000 UI ≈ US$ 825.000●Límite catástrofe (agregado): 15.000.000 UI ≈ US$ 2.476.000'],
+  // BSE queda vacío a propósito, incluido el 40: hay dos fuentes que no coinciden —el
+  // detalle en UI (5.000.000 UI ≈ US$ 825.000) y la tabla en dólares de la compañía (USD
+  // 840.000 por persona)—, y esto es lo que lee el cliente. Se completa cuando esté
+  // confirmado cuál manda; mientras tanto la cotización muestra solo el nivel.
+  ['BSE', '40', ''],
   ['BSE', '30', ''],
   ['BSE', '20', ''],
   ['BSE', '10', ''],
 
-  // PORTO: límite combinado por nivel. Falta confirmar el de catástrofe de cada uno.
-  ['PORTO', 'Nivel 4', 'Límite combinado (materiales + personales): USD 800.000'],
-  ['PORTO', 'Nivel 3', 'Límite combinado (materiales + personales): USD 600.000'],
-  ['PORTO', 'Nivel 2', 'Límite combinado (materiales + personales): USD 400.000'],
-  ['PORTO', 'Nivel 1', 'Límite combinado (materiales + personales): USD 200.000'],
+  // PORTO: tal cual los publica su propio selector "Nivel de RC" (de ahí también que el
+  // nivel 4 sean USD 800.000 y no los 825.000 de la conversión desde UI).
+  ['PORTO', 'Nivel 4', 'Límite combinado (materiales + personales): USD 800.000●Límite por catástrofe (agregado): USD 2.400.000'],
+  ['PORTO', 'Nivel 3', 'Límite combinado (materiales + personales): USD 600.000●Límite por catástrofe (agregado): USD 1.800.000'],
+  ['PORTO', 'Nivel 2', 'Límite combinado (materiales + personales): USD 400.000●Límite por catástrofe (agregado): USD 1.200.000'],
+  ['PORTO', 'Nivel 1', 'Límite combinado (materiales + personales): USD 200.000●Límite por catástrofe (agregado): USD 600.000'],
 
   // SANCOR: dos límites, con el importe que se haya elegido.
   ['SANCOR', 'US$ 1.000.000', 'Límite por personas (muerte/lesión): US$ 1.000.000●Límite daños materiales: US$ 1.000.000'],
@@ -59,6 +63,18 @@ const FILAS = [
   // SURA: límite combinado, según el plan.
   ['SURA', 'US$ 1.000.000', 'Límite combinado (materiales + personales): US$ 1.000.000'],
   ['SURA', 'US$ 1.500.000', 'Límite combinado (materiales + personales): US$ 1.500.000'],
+]
+
+// Valores globales (Grupo = "Configuracion", sin compañía) con los que se convierte a
+// dólares lo que está en Unidades Indexadas. BSE publica sus límites de RC en UI, que es
+// lo que figura en la póliza: el equivalente en dólares se calcula, no se escribe a mano,
+// porque la UI se ajusta todos los meses y el dólar todos los días.
+//
+// El dólar se crea vacío a propósito: preferimos mostrar solo la UI a mostrar una
+// conversión hecha con un valor inventado por nosotros.
+const CONFIG = [
+  ['Valor UI en pesos', '6.24', 'Cuánto vale una Unidad Indexada en pesos uruguayos. Se usa para convertir a dólares los límites de RC que las compañías publican en UI (ver PANEL, Grupo RC).'],
+  ['Dólar en pesos', '', 'Cotización del dólar en pesos uruguayos. Sin este valor, los límites en UI se muestran solo en UI, sin su equivalente aproximado en dólares.'],
 ]
 
 async function gql(query, variables) {
@@ -110,6 +126,11 @@ const valores = (compania, texto) =>
     [COL.texto]: texto,
   })
 
+const configFaltante = CONFIG.filter(
+  ([nombre]) => !existentes.some((e) => e.grupo === 'Configuracion' && e.name === nombre)
+)
+for (const [nombre] of configFaltante) console.log(`  crear      configuración · ${nombre}`)
+
 if (!APLICAR) {
   console.log()
   console.log('Simulación. Para aplicarlo: node scripts/mon-rc-panel.mjs --apply')
@@ -131,6 +152,24 @@ if (!APLICAR) {
       { boardId: PANEL_BOARD, itemId: a.id, values: valores(a.compania, a.texto) }
     )
     console.log(`actualizada ${a.compania} · ${a.nivel}`)
+  }
+  for (const [nombre, valor, descripcion] of configFaltante) {
+    await gql(
+      `mutation($boardId: ID!, $groupId: String!, $name: String!, $values: JSON!) {
+         create_item(board_id: $boardId, group_id: $groupId, item_name: $name, column_values: $values) { id }
+       }`,
+      {
+        boardId: PANEL_BOARD,
+        groupId: PANEL_GRUPO,
+        name: nombre,
+        values: JSON.stringify({
+          [COL.grupo]: { label: 'Configuracion' },
+          numeric_mm5fmjh0: valor,
+          text_mm5fmqdw: descripcion,
+        }),
+      }
+    )
+    console.log(`creada     configuración · ${nombre}`)
   }
   console.log()
   console.log('listo')
