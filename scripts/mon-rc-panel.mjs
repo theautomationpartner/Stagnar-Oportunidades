@@ -73,7 +73,7 @@ const FILAS = [
 // El dólar se crea vacío a propósito: preferimos mostrar solo la UI a mostrar una
 // conversión hecha con un valor inventado por nosotros.
 const CONFIG = [
-  ['Valor UI en pesos', '6.24', 'Cuánto vale una Unidad Indexada en pesos uruguayos. Se usa para convertir a dólares los límites de RC que las compañías publican en UI (ver PANEL, Grupo RC).'],
+  ['Valor UI en pesos', '6.64', 'Cuánto vale una Unidad Indexada en pesos uruguayos. Se usa para convertir a dólares los límites de RC que las compañías publican en UI (ver PANEL, Grupo RC).'],
   ['Dólar en pesos', '', 'Cotización del dólar en pesos uruguayos. Sin este valor, los límites en UI se muestran solo en UI, sin su equivalente aproximado en dólares.'],
 ]
 
