@@ -1349,6 +1349,19 @@ export async function setActivityEstado(activityId, estado) {
   return setActivityColumnValues(activityId, { [ACTIVITY_COLUMN_IDS.estado]: estado })
 }
 
+// Reactivar la actividad de Cotización al (re)cotizar: además de cambiar el Estado,
+// actualiza la Fecha a hoy — si no, con una oportunidad vieja podría nacer "vencida" de
+// movida en cuanto arranquen las automatizaciones de vencimiento. Distinto de
+// setActivityEstado (que no toca la Fecha): ese sirve para Completado, o para el "arranca
+// el turno" de una actividad que YA tenía su propia fecha planificada (ej. Seguimiento a
+// +3 días) y no hay que pisarla.
+export async function reactivarActividad(activityId, estado = 'Pendiente') {
+  return setActivityColumnValues(activityId, {
+    [ACTIVITY_COLUMN_IDS.estado]: estado,
+    [ACTIVITY_COLUMN_IDS.fecha]: fechaMonday(new Date()),
+  })
+}
+
 // Archivo/Link de una actividad de Inspección/Autorización — opcionales, ver
 // RequisitoPreviaPanel (pantalla de espera). uploadFileToColumn ya es genérica por
 // itemId/columnId (no hace falta boardId), sirve tal cual para un ítem de Actividades.
@@ -1368,11 +1381,14 @@ function fechaMonday(date) {
   return `${y}-${m}-${d}`
 }
 
-// Al crear una oportunidad: 1) Cotización a {Nombre}, Completada, con la fecha de hoy.
-// 2) Seguimiento a {Nombre}, Pendiente, programada a 3 días. Las dos asignadas al mismo
-// responsable de la oportunidad. `nombreCompleto` va en el nombre del ítem (no alcanza
-// con la conexión a Oportunidades para identificarla de un vistazo en el tablero de
-// Actividades, ver el resto del board). No bloqueante: si falla, se loguea y sigue — la
+// Al crear una oportunidad: 1) Cotización a {Nombre}, Pendiente, con la fecha de hoy —
+// arranca pendiente y no Completada: recién se marca así cuando la cotización automática
+// termina bien de verdad (ver el polling de "Cotizar" en OpportunityDetail.jsx), no con
+// solo crear la oportunidad. 2) Seguimiento a {Nombre}, Pendiente, programada a 3 días
+// (se completa cuando el cliente acepta una propuesta, ver handleConfirmarPaso3). Las
+// dos asignadas al mismo responsable de la oportunidad. `nombreCompleto` va en el nombre
+// del ítem (no alcanza con la conexión a Oportunidades para identificarla de un vistazo
+// en el tablero de Actividades). No bloqueante: si falla, se loguea y sigue — la
 // oportunidad ya se guardó bien, no tiene sentido perderla por esto.
 export async function crearActividadesIniciales(opportunityId, asignadoId, nombreCompleto) {
   const hoy = new Date()
@@ -1392,7 +1408,7 @@ export async function crearActividadesIniciales(opportunityId, asignadoId, nombr
       createActivityItem(`Cotización a ${nombreCompleto}`, {
         ...base,
         [ACTIVITY_COLUMN_IDS.tipo]: 'Cotización',
-        [ACTIVITY_COLUMN_IDS.estado]: 'Completado',
+        [ACTIVITY_COLUMN_IDS.estado]: 'Pendiente',
         [ACTIVITY_COLUMN_IDS.fecha]: fechaMonday(hoy),
       }),
       createActivityItem(`Seguimiento a ${nombreCompleto}`, {

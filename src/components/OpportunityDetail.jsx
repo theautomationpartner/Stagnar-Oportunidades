@@ -37,6 +37,7 @@ import {
   editarActividadRequisito,
   setActivityEstado,
   setActivityLink,
+  reactivarActividad,
   ACTIVITY_COLUMN_IDS,
 } from '../services/mondayApi'
 import { mapOpportunityItem } from '../services/opportunityMapper'
@@ -471,6 +472,12 @@ export default function OpportunityDetail({
           setSelectedIds(new Set(raws.filter((r) => r.incluirPropuesta).map((r) => r.id)))
           setPolling(false)
           setActiveStep('comparar')
+          // La cotización (o recotización) terminó bien de verdad — recién acá se
+          // completa la actividad de Cotización (ver marcarActividadInicial), no al
+          // crear la oportunidad. Y le llega el turno a Seguimiento (En Proceso): desde
+          // acá hasta que el cliente acepta es lo que hay que hacer.
+          marcarActividadInicial('Cotización', 'Completado')
+          marcarActividadInicial('Seguimiento', 'En Proceso')
         } else if (estadoCotizacion === 'Error') {
           setPolling(false)
           setMarkError(
@@ -945,6 +952,11 @@ export default function OpportunityDetail({
       cotizarPollStartRef.current = Date.now()
       cotizarProgresoVistoRef.current = 0
       setPolling(true)
+      // Le llega el turno a Cotización: En Proceso mientras el robot corre (si venía
+      // Completada de una vuelta anterior, vuelve acá) — recién se completa de nuevo si
+      // ESTA corrida termina bien (ver el polling más abajo); si falla, queda en
+      // Proceso para avisar más tarde, no hace falta nada extra acá para ese caso.
+      marcarActividadInicial('Cotización', 'En Proceso', { refrescarFecha: true })
     } catch (err) {
       setMarkError(err.message)
     } finally {
@@ -1170,6 +1182,27 @@ export default function OpportunityDetail({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeStep, opportunityId, requisitoResuelto])
 
+  // Cotización/Seguimiento (creadas al alta, ver crearActividadesIniciales en
+  // mondayApi.js) no viven en `actividades` de acá abajo (eso solo se carga en el paso
+  // Emitir) — se resuelven con su propia consulta liviana. Silencioso si falla o no
+  // encuentra nada: es un efecto secundario de cotizar/confirmar, no bloquea el flujo
+  // principal (mismo criterio que crearActividadesIniciales).
+  // `refrescarFecha`: solo para Cotización al (re)cotizar — esa Fecha SÍ tiene que
+  // quedar en hoy en cada vuelta (ver reactivarActividad). Seguimiento ya tiene su
+  // propia fecha planificada (+3 días desde el alta) y no hay que tocarla solo porque
+  // le llegó el turno.
+  const marcarActividadInicial = async (tipo, estado, { refrescarFecha = false } = {}) => {
+    try {
+      const lista = await fetchOpportunityActivities(opportunityId)
+      const actividad = lista.find((a) => a.tipo === tipo)
+      if (!actividad) return
+      if (refrescarFecha) await reactivarActividad(actividad.id, estado)
+      else await setActivityEstado(actividad.id, estado)
+    } catch (err) {
+      console.error(`No se pudo actualizar la actividad de ${tipo}:`, err)
+    }
+  }
+
   // Escribe Estado Oportunidad en monday Y en el estado local (evita repetir el mismo
   // patch de columna en cada handler de abajo).
   const patchEstadoOportunidad = async (nuevoEstado) => {
@@ -1367,6 +1400,9 @@ export default function OpportunityDetail({
         ),
       }))
       setActiveStep('emitir')
+      // El cliente aceptó una propuesta acá — es el momento en que se completa el
+      // Seguimiento (ver marcarActividadInicial), no antes.
+      marcarActividadInicial('Seguimiento', 'Completado')
     } catch (err) {
       setConfirmPaso3Error(err.message)
     } finally {
