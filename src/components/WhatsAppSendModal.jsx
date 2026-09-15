@@ -34,6 +34,8 @@ export default function WhatsAppSendModal({
   opportunity,
   images,
   onClose,
+  onSendStart,
+  onSendFailed,
   onSent,
   sendPolling,
   envioErrorDetail,
@@ -70,12 +72,30 @@ export default function WhatsAppSendModal({
   const handleSend = async () => {
     setSending(true)
     setError(null)
+    // El orden importa: el escenario de Make responde recién cuando terminó de mandar el
+    // WhatsApp, así que todo lo que se hacía "después del POST" llegaba tarde. La pantalla
+    // de avance y el estado "Enviando" van ANTES de llamarlo (ver
+    // handleWhatsAppSendStart): si no, el avance aparecía cuando ya estaba enviado y el
+    // "Enviando" pisaba el "Enviado" que Make acababa de dejar.
+    let estadoAnterior
+    let enviado = false
     try {
-      await sendQuotesToWhatsApp({ phone, opportunity, images, formato })
-      await onSent?.(images)
+      estadoAnterior = await onSendStart?.()
       setSubmitted(true)
+      await sendQuotesToWhatsApp({ phone, opportunity, images, formato })
+      enviado = true
+      await onSent?.(images)
     } catch (err) {
-      setError(err.message)
+      // Si el POST llegó a salir, el WhatsApp puede haberse mandado igual: lo que falló es
+      // lo de después (marcar "Incluir Propuesta"). Volver atrás el estado ahí sería
+      // borrar un envío real, así que solo se desanda cuando el envío nunca arrancó.
+      if (enviado) {
+        console.warn('El envío salió, pero falló un paso posterior', err)
+      } else {
+        setError(err.message)
+        setSubmitted(false)
+        await onSendFailed?.(estadoAnterior)
+      }
     } finally {
       setSending(false)
     }

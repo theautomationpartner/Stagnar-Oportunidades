@@ -993,6 +993,46 @@ export default function OpportunityDetail({
     }
   }
 
+  // Se llama ANTES de postear a Make, no después. El webhook de Make responde recién
+  // cuando el escenario terminó —ya mandó el WhatsApp y ya dejó Estado Envío en
+  // "Enviado"—, así que marcar "Enviando" al volver del POST pisaba ese estado final: la
+  // oportunidad volvía sola a "Enviando" y el polling se quedaba esperando para siempre
+  // un cambio que Make ya había hecho. Además la pantalla de avance recién aparecía
+  // cuando el envío ya había terminado, que es justo cuando ya no sirve.
+  //
+  // Devuelve el estado que había, para poder volver atrás si el POST falla.
+  const handleWhatsAppSendStart = async () => {
+    onOpportunityAction?.()
+    setEnvioErrorDetail(null)
+    const anterior = textOf(item?.column_values ?? [], ESTADO_ENVIO_COLUMN_ID)
+    await setSimpleColumnValue(opportunityId, ESTADO_ENVIO_COLUMN_ID, 'Enviando')
+    setItem((prev) => ({
+      ...prev,
+      column_values: prev.column_values.map((cv) =>
+        cv.id === ESTADO_ENVIO_COLUMN_ID ? { ...cv, text: 'Enviando' } : cv
+      ),
+    }))
+    setSendPolling(true)
+    return anterior
+  }
+
+  // El POST no salió: dejar la oportunidad marcada como "Enviando" sería mentir sobre algo
+  // que nunca arrancó, y el polling quedaría girando al pedo.
+  const handleWhatsAppSendFailed = async (anterior) => {
+    setSendPolling(false)
+    setItem((prev) => ({
+      ...prev,
+      column_values: prev.column_values.map((cv) =>
+        cv.id === ESTADO_ENVIO_COLUMN_ID ? { ...cv, text: anterior ?? '' } : cv
+      ),
+    }))
+    try {
+      await setSimpleColumnValue(opportunityId, ESTADO_ENVIO_COLUMN_ID, anterior ?? '')
+    } catch (err) {
+      console.warn('No se pudo restablecer Estado Envío', err)
+    }
+  }
+
   // Marca en monday las cotizaciones recién enviadas por WhatsApp como "Incluir Propuesta",
   // para que el paso Confirmar pueda listarlas como "enviadas" de forma persistente.
   const handleWhatsAppSent = async (sentEntries) => {
@@ -1010,19 +1050,6 @@ export default function OpportunityDetail({
       )
     }
 
-    // El envío en sí lo procesa el escenario de Make.com (ver services/makeWebhook.js);
-    // acá solo dejamos registrado en monday que arrancó ("Enviando") y prendemos el
-    // polling en vivo de color_mm4wr1t4 para reflejar cuando Make lo marque
-    // Enviado/Error — mismo patrón que "Cotizar" con Estado Cotización.
-    setEnvioErrorDetail(null)
-    await setSimpleColumnValue(opportunityId, ESTADO_ENVIO_COLUMN_ID, 'Enviando')
-    setItem((prev) => ({
-      ...prev,
-      column_values: prev.column_values.map((cv) =>
-        cv.id === ESTADO_ENVIO_COLUMN_ID ? { ...cv, text: 'Enviando' } : cv
-      ),
-    }))
-    setSendPolling(true)
     // A pedido: el paso pasa a "Confirmar" recién cuando el polling de abajo confirma
     // que Estado Envío llegó de verdad a "Enviado" — no acá (apenas se acepta el envío,
     // "Enviando" todavía). Antes se cambiaba de una en este punto y el modal de
@@ -2064,6 +2091,8 @@ export default function OpportunityDetail({
           opportunity={opportunity}
           images={waModalImages}
           onClose={() => setWaModalImages(null)}
+          onSendStart={handleWhatsAppSendStart}
+          onSendFailed={handleWhatsAppSendFailed}
           onSent={handleWhatsAppSent}
           sendPolling={sendPolling}
           envioErrorDetail={envioErrorDetail}
