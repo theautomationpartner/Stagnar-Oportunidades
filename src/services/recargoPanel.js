@@ -72,6 +72,36 @@ function buildIncluyeLookup(items) {
   return { porCobertura, porCompania }
 }
 
+// Textos de Responsabilidad Civil (Grupo = "RC"), los que ve el cliente en la cotización
+// que se le manda. La clave es el MISMO valor de RC que muestra la app: el nivel en BSE
+// ("40") y PORTO ("Nivel 4"), el importe elegido en SANCOR ("US$ 1.000.000") y, en SURA,
+// el que le corresponde a su cobertura (ver rcPorCompania.js). Así una sola tabla sirve
+// para las cuatro, sin un caso especial por compañía.
+//
+// Vive en PANEL y no en el código porque son valores comerciales que cambian sin avisar,
+// y el cliente los edita solo. Las viñetas se separan con "●", igual que los textos
+// INCLUYE.
+function buildRcLookup(items) {
+  const porCompania = {}
+
+  for (const item of items) {
+    const cv = item.column_values
+    if (grupoOf(cv) !== 'RC') continue
+
+    const compania = textOf(cv, 'dropdown_mm52feqr')
+    // La clave es el NOMBRE de la fila, igual que en las filas de Configuración: el
+    // nivel tal cual lo muestra la app ("40", "Nivel 4", "US$ 1.000.000").
+    const nivel = (item.name ?? '').trim()
+    const texto = textOf(cv, 'text_mm5f1wnh')
+    if (!compania || !nivel) continue
+
+    if (!porCompania[compania]) porCompania[compania] = {}
+    porCompania[compania][nivel] = texto
+  }
+
+  return porCompania
+}
+
 // Valores de configuración sueltos (Grupo = "Configuracion"): años mínimos de las
 // viñetas y precios de opcionales, todos en la misma columna `numeric_mm5fmjh0` — se
 // distinguen por el NOMBRE del ítem, no por columna.
@@ -107,6 +137,7 @@ export async function fetchPanelData() {
   return {
     recargoLookup: buildRecargoLookup(items),
     incluyeLookup: buildIncluyeLookup(items),
+    rcLookup: buildRcLookup(items),
     repuestosOriginalesMinYear: configuracion.globales['Año mínimo Repuestos Originales'] ?? null,
     // Los siguientes 2 son específicos de PORTO (ver pricingEngine.js#buildIncluyeBullets):
     // año mínimo para la viñeta "REPOSICIÓN 0KM EL PRIMER AÑO DE EMPADRONADO", y año

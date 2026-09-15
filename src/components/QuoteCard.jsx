@@ -12,7 +12,7 @@ import { autoExtraOpciones, isQuoteSelectable, opcionalesDeCompania } from '../s
 import { accentForCompania, selectionForCompania } from '../services/companyColors'
 import CompanyMark from './CompanyMark'
 import { coberturaGroupOf, coberturaParaMostrar, FAMILIA_LABEL } from '../services/coberturaGroups'
-import { opcionesRc } from '../services/rcPorCompania'
+import { opcionesRc, rcEsEditable } from '../services/rcPorCompania'
 import './QuoteCard.css'
 
 const BSE_DEDUCIBLE_OPTIONS = ['0.5', '1', '1.5', '2', '2.5', '3']
@@ -43,10 +43,14 @@ const FIXED_FIELDS = [
 // cliente), y el deducible/edad específico de cada compañía es otra selección de nivel
 // de cobertura. Ver /logica-monday-vibe.md.
 function fieldsForRaw(raw, rcOptions) {
-  const common = [
-    { key: 'bonif', label: 'Bonificación (%)', kind: 'number' },
-    { key: 'rc', label: 'RC', kind: 'select', options: opcionesRc(raw.compania, rcOptions) },
-  ]
+  const common = [{ key: 'bonif', label: 'Bonificación (%)', kind: 'number' }]
+
+  // SURA no elige RC: se lo fija el plan (Total = US$ 1.000.000, Total Plus = US$
+  // 1.500.000), así que ofrecerlo como desplegable invitaría a cambiar algo que la
+  // compañía no deja cambiar. Se sigue viendo en la cotización, no se puede tocar.
+  if (rcEsEditable(raw.compania)) {
+    common.push({ key: 'rc', label: 'RC', kind: 'select', options: opcionesRc(raw.compania, rcOptions) })
+  }
 
   if (raw.compania === 'BSE') {
     common.push(

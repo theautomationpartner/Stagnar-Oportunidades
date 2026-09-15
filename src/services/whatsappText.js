@@ -24,6 +24,15 @@ function lineaOpcional(opc) {
   return `• ${opc.label}: ${opc.desde ? 'desde ' : '+ '}${formatMoney(opc.precio)}`
 }
 
+// La Responsabilidad Civil con sus límites, que es lo que al cliente le dice algo: "40"
+// o "Nivel 4" solos no significan nada afuera de la compañía. Los límites salen de PANEL
+// (ver pricingEngine.js#rcBullets); si ese nivel todavía no los tiene cargados, queda la
+// línea de siempre en vez de un hueco.
+function rcLineas(quote) {
+  if (quote.rcDetalle?.length) return ['*Responsabilidad Civil*', ...quote.rcDetalle.map((l) => `• ${l}`)]
+  return quote.rc ? [`RC: hasta ${quote.rc}`] : []
+}
+
 export function renderQuoteText(opportunity, raw, quote) {
   if (quote.blocked) return ''
 
@@ -51,7 +60,7 @@ export function renderQuoteText(opportunity, raw, quote) {
   const plan = [
     `*${raw.compania}${cobertura ? ` — ${cobertura}` : ''}*`,
     subtitulo,
-    quote.rc && `RC: hasta ${quote.rc}`,
+    ...rcLineas(quote),
     quote.deducibleDisplay && quote.deducibleDisplay !== '—' && `Deducible: ${quote.deducibleDisplay}`,
   ].filter(Boolean)
   bloques.push(plan.join('\n'))

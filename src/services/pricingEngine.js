@@ -357,6 +357,16 @@ function buildIncluyeBullets(eff, panelContext) {
   return bullets.map(nombreComercialCobertura)
 }
 
+// Las viñetas de RC salen de PANEL con la misma convención que los textos INCLUYE: un
+// solo campo de texto con "●" entre viñetas.
+function rcBullets(eff, panelContext) {
+  const texto = panelContext?.rcLookup?.[eff.compania]?.[eff.rc]
+  return (texto ?? '')
+    .split('●')
+    .map((s) => s.trim())
+    .filter(Boolean)
+}
+
 function num(value, fallback = 0) {
   const n = parseFloat(value)
   return Number.isFinite(n) ? n : fallback
@@ -598,6 +608,10 @@ export function computeQuote(raw, overrides = {}, panelContext = {}) {
       adicionales,
     },
     rc: eff.rc || '',
+    // Lo que se le muestra al cliente sobre la Responsabilidad Civil: los límites del
+    // nivel elegido, en viñetas (ver PANEL, Grupo "RC"). Vacío si ese nivel todavía no
+    // tiene texto cargado — preferible a inventar límites en una cotización.
+    rcDetalle: rcBullets(eff, panelContext),
   }
 }
 

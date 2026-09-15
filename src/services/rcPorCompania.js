@@ -6,9 +6,8 @@
 // importes. Elegir el RC no cambia el precio — es el nivel de cobertura que se le muestra
 // al cliente (ver quote.rc).
 //
-// SURA queda deliberadamente afuera: su RC es fijo por plan (Total / Total Plus) y los
-// valores todavía no están confirmados, así que sigue con la lista del tablero hasta que
-// lo estén.
+// SURA no elige: su RC sale de la cobertura contratada (Total / Total Plus), así que no
+// aparece como selector sino como un valor ya resuelto. Ver RC_SURA_POR_COBERTURA.
 export const RC_POR_COMPANIA = {
   BSE: {
     porDefecto: '40',
@@ -40,8 +39,27 @@ export function opcionesRc(compania, opcionesDelTablero = []) {
 // El RC con el que arranca una cotización. El dato del portal puede venir vacío o con una
 // etiqueta vieja que no es de esta compañía ("Máximo" en una de BSE): en los dos casos
 // vale más el valor acordado por compañía que arrastrar algo que no se puede elegir.
-export function rcPorDefecto({ compania, rc } = {}) {
+// SURA: el RC no se elige, lo define el plan. Solo sus coberturas totales tienen un valor
+// acordado; las parciales no, así que ahí se respeta lo que haya traído el portal.
+const RC_SURA_POR_COBERTURA = {
+  TOTAL: 'US$ 1.000.000',
+  'TOTAL PLUS': 'US$ 1.500.000',
+}
+
+export function rcDeSura(cobertura) {
+  return RC_SURA_POR_COBERTURA[(cobertura ?? '').trim().toUpperCase()] ?? null
+}
+
+export function rcPorDefecto({ compania, cobertura, rc } = {}) {
+  if (compania === 'SURA') return rcDeSura(cobertura) ?? rc
+
   const config = RC_POR_COMPANIA[compania]
   if (!config) return rc
   return config.opciones.includes(rc) ? rc : config.porDefecto
+}
+
+// SURA no lleva selector de RC (lo fija el plan): la tarjeta lo muestra pero no lo ofrece
+// para cambiar.
+export function rcEsEditable(compania) {
+  return compania !== 'SURA'
 }
