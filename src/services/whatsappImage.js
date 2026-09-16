@@ -374,9 +374,6 @@ function drawVehicleCard(ctx, opportunity, raw, quote, y) {
   // Fijo: el renglón de la descripción se reserva aunque el modelo no tenga (los nombres
   // de Autodata sin coma), así todas las cotizaciones tienen la misma geometría acá.
   const headH = 28 + 30 + 22 + 4
-  // Tantas filas como tenga la columna más larga: 2 con los límites de RC abajo, 3 cuando
-  // el RC no está cargado y vuelve a la grilla.
-  const gridH = (rcLineas.length ? 2 : 3) * 44 + 16
   // A pedido: el campo "RC" mostraba la opción elegida ("Nivel 4", "40"), que afuera de la
   // compañía no le dice nada al cliente. Los límites van en una tira aparte, a todo el
   // ancho: en media columna una línea como "Límite por personas (muerte/lesión):
@@ -389,6 +386,10 @@ function drawVehicleCard(ctx, opportunity, raw, quote, y) {
     wrapLines(ctx, `• ${linea}`, w - 96, `13px ${FONT}`)
   )
   const rcH = rcLineas.length ? 24 + rcLineas.length * 17 + 8 : 0
+
+  // Tantas filas como tenga la columna más larga: 2 con los límites de RC abajo, 3 cuando
+  // el RC no está cargado y vuelve a la grilla.
+  const gridH = (rcLineas.length ? 2 : 3) * 44 + 16
   const h = headH + 16 + gridH + 8 + rcH
   card(ctx, x, y, w, h, { radius: 16 })
 
