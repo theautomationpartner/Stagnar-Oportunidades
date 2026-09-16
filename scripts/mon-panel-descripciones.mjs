@@ -23,7 +23,13 @@ const env = Object.fromEntries(
 
 const APLICAR = process.argv.includes('--apply')
 const PANEL_BOARD = '18421072511'
-const COL = { grupo: 'color_mm5fdknw', compania: 'dropdown_mm52feqr', valor: 'numeric_mm5fmjh0', descripcion: 'text_mm5fmqdw' }
+const COL = {
+  grupo: 'color_mm5fdknw',
+  compania: 'dropdown_mm52feqr',
+  cobertura: 'dropdown_mm5frxag',
+  valor: 'numeric_mm5fmjh0',
+  descripcion: 'text_mm5fmqdw',
+}
 
 // Cómo se escribe el precio de un opcional dentro de un texto, en vez de a mano.
 const comoUsarPrecio = (nombre) =>
@@ -62,6 +68,36 @@ const DESCRIPCIONES = {
     'Para cambiarlo: poné el año nuevo en la columna Valor.',
 }
 
+// Las filas de RC (Grupo = "RC") se documentan solas: el texto de cada una es lo que lee
+// el cliente, así que quien lo edita tiene que saber ahí mismo qué puede tocar y qué no.
+const QUE_SE_PUEDE = (nivel) =>
+  `Podés cambiar la redacción, los importes y agregar o sacar viñetas (se separan con ●). ` +
+  `Lo que NO hay que cambiar es el nombre de la fila ("${nivel}"): es lo que une esta fila con la opción de RC que se elige en la app. ` +
+  `Tampoco la compañía ni el Grupo. Si dejás el texto vacío, la cotización muestra solo el nivel, sin límites.`
+
+const CON_TOKEN_UI =
+  'Los importes van en UI con la forma {UI 5000000} y la app los muestra como "5.000.000 UI ≈ US$ 825.050": ' +
+  'el dólar lo calcula con los valores globales "Valor UI en pesos" y "Dólar en pesos". ' +
+  'Si escribís el dólar a mano deja de actualizarse, y cuando cambie la cotización el cliente va a seguir leyendo el número viejo.'
+
+const CON_IMPORTE_FIJO =
+  'Los importes están escritos directo porque la compañía los publica en dólares. ' +
+  'Si en algún momento los publica en UI, se escriben como {UI 5000000} y la app los convierte sola ' +
+  '(usa los valores globales "Valor UI en pesos" y "Dólar en pesos").'
+
+function descripcionRc(compania, nivel, cobertura) {
+  const queEs =
+    compania === 'SURA'
+      ? `Lo que ve el cliente sobre la Responsabilidad Civil cuando la cobertura es ${cobertura || 'la de esta fila'}. ` +
+        'En SURA el RC no se elige: lo fija el plan, y por eso el vendedor no ve un desplegable. ' +
+        'La columna Cobertura está para saber de un vistazo a qué plan corresponde; lo que une la fila con la cotización es el nombre.'
+      : `Lo que ve el cliente sobre la Responsabilidad Civil cuando esta cotización tiene el RC "${nivel}". ` +
+        'El vendedor elige ese nivel en la tarjeta de la cotización, y elegirlo no cambia el precio.'
+
+  const importes = compania === 'BSE' ? CON_TOKEN_UI : CON_IMPORTE_FIJO
+  return `${queEs} ${importes} ${QUE_SE_PUEDE(nivel)}`
+}
+
 async function gql(query, variables) {
   const r = await fetch('https://api.monday.com/v2', {
     method: 'POST',
@@ -74,28 +110,35 @@ async function gql(query, variables) {
 }
 
 const data = await gql(
-  `{ boards(ids: ${PANEL_BOARD}) { items_page(limit: 300) { items { id name column_values(ids: ["${COL.grupo}","${COL.compania}","${COL.valor}","${COL.descripcion}"]) { id text } } } } }`
+  `{ boards(ids: ${PANEL_BOARD}) { items_page(limit: 300) { items { id name column_values(ids: ["${COL.grupo}","${COL.compania}","${COL.cobertura}","${COL.valor}","${COL.descripcion}"]) { id text } } } } }`
 )
 
 const cambios = []
 for (const item of data.boards[0].items_page.items) {
   const cv = Object.fromEntries(item.column_values.map((c) => [c.id, c.text || '']))
-  if (cv[COL.grupo] !== 'Configuracion') continue
+  const grupo = cv[COL.grupo]
+  if (grupo !== 'Configuracion' && grupo !== 'RC') continue
 
   const nombre = item.name.trim()
   const compania = cv[COL.compania]
-  // Las filas con compañía son precios de opcionales; las globales tienen texto propio.
-  const nueva = compania
-    ? `Precio del opcional "${nombre}" para ${compania}. ${DONDE_PRECIO} ${comoUsarPrecio(nombre)} ` +
+  let nueva
+  if (grupo === 'RC') {
+    nueva = descripcionRc(compania, nombre, cv[COL.cobertura])
+  } else if (compania) {
+    // Con compañía son precios de opcionales; las globales tienen texto propio.
+    nueva =
+      `Precio del opcional "${nombre}" para ${compania}. ${DONDE_PRECIO} ${comoUsarPrecio(nombre)} ` +
       'Para cambiarlo: poné el precio nuevo en la columna Valor.'
-    : DESCRIPCIONES[nombre]
+  } else {
+    nueva = DESCRIPCIONES[nombre]
+  }
 
   if (!nueva) {
     console.log(`  sin texto definido para "${nombre}" — se deja como está`)
     continue
   }
   if (cv[COL.descripcion] === nueva) continue
-  cambios.push({ id: item.id, etiqueta: (compania ? compania + ' · ' : 'global · ') + nombre, nueva })
+  cambios.push({ id: item.id, etiqueta: (grupo === 'RC' ? 'RC ' : '') + (compania ? compania + ' · ' : 'global · ') + nombre, nueva })
 }
 
 console.log(`${cambios.length} descripciones a escribir`)
