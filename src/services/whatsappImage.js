@@ -11,6 +11,7 @@
 import { formatMoney, modeloSinMarca } from './format'
 import { BRAND_COLORS } from './companyColors'
 import { coberturaGroupOf, coberturaParaMostrar, FAMILIA_LABEL, SUBTITULO_POR_FAMILIA } from './coberturaGroups'
+import { iconoUrlParaBeneficio } from './beneficiosIconos'
 // A pedido: logo del header desde logo-blanco-.png con el fondo blanco recortado.
 import stagnariLogo from '../assets/stagnari-logo-header.png'
 import stagnariLogoSimple from '../assets/stagnari-logo-simple.png'
@@ -374,7 +375,19 @@ function drawVehicleCard(ctx, opportunity, raw, quote, y) {
   // de Autodata sin coma), así todas las cotizaciones tienen la misma geometría acá.
   const headH = 28 + 30 + 22 + 4
   const gridH = 3 * 44 + 16
-  const h = headH + 16 + gridH + 8
+  // A pedido: el campo "RC" mostraba la opción elegida ("Nivel 4", "40"), que afuera de la
+  // compañía no le dice nada al cliente. Los límites van en una tira aparte, a todo el
+  // ancho: en media columna una línea como "Límite por personas (muerte/lesión):
+  // 5.000.000 UI ≈ US$ 825.050" se corta. Salen de PANEL (ver quote.rcDetalle).
+  //
+  // Si esa cobertura todavía no tiene límites cargados, la tira no existe y la tarjeta
+  // queda exactamente como antes — el alto de la imagen es fijo y todo lo que crece acá
+  // se lo termina sacando la tarjeta de beneficios, así que no se paga sin necesidad.
+  const rcLineas = (quote.rcDetalle ?? []).flatMap((linea) =>
+    wrapLines(ctx, `• ${linea}`, w - 96, `13px ${FONT}`)
+  )
+  const rcH = rcLineas.length ? 24 + rcLineas.length * 17 + 8 : 0
+  const h = headH + 16 + gridH + 8 + rcH
   card(ctx, x, y, w, h, { radius: 16 })
 
   // Ícono auto en círculo + nombre + pill año
@@ -412,7 +425,10 @@ function drawVehicleCard(ctx, opportunity, raw, quote, y) {
     { icon: iconCard, label: 'COMBUSTIBLE', value: raw.combustibleVehiculo || opportunity.combustible || '—' },
   ]
   const right = [
-    { icon: (c, cx, cy, s) => strokeShield(c, cx, cy, s * 0.8), label: 'RC', value: quote.rc ? `Hasta ${quote.rc}` : '—' },
+    // Sin límites cargados queda el nivel a secas, que es mejor que nada.
+    ...(rcLineas.length
+      ? []
+      : [{ icon: (c, cx, cy, s) => strokeShield(c, cx, cy, s * 0.8), label: 'RC', value: quote.rc ? `Hasta ${quote.rc}` : '—' }]),
     { icon: iconWallet, label: 'DEDUCIBLE', value: quote.deducibleDisplay || '—' },
   ]
   const drawCol = (items, cx) => {
@@ -427,6 +443,24 @@ function drawVehicleCard(ctx, opportunity, raw, quote, y) {
   }
   drawCol(left, x + 16)
   drawCol(right, colMid + 16)
+
+  if (rcLineas.length) {
+    const ry = gy + gridH + 2
+    ctx.strokeStyle = C.borde
+    ctx.lineWidth = 1
+    ctx.beginPath()
+    ctx.moveTo(x + 16, ry)
+    ctx.lineTo(x + w - 16, ry)
+    ctx.stroke()
+    strokeShield(ctx, x + 34, ry + 26, 20)
+    text(ctx, 'RESPONSABILIDAD CIVIL', x + 56, ry + 14, { size: 13, color: C.gris })
+    let ly = ry + 36
+    for (const linea of rcLineas) {
+      text(ctx, linea, x + 56, ly, { size: 13 })
+      ly += 17
+    }
+  }
+
   return y + h
 }
 
@@ -551,7 +585,7 @@ function drawPaymentOptions(ctx, quote, y) {
 
 // `fontSize` baja (15 → 12) cuando el contenido no entra en el alto fijo; `extraH`
 // estira la tarjeta para llenar el lienzo cuando sobra espacio (ver renderQuoteImageDataUrl).
-function drawBenefits(ctx, incluye, y, { fontSize = 15, extraH = 0 } = {}) {
+function drawBenefits(ctx, incluye, y, { fontSize = 15, extraH = 0, iconos } = {}) {
   const cols = Math.min(4, Math.max(1, incluye.length))
   const gap = 16
   const colW = (INNER - 32 - gap * (cols - 1)) / cols
@@ -573,7 +607,12 @@ function drawBenefits(ctx, incluye, y, { fontSize = 15, extraH = 0 } = {}) {
   rows.forEach((row, ri) => {
     row.forEach((item, ci) => {
       const x = PAD + 16 + ci * (colW + gap)
-      iconCircleCheck(ctx, x + 11, ry + 12, 10)
+      // A pedido: el ícono propio de cada beneficio (ver biblioteca_beneficios/ y
+      // beneficiosIconos.js) en lugar del tilde genérico — que queda de respaldo para
+      // los textos que ninguna regla reconoce.
+      const icono = iconos?.get(item)
+      if (icono) ctx.drawImage(icono, x, ry, 23, 23)
+      else iconCircleCheck(ctx, x + 11, ry + 12, 10)
       const lines = wrapLines(ctx, item, colW - 36, itemFont)
       lines.forEach((line, li) => text(ctx, line, x + 30, ry + 17 + li * lineH, { size: fontSize }))
       if (ci > 0) {
@@ -675,7 +714,11 @@ function drawContent(ctx, opportunity, raw, quote, canvasHeight, logos, layout =
   y = drawPriceBand(ctx, quote, y + 18 + g)
   y = drawPaymentOptions(ctx, quote, y + 22 + g)
   if (quote.incluye?.length) {
-    y = drawBenefits(ctx, quote.incluye, y + 18, { fontSize: layout.benefitsFont, extraH: layout.benefitsExtra })
+    y = drawBenefits(ctx, quote.incluye, y + 18, {
+      fontSize: layout.benefitsFont,
+      extraH: layout.benefitsExtra,
+      iconos: logos.beneficios,
+    })
   }
   // LOG-18: debajo de los beneficios y en su propio cuadro. Achica la letra junto con
   // ellos (misma pasada de ajuste) para no romper el alto fijo de la imagen.
@@ -705,7 +748,14 @@ function drawContent(ctx, opportunity, raw, quote, canvasHeight, logos, layout =
 // beneficios bajando su letra — o sea, se arreglaba la condición y se rompía lo mismo
 // que arregla EST-04. El alto sigue siendo el mismo para las 4 compañías: las que no
 // tienen condición reparten la holgura estirando la tarjeta de beneficios (benefitsExtra).
-const FIXED_HEIGHT = 1502
+// MON-05: +84 al sumar la tira de Responsabilidad Civil abajo de la tarjeta del
+// vehículo. Se dimensiona para el caso más largo (BSE, 3 límites: personas, materiales y
+// catástrofe = 24 + 3×17 + 8), no para el que hay cargado hoy. Si no se subiera, esos
+// píxeles se los sacaría la tarjeta de beneficios compactando su letra, que es
+// exactamente el síntoma que arregló EST-04: el mismo texto se veía de otro tamaño según
+// la compañía. Las coberturas con menos límites (o sin ninguno) reparten la holgura
+// estirando la tarjeta de beneficios, igual que ya pasa con la promo sin condición.
+const FIXED_HEIGHT = 1586
 
 // Dos pasadas: la primera sobre un canvas descartable para medir hasta dónde llega el
 // contenido (el nombre del vehículo y los beneficios varían de alto), la segunda sobre
@@ -719,7 +769,14 @@ export async function renderQuoteImageDataUrl(opportunity, raw, quote) {
     loadImage(stagnariLogoBlanco),
     loadImage(INSURER_LOGOS[key]),
   ])
-  const logos = { stagnari, simple, miniBlanco, blanco, insurer }
+  // Ícono por beneficio (texto → Image, ver beneficiosIconos.js). loadImage ya devuelve
+  // null para los que no matchean ninguna regla — ahí drawBenefits dibuja el tilde.
+  const beneficios = new Map(
+    await Promise.all(
+      (quote.incluye ?? []).map(async (texto) => [texto, await loadImage(iconoUrlParaBeneficio(texto))])
+    )
+  )
+  const logos = { stagnari, simple, miniBlanco, blanco, insurer, beneficios }
 
   const measureCanvas = document.createElement('canvas')
   measureCanvas.width = WIDTH
