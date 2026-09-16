@@ -374,7 +374,9 @@ function drawVehicleCard(ctx, opportunity, raw, quote, y) {
   // Fijo: el renglón de la descripción se reserva aunque el modelo no tenga (los nombres
   // de Autodata sin coma), así todas las cotizaciones tienen la misma geometría acá.
   const headH = 28 + 30 + 22 + 4
-  const gridH = 3 * 44 + 16
+  // Tantas filas como tenga la columna más larga: 2 con los límites de RC abajo, 3 cuando
+  // el RC no está cargado y vuelve a la grilla.
+  const gridH = (rcLineas.length ? 2 : 3) * 44 + 16
   // A pedido: el campo "RC" mostraba la opción elegida ("Nivel 4", "40"), que afuera de la
   // compañía no le dice nada al cliente. Los límites van en una tira aparte, a todo el
   // ancho: en media columna una línea como "Límite por personas (muerte/lesión):
@@ -419,18 +421,25 @@ function drawVehicleCard(ctx, opportunity, raw, quote, y) {
   ctx.stroke()
 
   const localidad = [opportunity.zonaCirculacion, opportunity.departamento].filter(Boolean).join(' · ') || '—'
+  // A pedido: 2 y 2 en vez de 3 y 1. Con el RC abajo, la columna derecha quedaba con un
+  // solo dato y la tarjeta se veía volcada para la izquierda.
   const left = [
     { icon: iconPin, label: 'LOCALIDAD', value: localidad },
     { icon: iconCar, label: 'USO', value: raw.uso || opportunity.uso || '—' },
-    { icon: iconCard, label: 'COMBUSTIBLE', value: raw.combustibleVehiculo || opportunity.combustible || '—' },
   ]
   const right = [
-    // Sin límites cargados queda el nivel a secas, que es mejor que nada.
-    ...(rcLineas.length
-      ? []
-      : [{ icon: (c, cx, cy, s) => strokeShield(c, cx, cy, s * 0.8), label: 'RC', value: quote.rc ? `Hasta ${quote.rc}` : '—' }]),
     { icon: iconWallet, label: 'DEDUCIBLE', value: quote.deducibleDisplay || '—' },
+    { icon: iconCard, label: 'COMBUSTIBLE', value: raw.combustibleVehiculo || opportunity.combustible || '—' },
   ]
+  // Sin límites cargados el RC vuelve a la grilla como tercera fila: el nivel a secas es
+  // mejor que nada.
+  if (!rcLineas.length) {
+    right.push({
+      icon: (c, cx, cy, s) => strokeShield(c, cx, cy, s * 0.8),
+      label: 'RC',
+      value: quote.rc ? `Hasta ${quote.rc}` : '—',
+    })
+  }
   const drawCol = (items, cx) => {
     let iy = gy + 26
     for (const it of items) {
@@ -748,14 +757,14 @@ function drawContent(ctx, opportunity, raw, quote, canvasHeight, logos, layout =
 // beneficios bajando su letra — o sea, se arreglaba la condición y se rompía lo mismo
 // que arregla EST-04. El alto sigue siendo el mismo para las 4 compañías: las que no
 // tienen condición reparten la holgura estirando la tarjeta de beneficios (benefitsExtra).
-// MON-05: +84 al sumar la tira de Responsabilidad Civil abajo de la tarjeta del
-// vehículo. Se dimensiona para el caso más largo (BSE, 3 límites: personas, materiales y
-// catástrofe = 24 + 3×17 + 8), no para el que hay cargado hoy. Si no se subiera, esos
-// píxeles se los sacaría la tarjeta de beneficios compactando su letra, que es
-// exactamente el síntoma que arregló EST-04: el mismo texto se veía de otro tamaño según
-// la compañía. Las coberturas con menos límites (o sin ninguno) reparten la holgura
-// estirando la tarjeta de beneficios, igual que ya pasa con la promo sin condición.
-const FIXED_HEIGHT = 1586
+// MON-05: +40 por la tira de Responsabilidad Civil abajo de la tarjeta del vehículo. Se
+// dimensiona para el caso más largo (BSE, 3 límites = 24 + 3×17 + 8 = 83px), pero la
+// grilla pasó a 2 filas en vez de 3 cuando esa tira existe (los datos se repartieron 2 y
+// 2), así que devuelve 44 y el neto son 39. Si no se subiera, esos píxeles se los sacaría
+// la tarjeta de beneficios compactando su letra, que es el síntoma que arregló EST-04: el
+// mismo texto en otro tamaño según la compañía. Las coberturas con menos límites reparten
+// la holgura estirando la tarjeta de beneficios, igual que la promo sin condición.
+const FIXED_HEIGHT = 1542
 
 // Dos pasadas: la primera sobre un canvas descartable para medir hasta dónde llega el
 // contenido (el nombre del vehículo y los beneficios varían de alto), la segunda sobre
