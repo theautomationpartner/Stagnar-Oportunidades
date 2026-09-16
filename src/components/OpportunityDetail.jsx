@@ -38,6 +38,7 @@ import {
   setActivityEstado,
   setActivityLink,
   reactivarActividad,
+  crearActividadEnvio,
   ACTIVITY_COLUMN_IDS,
 } from '../services/mondayApi'
 import { mapOpportunityItem } from '../services/opportunityMapper'
@@ -401,6 +402,13 @@ export default function OpportunityDetail({
   const pollFailsRef = useRef(0)
   const lastItemSigRef = useRef('')
   const stalledFlagsRef = useRef(null)
+  // Cada tick pide fetchOpportunityDetail sin esperar a que termine el anterior
+  // (setInterval de punta a punta) — si por un hiccup de red una respuesta VIEJA llega
+  // después de una más nueva (ej. tick de los 4s tarda 6s, el de los 8s responde en 1s),
+  // sin esto la vieja pisaba el estado recién puesto — es como "Enviado" volvía solo a
+  // "Enviando" un instante después de mandar por WhatsApp. Un número de secuencia: si ya
+  // arrancó un tick más nuevo para cuando esta respuesta vuelve, se descarta.
+  const tickSeqRef = useRef(0)
   const [pollStalled, setPollStalled] = useState(false)
 
   useEffect(() => {
@@ -410,6 +418,7 @@ export default function OpportunityDetail({
 
 
     const tick = async () => {
+      const miSeq = ++tickSeqRef.current
       let data
       try {
         data = await fetchOpportunityDetail(opportunityId)
@@ -428,6 +437,7 @@ export default function OpportunityDetail({
         return
       }
       if (cancelled || !data) return
+      if (miSeq !== tickSeqRef.current) return // llegó una respuesta más nueva primero — esta ya es vieja
       pollFailsRef.current = 0
 
       const sig =
@@ -1041,9 +1051,19 @@ export default function OpportunityDetail({
   }
 
   // Marca en monday las cotizaciones recién enviadas por WhatsApp como "Incluir Propuesta",
-  // para que el paso Confirmar pueda listarlas como "enviadas" de forma persistente.
+  // para que el paso Confirmar pueda listarlas como "enviadas" de forma persistente. Acá
+  // (y no en el polling de Estado Envío) es donde ya se tiene el detalle de qué se mandó
+  // (sentEntries trae el mismo `.texto` de cada tarjeta, ver openWhatsAppModalWith) —
+  // para cuando llegue este punto, sendQuotesToWhatsApp ya esperó a que Make terminara
+  // el escenario, así que el envío ya es un hecho confirmado, no falta esperar nada más.
   const handleWhatsAppSent = async (sentEntries) => {
     onOpportunityAction?.()
+    crearActividadEnvio(
+      opportunityId,
+      opportunity?.asignadoId,
+      opportunity?.clienteNombre,
+      sentEntries.map((e) => e.texto)
+    )
     const idsToMark = sentEntries.map((e) => e.raw.id).filter((id) => {
       const raw = rawQuotes.find((r) => r.id === id)
       return raw && !raw.incluirPropuesta

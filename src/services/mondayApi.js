@@ -1512,6 +1512,98 @@ export async function crearActividadesIniciales(opportunityId, asignadoId, nombr
   }
 }
 
+const CREATE_UPDATE_MUTATION = `
+  mutation CreateUpdate($body: String!, $itemId: ID!) {
+    create_update(body: $body, item_id: $itemId) {
+      id
+    }
+  }
+`
+
+// El body de un Update, y el content de un timeline item (ver más abajo), SÍ interpretan
+// HTML (confirmado contra la API real: <b>/<br>/<ul><li> se guardan y se renderizan) pero
+// NO el *negrita* al estilo WhatsApp que ya arma renderQuoteText (whatsappText.js,
+// LOG-17) — ahí queda como asteriscos literales, así que se convierte ese marcador acá.
+// Los saltos de línea (\n) SÍ hay que pasarlos a <br> a mano: confirmado que
+// create_update los convierte solo, pero create_timeline_item no — sin este paso el
+// texto queda todo pegado en una sola línea ahí.
+function textoWhatsappAHtml(texto) {
+  return texto.replace(/\*(.+?)\*/g, '<b>$1</b>').replace(/\n/g, '<br>')
+}
+
+// A pedido: el envío de cotización NO es un ítem del tablero Actividades — es una
+// Custom Activity NATIVA de monday (CRM), y tiene que quedar registrada directo en el
+// timeline de actividades de la propia Oportunidad (create_timeline_item), visible ahí
+// sin ir a otro tablero. El id de la Custom Activity es fijo (se define una sola vez en
+// el Centro de Actividades de la cuenta, nombrada — con ese typo y todo —
+// "Envió de cotización"); si se llega a borrar y recrear allá, hay que actualizar este id
+// (Query: `{ custom_activity { id name } }`).
+const CUSTOM_ACTIVITY_ENVIO_ID = 'effc4135-d758-4ff3-ab95-46c5334ed015'
+
+const CREATE_TIMELINE_ITEM_MUTATION = `
+  mutation CreateTimelineItem(
+    $itemId: ID!
+    $userId: Int
+    $title: String!
+    $timestamp: ISO8601DateTime!
+    $content: String
+    $customActivityId: String!
+  ) {
+    create_timeline_item(
+      item_id: $itemId
+      user_id: $userId
+      title: $title
+      timestamp: $timestamp
+      content: $content
+      custom_activity_id: $customActivityId
+    ) {
+      id
+    }
+  }
+`
+
+// `textos`: el mismo `.texto` (renderQuoteText) que ya arma cada tarjeta de "Comparar y
+// enviar" para cada propuesta que se mandó — si viene, queda como contenido de las dos
+// (compañía, cobertura, deducible, costo, cuotas). A pedido, quedan las DOS cosas: la
+// Custom Activity nativa en el timeline de la propia Oportunidad (se ve sin salir de
+// ahí) Y su propio ítem en el tablero Actividades (para que quede en el mismo lugar que
+// Cotización/Seguimiento/Inspección/Autorización, con historial de todos los envíos —
+// a diferencia de esas, cada envío es un evento propio, no se reactiva un ítem único).
+// Las dos partes son independientes: si una falla, la otra igual se intenta. No
+// bloqueante en general, mismo criterio que crearActividadesIniciales.
+export async function crearActividadEnvio(opportunityId, asignadoId, nombreCompleto, textos = []) {
+  const cuerpo = textos.filter(Boolean).map(textoWhatsappAHtml).join('<br><br>—<br><br>')
+
+  try {
+    await callMondayApi(CREATE_TIMELINE_ITEM_MUTATION, {
+      itemId: opportunityId,
+      userId: asignadoId ? Number(asignadoId) : null,
+      title: 'Cotización enviada por WhatsApp',
+      timestamp: new Date().toISOString(),
+      content: cuerpo,
+      customActivityId: CUSTOM_ACTIVITY_ENVIO_ID,
+    })
+  } catch (err) {
+    console.error('No se pudo registrar la Custom Activity de envío de cotización:', err)
+  }
+
+  try {
+    const creada = await createActivityItem(`Envío de cotización a ${nombreCompleto}`, {
+      [ACTIVITY_COLUMN_IDS.oportunidad]: { item_ids: [Number(opportunityId)] },
+      [ACTIVITY_COLUMN_IDS.tipo]: 'Envío de cotización',
+      [ACTIVITY_COLUMN_IDS.medio]: 'WhatsApp',
+      [ACTIVITY_COLUMN_IDS.estado]: 'Completado',
+      [ACTIVITY_COLUMN_IDS.fecha]: fechaMonday(new Date()),
+      ...(asignadoId
+        ? { [ACTIVITY_COLUMN_IDS.asignado]: { personsAndTeams: [{ id: Number(asignadoId), kind: 'person' }] } }
+        : {}),
+    })
+    if (cuerpo) await callMondayApi(CREATE_UPDATE_MUTATION, { body: cuerpo, itemId: creada.id })
+  } catch (err) {
+    console.error('No se pudo crear el ítem de envío de cotización en Actividades:', err)
+  }
+}
+
 // Medio de Comunicación por defecto según el tipo de requisito: la Inspección es una
 // visita en persona, la Autorización se resuelve revisando el portal de la compañía.
 const REQUISITO_MEDIO = {
