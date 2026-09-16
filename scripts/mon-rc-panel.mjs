@@ -40,14 +40,15 @@ const COL = {
 }
 
 const FILAS = [
-  // BSE queda vacío a propósito, incluido el 40: hay dos fuentes que no coinciden —el
-  // detalle en UI (5.000.000 UI ≈ US$ 825.000) y la tabla en dólares de la compañía (USD
-  // 840.000 por persona)—, y esto es lo que lee el cliente. Se completa cuando esté
-  // confirmado cuál manda; mientras tanto la cotización muestra solo el nivel.
-  ['BSE', '40', ''],
-  ['BSE', '30', ''],
-  ['BSE', '20', ''],
-  ['BSE', '10', ''],
+  // Los límites de BSE están en UI, que es como figuran en la póliza; el equivalente en
+  // dólares lo calcula la app con "Valor UI en pesos" y "Dólar en pesos" (ver
+  // pricingEngine.js#expandirUI). Escalan proporcional: el nivel 40 son 5.000.000 UI por
+  // persona y cada escalón baja un cuarto — lo confirma la tabla en dólares de la
+  // compañía, que da 825.000 / 620.000 / 420.000 / 210.000 con esos mismos UI.
+  ['BSE', '40', 'Límite por personas (muerte/lesión): {UI 5000000}●Límite daños materiales: {UI 5000000}●Límite catástrofe (agregado): {UI 15000000}'],
+  ['BSE', '30', 'Límite por personas (muerte/lesión): {UI 3750000}●Límite daños materiales: {UI 3750000}●Límite catástrofe (agregado): {UI 11250000}'],
+  ['BSE', '20', 'Límite por personas (muerte/lesión): {UI 2500000}●Límite daños materiales: {UI 2500000}●Límite catástrofe (agregado): {UI 7500000}'],
+  ['BSE', '10', 'Límite por personas (muerte/lesión): {UI 1250000}●Límite daños materiales: {UI 1250000}●Límite catástrofe (agregado): {UI 3750000}'],
 
   // PORTO: tal cual los publica su propio selector "Nivel de RC" (de ahí también que el
   // nivel 4 sean USD 800.000 y no los 825.000 de la conversión desde UI).
