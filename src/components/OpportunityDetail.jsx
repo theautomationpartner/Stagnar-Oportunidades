@@ -645,6 +645,13 @@ export default function OpportunityDetail({
       reposicion0kmMinYear: schema?.reposicion0kmMinYear,
       serviciosIlimitadosPortoMinYear: schema?.serviciosIlimitadosPortoMinYear,
       preciosOpcionales: schema?.preciosOpcionales ?? {},
+      // Textos de RC por nivel y los dos valores con los que se convierte UI a dólares.
+      // Esta lista se arma campo por campo, así que lo que no se agregue acá no llega al
+      // motor por más que PANEL lo devuelva: los límites de RC se veían bien en las
+      // pruebas del motor y no aparecían en la app, justamente por faltar acá.
+      rcLookup: schema?.rcLookup ?? {},
+      valorUI: schema?.valorUI,
+      valorDolar: schema?.valorDolar,
     }
     // Los recargos por cuota se aplican ACÁ y no al traer las cotizaciones: este memo
     // depende de `schema`, así que si PANEL llega después que el detalle (pasa siempre
