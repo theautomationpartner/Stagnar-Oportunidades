@@ -375,6 +375,16 @@ function QuoteCard({
         )}
       </div>
 
+      {/* Problema de carga del RC (ver pricingEngine.js#rcInfo). Es un aviso PARA EL
+          VENDEDOR y no viaja en la cotización: dice que lo que está por mandar sale
+          incompleto y qué hay que arreglar en PANEL. Va abajo de la advertencia comercial
+          y con otro color, para que no se confunda con algo que el cliente vaya a leer. */}
+      {quote.rcProblema && (
+        <p className="quote-card__rc-problema" title={quote.rcProblema.full}>
+          <MdWarningAmber /> {quote.rcProblema.short}
+        </p>
+      )}
+
       {/* A pedido: cuotas y etiquetas ahora conviven en 2 columnas (Flexbox) adentro de
           un mismo wrapper, en vez de un renglón a lo ancho completo cada una — mejor
           aprovechamiento del ancho de la tarjeta. */}
@@ -491,6 +501,12 @@ function QuoteCard({
           {quote.warning && (
             <p className="quote-card__warning quote-card__warning--full">
               <MdWarningAmber /> {quote.warning.full}
+            </p>
+          )}
+
+          {quote.rcProblema && (
+            <p className="quote-card__warning quote-card__warning--full quote-card__warning--interno">
+              <MdWarningAmber /> {quote.rcProblema.full}
             </p>
           )}
 

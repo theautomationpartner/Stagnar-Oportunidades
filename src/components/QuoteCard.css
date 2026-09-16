@@ -594,3 +594,25 @@
 .quote-card__opcional--contratado .quote-card__opcional-precio {
   color: var(--verde, #2e7d32);
 }
+
+
+/* Avisos internos: lo que el vendedor tiene que arreglar antes de mandar, no algo que el
+   cliente vaya a leer. Van en naranja y no en el rojo de los errores de cotización: la
+   cotización sirve igual, lo que sale incompleto es el texto de RC. */
+.quote-card__rc-problema {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0 16px 8px;
+  font-size: 12px;
+  color: #a05a00;
+}
+
+.quote-card__rc-problema svg {
+  flex: 0 0 auto;
+  font-size: 14px;
+}
+
+.quote-card__warning--interno {
+  color: #a05a00;
+}

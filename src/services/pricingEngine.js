@@ -359,12 +359,65 @@ function buildIncluyeBullets(eff, panelContext) {
 
 // Las viñetas de RC salen de PANEL con la misma convención que los textos INCLUYE: un
 // solo campo de texto con "●" entre viñetas.
-function rcBullets(eff, panelContext) {
-  const texto = panelContext?.rcLookup?.[eff.compania]?.[eff.rc]
-  return (texto ?? '')
+// Los límites de RC y, si algo no está bien cargado, el motivo — para el vendedor, no
+// para el cliente (quote.warning sí viaja en la cotización que se manda; esto no).
+//
+// Falla en silencio es lo peor que puede hacer esto: la cotización sale igual, sin las
+// cifras o con un token crudo adentro, y el que se entera es el cliente. Que el problema
+// se vea en la tarjeta, antes de mandar nada, es todo el punto.
+function rcInfo(eff, panelContext) {
+  const compania = eff.compania || '—'
+  const nivel = eff.rc
+  if (!nivel) return { lineas: [], problema: null }
+
+  const texto = panelContext?.rcLookup?.[compania]?.[nivel]
+  if (!texto || !texto.trim()) {
+    return {
+      lineas: [],
+      problema: {
+        short: 'Sin límites de RC cargados',
+        full:
+          `No hay límites de Responsabilidad Civil cargados para ${compania} · "${nivel}" en PANEL (Grupo "RC"). ` +
+          'La cotización se manda igual, pero con el nivel a secas y sin ninguna cifra.',
+      },
+    }
+  }
+
+  const lineas = texto
     .split('●')
-    .map((s) => expandirTokens(s.trim(), eff, panelContext))
+    .map((parte) => expandirTokens(parte.trim(), eff, panelContext))
     .filter(Boolean)
+
+  // Un token que quedó sin reemplazar (mal escrito, o un opcional que no existe en esa
+  // compañía) se ve tal cual en la cotización: "+{precio Granizoo}".
+  const sinResolver = [...new Set(lineas.flatMap((linea) => [...linea.matchAll(/{[^}]+}/g)].map((m) => m[0])))]
+  if (sinResolver.length) {
+    return {
+      lineas,
+      problema: {
+        short: 'El texto de RC tiene datos sin resolver',
+        full:
+          `El texto de RC de ${compania} · "${nivel}" tiene ${sinResolver.join(', ')}, que la app no pudo reemplazar. ` +
+          'Revisá cómo está escrito en PANEL: así como está, eso mismo le llega al cliente.',
+      },
+    }
+  }
+
+  // El importe está en UI pero falta con qué pasarlo a dólares: el cliente ve "5.000.000
+  // UI" sin referencia, que para la mayoría no significa nada.
+  if (texto.includes('{UI ') && !(num(panelContext?.valorUI) > 0 && num(panelContext?.valorDolar) > 0)) {
+    return {
+      lineas,
+      problema: {
+        short: 'Falta el valor del dólar o de la UI',
+        full:
+          'Los límites de RC están en Unidades Indexadas, pero en PANEL falta "Valor UI en pesos" o "Dólar en pesos". ' +
+          'La cotización sale con el importe en UI y sin el equivalente en dólares.',
+      },
+    }
+  }
+
+  return { lineas, problema: null }
 }
 
 // Los textos de PANEL pueden traer estos tokens, y se reemplazan al mostrarlos:
@@ -633,6 +686,7 @@ export function computeQuote(raw, overrides = {}, panelContext = {}) {
       }
     : null
 
+  const rc = rcInfo(eff, panelContext)
   return {
     blocked: false,
     total,
@@ -658,7 +712,9 @@ export function computeQuote(raw, overrides = {}, panelContext = {}) {
     // Lo que se le muestra al cliente sobre la Responsabilidad Civil: los límites del
     // nivel elegido, en viñetas (ver PANEL, Grupo "RC"). Vacío si ese nivel todavía no
     // tiene texto cargado — preferible a inventar límites en una cotización.
-    rcDetalle: rcBullets(eff, panelContext),
+    rcDetalle: rc.lineas,
+    // Solo para el vendedor: qué está mal cargado. No se manda al cliente.
+    rcProblema: rc.problema,
   }
 }
 
