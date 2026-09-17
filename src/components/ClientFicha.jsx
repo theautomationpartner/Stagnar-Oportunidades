@@ -1,4 +1,4 @@
-import { MdEdit, MdLocationOn, MdSmartphone, MdHome } from 'react-icons/md'
+import { MdEdit, MdSmartphone, MdHome } from 'react-icons/md'
 import { Button } from '@vibe/core'
 import ClienteArchivos from './ClienteArchivos'
 import { formatShortDate, modeloSinMarca } from '../services/format'
@@ -32,7 +32,6 @@ export default function ClientFicha({
   children,
   showDocumentos = true,
 }) {
-  const ubicacion = [opportunity.departamento, opportunity.zonaCirculacion].filter(Boolean).join(' — ')
   // A pedido: "Cliente" o "Lead" según la Situación real en el tablero Clientes — no
   // llamar "cliente" a quien todavía es un lead.
   const situacion = opportunity.clienteSituacion || ''
@@ -49,22 +48,19 @@ export default function ClientFicha({
               {tag && <span className="client-ficha__tag">{tag}</span>}
               {situacion && <span className="client-ficha__tag">{situacion}</span>}
             </div>
-            {/* A pedido: una sola línea de ubicación. Con Cliente/Lead vinculado se muestra
-                su domicilio principal (casa: Dirección, Localidad, Departamento del tablero
-                Clientes); solo si la oportunidad no tiene persona vinculada (casos viejos)
-                se cae a la ubicación de circulación propia de la oportunidad, para no
-                perder el dato. */}
-            {opportunity.clienteId ? (
-              <span className="client-ficha__address" title="Domicilio principal">
-                <MdHome />
-                {opportunity.clienteDomicilio || 'Sin domicilio cargado'}
-              </span>
-            ) : (
-              <span className="client-ficha__address" title="Ubicación">
-                <MdLocationOn />
-                {ubicacion || 'Sin ubicación cargada'}
-              </span>
-            )}
+            {/* Acá va SOLO el domicilio del Cliente/Lead (Dirección, Localidad y
+                Departamento del tablero Clientes). Antes, cuando la oportunidad no tenía
+                persona vinculada, se caía a la zona de circulación del vehículo: en el
+                mismo renglón y debajo del nombre, eso se lee como el domicilio de la
+                persona, y no lo es. Reportado con una oportunidad cuyo cliente no tiene
+                localidad ni departamento cargados y que aparecía viviendo en "Montevideo —
+                Montevideo - CP11100", que es donde circula el auto.
+                La zona de circulación no se pierde: se ve en "Datos obligatorios para
+                cotizar" y en el bloque de ubicación, que es donde corresponde. */}
+            <span className="client-ficha__address" title="Domicilio principal">
+              <MdHome />
+              {opportunity.clienteDomicilio || 'Sin domicilio cargado'}
+            </span>
           </div>
         </div>
         <div className="client-ficha__header-actions">
