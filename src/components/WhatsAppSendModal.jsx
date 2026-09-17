@@ -1,7 +1,9 @@
 import { useEffect, useState } from 'react'
 import { MdSend, MdCheckCircle, MdArrowForward, MdImage, MdNotes, MdLibraryAddCheck } from 'react-icons/md'
-import { Modal, ModalHeader, ModalContent, ModalFooter, AttentionBox, TextField } from '@vibe/core'
+import { Modal, ModalHeader, ModalContent, ModalFooter, AttentionBox, TextField, Dropdown } from '@vibe/core'
 import { sendQuotesToWhatsApp, getMakeWebhookUrl } from '../services/makeWebhook'
+import { fetchTelefonosEnvioHabilitados } from '../services/mondayApi'
+import { splitTelefono } from '../services/personaFields'
 import GradientSpinner from './GradientSpinner'
 import ErrorDetailBox from './ErrorDetailBox'
 import ProgressBar from './ProgressBar'
@@ -48,6 +50,36 @@ export default function WhatsAppSendModal({
   const [error, setError] = useState(null)
   const [submitted, setSubmitted] = useState(false)
   const webhookConfigured = Boolean(getMakeWebhookUrl())
+
+  // A pedido: mostrar ANTES de mandar con qué línea (o líneas) de WhatsApp se puede enviar
+  // y de quién es cada celular (ver fetchTelefonosEnvioHabilitados) — no depende de quién
+  // está usando la app, sino de qué celulares están marcados "Habilitado" en la lista
+  // blanca. Hoy hay uno solo habilitado, así que se muestra fijo; si en algún momento hay
+  // más de uno, se deja elegir con un Dropdown en vez de listarlos todos sin poder actuar.
+  // Se resuelve una sola vez al abrir el modal; si ninguna fila está habilitada, no se
+  // muestra nada — no es un dato obligatorio para poder enviar. Lo elegido acá viaja al
+  // webhook como "telefonoEnvio" (ver handleSubmit y makeWebhook.js) para que el
+  // escenario de Make pueda usarlo si en algún momento necesita elegir línea/dispositivo.
+  const [telefonosEnvio, setTelefonosEnvio] = useState([]) // [{ telefono, titular }]
+  const [telefonoEnvioIndex, setTelefonoEnvioIndex] = useState(0)
+  useEffect(() => {
+    let cancelado = false
+    fetchTelefonosEnvioHabilitados().then((lista) => {
+      if (!cancelado) setTelefonosEnvio(lista)
+    })
+    return () => {
+      cancelado = true
+    }
+  }, [])
+  const formatearTelefonoEnvio = (raw) => Object.values(splitTelefono(raw, 'UY')).filter(Boolean).join(' ')
+  const telefonoEnvioOpciones = telefonosEnvio.map((op, i) => ({
+    value: String(i),
+    label: formatearTelefonoEnvio(op.telefono) + (op.titular ? ` (${op.titular})` : ''),
+  }))
+  const telefonoEnvioSeleccionado = telefonosEnvio[telefonoEnvioIndex] ?? null
+  const telefonoEnvioFormateado = telefonoEnvioSeleccionado?.telefono
+    ? formatearTelefonoEnvio(telefonoEnvioSeleccionado.telefono)
+    : null
   // A pedido: la animación de "Enviando" tiene que reflejar el estado REAL de la
   // columna Estado Envío (sendPolling, ver el polling en OpportunityDetail.jsx), no
   // solo si este envío puntual se hizo desde ESTA instancia del modal — si se cierra el
@@ -82,7 +114,7 @@ export default function WhatsAppSendModal({
     try {
       estadoAnterior = await onSendStart?.()
       setSubmitted(true)
-      await sendQuotesToWhatsApp({ phone, opportunity, images, formato })
+      await sendQuotesToWhatsApp({ phone, opportunity, images, formato, telefonoEnvio: telefonoEnvioSeleccionado?.telefono })
       enviado = true
       await onSent?.(images)
     } catch (err) {
@@ -177,14 +209,40 @@ export default function WhatsAppSendModal({
               </AttentionBox>
             )}
 
-            {/* TextField nativo de @vibe/core en vez de <label>+<input> a mano. */}
-            <TextField
-              wrapperClassName="wa-modal__field"
-              title="Número de teléfono"
-              placeholder="Ej: 099 123 456"
-              value={phone}
-              onChange={(value) => setPhone(value)}
-            />
+            {/* A pedido: el input achicado y el aviso de origen al lado, no arriba —
+                ocupaban demasiado alto para un dato secundario. */}
+            <div className="wa-modal__telefono-row">
+              {/* TextField nativo de @vibe/core en vez de <label>+<input> a mano. */}
+              <TextField
+                wrapperClassName="wa-modal__field wa-modal__field--telefono"
+                title="Número de teléfono"
+                placeholder="Ej: 099 123 456"
+                value={phone}
+                onChange={(value) => setPhone(value)}
+              />
+              {telefonosEnvio.length === 1 && telefonoEnvioFormateado && (
+                <p className="wa-modal__telefono-envio">
+                  Se va a enviar desde <strong>{telefonoEnvioFormateado}</strong>
+                  {telefonoEnvioSeleccionado.titular && <> (celular de {telefonoEnvioSeleccionado.titular})</>}
+                </p>
+              )}
+              {/* Más de un celular habilitado a la vez: en vez de listarlos todos sin
+                  poder elegir, un Dropdown para decidir cuál mostrar como origen. */}
+              {telefonosEnvio.length > 1 && (
+                <div className="wa-modal__telefono-envio-selector">
+                  <span className="wa-modal__telefono-envio-label">Enviar desde</span>
+                  <Dropdown
+                    size="small"
+                    className="wa-modal__telefono-envio-dropdown"
+                    options={telefonoEnvioOpciones}
+                    value={telefonoEnvioOpciones[telefonoEnvioIndex] ?? null}
+                    clearable={false}
+                    searchable={false}
+                    onChange={(opcion) => setTelefonoEnvioIndex(Number(opcion?.value ?? 0))}
+                  />
+                </div>
+              )}
+            </div>
 
             {/* LOG-17: la misma cotización se puede mandar como imagen, como texto (para
                 que el cliente la reenvíe o copie un dato) o las dos cosas. Control

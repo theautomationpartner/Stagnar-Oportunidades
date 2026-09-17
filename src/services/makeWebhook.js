@@ -65,7 +65,7 @@ function buildFilename(raw, opportunity, ext = 'png') {
 // cotización escrita (ver whatsappText.js) y "ambos", las dos cosas.
 export const FORMATOS_ENVIO = ['imagen', 'texto', 'ambos']
 
-export async function sendQuotesToWhatsApp({ phone, opportunity, images, formato = 'imagen' }) {
+export async function sendQuotesToWhatsApp({ phone, opportunity, images, formato = 'imagen', telefonoEnvio }) {
   const url = getMakeWebhookUrl()
   if (!url) {
     throw new Error(
@@ -78,6 +78,12 @@ export async function sendQuotesToWhatsApp({ phone, opportunity, images, formato
   formData.append('opportunityId', opportunity.id)
   formData.append('oppNumber', opportunity.oppNumber)
   formData.append('clienteNombre', opportunity.clienteNombre)
+  // A pedido: el número de origen elegido en WhatsAppSendModal (ver
+  // fetchTelefonosEnvioHabilitados), para que el escenario de Make pueda usarlo para
+  // decidir por cuál línea/dispositivo mandar. Solo viaja si hay uno resuelto — el
+  // escenario de Make hoy no lo necesita para nada (sigue mandando por su única línea
+  // configurada), así que su ausencia no debería romper nada del lado de Make.
+  if (telefonoEnvio) formData.append('telefonoEnvio', telefonoEnvio)
   // LOG-17: el escenario de Make lee esto para decidir qué mandar. Igual solo viajan los
   // campos que correspondan al formato elegido, así que un escenario que itere lo que
   // llega ya se comporta bien sin mirarlo.

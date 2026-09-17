@@ -1016,6 +1016,59 @@ export async function fetchCurrentMondayUser() {
   }
 }
 
+// Desde qué línea (o líneas) de WhatsApp se puede enviar ahora mismo, y de quién es cada
+// celular — a pedido, para mostrarlo antes de mandar una cotización (ver
+// WhatsAppSendModal). No depende de quién está usando la app: se buscan en "Usuario
+// Habilitados - Lista Blanca" (18409461390, el mismo tablero que usa el sistema de
+// autenticación — ver api/_auth/boardLectura.js) TODAS las filas marcadas "Celular
+// habilitado" = Habilitada (color_mm71pdy7), y de cada una se devuelve su "Whatsapp Envio"
+// (phone_mm6sbe95) y su nombre. Hoy hay una sola fila habilitada (el resto dice "No
+// habilitado"); a medida que se habiliten los celulares de las demás personas, cada una va
+// a aparecer acá con su propio número — si en algún momento hay más de una,
+// WhatsAppSendModal deja elegir con cuál enviar.
+// Es una lectura DISTINTA e independiente de la que hace el backend de autenticación:
+// solo pide estas 2 columnas puntuales, nunca Rol/Email/Estado, y nunca corre
+// server-side — no hay que tocar boardLectura.js para esto.
+const USUARIOS_LISTA_BLANCA_BOARD_ID = 18409461390
+const USUARIO_TELEFONO_ENVIO_COLUMN_ID = 'phone_mm6sbe95' // "Whatsapp Envio"
+const USUARIO_CELULAR_HABILITADO_COLUMN_ID = 'color_mm71pdy7' // "Celular habilitado"
+const USUARIO_CELULAR_HABILITADO_LABEL = 'Habilitada'
+
+const FETCH_TELEFONO_ENVIO_QUERY = `
+  query FetchTelefonoEnvio($boardId: ID!) {
+    boards(ids: [$boardId]) {
+      items_page(limit: 500) {
+        cursor
+        items {
+          name
+          column_values(ids: ["${USUARIO_TELEFONO_ENVIO_COLUMN_ID}", "${USUARIO_CELULAR_HABILITADO_COLUMN_ID}"]) {
+            id
+            text
+          }
+        }
+      }
+    }
+  }
+`
+
+export async function fetchTelefonosEnvioHabilitados() {
+  try {
+    const data = await callMondayApi(FETCH_TELEFONO_ENVIO_QUERY, { boardId: USUARIOS_LISTA_BLANCA_BOARD_ID })
+    const items = data.boards?.[0]?.items_page?.items ?? []
+    return items
+      .filter(
+        (item) => textOf(item.column_values, USUARIO_CELULAR_HABILITADO_COLUMN_ID) === USUARIO_CELULAR_HABILITADO_LABEL
+      )
+      .map((item) => ({
+        telefono: textOf(item.column_values, USUARIO_TELEFONO_ENVIO_COLUMN_ID),
+        titular: item.name || null,
+      }))
+      .filter((op) => op.telefono)
+  } catch {
+    return []
+  }
+}
+
 // Personas a las que se le puede asignar una oportunidad ("Asignado", deal_owner). Son las
 // mismas que monday ofrece en su propio selector de la columna people: los miembros de la
 // cuenta, sin invitados ni cuentas deshabilitadas. Se piden una vez por sesión y se
