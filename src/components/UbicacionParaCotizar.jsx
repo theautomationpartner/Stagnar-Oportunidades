@@ -1,0 +1,181 @@
+import { useMemo, useState } from 'react'
+import { Button, Dropdown } from '@vibe/core'
+import { MdPlace } from 'react-icons/md'
+import { matchOption } from '../services/format'
+import './UbicacionParaCotizar.css'
+
+// A pedido: antes de la primera cotización se elige con qué ubicación se cotiza, porque
+// es la que define la zona de circulación y por lo tanto el precio. Hasta ahora la
+// oportunidad nacía con Montevideo - CP11500 puesto por defecto (ver
+// CrearOportunidadForm#defaultUbicacion) y había que acordarse de entrar a "Editar" para
+// cambiarla: el default pasaba desapercibido y se terminaba cotizando con una zona que no
+// era la del vehículo.
+//
+// Las tres opciones son las tres cosas que pasan en la realidad: el vehículo circula
+// donde vive el cliente, circula en Montevideo (el caso más común), o hay que elegir otra
+// a mano.
+//
+// Solo aparece antes de cotizar por primera vez. Después la ubicación se cambia desde
+// "Editar", que es el camino de siempre y ya avisa que hay que recotizar.
+export const UBICACION_MONTEVIDEO = { departamento: 'Montevideo', localidad: 'Montevideo - CP11500' }
+
+// Busca el ítem real del tablero por nombre, tolerando diferencias de acentos o espacios
+// (el nombre guardado en la oportunidad y el del tablero no siempre coinciden carácter a
+// carácter). Devuelve el id, que es lo que se guarda en la columna conectada.
+function idPorNombre(opciones, nombre) {
+  const real = matchOption(
+    opciones.map((o) => o.name),
+    nombre
+  )
+  return opciones.find((o) => o.name === real)?.id ?? ''
+}
+
+export default function UbicacionParaCotizar({ opportunity, dropdownOptions, onGuardar, guardando }) {
+  const departamentos = dropdownOptions?.departamentos ?? []
+  const localidades = dropdownOptions?.localidades ?? []
+
+  const delCliente = useMemo(() => {
+    const departamentoId = idPorNombre(departamentos, opportunity.clienteDepartamento)
+    const localidadId = idPorNombre(localidades, opportunity.clienteLocalidad)
+    // Sin los dos no sirve: media ubicación no se puede guardar ni cotizar.
+    if (!departamentoId || !localidadId) return null
+    return {
+      departamentoId,
+      localidadId,
+      departamento: opportunity.clienteDepartamento,
+      localidad: opportunity.clienteLocalidad,
+    }
+  }, [departamentos, localidades, opportunity.clienteDepartamento, opportunity.clienteLocalidad])
+
+  const montevideo = useMemo(
+    () => ({
+      departamentoId: idPorNombre(departamentos, UBICACION_MONTEVIDEO.departamento),
+      localidadId: idPorNombre(localidades, UBICACION_MONTEVIDEO.localidad),
+      ...UBICACION_MONTEVIDEO,
+    }),
+    [departamentos, localidades]
+  )
+
+  const actual = useMemo(
+    () => ({
+      departamentoId: idPorNombre(departamentos, opportunity.departamento),
+      localidadId: idPorNombre(localidades, opportunity.zonaCirculacion),
+    }),
+    [departamentos, localidades, opportunity.departamento, opportunity.zonaCirculacion]
+  )
+
+  const mismaQue = (u) => Boolean(u) && u.departamentoId === actual.departamentoId && u.localidadId === actual.localidadId
+
+  // Arranca marcada la opción que coincide con lo que la oportunidad ya tiene: así se ve
+  // de entrada con qué se va a cotizar, en vez de pedir una elección a ciegas.
+  const [eleccion, setEleccion] = useState(() => {
+    if (mismaQue(delCliente)) return 'cliente'
+    if (mismaQue(montevideo)) return 'montevideo'
+    return 'otra'
+  })
+  const [otra, setOtra] = useState(() => ({ ...actual }))
+
+  const localidadesDelDepartamento = useMemo(() => {
+    const nombre = departamentos.find((d) => d.id === otra.departamentoId)?.name
+    // Sin departamento elegido se ven todas: filtrar a cero sería peor que no filtrar.
+    return nombre ? localidades.filter((l) => l.departamento === nombre) : localidades
+  }, [departamentos, localidades, otra.departamentoId])
+
+  const elegida = eleccion === 'cliente' ? delCliente : eleccion === 'montevideo' ? montevideo : otra
+  const completa = Boolean(elegida?.departamentoId && elegida?.localidadId)
+  const sinCambios = completa && mismaQue(elegida)
+
+  const opciones = [
+    {
+      key: 'cliente',
+      titulo: 'La del cliente',
+      detalle: delCliente
+        ? `${delCliente.localidad} · ${delCliente.departamento}`
+        : 'El cliente no tiene localidad y departamento cargados',
+      deshabilitada: !delCliente,
+    },
+    {
+      key: 'montevideo',
+      titulo: 'Montevideo',
+      detalle: `${UBICACION_MONTEVIDEO.localidad} · ${UBICACION_MONTEVIDEO.departamento}`,
+      deshabilitada: !montevideo.departamentoId || !montevideo.localidadId,
+    },
+    { key: 'otra', titulo: 'Otra', detalle: 'Elegir departamento y localidad' },
+  ]
+
+  const comoOpcion = (lista, id) => {
+    const item = lista.find((o) => o.id === id)
+    return item ? { value: item.id, label: item.name } : null
+  }
+
+  return (
+    <section className="ubicacion-cotizar">
+      <h3 className="ubicacion-cotizar__titulo">
+        <MdPlace /> ¿Con qué ubicación se cotiza?
+      </h3>
+      <p className="ubicacion-cotizar__sub">
+        Define la zona de circulación del vehículo, así que cambia el precio. Se puede
+        modificar después desde &quot;Editar&quot;.
+      </p>
+
+      <div className="ubicacion-cotizar__opciones">
+        {opciones.map((o) => (
+          <button
+            key={o.key}
+            type="button"
+            className={
+              eleccion === o.key
+                ? 'ubicacion-cotizar__opcion ubicacion-cotizar__opcion--activa'
+                : 'ubicacion-cotizar__opcion'
+            }
+            aria-pressed={eleccion === o.key}
+            disabled={o.deshabilitada}
+            onClick={() => setEleccion(o.key)}
+          >
+            <span className="ubicacion-cotizar__opcion-titulo">{o.titulo}</span>
+            <span className="ubicacion-cotizar__opcion-detalle">{o.detalle}</span>
+          </button>
+        ))}
+      </div>
+
+      {eleccion === 'otra' && (
+        <div className="ubicacion-cotizar__selects">
+          <label className="ubicacion-cotizar__campo">
+            <span>Departamento</span>
+            <Dropdown
+              size="small"
+              placeholder="Elegí un departamento"
+              options={departamentos.map((d) => ({ value: d.id, label: d.name }))}
+              value={comoOpcion(departamentos, otra.departamentoId)}
+              onChange={(opt) =>
+                // Cambiar de departamento borra la localidad: la que estaba puede no
+                // pertenecer al nuevo, y guardar ese par sería guardar algo que no existe.
+                setOtra({ departamentoId: opt?.value ?? '', localidadId: '' })
+              }
+            />
+          </label>
+          <label className="ubicacion-cotizar__campo">
+            <span>Localidad</span>
+            <Dropdown
+              size="small"
+              placeholder={otra.departamentoId ? 'Elegí una localidad' : 'Elegí primero el departamento'}
+              options={localidadesDelDepartamento.map((l) => ({ value: l.id, label: l.name }))}
+              value={comoOpcion(localidades, otra.localidadId)}
+              onChange={(opt) => setOtra((prev) => ({ ...prev, localidadId: opt?.value ?? '' }))}
+            />
+          </label>
+        </div>
+      )}
+
+      <div className="ubicacion-cotizar__pie">
+        <Button
+          kind="primary"
+          disabled={!completa || sinCambios || guardando}
+          onClick={() => onGuardar({ departamentoId: elegida.departamentoId, localidadId: elegida.localidadId })}
+        >
+          {guardando ? 'Guardando...' : sinCambios ? 'Es la que está puesta' : 'Usar esta ubicación'}
+        </Button>
+      </div>
+    </section>
+  )
+}

@@ -8,6 +8,7 @@ import AutodataModeloPorAnioMarca from './AutodataModeloPorAnioMarca'
 import AlertModal from './AlertModal'
 import ErrorDetailBox from './ErrorDetailBox'
 import ClientFicha from './ClientFicha'
+import UbicacionParaCotizar from './UbicacionParaCotizar'
 import StepFooter from './StepFooter'
 import './CotizarStepPanel.css'
 
@@ -165,6 +166,24 @@ export default function CotizarStepPanel({
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
   const [confirmingRecotizar, setConfirmingRecotizar] = useState(false)
+  const [guardandoUbicacion, setGuardandoUbicacion] = useState(false)
+
+  // Guardar la ubicación elegida pasa por el MISMO camino que "Editar" (onSave con el
+  // formulario completo) y no por una escritura suelta de las dos columnas: ese camino ya
+  // sabe escribir columnas conectadas, refresca la oportunidad y renombra el ítem. Mandar
+  // solo los dos campos vaciaría todo lo demás, porque el guardado compara campo por
+  // campo contra el formulario que recibe.
+  const handleGuardarUbicacion = async ({ departamentoId, localidadId }) => {
+    setGuardandoUbicacion(true)
+    setSaveError(null)
+    try {
+      await onSave({ ...buildInitialForm(opportunity, dropdownOptions), departamentoId, localidadId })
+    } catch (err) {
+      setSaveError(err.message)
+    } finally {
+      setGuardandoUbicacion(false)
+    }
+  }
 
   // A pedido, estética tipo mockup: popup compartido (AlertModal) para "Error al
   // cotizar" en vez de texto suelto — cerrarlo es solo visual, `marking` se resetea a
@@ -428,6 +447,19 @@ export default function CotizarStepPanel({
           )}
         </div>
       </div>
+
+      {/* A pedido: antes de la primera cotización se elige con qué ubicación cotizar.
+          Después no: la oportunidad ya tiene cotizaciones hechas con una zona, y
+          cambiarla desde acá las dejaría calladamente desactualizadas — para eso está
+          "Editar", que avisa que hay que recotizar. */}
+      {!hasQuotes && (
+        <UbicacionParaCotizar
+          opportunity={opportunity}
+          dropdownOptions={dropdownOptions}
+          onGuardar={handleGuardarUbicacion}
+          guardando={guardandoUbicacion}
+        />
+      )}
 
       {/* A pedido: editar ahora es un popup prolijo (mismo patrón que
           EditarContactoModal en CrearOportunidadForm.jsx: Modal + ModalContent +

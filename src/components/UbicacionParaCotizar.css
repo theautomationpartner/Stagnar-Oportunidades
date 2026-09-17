@@ -1,0 +1,103 @@
+/* Elección de ubicación antes de la primera cotización (ver UbicacionParaCotizar.jsx).
+   Mismo lenguaje visual que las tarjetas del paso Cotizar: borde suave, fondo blanco y
+   el acento solo en la opción elegida. */
+.ubicacion-cotizar {
+  margin: 16px var(--page-gutter) 0;
+  padding: 16px 20px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.ubicacion-cotizar__titulo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0;
+  font-size: 15px;
+}
+
+.ubicacion-cotizar__sub {
+  margin: 4px 0 14px;
+  font-size: 13px;
+  color: var(--texto-suave, #676879);
+}
+
+/* Se reparten el ancho, y abajo de 720px pasan una debajo de la otra: son tres textos
+   largos que en una fila angosta quedaban cortados. */
+.ubicacion-cotizar__opciones {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 10px;
+}
+
+@media (max-width: 720px) {
+  .ubicacion-cotizar__opciones {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ubicacion-cotizar__opcion {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: #fff;
+  text-align: left;
+  cursor: pointer;
+}
+
+.ubicacion-cotizar__opcion:hover:not(:disabled) {
+  border-color: var(--verde-oscuro, #0f7a6b);
+}
+
+.ubicacion-cotizar__opcion--activa {
+  border-color: var(--verde-oscuro, #0f7a6b);
+  box-shadow: inset 0 0 0 1px var(--verde-oscuro, #0f7a6b);
+}
+
+/* Deshabilitada = el dato no existe (el cliente sin localidad cargada). Se deja a la
+   vista, en gris, en vez de esconderla: que falte ese dato es información útil. */
+.ubicacion-cotizar__opcion:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.ubicacion-cotizar__opcion-titulo {
+  font-size: 14px;
+  font-weight: 600;
+}
+
+.ubicacion-cotizar__opcion-detalle {
+  font-size: 12px;
+  color: var(--texto-suave, #676879);
+}
+
+.ubicacion-cotizar__selects {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+@media (max-width: 720px) {
+  .ubicacion-cotizar__selects {
+    grid-template-columns: 1fr;
+  }
+}
+
+.ubicacion-cotizar__campo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 12px;
+  color: var(--texto-suave, #676879);
+}
+
+.ubicacion-cotizar__pie {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 14px;
+}
