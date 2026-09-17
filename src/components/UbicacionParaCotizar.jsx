@@ -66,14 +66,26 @@ export default function UbicacionParaCotizar({ opportunity, dropdownOptions, onG
 
   const mismaQue = (u) => Boolean(u) && u.departamentoId === actual.departamentoId && u.localidadId === actual.localidadId
 
-  // Arranca marcada la opción que coincide con lo que la oportunidad ya tiene: así se ve
-  // de entrada con qué se va a cotizar, en vez de pedir una elección a ciegas.
-  const [eleccion, setEleccion] = useState(() => {
-    if (mismaQue(delCliente)) return 'cliente'
-    if (mismaQue(montevideo)) return 'montevideo'
-    return 'otra'
-  })
-  const [otra, setOtra] = useState(() => ({ ...actual }))
+  // Marcada la opción que coincide con lo que la oportunidad ya tiene: así se ve de
+  // entrada con qué se va a cotizar, en vez de pedir una elección a ciegas.
+  //
+  // Derivado y no un useState con el valor calculado de arranque: las listas de
+  // departamentos y localidades llegan asincrónicas, y en el primer render pueden estar
+  // vacías. Con el valor congelado ahí, TODA oportunidad quedaba marcada en "Montevideo"
+  // —porque con las listas vacías los ids son '' y '' coincide con ''— y nunca se
+  // corregía al llegar los datos. Lo que sí se guarda es lo que la persona elige, que
+  // pisa lo derivado.
+  const [eleccionManual, setEleccionManual] = useState(null)
+  const eleccionAuto = mismaQue(delCliente) ? 'cliente' : mismaQue(montevideo) ? 'montevideo' : 'otra'
+  const eleccion = eleccionManual ?? eleccionAuto
+  const setEleccion = setEleccionManual
+
+  // Mismo criterio para los dos selectores de "Otra": mientras nadie los toque muestran
+  // la ubicación actual (cuando es justamente una "otra"), y se vacían apenas se elige
+  // "Otra" a mano.
+  const [otraManual, setOtraManual] = useState(null)
+  const otra = otraManual ?? (eleccionAuto === 'otra' ? actual : { departamentoId: '', localidadId: '' })
+  const setOtra = (valor) => setOtraManual((prev) => (typeof valor === 'function' ? valor(prev ?? otra) : valor))
 
   const localidadesDelDepartamento = useMemo(() => {
     const nombre = departamentos.find((d) => d.id === otra.departamentoId)?.name
@@ -130,7 +142,13 @@ export default function UbicacionParaCotizar({ opportunity, dropdownOptions, onG
             }
             aria-pressed={eleccion === o.key}
             disabled={o.deshabilitada}
-            onClick={() => setEleccion(o.key)}
+            onClick={() => {
+              // Entrar a "Otra" arranca en blanco. Antes traía puesta la ubicación que la
+              // oportunidad ya tenía, y eso contradice lo que promete el botón: se elige
+              // "Otra" justamente para poner otra, no para confirmar la de siempre.
+              if (o.key === 'otra' && eleccion !== 'otra') setOtra({ departamentoId: '', localidadId: '' })
+              setEleccion(o.key)
+            }}
           >
             <span className="ubicacion-cotizar__opcion-titulo">{o.titulo}</span>
             <span className="ubicacion-cotizar__opcion-detalle">{o.detalle}</span>
