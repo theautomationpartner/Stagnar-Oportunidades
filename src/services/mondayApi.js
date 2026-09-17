@@ -472,6 +472,18 @@ const AUTODATA_SIN_DATO = new Set(['sin motor', 'sin tipo', 'sin datos'])
 const esSinDato = (texto) => AUTODATA_SIN_DATO.has((texto ?? '').trim().toLowerCase())
 const datoRealONull = (texto) => (texto && !esSinDato(texto) ? texto : null)
 
+// A pedido: las casas rodantes y los trailers no se cotizan, así que no tienen por qué
+// aparecer como vehículo elegible al crear una oportunidad. Se filtran por marca y no por
+// el "sin datos" de más abajo, que solo agarra las fichas sin combustible ni tipo: las hay
+// de esta marca con los dos campos cargados, y tampoco son cotizables. La marca vive solo
+// en AUTODATA V2 (en V1 no existe), pero el filtro corre sobre los dos: si mañana aparece
+// en el otro, ya está cubierto.
+export const MARCAS_NO_COTIZABLES = new Set(['CASA RODANTE/TRAILERS'])
+
+function esCotizable(vehiculo) {
+  return !MARCAS_NO_COTIZABLES.has((vehiculo.marca ?? '').trim().toUpperCase())
+}
+
 function mapAutodataItem(item, board) {
   const cv = Object.fromEntries(item.column_values.map((c) => [c.id, c.text]))
   const combustible = cv[board.combustibleColumnId] || null
@@ -479,6 +491,7 @@ function mapAutodataItem(item, board) {
   return {
     id: item.id,
     name: item.name,
+    marca: cv[board.marcaColumnId] || null,
     combustible: datoRealONull(combustible),
     tipo: datoRealONull(tipo),
     // Una ficha con los DOS campos en "sin dato" no es un vehículo cotizable (remolques,
@@ -501,10 +514,12 @@ async function queryAutodataBoardsUncached(buildRules, operator, limit) {
         rules: buildRules(board),
         operator,
         limit,
-        columnIds: [board.combustibleColumnId, board.tipoColumnId],
+        columnIds: [board.combustibleColumnId, board.tipoColumnId, board.marcaColumnId],
       })
       const items = data.boards[0]?.items_page.items ?? []
-      return items.map((item) => mapAutodataItem(item, board))
+      // Acá y no en cada búsqueda: por este punto pasan tanto la de texto libre como la
+      // de Año + Marca, así que un solo filtro cubre las dos.
+      return items.map((item) => mapAutodataItem(item, board)).filter(esCotizable)
     })
   )
   return results.flat()

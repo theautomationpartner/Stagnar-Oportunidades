@@ -8,6 +8,7 @@ import {
   CONTACTO_ESTADO_COLUMN_ID,
   CONTACTO_EXTRANJERO_COLUMN_ID,
   CONTACTO_NACIONALIDAD_COLUMN_ID,
+  MARCAS_NO_COTIZABLES,
 } from './mondayApi'
 
 const DEFAULT_COLOR = { bg: '#c4c4c4', border: '#b0b0b0' }
@@ -96,7 +97,12 @@ export async function fetchFilterAndStatusSchema() {
     tipoSujeto: parseStatusColumn(clienteById[CONTACTO_ESTADO_COLUMN_ID]),
     extranjero: parseStatusColumn(clienteById[CONTACTO_EXTRANJERO_COLUMN_ID]),
     nacionalidades: parseDropdownColumn(clienteById[CONTACTO_NACIONALIDAD_COLUMN_ID]),
-    marcas: parseDropdownColumn(byId[DROPDOWN_COLUMNS.marcas]).sort((a, b) => a.localeCompare(b)),
+    // Sin las marcas que no se cotizan (ver mondayApi.js): si quedaran elegibles, elegir
+    // una dejaría la lista de modelos vacía sin decir por qué — los vehículos ya están
+    // filtrados del otro lado.
+    marcas: parseDropdownColumn(byId[DROPDOWN_COLUMNS.marcas])
+      .filter((marca) => !MARCAS_NO_COTIZABLES.has(marca.trim().toUpperCase()))
+      .sort((a, b) => a.localeCompare(b)),
     anios: parseDropdownColumn(byId[DROPDOWN_COLUMNS.anios]).sort((a, b) => Number(b) - Number(a)),
     combustibles: parseDropdownColumn(byId[DROPDOWN_COLUMNS.combustibles]),
     tipo: parseDropdownColumn(byId[DROPDOWN_COLUMNS.tipo]),
