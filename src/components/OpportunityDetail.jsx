@@ -53,8 +53,11 @@ import { COBERTURA_TABS, coberturaGroupOf } from '../services/coberturaGroups'
 
 // A pedido: órdenes disponibles para las tarjetas de "Comparar y enviar" (ver
 // ordenElegido y el selector arriba de la grilla). Las claves son las del mapa de
-// comparadores en visibleQuoteEntries.
+// comparadores en visibleQuoteEntries. "Enviadas" solo existe cuando hay cotizaciones ya
+// enviadas por WhatsApp (incluirPropuesta) — y en ese caso es el orden por defecto: lo
+// primero que se quiere ver al volver a una oportunidad con envíos es qué se le mandó.
 const ORDEN_OPCIONES = [
+  { key: 'enviadas', label: 'Enviadas' },
   { key: 'precio-asc', label: 'Menor precio' },
   { key: 'precio-desc', label: 'Mayor precio' },
   { key: 'compania', label: 'Compañía' },
@@ -699,9 +702,20 @@ export default function OpportunityDetail({
   // sin importar la compañía (ver coberturaGroups.js — las 2 familias ya cubren todas
   // las coberturas reales, no dependen de qué compañía sea).
   const activeCoberturaTab = COBERTURA_TABS[coberturaTabIndex]?.key ?? 'general'
-  // A pedido: cómo se ordenan las tarjetas de la solapa activa. 'precio-asc' es el de
-  // siempre (LOG-12); ver ORDEN_OPCIONES y el selector arriba de la grilla.
-  const [ordenElegido, setOrdenElegido] = useState('precio-asc')
+  // A pedido: cómo se ordenan las tarjetas de la solapa activa (ver ORDEN_OPCIONES y el
+  // selector arriba de la grilla). `null` = automático: "Enviadas" si la oportunidad ya
+  // tiene cotizaciones enviadas por WhatsApp, si no el clásico menor precio (LOG-12). Es
+  // derivado y no un useState con el default calculado una vez, porque las cotizaciones
+  // llegan asincrónicas: al montar todavía no se sabe si hay enviadas.
+  const [ordenElegido, setOrdenElegido] = useState(null)
+  const hayEnviadas = useMemo(
+    () => groups.some((g) => g.entries.some((e) => e.raw.incluirPropuesta)),
+    [groups]
+  )
+  const ordenPedido = ordenElegido ?? (hayEnviadas ? 'enviadas' : 'precio-asc')
+  // Si el orden pedido es "enviadas" pero ya no hay ninguna (recotizar borra subitems),
+  // se cae al default clásico — la opción tampoco se muestra en ese caso.
+  const ordenActivo = ordenPedido === 'enviadas' && !hayEnviadas ? 'precio-asc' : ordenPedido
   // Foto del orden de las tarjetas en el momento en que se abrió el primer panel (ver
   // visibleQuoteEntries).
   const [ordenCongelado, setOrdenCongelado] = useState(null)
@@ -742,10 +756,13 @@ export default function OpportunityDetail({
     // orden: si no, un total 0 encabezaría la lista.
     const total = (e) => Number(e.quote.total) || 0
     const comparar = {
+      // Las ya enviadas por WhatsApp primero (por precio adentro de cada grupo).
+      enviadas: (a, b) =>
+        (b.raw.incluirPropuesta ? 1 : 0) - (a.raw.incluirPropuesta ? 1 : 0) || total(a) - total(b),
       'precio-asc': (a, b) => total(a) - total(b),
       'precio-desc': (a, b) => total(b) - total(a),
       compania: (a, b) => a.compania.localeCompare(b.compania, 'es') || total(a) - total(b),
-    }[ordenElegido]
+    }[ordenActivo]
     const ordenadas = [...deLaSolapa].sort((a, b) => {
       const aSel = isQuoteSelectable(a.quote)
       const bSel = isQuoteSelectable(b.quote)
@@ -760,7 +777,7 @@ export default function OpportunityDetail({
     return ordenadas.sort(
       (a, b) => (posicion.get(a.raw.id) ?? Number.MAX_SAFE_INTEGER) - (posicion.get(b.raw.id) ?? Number.MAX_SAFE_INTEGER)
     )
-  }, [groups, activeCoberturaTab, ordenCongelado, ordenElegido])
+  }, [groups, activeCoberturaTab, ordenCongelado, ordenActivo])
 
   useEffect(() => {
     ordenActualRef.current = visibleQuoteEntries.map((e) => e.raw.id)
@@ -780,7 +797,7 @@ export default function OpportunityDetail({
   useEffect(() => {
     setOrdenCongelado(null)
     setConPanelAbierto(new Set())
-  }, [activeCoberturaTab, ordenElegido])
+  }, [activeCoberturaTab, ordenActivo])
 
   // Y también cuando cambian las cotizaciones en sí (recotizar borra y vuelve a crear los
   // subitems): la foto vieja ya no describe nada. Un cambio de PRECIO no cuenta como
@@ -1911,13 +1928,15 @@ export default function OpportunityDetail({
                     Ordenar por
                   </span>
                   <div role="group" aria-labelledby="opp-detail-orden-label" className="opp-detail__orden-botones">
-                    {ORDEN_OPCIONES.map((o) => (
+                    {/* "Enviadas" solo aparece si hay cotizaciones ya enviadas — sin
+                        envíos previos sería un botón que no ordena nada. */}
+                    {ORDEN_OPCIONES.filter((o) => o.key !== 'enviadas' || hayEnviadas).map((o) => (
                       <button
                         key={o.key}
                         type="button"
-                        aria-pressed={ordenElegido === o.key}
+                        aria-pressed={ordenActivo === o.key}
                         className={
-                          ordenElegido === o.key
+                          ordenActivo === o.key
                             ? 'opp-detail__orden-btn opp-detail__orden-btn--activo'
                             : 'opp-detail__orden-btn'
                         }

@@ -6,6 +6,7 @@ import {
   MdListAlt,
   MdTune,
 } from 'react-icons/md'
+import { FaWhatsapp } from 'react-icons/fa'
 import { Button, IconButton, Dropdown, Checkbox, NumberField } from '@vibe/core'
 import { formatMoney, CUOTA_COUNTS, toPercentString } from '../services/format'
 import { autoExtraOpciones, isQuoteSelectable, opcionalesDeCompania } from '../services/pricingEngine'
@@ -328,6 +329,14 @@ function QuoteCard({
               disabled={!selectable}
               aria-label={selectable ? 'Seleccionar opción' : 'No seleccionable: sin costo total'}
             />
+            {/* Mismo indicador de "ya se envió por WhatsApp" que la tarjeta del paso 3
+                (ver confirmar-step__card-wa): con el orden "Enviadas" delante, sin esta
+                marca no se vería POR QUÉ una tarjeta está primera. */}
+            {raw.incluirPropuesta && (
+              <span className="quote-card__wa" title="Ya se envió por WhatsApp">
+                <FaWhatsapp />
+              </span>
+            )}
             {/* A pedido: logotipo oficial sobre blanco + recuadro con el color exacto de
                 la marca (ver CompanyMark), en lugar del globito con el nombre escrito. */}
             <CompanyMark compania={raw.compania} />

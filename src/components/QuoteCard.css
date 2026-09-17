@@ -96,6 +96,21 @@
    quedaban 2 líneas apretadas una al lado de la otra en el borde izquierdo. El
    border-left-color sigue siendo el de la compañía (viene inline, gana sobre este
    border-color); acá solo se resaltan los otros 3 lados + un tinte de fondo. */
+/* "Ya se envió por WhatsApp" — mismo globito verde que la tarjeta del paso 3
+   (.confirmar-step__card-wa): los dos pasos muestran las mismas cotizaciones. */
+.quote-card__wa {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--green);
+  color: #fff;
+  font-size: 11px;
+  flex-shrink: 0;
+}
+
 /* A pedido: la marcada se tiñe con el tono de SU compañía (fondo bien suave + borde en
    el acento pleno) en vez del azul genérico. Las variables vienen inline desde el JSX
    (selectionForCompania); el azul queda solo de respaldo por si faltaran. Ojo: tres
