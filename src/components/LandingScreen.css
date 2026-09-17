@@ -1,10 +1,30 @@
+/* Pantalla principal estilo "paso 0" de labatea (ver LandingScreen.jsx): logo, dos
+   selectores etiquetados (label arriba, caja abajo) y Confirmar. Tokens de esta app. */
+
+/* Mismo fondo de marca que las pantallas de autenticación (ver auth.css): gradiente
+   sobre el verde del logo con un brillo suave arriba — del login al home se ve una sola
+   pieza. El eslogan de abajo también es el mismo (decorativo, por eso vive en CSS). */
 .landing {
   min-height: 100vh;
   min-height: 100dvh;
   display: flex;
+  flex-direction: column;
   align-items: center;
   justify-content: center;
+  gap: 20px;
   padding: 48px 40px;
+  background:
+    radial-gradient(ellipse at 20% -10%, rgb(255 255 255 / 14%), transparent 55%),
+    linear-gradient(155deg, #00615e 0%, #008581 55%, #009d97 100%);
+}
+
+.landing::after {
+  content: 'Tu tranquilidad, nuestra prioridad. Siempre.';
+  font-size: 0.9rem;
+  font-style: italic;
+  text-align: center;
+  color: #fff;
+  text-shadow: 0 1px 8px rgb(0 60 58 / 45%);
 }
 
 @media (max-width: 640px) {
@@ -13,100 +33,260 @@
   }
 }
 
-.landing__cards {
-  display: flex;
-  flex-wrap: wrap;
-  justify-content: center;
-  gap: 28px;
-}
-
-/* A pedido: tarjetas más grandes — eran las primeras (y únicas) opciones de la
-   pantalla principal, con bastante aire alrededor; un poco más de tamaño las hace más
-   visibles/fáciles de leer de un vistazo sin quedar desproporcionadas para lo poco que
-   hay alrededor. */
-.landing__card {
-  display: flex;
-  align-items: center;
-  gap: 18px;
-  width: 380px;
-  padding: 26px;
-  border-radius: 14px;
-  border: 1px solid;
-  font: inherit;
-  text-align: left;
-  cursor: pointer;
-  transition: box-shadow 0.15s ease;
-}
-
-.landing__card:hover {
-  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.07);
-}
-
-@media (max-width: 640px) {
-  .landing__card {
-    width: 100%;
-  }
-}
-
-.landing__card--primary {
-  background: #f5f8ff;
-  border-color: #c2d9fb;
-}
-
-.landing__card--secondary {
-  background: #f2fbf7;
-  border-color: #bfe6d4;
-}
-
-.landing__card-icon {
-  flex-shrink: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 58px;
-  height: 58px;
-  border-radius: 50%;
-  font-size: 26px;
-}
-
-.landing__card-icon--primary {
-  background: #e3edff;
-  color: var(--primary-blue);
-}
-
-.landing__card-icon--secondary {
-  background: #dff5ea;
-  color: var(--green-dark);
-}
-
-.landing__card-body {
-  flex: 1;
+.landing__panel {
+  width: 100%;
+  max-width: 680px;
   display: flex;
   flex-direction: column;
-  gap: 2px;
-  min-width: 0;
+  align-items: center;
+  gap: 10px;
+  padding: 40px 44px 32px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 14px;
+  /* Sombra presente, como la tarjeta de auth: sobre el fondo verde oscuro la sutil de
+     antes parecía pegada. */
+  box-shadow: 0 12px 36px rgb(0 34 33 / 30%);
 }
 
-.landing__card-title {
-  font-size: 18px;
-  font-weight: 700;
+.landing__logo {
+  height: 58px;
+  width: auto;
+  object-fit: contain;
+}
+
+/* Quién está en el sistema — chip bajo el logo (heredado de la barra lateral). */
+.landing__sesion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 12px;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 999px;
+  font-size: 13px;
+}
+
+.landing__sesion-lbl {
+  color: var(--text-muted);
+}
+
+.landing__sesion-nombre {
+  font-weight: 600;
   color: var(--text-dark);
 }
 
-.landing__card-desc {
+.landing__salir {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-left: 6px;
+  padding: 3px 10px;
+  font-size: 12px;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--text-gray);
+  background: #fff;
+  border: 1px solid var(--border-input);
+  border-radius: 999px;
+  cursor: pointer;
+}
+
+.landing__salir:hover:not(:disabled) {
+  color: var(--tint-danger-text);
+  border-color: var(--tint-danger-bd);
+  background: var(--tint-danger);
+}
+
+.landing__salir:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.landing__saludo {
+  margin: 4px 0 14px;
   font-size: 14px;
   color: var(--text-gray);
+  text-align: center;
 }
 
-.landing__card-chevron {
-  flex-shrink: 0;
-  font-size: 22px;
+.landing__selectores {
+  display: flex;
+  gap: 24px;
+  width: 100%;
+  justify-content: center;
+  align-items: flex-start;
+  flex-wrap: wrap;
 }
 
-.landing__card-chevron--primary {
+/* Item tipo labatea: etiqueta arriba, caja abajo. position:relative para que la lista
+   desplegada cuelgue de su selector sin empujar al resto. */
+.landing__selector {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 260px;
+  max-width: 300px;
+}
+
+.landing__selector-lbl {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.landing__selbox {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  width: 100%;
+  height: 44px;
+  padding: 0 12px;
+  font-size: 14px;
+  font-family: inherit;
+  color: var(--text-dark);
+  background: #fff;
+  border: 1px solid var(--border-input);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+
+.landing__selbox:hover,
+.landing__selbox--abierto {
+  border-color: var(--primary-blue);
+}
+
+.landing__selbox-ph {
+  color: var(--text-muted);
+}
+
+.landing__selbox-val {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  font-weight: 600;
+}
+
+.landing__selbox-icono {
+  flex: none;
+  font-size: 18px;
   color: var(--primary-blue);
 }
 
-.landing__card-chevron--secondary {
-  color: var(--green-dark);
+.landing__selbox-chevron {
+  flex: none;
+  font-size: 20px;
+  color: var(--text-muted);
+}
+
+.landing__lista {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: var(--z-dropdown);
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  max-height: 280px;
+  overflow-y: auto;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  box-shadow: 0 12px 32px rgb(0 0 0 / 14%);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.landing__opcion {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 8px 10px;
+  text-align: left;
+  font-family: inherit;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.landing__opcion:hover {
+  background: var(--bg-subtle);
+}
+
+.landing__opcion--elegida {
+  background: var(--tint-info);
+  border-color: var(--tint-info-bd);
+}
+
+.landing__opcion-icono {
+  flex: none;
+  font-size: 20px;
+  color: var(--primary-blue);
+}
+
+.landing__opcion-cuerpo {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.landing__opcion-label {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.landing__opcion-desc {
+  font-size: 12px;
+  color: var(--text-gray);
+}
+
+/* Mismo avatar-con-iniciales del resto de la app (ver AsignadoPicker): tinte verde de
+   marca cuando no hay foto. */
+.landing__avatar {
+  flex: none;
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  object-fit: cover;
+}
+
+.landing__avatar--chico {
+  width: 24px;
+  height: 24px;
+}
+
+.landing__avatar--iniciales {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--color-verde-cta);
+  background: #e9f5f4;
+}
+
+.landing__avatar--chico.landing__avatar--iniciales {
+  font-size: 10px;
+}
+
+.landing__acciones {
+  display: flex;
+  justify-content: flex-end;
+  width: 100%;
+  margin-top: 18px;
+  padding-top: 18px;
+  border-top: 1px solid var(--border);
 }

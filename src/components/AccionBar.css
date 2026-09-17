@@ -1,0 +1,135 @@
+/* Barra de "¿Qué querés hacer?" arriba de cada sección (ver AccionBar.jsx). Delgada,
+   sobre blanco con borde abajo — no compite con el encabezado propio de cada pantalla. */
+
+.accion-bar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px var(--page-gutter);
+  background: #fff;
+  border-bottom: 1px solid var(--border);
+}
+
+.accion-bar__logo-btn {
+  display: inline-flex;
+  padding: 2px;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.accion-bar__logo {
+  width: 30px;
+  height: 30px;
+  object-fit: contain;
+}
+
+.accion-bar__lbl {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-gray);
+  white-space: nowrap;
+}
+
+@media (max-width: 640px) {
+  .accion-bar__lbl {
+    display: none;
+  }
+}
+
+.accion-bar__selector {
+  position: relative;
+}
+
+.accion-bar__selbox {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  min-width: 250px;
+  height: 34px;
+  padding: 0 10px;
+  font-size: 13px;
+  font-family: inherit;
+  color: var(--text-dark);
+  background: #fff;
+  border: 1px solid var(--border-input);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: border-color 0.12s ease;
+}
+
+.accion-bar__selbox:hover,
+.accion-bar__selbox--abierto {
+  border-color: var(--primary-blue);
+}
+
+.accion-bar__selbox-val {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.accion-bar__selbox-icono {
+  flex: none;
+  font-size: 16px;
+  color: var(--primary-blue);
+}
+
+.accion-bar__selbox-chevron {
+  flex: none;
+  font-size: 18px;
+  color: var(--text-muted);
+}
+
+.accion-bar__lista {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  right: 0;
+  z-index: var(--z-dropdown);
+  margin: 0;
+  padding: 5px;
+  list-style: none;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 10px 28px rgb(0 0 0 / 14%);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.accion-bar__opcion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  padding: 7px 9px;
+  font-size: 13px;
+  font-weight: 500;
+  font-family: inherit;
+  color: var(--text-dark);
+  text-align: left;
+  background: none;
+  border: 1px solid transparent;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.accion-bar__opcion svg {
+  color: var(--primary-blue);
+  font-size: 16px;
+}
+
+.accion-bar__opcion:hover {
+  background: var(--bg-subtle);
+}
+
+.accion-bar__opcion--elegida {
+  background: var(--tint-info);
+  border-color: var(--tint-info-bd);
+}

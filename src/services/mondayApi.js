@@ -1017,6 +1017,35 @@ function withTimeout(promise, ms) {
 // ventana padre quién es el usuario actual. Devuelve null (sin tirar error) si no hay
 // contexto de monday disponible (dev/preview standalone) o si algo falla — Sidebar.jsx
 // se queda con su fallback genérico en ese caso, nunca rompe la barra.
+// Dueño del token con el que la app habla con monday ("me"). Es el RESPALDO de "quién
+// está en el sistema" (ver LandingScreen) cuando no hay ni sesión de autenticación ni
+// contexto de monday — o sea, en local y previews sueltas, donde quien opera es el
+// asiento del token (The Automation Partner). Cacheado por sesión, igual que
+// fetchMondayUsers; si falla se descarta la promesa para poder reintentar.
+const ME_QUERY = `
+  query Me {
+    me {
+      id
+      name
+      photo_thumb_small
+    }
+  }
+`
+let mePromesa = null
+export function fetchMe() {
+  if (!mePromesa) {
+    mePromesa = callMondayApi(ME_QUERY, {})
+      .then((data) =>
+        data.me ? { id: String(data.me.id), name: data.me.name, photo: data.me.photo_thumb_small || null } : null
+      )
+      .catch((err) => {
+        mePromesa = null
+        throw err
+      })
+  }
+  return mePromesa
+}
+
 export async function fetchCurrentMondayUser() {
   try {
     const context = await withTimeout(monday.get('context'), 4000)
@@ -1045,6 +1074,62 @@ export async function fetchCurrentMondayUser() {
 // solo pide estas 2 columnas puntuales, nunca Rol/Email/Estado, y nunca corre
 // server-side — no hay que tocar boardLectura.js para esto.
 const USUARIOS_LISTA_BLANCA_BOARD_ID = 18409461390
+
+// Usuarios para el "¿Con qué usuario?" de la pantalla principal (ver LandingScreen): las
+// filas del tablero de Usuarios Habilitados con "Estado Usuario" = Activo — la misma
+// lista blanca del sistema de autenticación, pero leyendo SOLO nombre, ID de monday y
+// estado (nunca Rol/Email), y filtrando los inactivos acá. La foto sale de la cuenta de
+// monday (fetchMondayUsers) matcheando por "ID Usuario": en el asiento compartido varias
+// filas comparten la misma foto, y una fila sin ID sale con iniciales.
+const USUARIO_ESTADO_COLUMN_ID = 'color_mm6sf2bt' // "Estado Usuario": Activo | Inactivo
+const USUARIO_MONDAY_ID_COLUMN_ID = 'text_mm6sdhy6' // "ID Usuario" (user_id de monday)
+const USUARIOS_HABILITADOS_QUERY = `
+  query GetUsuariosHabilitados($boardId: [ID!]) {
+    boards(ids: $boardId) {
+      items_page(limit: 100) {
+        items {
+          id
+          name
+          column_values(ids: ["${USUARIO_MONDAY_ID_COLUMN_ID}", "${USUARIO_ESTADO_COLUMN_ID}"]) {
+            id
+            text
+          }
+        }
+      }
+    }
+  }
+`
+let usuariosHabilitadosPromesa = null
+export function fetchUsuariosHabilitados() {
+  if (!usuariosHabilitadosPromesa) {
+    usuariosHabilitadosPromesa = (async () => {
+      const [data, cuenta] = await Promise.all([
+        callMondayApi(USUARIOS_HABILITADOS_QUERY, { boardId: [String(USUARIOS_LISTA_BLANCA_BOARD_ID)] }),
+        // Sin la lista de la cuenta solo se pierden las fotos, no la funcionalidad.
+        fetchMondayUsers().catch(() => []),
+      ])
+      const items = data.boards?.[0]?.items_page?.items ?? []
+      return items
+        .filter((item) => textOf(item.column_values, USUARIO_ESTADO_COLUMN_ID) === 'Activo')
+        .map((item) => {
+          const crudo = textOf(item.column_values, USUARIO_MONDAY_ID_COLUMN_ID).trim()
+          // Columna de texto libre: solo un número entero es un user_id usable.
+          const mondayUserId = /^\d+$/.test(crudo) ? crudo : null
+          return {
+            id: item.id,
+            nombre: item.name,
+            mondayUserId,
+            photo: (mondayUserId && cuenta.find((u) => u.id === mondayUserId)?.photo) || null,
+          }
+        })
+        .sort((a, b) => a.nombre.localeCompare(b.nombre, 'es'))
+    })().catch((err) => {
+      usuariosHabilitadosPromesa = null
+      throw err
+    })
+  }
+  return usuariosHabilitadosPromesa
+}
 const USUARIO_TELEFONO_ENVIO_COLUMN_ID = 'phone_mm6sbe95' // "Whatsapp Envio"
 const USUARIO_CELULAR_HABILITADO_COLUMN_ID = 'color_mm71pdy7' // "Celular habilitado"
 const USUARIO_CELULAR_HABILITADO_LABEL = 'Habilitada'

@@ -11,8 +11,10 @@
 
 /* Sidebar.jsx a la izquierda + contenido a la derecha — layout de las 4 vistas de la
    app (landing, tabla de Oportunidades, crear, detalle de una Oportunidad). */
+/* Columna desde que no hay barra lateral: la AccionBar arriba y el contenido abajo. */
 .app-shell {
   display: flex;
+  flex-direction: column;
   min-height: 100vh;
   min-height: 100dvh;
   background: var(--bg-canvas);

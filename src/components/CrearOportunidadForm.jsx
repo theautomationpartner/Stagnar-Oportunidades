@@ -1,8 +1,6 @@
 import { useEffect, useState } from 'react'
 import {
   MdClear,
-  MdSearch,
-  MdHome,
   MdArrowForward,
   MdArrowBack,
   MdEventNote,
@@ -16,7 +14,6 @@ import {
 } from 'react-icons/md'
 import {
   Button,
-  IconButton,
   AttentionBox,
   Loader,
   TextField,
@@ -72,6 +69,7 @@ import { mapOpportunities } from '../services/opportunityMapper'
 import { revisarIdentificacion } from '../services/vehiculoIdentificacion'
 import { ciError, fechaError, fieldStateClass, maxFechaNacimiento, NACIONALIDAD_URUGUAY, normalizeFechaIA, splitNombreApellido, splitTelefono, stripCi, telefonoError, buildMondayPhone, emailError, buildMondayEmail } from '../services/personaFields'
 import { clearPersistedSearch, loadPersistedSearch, savePersistedSearch } from '../services/persistedSearch'
+import { publicarTrabajoEnCrear } from '../services/crearEnCurso'
 import { DocumentChoiceToggle, ExtranjeroFields, Required, RequiredDropdown, SectionTitle, StepHeading, TelefonoField } from './crear/FormPrimitives'
 import { ExistingRecordSearch } from './crear/ExistingRecordSearch'
 import { VehiculoManualFields } from './crear/VehiculoManualFields'
@@ -164,8 +162,6 @@ export default function CrearOportunidadForm({
   schema: schemaProp,
   opportunities,
   onCancel,
-  onVerOportunidades,
-  onHome,
   onOpenOportunidad,
   onCreated,
 }) {
@@ -188,7 +184,26 @@ export default function CrearOportunidadForm({
   // null = todavía no se eligió a mano: sigue a quien crea. Es derivado y no un estado
   // inicializado una vez porque el respaldo (el contexto de monday) llega tarde: con un
   // useState(creadorId) quedaría fijo en null.
-  const [asignadoElegido, setAsignadoElegido] = useState(null)
+  //
+  // La pantalla principal deja elegir "con qué usuario" trabajar (ver LandingScreen y su
+  // ASIGNADO_PREFILL_KEY): si vino de ahí, esa persona arranca como Asignado. El
+  // initializer SOLO lee (StrictMode lo invoca dos veces: leer-y-borrar ahí dejaba la
+  // segunda pasada sin el dato); el borrado va en el efecto de abajo — es un dato de ese
+  // viaje, no una preferencia que deba sobrevivir.
+  const [asignadoElegido, setAsignadoElegido] = useState(() => {
+    try {
+      return sessionStorage.getItem('stg_asignado_prefill') || null
+    } catch {
+      return null
+    }
+  })
+  useEffect(() => {
+    try {
+      sessionStorage.removeItem('stg_asignado_prefill')
+    } catch {
+      /* nada para borrar */
+    }
+  }, [])
   const asignadoId = asignadoElegido ?? creadorId
   // Calculado una sola vez, al montar (ver loadPersistedSearch) — de acá salen los
   // valores iniciales de stepIndex/form/resultadoSeleccionado/searchPreview/
@@ -571,6 +586,14 @@ export default function CrearOportunidadForm({
     // tipoRiesgo queda afuera a propósito: se autocompleta solo (único tipo disponible).
     searchPreview || stepIndex > 0 || form.nombre || form.apellido || form.ci || form.telefono || form.email
   )
+  // La AccionBar del shell también sale de acá y necesita saber si hay algo que perder
+  // (ver crearEnCurso.js) — mismo criterio que handleExit: con la oportunidad ya creada,
+  // o guardando, salir no descarta nada.
+  useEffect(() => {
+    publicarTrabajoEnCrear(hasUnsavedWork && !saving && !createdItemId)
+  })
+  useEffect(() => () => publicarTrabajoEnCrear(false), [])
+
   const handleExit = (destino) => {
     if (hasUnsavedWork && !saving && !createdItemId) {
       setPendingExit(() => destino)
@@ -1404,10 +1427,11 @@ export default function CrearOportunidadForm({
             activeKey={STEPS[stepIndex].key}
             onSelect={(key) => handleStepClick(STEPS.findIndex((s) => s.key === key))}
           />
-          <div className="crear-op__header-actions">
-            <IconButton icon={MdSearch} onClick={() => handleExit(onVerOportunidades)} aria-label="Buscar Oportunidad" />
-            <IconButton icon={MdHome} onClick={() => handleExit(onHome)} aria-label="Inicio" />
-          </div>
+          {/* A pedido, sin la lupa ni la casita: cambiar de tarea o volver al inicio vive
+              en la AccionBar de arriba (su logo es "Inicio"), que además avisa que salir
+              de acá descarta lo ingresado. El div queda: es la 3ª columna del grid que
+              centra el Stepper. */}
+          <div className="crear-op__header-actions" />
         </div>
 
         {stepIndex === 0 && (

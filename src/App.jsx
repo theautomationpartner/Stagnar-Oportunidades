@@ -2,7 +2,6 @@ import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } fro
 import LoadingScreen from './components/LoadingScreen'
 import { useHashRoute } from './hooks/useHashRoute'
 import { AppProviders } from './context/AppContext'
-import Sidebar from './components/Sidebar'
 import PageHeader from './components/PageHeader'
 import FilterPanel from './components/FilterPanel'
 import OpportunitiesTable from './components/OpportunitiesTable'
@@ -11,6 +10,7 @@ import OpportunitiesTable from './components/OpportunitiesTable'
 // chunk inicial queda con landing + tabla + filtros.
 const OpportunityDetail = lazy(() => import('./components/OpportunityDetail'))
 import LandingScreen from './components/LandingScreen'
+import AccionBar from './components/AccionBar'
 const CrearOportunidadForm = lazy(() => import('./components/CrearOportunidadForm'))
 import {
   fetchOpportunitiesPage,
@@ -295,8 +295,6 @@ export default function App() {
           schema={schema}
           opportunities={opportunities}
           onCancel={nav.goHome}
-          onVerOportunidades={nav.goTable}
-          onHome={nav.goHome}
           onOpenOportunidad={(id) => {
             setOpenedFromCrearFlow(true)
             nav.openOpportunity(id)
@@ -313,7 +311,7 @@ export default function App() {
   } else {
     main = (
       <div className="app">
-        <PageHeader onCreateNew={nav.goCreate} onHome={nav.goHome} />
+        <PageHeader />
         <FilterPanel
           searchTerm={searchTerm}
           onSearchTermChange={setSearchTerm}
@@ -347,17 +345,28 @@ export default function App() {
     )
   }
 
-  // Un solo shell: la Sidebar se monta UNA vez (antes se escribía 4 veces, una por
-  // vista, y se desmontaba/remontaba en cada cambio de pantalla).
+  // A pedido, sin barra lateral: con una sola sección ("Oportunidades") no navegaba
+  // nada que no navegue ya cada pantalla, y solo robaba ancho. Lo que vivía ahí se mudó:
+  // el logo y quién está en el sistema van en la pantalla principal (ver LandingScreen),
+  // igual que "Cerrar sesión". En su lugar, arriba de cada sección va la barra de
+  // "¿Qué querés hacer?" (ver AccionBar): cambia de tarea desde cualquier pantalla,
+  // avisando antes qué pasa con los datos.
+  const enDetalle = route.seg === 'oportunidades' && Boolean(route.id)
   return (
     <AppProviders schema={schema} mondayUser={mondayUser} nav={nav}>
       <div className="app-shell">
-        <Sidebar
-          active={route.seg === 'oportunidades'}
-          defaultExpanded={route.seg === 'inicio'}
-          user={mondayUser}
-          onNavigateOportunidades={() => closeDetail('oportunidades')}
-        />
+        {route.seg !== 'inicio' && (
+          <AccionBar
+            accionActual={route.seg === 'crear' ? 'crear' : 'consultar'}
+            enDetalle={enDetalle}
+            onIrAInicio={nav.goHome}
+            onCambiar={(accion) => {
+              setOpenedFromCrearFlow(false)
+              if (accion === 'crear') nav.goCreate()
+              else nav.goTable()
+            }}
+          />
+        )}
         <div className="app-shell__main">{main}</div>
       </div>
     </AppProviders>
