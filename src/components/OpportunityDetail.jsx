@@ -19,6 +19,7 @@ import './PillTabs.css'
 import {
   fetchOpportunityDetail,
   setSimpleColumnValue,
+  fetchColumnText,
   setItemName,
   setDropdownColumnValue,
   setConnectedColumnValue,
@@ -974,12 +975,26 @@ export default function OpportunityDetail({
     setMarkError(null)
     setCotizarErrorDetail(null)
     try {
-      // Antes de largar al robot se reescribe el año a cotizar, que es el que lee. Las
-      // dos escrituras de arriba (alta y edición) ya lo dejan bien; esto cubre lo que no
-      // pasó por la app: oportunidades anteriores a esta columna, o un año cambiado a mano
-      // en el tablero. Es una sola llamada y evita cotizar con un año equivocado, que se
-      // descubriría recién al mirar las primas.
-      await setSimpleColumnValue(opportunityId, ANIO_COTIZACION_COLUMN_ID, anioParaCotizar(opportunity?.anio))
+      // El robot cotiza con "Año a cotizar", así que ese campo tiene que estar bien ANTES
+      // de largarlo: una vez marcado "Cotizar" ya no hay vuelta atrás, y un año vacío o
+      // viejo se descubriría recién al mirar las primas, con las cotizaciones hechas.
+      //
+      // Se reescribe (las escrituras del alta y de la edición ya lo dejan bien; esto cubre
+      // lo que no pasó por la app), se vuelve a leer para confirmar que quedó asentado, y
+      // recién ahí se marca. Si algo de eso falla, no se cotiza y se avisa.
+      const anioCotizacion = anioParaCotizar(opportunity?.anio)
+      if (!anioCotizacion) {
+        throw new Error(
+          'La oportunidad no tiene un año de vehículo válido, así que no se puede saber con qué año cotizar. Completalo en "Editar" y volvé a intentar.'
+        )
+      }
+      await setSimpleColumnValue(opportunityId, ANIO_COTIZACION_COLUMN_ID, anioCotizacion)
+      const anioConfirmado = await fetchColumnText(opportunityId, ANIO_COTIZACION_COLUMN_ID)
+      if (anioConfirmado.trim() !== anioCotizacion) {
+        throw new Error(
+          `No se pudo dejar el año a cotizar en ${anioCotizacion} (quedó "${anioConfirmado}"). No se cotizó, para que el robot no use un año equivocado.`
+        )
+      }
       await setSimpleColumnValue(opportunityId, ESTADO_COTIZACION_COLUMN_ID, 'Cotizar')
       setItem((prev) => ({
         ...prev,

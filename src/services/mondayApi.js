@@ -713,6 +713,24 @@ const ITEM_STATE_QUERY = `
   }
 `
 
+// Lee UNA columna de UN ítem. Existe para confirmar que una escritura quedó asentada sin
+// tener que traerse el detalle completo (que son varias columnas, subitems y linked items).
+const COLUMN_TEXT_QUERY = `
+  query GetColumnText($itemId: ID!, $columnId: String!) {
+    items(ids: [$itemId]) {
+      column_values(ids: [$columnId]) {
+        id
+        text
+      }
+    }
+  }
+`
+
+export async function fetchColumnText(itemId, columnId) {
+  const data = await callMondayApi(COLUMN_TEXT_QUERY, { itemId, columnId })
+  return data.items?.[0]?.column_values?.[0]?.text ?? ''
+}
+
 export async function fetchItemState(itemId) {
   const data = await callMondayApi(ITEM_STATE_QUERY, { itemId })
   return data.items?.[0] ?? null
