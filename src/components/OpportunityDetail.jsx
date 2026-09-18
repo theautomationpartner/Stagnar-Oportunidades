@@ -106,6 +106,7 @@ function useFlipDeTarjetas(contenedorRef, idsEnOrden) {
   })
 }
 import { nombreDeOportunidad } from '../services/nombreOportunidad'
+import { ANIO_COTIZACION_COLUMN_ID, anioParaCotizar } from '../services/anioCotizacion'
 import './OpportunityDetail.css'
 
 const ESTADO_OPORTUNIDAD_COLUMN_ID = 'deal_stage'
@@ -973,6 +974,12 @@ export default function OpportunityDetail({
     setMarkError(null)
     setCotizarErrorDetail(null)
     try {
+      // Antes de largar al robot se reescribe el año a cotizar, que es el que lee. Las
+      // dos escrituras de arriba (alta y edición) ya lo dejan bien; esto cubre lo que no
+      // pasó por la app: oportunidades anteriores a esta columna, o un año cambiado a mano
+      // en el tablero. Es una sola llamada y evita cotizar con un año equivocado, que se
+      // descubriría recién al mirar las primas.
+      await setSimpleColumnValue(opportunityId, ANIO_COTIZACION_COLUMN_ID, anioParaCotizar(opportunity?.anio))
       await setSimpleColumnValue(opportunityId, ESTADO_COTIZACION_COLUMN_ID, 'Cotizar')
       setItem((prev) => ({
         ...prev,
@@ -1541,6 +1548,9 @@ export default function OpportunityDetail({
     const textByColumnId = {
       numeric_mm51mb0s: formValues.ci,
       dropdown_mm51mdmq: formValues.anio,
+      // Se recalcula con el año: si se corrige de 2027 a 2024, el año a cotizar tiene que
+      // acompañar. Ver anioCotizacion.js.
+      [ANIO_COTIZACION_COLUMN_ID]: anioParaCotizar(formValues.anio),
       // Muestra ya la elección nueva del buscador Autodata si se hizo una; si no, sigue
       // mostrando el texto real actual tal cual estaba.
       text_mm54fb7m: formValues.modeloSeleccion?.name ?? formValues.modelo,

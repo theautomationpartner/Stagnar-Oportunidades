@@ -8,6 +8,7 @@ import AutodataModeloPorAnioMarca from './AutodataModeloPorAnioMarca'
 import AlertModal from './AlertModal'
 import ErrorDetailBox from './ErrorDetailBox'
 import ClientFicha from './ClientFicha'
+import { anioParaCotizar, esAnioAdelantado } from '../services/anioCotizacion'
 import UbicacionParaCotizar from './UbicacionParaCotizar'
 import StepFooter from './StepFooter'
 import './CotizarStepPanel.css'
@@ -385,7 +386,18 @@ export default function CotizarStepPanel({
     },
     { key: 'marca', label: 'Marca', value: opportunity.marca, missing: missingKeys.has('marca') },
     { key: 'modelo', label: 'Modelo', value: opportunity.modelo, missing: missingKeys.has('modelo') },
-    { key: 'anio', label: 'Año', value: opportunity.anio, missing: missingKeys.has('anio') },
+    {
+      key: 'anio',
+      label: 'Año',
+      // Un 0km puede tener el año adelantado (un 2027 vendido en 2026) y las aseguradoras
+      // todavía no cotizan ese año: se les pide el año en curso (ver anioCotizacion.js).
+      // Se aclara acá porque, si no, las primas vuelven de otro año que el que muestra la
+      // pantalla y parece un error de la app.
+      value: esAnioAdelantado(opportunity.anio)
+        ? `${opportunity.anio} — se cotiza como ${anioParaCotizar(opportunity.anio)}`
+        : opportunity.anio,
+      missing: missingKeys.has('anio'),
+    },
     {
       key: 'combustible',
       label: 'Combustible',

@@ -20,6 +20,7 @@ import {
 } from '@vibe/core'
 import PersonaFicha from './crear/PersonaFicha'
 import { matchOption } from '../services/format'
+import { ANIO_COTIZACION_COLUMN_ID, anioParaCotizar } from '../services/anioCotizacion'
 import { nombreDeOportunidad } from '../services/nombreOportunidad'
 import { useSchema, useMondayUser } from '../context/AppContext'
 import { useAuth } from '../auth/AuthContext'
@@ -1235,6 +1236,10 @@ export default function CrearOportunidadForm({
         // hace que monday lo confunda con un ID de label interno y lo descarte en
         // silencio (ver dropdownColumnValue en mondayApi.js).
         columnValues.dropdown_mm51mdmq = dropdownColumnValue(form.anio)
+        // Con qué año se le pide la cotización a las aseguradoras: el del vehículo, salvo
+        // que sea un 0km de año adelantado (un 2027 vendido en 2026), que todavía no
+        // cotizan. Ver anioCotizacion.js.
+        columnValues[ANIO_COTIZACION_COLUMN_ID] = anioParaCotizar(form.anio)
         columnValues.color_mm52ey1d = form.uso
         // LOG-21: identificación del vehículo leída de la Carta Automóvil. Solo se
         // escriben si la lectura las trajo — un valor vacío no aporta nada y encima
