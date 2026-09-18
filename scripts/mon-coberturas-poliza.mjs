@@ -3,25 +3,28 @@
 //
 // Por qué existe: al validar una póliza emitida hay que comparar su cobertura contra la
 // que se cotizó, y no se llaman igual. PORTO escribe "1- Daños, Hurto, Incendio y
-// Responsabilidad Civil" donde nosotros tenemos "TOTAL 2500". Sin esta tabla el código
-// tiene que adivinar por las palabras del texto, que acierta la mayoría de las veces pero
-// no siempre, y cuando falla lo hace en silencio.
+// Responsabilidad Civil" donde nosotros tenemos "GLOBAL". El Run code sabe deducirlo con
+// las reglas de cada compañía (ver REGLAS_POR_COMPANIA en validacion-poliza.run-code.js),
+// pero una fila acá le gana a la deducción: es alguien diciendo qué es, y se corrige en
+// monday sin tocar el código del escenario.
 //
-// No hace falta ninguna columna nueva: PANEL ya tiene Compañias de Seguro y Cobertura.
+// EL NOMBRE DE LA FILA ES LA CLAVE DE BÚSQUEDA: se compara contra el texto de la póliza,
+// completo y letra por letra. Las filas que crea este script se llaman como nuestra
+// cobertura, que es lo único que se sabe sin tener la póliza delante. A medida que
+// aparezcan pólizas reales hay que renombrar cada fila con el texto TAL CUAL figura en el
+// PDF —copiado y pegado— o agregar otra fila con ese texto. Mientras tanto no molestan:
+// si no matchean, el Run code deduce con las reglas y avisa en "faltantes".
+//
 // Una cobertura por fila, porque esa columna admite una sola (label_limit_count: 1) y no
 // se cambia: las otras 100 filas de PANEL se refieren a una cobertura cada una. Alcanza
-// igual, porque el Run code compara por familia — si acá dice que el texto de PORTO es
-// GLOBAL, una GLOBAL ded Alto cotizada también valida. Si hace falta más precisión, se
-// agrega otra fila con el mismo texto y otra cobertura.
+// igual, porque el Run code compara por familia — si una fila dice que el texto de PORTO
+// es GLOBAL, una GLOBAL ded Alto cotizada también valida.
 //
-// Cómo se completa: el nombre de la fila es el texto TAL CUAL figura en la póliza. Si no
-// coincide letra por letra no se encuentra, así que conviene copiarlo y pegarlo del PDF.
-// Una fila sin compañía vale para todas, para los textos que usan varias.
+// Qué filas crea: una por cada combinación compañía + cobertura que ya existe en PANEL
+// (grupo Incluye), o sea lo que cada compañía vende de verdad. No se inventa ninguna.
 //
-// Las filas se siembran solo con lo verificado contra una póliza real. El resto se va
-// cargando a medida que aparecen: el escenario avisa cuál falta en "faltantes".
-//
-// Idempotente: si la fila ya existe la deja como está.
+// Idempotente: la clave es compañía + nombre, así que "TRIPLE" de SURA y "TRIPLE" de
+// PORTO son dos filas distintas y ninguna se duplica al correrlo de nuevo.
 //
 // Uso:
 //   node scripts/mon-coberturas-poliza.mjs            # muestra qué haría
@@ -43,15 +46,9 @@ const COMPANIA_COLUMN = 'dropdown_mm52feqr'
 const COBERTURA_COLUMN = 'dropdown_mm5frxag'
 const GRUPO = 'Coberturas'
 
-// PORTO usa GLOBAL, GLOBAL ded Alto y TRIPLE. El texto describe todo riesgo, así que se
-// mapea a GLOBAL y la familia cubre la variante de deducible.
-const FILAS = [
-  {
-    texto: '1- Daños, Hurto, Incendio y Responsabilidad Civil',
-    compania: 'PORTO',
-    nuestra: 'GLOBAL',
-  },
-]
+// Solo estas cuatro: son de las que se emiten pólizas y las únicas con reglas de lectura
+// en el Run code.
+const COMPANIAS = ['SURA', 'PORTO', 'SANCOR', 'BSE']
 
 async function gql(query, variables) {
   const r = await fetch('https://api.monday.com/v2', {
@@ -64,40 +61,36 @@ async function gql(query, variables) {
   return j.data
 }
 
-const board = (await gql(`{ boards(ids: ${PANEL}) { columns { id title type settings_str } groups { id title } } }`)).boards[0]
-const grupoCol = board.columns.find((c) => c.id === GRUPO_COLUMN)
-const etiquetasGrupo = Object.values(JSON.parse(grupoCol.settings_str).labels || {})
+const data = await gql(
+  `{ boards(ids: ${PANEL}) { items_page(limit: 300) { items { id name column_values(ids: ["${GRUPO_COLUMN}","${COMPANIA_COLUMN}","${COBERTURA_COLUMN}"]) { id text } } } } }`
+)
+const items = data.boards[0].items_page.items
+const valor = (item, id) => (item.column_values.find((c) => c.id === id)?.text || '').trim()
 
-// La etiqueta del grupo no se puede crear con una mutación de columna: la API no deja
-// tocar settings_str de un status. Sí se crea al escribirla en un ítem con
-// create_labels_if_missing, que es lo que hace este script.
-if (!etiquetasGrupo.includes(GRUPO)) {
-  console.log(`La etiqueta "${GRUPO}" todavía no existe en la columna Grupo. Se crea al escribir la primera fila.`)
-  console.log(`Etiquetas actuales: ${etiquetasGrupo.join(', ')}`)
-  console.log()
+// Lo que vende cada compañía sale de PANEL, no de una lista escrita acá: así no se
+// inventa ninguna combinación ni queda desactualizada cuando se agrega una cobertura.
+const combinaciones = new Map()
+for (const i of items) {
+  if (valor(i, GRUPO_COLUMN) !== 'Incluye') continue
+  const compania = valor(i, COMPANIA_COLUMN)
+  const cobertura = valor(i, COBERTURA_COLUMN)
+  if (!COMPANIAS.includes(compania) || !cobertura) continue
+  combinaciones.set(`${compania}|${cobertura}`, { compania, cobertura })
 }
 
-const coberturasValidas = Object.values(JSON.parse(board.columns.find((c) => c.id === COBERTURA_COLUMN).settings_str).labels || {}).map((l) => (typeof l === 'string' ? l : l.name))
-const desconocidas = [...new Set(FILAS.map((f) => f.nuestra))].filter((c) => !coberturasValidas.includes(c))
-if (desconocidas.length) {
-  console.error(`Estas coberturas no existen en el dropdown de PANEL: ${desconocidas.join(', ')}`)
-  process.exit(1)
-}
-
-const data = await gql(`{ boards(ids: ${PANEL}) { items_page(limit: 300) { items { id name column_values(ids: ["${GRUPO_COLUMN}"]) { id text } } } } }`)
+// La clave es compañía + nombre: "TRIPLE" de SURA no es "TRIPLE" de PORTO.
 const existentes = new Set(
-  data.boards[0].items_page.items
-    .filter((i) => (i.column_values[0]?.text || '').trim() === GRUPO)
-    .map((i) => i.name.trim().toLowerCase())
+  items
+    .filter((i) => valor(i, GRUPO_COLUMN) === GRUPO)
+    .map((i) => `${valor(i, COMPANIA_COLUMN)}|${i.name.trim().toLowerCase()}`)
 )
 
-const faltan = FILAS.filter((f) => !existentes.has(f.texto.trim().toLowerCase()))
+const faltan = [...combinaciones.values()].filter(
+  (c) => !existentes.has(`${c.compania}|${c.cobertura.toLowerCase()}`)
+)
 
-console.log(`${existentes.size} filas ya en el grupo "${GRUPO}", ${faltan.length} a crear`)
-for (const f of faltan) {
-  console.log(`  crear  ${f.compania || '(todas)'}  "${f.texto}"`)
-  console.log(`         → ${f.nuestra}`)
-}
+console.log(`${existentes.size} filas ya en "${GRUPO}", ${combinaciones.size} combinaciones, ${faltan.length} a crear`)
+for (const c of faltan) console.log(`  crear  ${c.compania.padEnd(8)} "${c.cobertura}"  →  ${c.cobertura}`)
 
 if (!faltan.length) {
   console.log('Nada que hacer.')
@@ -105,19 +98,19 @@ if (!faltan.length) {
   console.log()
   console.log('Simulación. Para aplicarlo: node scripts/mon-coberturas-poliza.mjs --apply')
 } else {
-  for (const f of faltan) {
+  for (const c of faltan) {
     const valores = {
       [GRUPO_COLUMN]: { label: GRUPO },
-      [COBERTURA_COLUMN]: { labels: [f.nuestra] },
+      [COMPANIA_COLUMN]: { labels: [c.compania] },
+      [COBERTURA_COLUMN]: { labels: [c.cobertura] },
     }
-    if (f.compania) valores[COMPANIA_COLUMN] = { labels: [f.compania] }
     const creado = await gql(
       `mutation($boardId: ID!, $name: String!, $values: JSON!) {
-         create_item(board_id: $boardId, item_name: $name, column_values: $values, create_labels_if_missing: true) { id name }
+         create_item(board_id: $boardId, item_name: $name, column_values: $values) { id name }
        }`,
-      { boardId: PANEL, name: f.texto, values: JSON.stringify(valores) }
+      { boardId: PANEL, name: c.cobertura, values: JSON.stringify(valores) }
     )
-    console.log(`creada ${creado.create_item.id}  ${creado.create_item.name}`)
+    console.log(`creada ${creado.create_item.id}  ${c.compania}  ${creado.create_item.name}`)
   }
   console.log()
   console.log(`listo: ${faltan.length} filas`)
