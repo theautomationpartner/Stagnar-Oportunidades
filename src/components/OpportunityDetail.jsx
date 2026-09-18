@@ -108,6 +108,8 @@ function useFlipDeTarjetas(contenedorRef, idsEnOrden) {
 }
 import { nombreDeOportunidad } from '../services/nombreOportunidad'
 import { ANIO_COTIZACION_COLUMN_ID, anioParaCotizar } from '../services/anioCotizacion'
+import { ESTADO_VALIDACION, VALIDACION_POLIZA_COLUMN_ID, estaValidando } from '../services/validacionPoliza'
+import { useAuth } from '../auth/AuthContext'
 import './OpportunityDetail.css'
 
 const ESTADO_OPORTUNIDAD_COLUMN_ID = 'deal_stage'
@@ -200,6 +202,8 @@ export default function OpportunityDetail({
   const [error, setError] = useState(null)
   const [overridesByQuoteId, setOverridesByQuoteId] = useState({})
   const [selectedIds, setSelectedIds] = useState(new Set())
+  // Para dejar constancia de quién revisa una validación a mano (ver handleRevisarValidacion).
+  const { usuario: usuarioSesion } = useAuth()
   const [activeStep, setActiveStep] = useState('cotizar')
   // Solapas "Total / Parcial / General" del paso "Comparar y enviar" — índice de
   // COBERTURA_TABS, no el texto (así matchea directo con TabList/Tab de @vibe/core). En
@@ -403,7 +407,12 @@ export default function OpportunityDetail({
   // - contador de fallos consecutivos: a los POLL_MAX_FAILS se corta y se avisa
   //   (pollStalled, ver AttentionBox arriba del todo) con "Reintentar", en vez de girar
   //   para siempre si la API de monday dejó de responder.
-  const anyPolling = polling || sendPolling || polizaPolling || lecturaPolling
+  // La validación de la póliza corre DESPUÉS de crearla, cuando el polling de creación
+  // ya se apagó. No lleva estado propio: se deriva de la columna que escribe el escenario,
+  // así arranca sola cuando él la pone en "Validando" y se corta sola cuando la deja en
+  // un estado terminal, sin que la app tenga que adivinar cuánto tarda.
+  const validacionPolling = estaValidando(textOf(item?.column_values ?? [], VALIDACION_POLIZA_COLUMN_ID))
+  const anyPolling = polling || sendPolling || polizaPolling || lecturaPolling || validacionPolling
   const pollFailsRef = useRef(0)
   const lastItemSigRef = useRef('')
   const stalledFlagsRef = useRef(null)
@@ -581,7 +590,7 @@ export default function OpportunityDetail({
       document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('focus', handleVisibility)
     }
-  }, [anyPolling, polling, sendPolling, polizaPolling, lecturaPolling, opportunityId, schema])
+  }, [anyPolling, polling, sendPolling, polizaPolling, lecturaPolling, validacionPolling, opportunityId, schema])
 
   // Refleja el paso activo en la URL (solo después de cargar, para no pisar el paso
   // pedido en la URL con el 'cotizar' inicial del useState).
@@ -1226,6 +1235,38 @@ export default function OpportunityDetail({
   // manos de la automatización real de monday, el polling de acá abajo ya refresca el
   // ítem completo en cada tick (ver el useEffect de polizaPolling) y va a reflejar solo
   // cuando de verdad haya pasado en monday, no antes.
+  // A pedido: si una validación de la póliza da mal, se puede emitir igual marcándola
+  // como revisada a mano. Pasa seguido que el dato correcto sea el de la póliza y el que
+  // haya que corregir sea el de la oportunidad.
+  //
+  // Queda constancia de quién la pasó dentro del propio motivo: la escritura en monday va
+  // con el usuario de la integración, así que el historial de la columna diría siempre lo
+  // mismo. El motivo que dejó el escenario no se pisa, se le agrega.
+  const [revisandoValidacion, setRevisandoValidacion] = useState(null)
+  const handleRevisarValidacion = async (validacion) => {
+    setRevisandoValidacion(validacion.key)
+    try {
+      const quien = usuarioSesion?.nombre || usuarioSesion?.email || 'un usuario de la app'
+      const nota = `Revisado a mano por ${quien} el ${new Date().toLocaleDateString('es-UY')}.`
+      const motivoActual = opportunity?.validacionesPoliza?.[validacion.key]?.motivo ?? ''
+      const motivoNuevo = motivoActual ? `${motivoActual} — ${nota}` : nota
+      await setSimpleColumnValue(opportunityId, validacion.estadoColumnId, ESTADO_VALIDACION.revisado)
+      await setSimpleColumnValue(opportunityId, validacion.motivoColumnId, motivoNuevo)
+      setItem((prev) => ({
+        ...prev,
+        column_values: prev.column_values.map((cv) => {
+          if (cv.id === validacion.estadoColumnId) return { ...cv, text: ESTADO_VALIDACION.revisado }
+          if (cv.id === validacion.motivoColumnId) return { ...cv, text: motivoNuevo }
+          return cv
+        }),
+      }))
+    } catch (err) {
+      console.warn('No se pudo marcar la validación como revisada', err)
+    } finally {
+      setRevisandoValidacion(null)
+    }
+  }
+
   const handleConfirmarEmision = async () => {
     onOpportunityAction?.()
     setConfirmandoEmision(true)
@@ -2146,6 +2187,8 @@ export default function OpportunityDetail({
               polling={polizaPolling}
               errorDetail={polizaErrorDetail}
               onConfirmarEmision={handleConfirmarEmision}
+              onRevisarValidacion={handleRevisarValidacion}
+              revisandoValidacion={revisandoValidacion}
               confirmandoEmision={confirmandoEmision}
               confirmarEmisionError={confirmarEmisionError}
               onBack={() => setActiveStep('confirmar')}

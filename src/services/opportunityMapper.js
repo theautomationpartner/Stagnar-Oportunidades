@@ -3,6 +3,7 @@
 // Los colores de estado NO se hardcodean: vienen de statusColors, leido en el momento
 // desde la config real de las columnas (ver services/boardSchema.js).
 
+import { VALIDACIONES_POLIZA, VALIDACION_POLIZA_COLUMN_ID } from './validacionPoliza'
 import { formatShortDate } from './format'
 import { textOf, boardRelationDisplayOf } from './mondayColumns'
 
@@ -134,6 +135,16 @@ export function mapOpportunityItem(item, statusColors = {}) {
     vehiculoAsegurado,
     // LOG-13: forma de pago con la que se cierra (etiqueta de color_mm71kfpr).
     cuotasElegidas: textOf(cv, 'color_mm71kfpr'),
+    // Validación de la póliza emitida: el veredicto de cada cosa con su motivo, tal cual
+    // lo dejó el escenario (ver validacionPoliza.js). Agrupado acá y no suelto en nueve
+    // campos, porque siempre se usan juntos.
+    validacionPolizaEstado: textOf(cv, VALIDACION_POLIZA_COLUMN_ID),
+    validacionesPoliza: Object.fromEntries(
+      VALIDACIONES_POLIZA.map((v) => [
+        v.key,
+        { estado: textOf(cv, v.estadoColumnId), motivo: textOf(cv, v.motivoColumnId) },
+      ])
+    ),
     libretaConducir: textOf(cv, 'file_mm51jy06'),
     cedula: textOf(cv, 'file_mm5pc008'),
     poliza: textOf(cv, 'file_mm5bzdd4'),

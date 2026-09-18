@@ -1,6 +1,7 @@
 import { memoAsync, invalidate as invalidateCache } from './cache'
 import mondaySdk from 'monday-sdk-js'
 import { fetchProtegido } from '../auth/fetchProtegido'
+import { COLUMNAS_VALIDACION_POLIZA } from './validacionPoliza'
 import { textOf } from './mondayColumns'
 
 // SDK cliente de monday (no confundir con `callMondayApi` de acá abajo, que pega
@@ -32,6 +33,9 @@ const OPPORTUNITY_COLUMN_IDS = [
   // Tipo de Riesgo: lo usa el nombre del ítem cuando todavía no hay vehículo cargado
   // (ver nombreOportunidad.js).
   'color_mm5atxav', // Tipo de Riesgo
+  // Validación de los datos de la póliza emitida (la escribe el escenario de Make, ver
+  // validacionPoliza.js): un estado general, cuatro estados y cuatro motivos.
+  ...COLUMNAS_VALIDACION_POLIZA,
   'deal_stage', // Estado Oportunidad
   'deal_owner', // Asignado
   'date_mm52w0h8', // Fecha Cot.

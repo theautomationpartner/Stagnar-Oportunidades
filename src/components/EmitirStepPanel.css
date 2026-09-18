@@ -208,3 +208,90 @@
 .emitir-step__poliza-check li {
   margin-bottom: 3px;
 }
+
+/* Validación de los datos de la póliza (ver validacionPoliza.js). La escribe el escenario
+   de Make; acá solo se muestra. El color dice el veredicto de un vistazo: verde pasó,
+   rojo no, naranja lo pasó una persona a mano, gris todavía no se validó. */
+.emitir-step__validacion {
+  margin: 0 0 16px;
+  padding: 14px 16px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.emitir-step__validacion-titulo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 0 0 10px;
+  font-size: 15px;
+}
+
+.emitir-step__validacion-corriendo {
+  font-size: 12px;
+  font-weight: 400;
+  color: var(--texto-suave, #676879);
+}
+
+.emitir-step__validacion-lista {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 720px) {
+  .emitir-step__validacion-lista {
+    grid-template-columns: 1fr;
+  }
+}
+
+.emitir-step__validacion-item {
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: 8px;
+}
+
+.emitir-step__validacion-item--ok {
+  border-left-color: #00854d;
+}
+
+.emitir-step__validacion-item--mal {
+  border-left-color: #d83a52;
+}
+
+.emitir-step__validacion-item--revisado {
+  border-left-color: #fdab3d;
+}
+
+.emitir-step__validacion-item--pendiente {
+  border-left-color: #c4c4c4;
+}
+
+.emitir-step__validacion-fila {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 14px;
+}
+
+.emitir-step__validacion-estado {
+  font-size: 12px;
+  color: var(--texto-suave, #676879);
+}
+
+.emitir-step__validacion-motivo {
+  margin: 4px 0 6px;
+  font-size: 12px;
+  color: var(--texto-suave, #676879);
+}
+
+.emitir-step__validacion-aviso {
+  margin: 10px 0 0;
+  font-size: 13px;
+  color: #d83a52;
+}

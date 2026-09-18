@@ -6,6 +6,13 @@ import { badgeForCompania } from '../services/companyColors'
 import { fetchFileColumnAsFile } from '../services/mondayApi'
 import { getMissingLabels as getMissingLabelsByStage } from '../services/requiredFields'
 import { compararPoliza } from '../services/polizaCheck'
+import {
+  VALIDACIONES_POLIZA,
+  ESTADO_VALIDACION,
+  estaValidando,
+  hayValidacion,
+  validacionesQueBloquean,
+} from '../services/validacionPoliza'
 import { revisarCampo, revisarIdentificacion } from '../services/vehiculoIdentificacion'
 import FileUploadField from './FileUploadField'
 import StepFooter from './StepFooter'
@@ -47,6 +54,8 @@ export default function EmitirStepPanel({
   polling,
   errorDetail,
   onConfirmarEmision,
+  onRevisarValidacion,
+  revisandoValidacion,
   confirmandoEmision,
   confirmarEmisionError,
   onBack,
@@ -71,6 +80,14 @@ export default function EmitirStepPanel({
   // hay vehículo vinculado todavía (póliza sin crear) no hay nada que comparar y no se
   // muestra nada.
   const diferenciasPoliza = compararPoliza(opportunity, opportunity.vehiculoAsegurado)
+
+  // Validación de la póliza emitida: la hace el escenario de Make (es el único que puede
+  // leer el PDF) y acá se muestra lo que dejó, en vivo. No se emite con algo en rojo sin
+  // que alguien lo revise — ver validacionPoliza.js.
+  const validaciones = opportunity.validacionesPoliza ?? {}
+  const validandoPoliza = estaValidando(opportunity.validacionPolizaEstado)
+  const tieneValidacion = hayValidacion(validaciones, opportunity.validacionPolizaEstado)
+  const bloqueantes = validacionesQueBloquean(validaciones)
 
   // Red distinta de la de arriba: acá no se comparan los dos lados, se mira si cada valor
   // PUEDE ser lo que dice ser (un chasis de 5 caracteres no es un chasis). Un dato mal
@@ -137,6 +154,55 @@ export default function EmitirStepPanel({
           falta es que la diferencia se vea, no impedir el paso: se muestran los dos
           valores enfrentados para que la persona decida en el momento, que es cuando
           todavía es barato corregirlo. */}
+      {(tieneValidacion || validandoPoliza) && (
+        <section className="emitir-step__validacion">
+          <h3 className="emitir-step__validacion-titulo">
+            Validación de los datos de la póliza
+            {validandoPoliza && <span className="emitir-step__validacion-corriendo">validando…</span>}
+          </h3>
+          <ul className="emitir-step__validacion-lista">
+            {VALIDACIONES_POLIZA.map((v) => {
+              const r = validaciones[v.key] ?? {}
+              const estado = r.estado || ESTADO_VALIDACION.sinValidar
+              const mal = estado === ESTADO_VALIDACION.incorrecto
+              return (
+                <li
+                  key={v.key}
+                  className={`emitir-step__validacion-item emitir-step__validacion-item--${
+                    mal ? 'mal' : estado === ESTADO_VALIDACION.valido ? 'ok' : estado === ESTADO_VALIDACION.revisado ? 'revisado' : 'pendiente'
+                  }`}
+                >
+                  <div className="emitir-step__validacion-fila">
+                    <strong>{v.label}</strong>
+                    <span className="emitir-step__validacion-estado">{estado}</span>
+                  </div>
+                  {/* El motivo lo escribe el escenario y se muestra tal cual: es el que
+                      sabe qué no coincidió. Sin motivo queda la descripción de qué
+                      compara esa validación, que al menos dice qué se miró. */}
+                  <p className="emitir-step__validacion-motivo">{r.motivo || v.detalle}</p>
+                  {mal && onRevisarValidacion && (
+                    <Button
+                      kind="tertiary"
+                      size="small"
+                      disabled={revisandoValidacion === v.key}
+                      onClick={() => onRevisarValidacion(v)}
+                    >
+                      {revisandoValidacion === v.key ? 'Marcando...' : 'Lo revisé, está bien'}
+                    </Button>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
+          {bloqueantes.length > 0 && (
+            <p className="emitir-step__validacion-aviso">
+              No se puede concretar hasta corregir {bloqueantes.map((v) => v.label.toLowerCase()).join(', ')} o
+              marcarlo como revisado.
+            </p>
+          )}
+        </section>
+      )}
+
       {diferenciasPoliza.length > 0 && (
         <AttentionBox type="warning" title="La póliza no coincide con el vehículo cotizado">
           <ul className="emitir-step__poliza-check">
@@ -305,7 +371,7 @@ export default function EmitirStepPanel({
             kind="primary"
             className="emitir-step__confirmar-btn"
             onClick={handleConcretarAttempt}
-            disabled={confirmandoEmision || polling}
+            disabled={confirmandoEmision || polling || validandoPoliza || bloqueantes.length > 0}
           >
             <MdCheckCircle /> {confirmandoEmision ? 'Confirmando...' : 'Concretar Oportunidad'}
           </Button>
