@@ -108,7 +108,13 @@ function useFlipDeTarjetas(contenedorRef, idsEnOrden) {
 }
 import { nombreDeOportunidad } from '../services/nombreOportunidad'
 import { ANIO_COTIZACION_COLUMN_ID, anioParaCotizar } from '../services/anioCotizacion'
-import { ESTADO_VALIDACION, VALIDACION_POLIZA_COLUMN_ID, estaValidando } from '../services/validacionPoliza'
+import {
+  ESTADO_VALIDACION,
+  ESTADO_GENERAL,
+  VALIDACIONES_POLIZA,
+  VALIDACION_POLIZA_COLUMN_ID,
+  estaValidando,
+} from '../services/validacionPoliza'
 import { useAuth } from '../auth/AuthContext'
 import './OpportunityDetail.css'
 
@@ -1181,6 +1187,28 @@ export default function OpportunityDetail({
   // "Concretada" sola (antes lo hacía apenas confirmaba la subida); eso se movió al
   // botón "Concretar Oportunidad" (ver handleConfirmarEmision más abajo), que es la
   // acción explícita que de verdad cierra la oportunidad.
+  const pedirValidacionPoliza = async () => {
+    const limpios = VALIDACIONES_POLIZA.flatMap((v) => [
+      [v.estadoColumnId, ESTADO_VALIDACION.sinValidar],
+      [v.motivoColumnId, ''],
+    ])
+    for (const [columnId, valor] of limpios) {
+      await setSimpleColumnValue(opportunityId, columnId, valor)
+    }
+    // El pedido va último: recién cuando los veredictos viejos ya no están, así el
+    // escenario no puede llegar a leer una mezcla de los dos.
+    await setSimpleColumnValue(opportunityId, VALIDACION_POLIZA_COLUMN_ID, ESTADO_GENERAL.validar)
+    setItem((prev) => ({
+      ...prev,
+      column_values: prev.column_values.map((cv) => {
+        const limpio = limpios.find(([columnId]) => columnId === cv.id)
+        if (limpio) return { ...cv, text: limpio[1] }
+        if (cv.id === VALIDACION_POLIZA_COLUMN_ID) return { ...cv, text: ESTADO_GENERAL.validar }
+        return cv
+      }),
+    }))
+  }
+
   const handleUploadPoliza = async (file) => {
     onOpportunityAction?.()
     setUploadingDoc((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: true }))
@@ -1221,6 +1249,16 @@ export default function OpportunityDetail({
           cv.id === POLIZA_COLUMN_ID ? { ...cv, text: file.name } : cv
         ),
       }))
+
+      // Con la póliza arriba se pide la validación: el escenario lee el PDF y contrasta
+      // persona, vehículo, compañía y cotización. Va acá y no en "Concretar" a propósito
+      // — validar sirve ANTES de crear la póliza en monday, para no crearla si los datos
+      // no coinciden.
+      //
+      // Los veredictos anteriores se limpian junto con el pedido: son de la póliza que se
+      // acaba de reemplazar, y dejarlos a la vista mientras corre la validación nueva
+      // haría creer que ya se validó esta.
+      await pedirValidacionPoliza()
     } catch (err) {
       setDocUploadError((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: err.message }))
     } finally {

@@ -41,7 +41,7 @@ export const VALIDACIONES_POLIZA = [
 
 // El estado general lo escribe el escenario: dice en qué anda, para poder mostrar el
 // progreso en vivo en vez de un cartel fijo.
-export const VALIDACION_POLIZA_COLUMN_ID = 'color_mm7ayfcj'
+export const VALIDACION_POLIZA_COLUMN_ID = 'color_mm7ash2k'
 
 export const ESTADO_VALIDACION = {
   sinValidar: 'Sin validar',
@@ -52,6 +52,10 @@ export const ESTADO_VALIDACION = {
 
 export const ESTADO_GENERAL = {
   sinValidar: 'Sin validar',
+  // Lo escribe la app al subir la póliza: es el pedido, igual que "Cotizar" en Estado
+  // Cotización. El escenario lo toma, pasa a "Validando" y termina en uno de los dos
+  // últimos.
+  validar: 'Validar',
   validando: 'Validando',
   validos: 'Datos válidos',
   conDiferencias: 'Con diferencias',
@@ -77,8 +81,11 @@ export function validacionesQueBloquean(validaciones) {
 
 // Mientras el escenario corre no tiene sentido dejar emitir ni mostrar un veredicto a
 // medio hacer: los estados van cambiando de a uno.
+// "Validar" cuenta como en curso: es el rato entre que la app lo pide y el escenario lo
+// agarra. Si no, la pantalla quedaría quieta justo al principio, que es cuando la persona
+// está mirando.
 export function estaValidando(general) {
-  return general === ESTADO_GENERAL.validando
+  return general === ESTADO_GENERAL.validar || general === ESTADO_GENERAL.validando
 }
 
 // Sin nada escrito todavía (pólizas anteriores a esta validación, o un escenario que no

@@ -47,10 +47,11 @@ const ESTADOS_VALIDACION = {
   labels: { 5: 'Sin validar', 1: 'Válido', 2: 'Incorrecto', 0: 'Revisado a mano' },
 }
 
-// El general lleva además "Validando", que es lo que la app muestra en vivo mientras el
-// escenario corre.
+// El general marca el ciclo completo: la app pide "Validar" al subir la póliza, el
+// escenario pasa a "Validando" mientras trabaja y cierra en "Datos válidos" o "Con
+// diferencias". La app muestra el progreso con eso y deja de refrescar al llegar al final.
 const ESTADO_GENERAL = {
-  labels: { 5: 'Sin validar', 3: 'Validando', 1: 'Datos válidos', 2: 'Con diferencias' },
+  labels: { 5: 'Sin validar', 4: 'Validar', 3: 'Validando', 1: 'Datos válidos', 2: 'Con diferencias' },
 }
 
 const COLUMNAS = [
