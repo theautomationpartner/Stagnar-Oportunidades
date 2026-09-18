@@ -136,16 +136,73 @@ const matriculaConfiable = (m) => {
 // La familia de una cobertura del catálogo.
 const familiaDeCatalogo = (cobertura) => FAMILIA_POR_COBERTURA[String(cobertura ?? '').trim().toUpperCase()] || null
 
-// La familia que describe el texto de la póliza. Lo que separa una de otra es si cubre
-// DAÑOS al propio vehículo: una parcial solo cubre responsabilidad civil, hurto e
-// incendio. Si el texto no alcanza para decidir, devuelve null y se dice que no se pudo
-// confirmar, en vez de adivinar.
-const familiaDeTextoPoliza = (texto) => {
+// Cómo nombra cada compañía sus coberturas. Son las mismas reglas con las que se importan
+// las cotizaciones desde los Excel de cada portal, así que es el vocabulario real de cada
+// una y no una interpretación nuestra.
+//
+// Cada regla es una lista de alternativas y cada alternativa una lista de palabras que
+// tienen que estar TODAS. El ORDEN IMPORTA: se toma la primera que matchea. "DAÑOS,
+// HURTO E INCENDIO" también contiene hurto+incendio, así que la regla de la total va
+// antes que la de la parcial o toda total se leería como parcial.
+//
+// Los textos ya vienen por normalizar(): minúsculas y sin acentos ("DAÑOS" es "danos").
+const REGLAS_POR_COMPANIA = {
+  porto: [
+    { cobertura: 'GLOBAL ded Alto', alternativas: [['incrementado'], ['alto']] },
+    { cobertura: 'GLOBAL', alternativas: [['global'], ['danos', 'hurto', 'incendio']] },
+    { cobertura: 'TRIPLE', alternativas: [['triple'], ['hurto', 'incendio']] },
+  ],
+  sura: [
+    { cobertura: 'TOTAL PLUS', alternativas: [['total', 'plus']] },
+    { cobertura: '4 EN 1', alternativas: [['4 en 1'], ['4en1']] },
+    { cobertura: 'TOTAL', alternativas: [['total']] },
+    { cobertura: 'TRIPLE', alternativas: [['triple'], ['hurto', 'incendio']] },
+  ],
+  sancor: [
+    { cobertura: 'TOTAL 600', alternativas: [['600']] },
+    { cobertura: 'TOTAL 800', alternativas: [['800']] },
+    { cobertura: 'TOTAL 1500', alternativas: [['1500']] },
+    { cobertura: 'TOTAL 2500', alternativas: [['2500']] },
+    { cobertura: 'PARCIAL PLUS', alternativas: [['parcial', 'plus']] },
+    { cobertura: 'PARCIAL', alternativas: [['parcial']] },
+  ],
+  bse: [
+    { cobertura: 'GLOBAL - 3x2', alternativas: [['global', '3x2'], ['todo riesgo', '3x2']] },
+    { cobertura: 'GLOBAL - anual', alternativas: [['global'], ['todo riesgo']] },
+    { cobertura: 'TRIPLE - 3X2', alternativas: [['triple', '3x2'], ['hurto', 'incendio', '3x2']] },
+    { cobertura: 'TRIPLE - anual', alternativas: [['triple'], ['hurto', 'incendio']] },
+  ],
+}
+
+// Qué cobertura nuestra describe ese texto, según las reglas de esa compañía.
+const coberturaDeTextoPoliza = (texto, compania) => {
+  const t = normalizar(texto)
+  const c = normalizar(compania)
+  if (!t || !c) return null
+  const clave = Object.keys(REGLAS_POR_COMPANIA).find((k) => c.includes(k))
+  if (!clave) return null
+  const regla = REGLAS_POR_COMPANIA[clave].find((r) =>
+    r.alternativas.some((palabras) => palabras.every((p) => t.includes(p)))
+  )
+  return regla ? regla.cobertura : null
+}
+
+// La familia que describe el texto de la póliza, cuando no hay una fila en PANEL que lo
+// diga. Si no alcanza para decidir devuelve null y se avisa que no se pudo confirmar, en
+// vez de adivinar.
+const familiaDeTextoPoliza = (texto, compania) => {
   const t = normalizar(texto)
   if (!t) return null
   if (familiaDeCatalogo(texto)) return familiaDeCatalogo(texto)
-  // "daños a terceros" es responsabilidad civil, no daño propio: si no se saca antes,
-  // toda parcial que lo diga con esas palabras se leería como total.
+  const porRegla = coberturaDeTextoPoliza(texto, compania)
+  // Una compañía conocida cuyo texto no matchea ninguna regla no se sigue adivinando con
+  // palabras sueltas: sus reglas ya dicen cómo nombra sus coberturas, y contradecirlas
+  // sería peor que decir que no se pudo determinar.
+  if (porRegla) return familiaDeCatalogo(porRegla)
+  if (Object.keys(REGLAS_POR_COMPANIA).some((k) => normalizar(compania).includes(k))) return null
+  // Compañía desconocida: no queda más que las palabras. "daños a terceros" es
+  // responsabilidad civil, no daño propio: si no se saca antes, toda parcial que lo diga
+  // con esas palabras se leería como total.
   const propios = t.replace(/dan(o|os|io|ios) (a|contra) (terceros|personas|cosas|bienes)/g, ' ')
   if (/dan(o|os|io|ios)|todo riesgo|casco/.test(propios)) return 'TOTAL'
   if (/responsabilidad civil|hurto|incendio/.test(t)) return 'PARCIAL'
@@ -371,7 +428,7 @@ if (!elegida) {
 // importa es que no se haya emitido una parcial cuando se cotizó una total.
 let cotizacion
 const familiaCot = elegida ? familiaDeCatalogo(elegida.cobertura) : null
-const familiaPol = familiaDeTextoPoliza(poliza.cobertura)
+const familiaPol = familiaDeTextoPoliza(poliza.cobertura, poliza.compania)
 const etiqueta = (familia) => (familia === 'TOTAL' ? 'cobertura total' : 'cobertura parcial')
 const equivalentes = coberturasEquivalentes(poliza.cobertura, poliza.compania)
 if (!elegida) {
@@ -403,7 +460,12 @@ if (!elegida) {
 } else if (!familiaPol) {
   cotizacion = mal(`No se pudo determinar si la póliza es total o parcial. Dice: "${poliza.cobertura}". Se cotizó ${elegida.cobertura}.`)
 } else if (familiaPol !== familiaCot) {
-  cotizacion = mal(`La póliza es ${etiqueta(familiaPol)} ("${poliza.cobertura}") y se cotizó ${etiqueta(familiaCot)} (${elegida.cobertura}).`)
+  const deducida = coberturaDeTextoPoliza(poliza.cobertura, poliza.compania)
+  cotizacion = mal(
+    deducida
+      ? `La póliza dice "${poliza.cobertura}", que en ${poliza.compania} es ${deducida}, y se cotizó ${elegida.cobertura}.`
+      : `La póliza es ${etiqueta(familiaPol)} ("${poliza.cobertura}") y se cotizó ${etiqueta(familiaCot)} (${elegida.cobertura}).`
+  )
 } else {
   const partes = []
   if (normalizar(poliza.cobertura) !== normalizar(elegida.cobertura)) {
