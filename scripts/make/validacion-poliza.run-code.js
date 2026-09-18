@@ -110,6 +110,12 @@ const codigo = (v) => String(v ?? '').toUpperCase().replace(/[^A-Z0-9]/g, '')
 
 const soloDigitos = (v) => String(v ?? '').replace(/\D/g, '')
 
+// Para comparar el texto de una cobertura contra el nombre de una fila de PANEL: sin
+// acentos, sin mayúsculas, sin espacios y sin puntuación. El mismo plan viene escrito
+// distinto según de dónde salga — el Excel de PORTO dice "1. DAÑOS, HURTO..." y el PDF de
+// la póliza "1- Daños, Hurto..." — y esa diferencia no significa nada.
+const claveTexto = (v) => normalizar(v).replace(/[^a-z0-9]/g, '')
+
 const numero = (v) => {
   const n = Number(String(v ?? '').replace(/\./g, '').replace(',', '.'))
   return Number.isFinite(n) ? n : null
@@ -271,9 +277,9 @@ const equivalencias = (input.coberturas || [])
 // las filas sin compañía valen para todas, para los textos genéricos que usan varias.
 // Mandan las de la compañía si existen: lo específico le gana a lo general.
 const coberturasEquivalentes = (texto, compania) => {
-  const t = normalizar(texto)
+  const t = claveTexto(texto)
   if (!t) return []
-  const filas = equivalencias.filter((e) => normalizar(e.texto) === t && e.nuestra)
+  const filas = equivalencias.filter((e) => claveTexto(e.texto) === t && e.nuestra)
   const propias = filas.filter((e) => e.compania && normalizar(e.compania) === normalizar(compania))
   return (propias.length ? propias : filas.filter((e) => !e.compania)).map((e) => e.nuestra)
 }

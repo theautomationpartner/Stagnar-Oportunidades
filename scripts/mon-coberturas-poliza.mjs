@@ -1,30 +1,29 @@
-// Crea en PANEL el grupo "Coberturas": la tabla que dice, para cada compañía, a qué
-// cobertura nuestra equivale el texto que esa compañía escribe en la póliza.
+// Carga en PANEL el grupo "Coberturas": cómo nombra cada compañía sus coberturas y a cuál
+// de las nuestras corresponde.
 //
 // Por qué existe: al validar una póliza emitida hay que comparar su cobertura contra la
-// que se cotizó, y no se llaman igual. PORTO escribe "1- Daños, Hurto, Incendio y
-// Responsabilidad Civil" donde nosotros tenemos "GLOBAL". El Run code sabe deducirlo con
-// las reglas de cada compañía (ver REGLAS_POR_COMPANIA en validacion-poliza.run-code.js),
-// pero una fila acá le gana a la deducción: es alguien diciendo qué es, y se corrige en
-// monday sin tocar el código del escenario.
+// que se cotizó, y no se llaman igual. PORTO escribe "1. DAÑOS, HURTO, INCENDIO Y
+// RESPONSABILIDAD CIVIL" donde nosotros tenemos "GLOBAL". El Run code sabe deducirlo con
+// las reglas de cada compañía (REGLAS_POR_COMPANIA en validacion-poliza.run-code.js), pero
+// una fila acá le gana a la deducción: es alguien diciendo qué es, y se corrige en monday
+// sin tocar el código del escenario.
 //
-// EL NOMBRE DE LA FILA ES LA CLAVE DE BÚSQUEDA: se compara contra el texto de la póliza,
-// completo y letra por letra. Las filas que crea este script se llaman como nuestra
-// cobertura, que es lo único que se sabe sin tener la póliza delante. A medida que
-// aparezcan pólizas reales hay que renombrar cada fila con el texto TAL CUAL figura en el
-// PDF —copiado y pegado— o agregar otra fila con ese texto. Mientras tanto no molestan:
-// si no matchean, el Run code deduce con las reglas y avisa en "faltantes".
+// EL NOMBRE DE LA FILA ES EL TEXTO ORIGINAL DE LA COMPAÑÍA. Es contra eso que se compara
+// la cobertura leída de la póliza. La comparación ignora mayúsculas, acentos y puntuación,
+// así que "1. DAÑOS..." y "1- Daños..." son el mismo texto — pero las palabras tienen que
+// estar. Si aparece un texto que no está en esta lista, conviene agregarlo tal cual sale
+// del PDF.
 //
-// Una cobertura por fila, porque esa columna admite una sola (label_limit_count: 1) y no
-// se cambia: las otras 100 filas de PANEL se refieren a una cobertura cada una. Alcanza
-// igual, porque el Run code compara por familia — si una fila dice que el texto de PORTO
-// es GLOBAL, una GLOBAL ded Alto cotizada también valida.
+// Dos filas pueden tener el mismo nombre a propósito:
+//   SURA "COBERTURA TOTAL"  → TOTAL  y también  TOTAL c/ Mov
+//   BSE  "GLOBAL"           → GLOBAL - anual  y también  GLOBAL - 3x2 (el bloque 3X2)
+// Son casos donde el texto de la compañía no alcanza para distinguir cuál de las dos es.
+// El Run code junta todas las filas que matchean, así que cualquiera de las dos cotizada
+// valida, que es lo correcto: no hay forma de saberlo por el texto.
 //
-// Qué filas crea: una por cada combinación compañía + cobertura que ya existe en PANEL
-// (grupo Incluye), o sea lo que cada compañía vende de verdad. No se inventa ninguna.
+// Una cobertura por fila porque esa columna admite una sola (label_limit_count: 1).
 //
-// Idempotente: la clave es compañía + nombre, así que "TRIPLE" de SURA y "TRIPLE" de
-// PORTO son dos filas distintas y ninguna se duplica al correrlo de nuevo.
+// Idempotente: la clave es compañía + nombre + cobertura.
 //
 // Uso:
 //   node scripts/mon-coberturas-poliza.mjs            # muestra qué haría
@@ -46,9 +45,31 @@ const COMPANIA_COLUMN = 'dropdown_mm52feqr'
 const COBERTURA_COLUMN = 'dropdown_mm5frxag'
 const GRUPO = 'Coberturas'
 
-// Solo estas cuatro: son de las que se emiten pólizas y las únicas con reglas de lectura
-// en el Run code.
-const COMPANIAS = ['SURA', 'PORTO', 'SANCOR', 'BSE']
+// Los textos tal cual los escribe cada compañía.
+const FILAS = [
+  ['PORTO', '1. DAÑOS, HURTO, INCENDIO Y RESPONSABILIDAD CIVIL', 'GLOBAL'],
+  ['PORTO', '1. DAÑOS, HURTO, INCENDIO Y RESPONSABILIDAD CIVIL CON DEDUCIBLE INCREMENTADO', 'GLOBAL ded Alto'],
+  ['PORTO', '2. HURTO, INCENDIO Y RESPONSABILIDAD CIVIL', 'TRIPLE'],
+  ['PORTO', '2.5. HURTO, INCENDIO Y RESPONSABILIDAD CIVIL CON AGENTES EXTERNOS', 'TRIPLE'],
+
+  ['SURA', 'COBERTURA 4 EN 1', '4 EN 1'],
+  ['SURA', 'RC HURTO E INCENDIO', 'TRIPLE'],
+  ['SURA', 'COBERTURA TOTAL PLUS', 'TOTAL PLUS'],
+  ['SURA', 'COBERTURA TOTAL', 'TOTAL'],
+  ['SURA', 'COBERTURA TOTAL', 'TOTAL c/ Mov'],
+
+  ['SANCOR', 'PARCIAL', 'PARCIAL'],
+  ['SANCOR', 'PARCIAL PLUS', 'PARCIAL PLUS'],
+  ['SANCOR', 'TOTAL 2500', 'TOTAL 2500'],
+  ['SANCOR', 'TOTAL 800', 'TOTAL 800'],
+  ['SANCOR', 'TOTAL 600', 'TOTAL 600'],
+  ['SANCOR', 'TOTAL 1500', 'TOTAL 1500'],
+
+  ['BSE', 'GLOBAL', 'GLOBAL - anual'],
+  ['BSE', 'TRIPLE', 'TRIPLE - anual'],
+  ['BSE', 'GLOBAL', 'GLOBAL - 3x2'],
+  ['BSE', 'TRIPLE', 'TRIPLE - 3X2'],
+].map(([compania, texto, nuestra]) => ({ compania, texto, nuestra }))
 
 async function gql(query, variables) {
   const r = await fetch('https://api.monday.com/v2', {
@@ -61,57 +82,68 @@ async function gql(query, variables) {
   return j.data
 }
 
-const data = await gql(
-  `{ boards(ids: ${PANEL}) { items_page(limit: 300) { items { id name column_values(ids: ["${GRUPO_COLUMN}","${COMPANIA_COLUMN}","${COBERTURA_COLUMN}"]) { id text } } } } }`
+const board = await gql(
+  `{ boards(ids: ${PANEL}) { columns(ids: ["${COBERTURA_COLUMN}"]) { settings_str }
+     items_page(limit: 300) { items { id name column_values(ids: ["${GRUPO_COLUMN}","${COMPANIA_COLUMN}","${COBERTURA_COLUMN}"]) { id text } } } } }`
 )
-const items = data.boards[0].items_page.items
+const items = board.boards[0].items_page.items
 const valor = (item, id) => (item.column_values.find((c) => c.id === id)?.text || '').trim()
 
-// Lo que vende cada compañía sale de PANEL, no de una lista escrita acá: así no se
-// inventa ninguna combinación ni queda desactualizada cuando se agrega una cobertura.
-const combinaciones = new Map()
-for (const i of items) {
-  if (valor(i, GRUPO_COLUMN) !== 'Incluye') continue
-  const compania = valor(i, COMPANIA_COLUMN)
-  const cobertura = valor(i, COBERTURA_COLUMN)
-  if (!COMPANIAS.includes(compania) || !cobertura) continue
-  combinaciones.set(`${compania}|${cobertura}`, { compania, cobertura })
+const catalogo = Object.values(JSON.parse(board.boards[0].columns[0].settings_str).labels || {}).map((l) =>
+  typeof l === 'string' ? l : l.name
+)
+const fueraDeCatalogo = FILAS.filter((f) => !catalogo.includes(f.nuestra))
+if (fueraDeCatalogo.length) {
+  console.error('Estas coberturas no existen en el dropdown de PANEL:')
+  for (const f of fueraDeCatalogo) console.error(`  ${f.compania} → "${f.nuestra}"`)
+  process.exit(1)
 }
 
-// La clave es compañía + nombre: "TRIPLE" de SURA no es "TRIPLE" de PORTO.
-const existentes = new Set(
-  items
-    .filter((i) => valor(i, GRUPO_COLUMN) === GRUPO)
-    .map((i) => `${valor(i, COMPANIA_COLUMN)}|${i.name.trim().toLowerCase()}`)
+const clave = (compania, nombre, cobertura) => `${compania}|${nombre.trim().toLowerCase()}|${cobertura}`
+const enElGrupo = items.filter((i) => valor(i, GRUPO_COLUMN) === GRUPO)
+const existentes = new Set(enElGrupo.map((i) => clave(valor(i, COMPANIA_COLUMN), i.name, valor(i, COBERTURA_COLUMN))))
+
+const faltan = FILAS.filter((f) => !existentes.has(clave(f.compania, f.texto, f.nuestra)))
+
+// Sobran las filas de una corrida anterior que se llamaban como NUESTRA cobertura en vez
+// del texto de la compañía. Se reconocen porque su nombre es exactamente una etiqueta del
+// catálogo: nadie escribiría eso a mano como texto de una póliza. Cualquier otra fila que
+// haya cargado una persona no se toca.
+const deseadas = new Set(FILAS.map((f) => clave(f.compania, f.texto, f.nuestra)))
+const sobran = enElGrupo.filter(
+  (i) =>
+    !deseadas.has(clave(valor(i, COMPANIA_COLUMN), i.name, valor(i, COBERTURA_COLUMN))) &&
+    catalogo.includes(i.name.trim())
 )
 
-const faltan = [...combinaciones.values()].filter(
-  (c) => !existentes.has(`${c.compania}|${c.cobertura.toLowerCase()}`)
-)
+console.log(`${enElGrupo.length} filas en "${GRUPO}": ${faltan.length} a crear, ${sobran.length} a borrar`)
+for (const f of faltan) console.log(`  crear   ${f.compania.padEnd(7)} "${f.texto}"  →  ${f.nuestra}`)
+for (const i of sobran) console.log(`  borrar  ${valor(i, COMPANIA_COLUMN).padEnd(7)} "${i.name}"  (nombre autogenerado, no es el texto de la compañía)`)
 
-console.log(`${existentes.size} filas ya en "${GRUPO}", ${combinaciones.size} combinaciones, ${faltan.length} a crear`)
-for (const c of faltan) console.log(`  crear  ${c.compania.padEnd(8)} "${c.cobertura}"  →  ${c.cobertura}`)
-
-if (!faltan.length) {
+if (!faltan.length && !sobran.length) {
   console.log('Nada que hacer.')
 } else if (!APLICAR) {
   console.log()
   console.log('Simulación. Para aplicarlo: node scripts/mon-coberturas-poliza.mjs --apply')
 } else {
-  for (const c of faltan) {
+  for (const f of faltan) {
     const valores = {
       [GRUPO_COLUMN]: { label: GRUPO },
-      [COMPANIA_COLUMN]: { labels: [c.compania] },
-      [COBERTURA_COLUMN]: { labels: [c.cobertura] },
+      [COMPANIA_COLUMN]: { labels: [f.compania] },
+      [COBERTURA_COLUMN]: { labels: [f.nuestra] },
     }
     const creado = await gql(
       `mutation($boardId: ID!, $name: String!, $values: JSON!) {
-         create_item(board_id: $boardId, item_name: $name, column_values: $values) { id name }
+         create_item(board_id: $boardId, item_name: $name, column_values: $values) { id }
        }`,
-      { boardId: PANEL, name: c.cobertura, values: JSON.stringify(valores) }
+      { boardId: PANEL, name: f.texto, values: JSON.stringify(valores) }
     )
-    console.log(`creada ${creado.create_item.id}  ${c.compania}  ${creado.create_item.name}`)
+    console.log(`creada  ${creado.create_item.id}  ${f.compania}  ${f.nuestra}`)
+  }
+  for (const i of sobran) {
+    await gql(`mutation($itemId: ID!) { delete_item(item_id: $itemId) { id } }`, { itemId: i.id })
+    console.log(`borrada ${i.id}  ${valor(i, COMPANIA_COLUMN)}  ${i.name}`)
   }
   console.log()
-  console.log(`listo: ${faltan.length} filas`)
+  console.log(`listo: ${faltan.length} creadas, ${sobran.length} borradas`)
 }
