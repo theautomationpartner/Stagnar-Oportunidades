@@ -15,10 +15,11 @@
 //                       De ahí sale la cotización elegida, sin tener que mapearla.
 //   input.cliente     = opcional, el ítem del Cliente vinculado: { name, column_values }.
 //                       Solo se usa como respaldo si la oportunidad no trae el dato.
-//   input.coberturas  = filas del PANEL con Grupo "Coberturas": cada una dice, para una
+//   input.coberturas  = filas del PANEL: cada una del grupo "Coberturas" dice, para una
 //                       compañía, a qué cobertura(s) nuestra(s) equivale el texto que usa
-//                       esa compañía en la póliza. Sin esto se cae a adivinar por las
-//                       palabras del texto, que acierta menos.
+//                       esa compañía en la póliza. Se puede pasar PANEL entero sin filtrar:
+//                       acá se queda con las del grupo que corresponde. Sin esto se cae a
+//                       adivinar por las palabras del texto, que acierta menos.
 //   input.poliza      = lo leído del PDF: { cedula, rut, titular, matricula, chasis,
 //                       motor, marca, anio, compania, cobertura, premio, observaciones }
 //                       La IA devuelve TEXTO LITERAL: no conoce nuestro catálogo de
@@ -49,6 +50,7 @@ const COL = {
   cliRazonSocial: 'text_mm51hysn',
   cliTipo: 'color_mm51rgar',
   // PANEL (filas del grupo "Coberturas")
+  panGrupo: 'color_mm5fdknw',
   panCompania: 'dropdown_mm52feqr',
   panCobertura: 'dropdown_mm5frxag',
   // Subitem (cotización)
@@ -185,14 +187,23 @@ const cliente = {
 // qué coberturas nuestras equivale. Es multi-select porque un mismo texto no equivale a
 // una sola: "Daños, Hurto, Incendio y RC" de PORTO es cualquiera de las Total, que entre
 // ellas se diferencian por el deducible y no por lo que cubren.
-const equivalencias = (input.coberturas || []).map((fila) => {
-  const cv = fila.column_values || fila.columnValues || []
-  return {
-    texto: String(fila.name ?? '').trim(),
-    compania: valorDe(cv, COL.panCompania),
-    nuestras: valorDe(cv, COL.panCobertura).split(',').map((c) => c.trim()).filter(Boolean),
-  }
-})
+// Se filtra acá y no en la consulta a propósito: en monday, filtrar una columna de estado
+// por el TEXTO de la etiqueta devuelve cero filas y ningún error (hay que pasar el índice
+// numérico). Un escenario armado así mostraría "no hay equivalencias cargadas" para
+// siempre, sin una sola pista de por qué. Traer PANEL entero y filtrar acá no tiene ese
+// modo de falla, y son 100 filas.
+const equivalencias = (input.coberturas || [])
+  .map((fila) => {
+    const cv = fila.column_values || fila.columnValues || []
+    return {
+      grupo: valorDe(cv, COL.panGrupo),
+      texto: String(fila.name ?? '').trim(),
+      compania: valorDe(cv, COL.panCompania),
+      nuestras: valorDe(cv, COL.panCobertura).split(',').map((c) => c.trim()).filter(Boolean),
+    }
+  })
+  // Sin la columna Grupo se asume que ya vinieron filtradas.
+  .filter((e) => !e.grupo || normalizar(e.grupo) === 'coberturas')
 
 // Se busca por texto y compañía. Una fila sin compañía vale para todas: sirve para los
 // textos genéricos que usan varias.
