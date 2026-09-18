@@ -1746,8 +1746,14 @@ const CREATE_TIMELINE_ITEM_MUTATION = `
 // a diferencia de esas, cada envío es un evento propio, no se reactiva un ítem único).
 // Las dos partes son independientes: si una falla, la otra igual se intenta. No
 // bloqueante en general, mismo criterio que crearActividadesIniciales.
+//
+// Devuelve { ok, fallos } en vez de tragarse el problema: antes los dos catch escribían
+// en la consola y nada más, así que si monday empezaba a rechazar esto la oportunidad se
+// quedaba sin registro de lo que se mandó y no se enteraba nadie. Sigue sin bloquear —
+// para cuando corre, la cotización ya salió— pero ahora quien llama puede avisarlo.
 export async function crearActividadEnvio(opportunityId, asignadoId, nombreCompleto, textos = []) {
   const cuerpo = textos.filter(Boolean).map(textoWhatsappAHtml).join('<br><br>—<br><br>')
+  const fallos = []
 
   try {
     await callMondayApi(CREATE_TIMELINE_ITEM_MUTATION, {
@@ -1760,6 +1766,7 @@ export async function crearActividadEnvio(opportunityId, asignadoId, nombreCompl
     })
   } catch (err) {
     console.error('No se pudo registrar la Custom Activity de envío de cotización:', err)
+    fallos.push('la actividad en el historial de la oportunidad')
   }
 
   try {
@@ -1776,7 +1783,10 @@ export async function crearActividadEnvio(opportunityId, asignadoId, nombreCompl
     if (cuerpo) await callMondayApi(CREATE_UPDATE_MUTATION, { body: cuerpo, itemId: creada.id })
   } catch (err) {
     console.error('No se pudo crear el ítem de envío de cotización en Actividades:', err)
+    fallos.push('el ítem en el tablero Actividades')
   }
+
+  return { ok: fallos.length === 0, fallos }
 }
 
 // Medio de Comunicación por defecto según el tipo de requisito: la Inspección es una

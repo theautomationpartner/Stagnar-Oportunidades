@@ -265,6 +265,10 @@ export default function OpportunityDetail({
   // en un intento anterior.
   const [cotizandoModalDismissed, setCotizandoModalDismissed] = useState(false)
   const [envioErrorDetail, setEnvioErrorDetail] = useState(null)
+  // Falla al dejar registrada la actividad del envío. Va aparte de envioErrorDetail:
+  // aquel es lo que informa Make sobre el envío en sí, y este es un problema nuestro con
+  // monday DESPUÉS de que la cotización ya salió.
+  const [actividadError, setActividadError] = useState(null)
   const [polizaErrorDetail, setPolizaErrorDetail] = useState(null)
   const [lecturaErrorDetail, setLecturaErrorDetail] = useState(null)
 
@@ -1075,6 +1079,7 @@ export default function OpportunityDetail({
   const handleWhatsAppSendStart = async () => {
     onOpportunityAction?.()
     setEnvioErrorDetail(null)
+    setActividadError(null)
     const anterior = textOf(item?.column_values ?? [], ESTADO_ENVIO_COLUMN_ID)
     await setSimpleColumnValue(opportunityId, ESTADO_ENVIO_COLUMN_ID, 'Enviando')
     setItem((prev) => ({
@@ -1112,12 +1117,32 @@ export default function OpportunityDetail({
   // el escenario, así que el envío ya es un hecho confirmado, no falta esperar nada más.
   const handleWhatsAppSent = async (sentEntries) => {
     onOpportunityAction?.()
+    // La función atrapa sus dos fallos y antes solo los escribía en la consola: si monday
+    // empezaba a rechazar esto, la oportunidad se quedaba sin registro de lo que se mandó
+    // y no se enteraba nadie.
+    //
+    // No frena el flujo a propósito. Para cuando corre esta línea el mensaje ya salió
+    // (ver el comentario de arriba), así que presentarlo como un envío fallido sería
+    // mentirle a quien ya vio llegar la cotización. Se avisa aparte, sin bloquear.
     crearActividadEnvio(
       opportunityId,
       opportunity?.asignadoId,
       opportunity?.clienteNombre,
       sentEntries.map((e) => e.texto)
     )
+      .then(({ ok, fallos }) => {
+        if (ok) return
+        setActividadError(
+          `La cotización se envió bien, pero monday no registró ${fallos.join(' ni ')}. Avisar al administrador del sistema.`
+        )
+      })
+      .catch((err) => {
+        // Por si falla armando el cuerpo, que queda fuera de los try de la función.
+        console.warn('No se pudo registrar la actividad del envío', err)
+        setActividadError(
+          'La cotización se envió bien, pero no se pudo registrar la actividad. Avisar al administrador del sistema.'
+        )
+      })
     const idsToMark = sentEntries.map((e) => e.raw.id).filter((id) => {
       const raw = rawQuotes.find((r) => r.id === id)
       return raw && !raw.incluirPropuesta
@@ -2084,6 +2109,14 @@ export default function OpportunityDetail({
                 title="Detalle del error de envío (último update en la oportunidad):"
                 className="opp-detail__error-detail-spacing"
               />
+
+              {/* Aviso, no error: el envío salió igual. Por eso es "warning" y no corta
+                  el paso ni esconde el footer. */}
+              {actividadError && (
+                <AttentionBox type="warning" title="No quedó registrado el envío">
+                  {actividadError}
+                </AttentionBox>
+              )}
 
               {/* A pedido: mismo footer pegado abajo del todo que los otros 3 pasos de
                   la Oportunidad (ver StepFooter) — "Volver" a la izquierda vuelve a
