@@ -15,6 +15,10 @@
 //                       De ahí sale la cotización elegida, sin tener que mapearla.
 //   input.cliente     = opcional, el ítem del Cliente vinculado: { name, column_values }.
 //                       Solo se usa como respaldo si la oportunidad no trae el dato.
+//   input.coberturas  = filas del PANEL con Grupo "Coberturas": cada una dice, para una
+//                       compañía, a qué cobertura(s) nuestra(s) equivale el texto que usa
+//                       esa compañía en la póliza. Sin esto se cae a adivinar por las
+//                       palabras del texto, que acierta menos.
 //   input.poliza      = lo leído del PDF: { cedula, rut, titular, matricula, chasis,
 //                       motor, marca, anio, compania, cobertura, premio, observaciones }
 //                       La IA devuelve TEXTO LITERAL: no conoce nuestro catálogo de
@@ -44,6 +48,9 @@ const COL = {
   cliCedula: 'text_mm4vk9aq',
   cliRazonSocial: 'text_mm51hysn',
   cliTipo: 'color_mm51rgar',
+  // PANEL (filas del grupo "Coberturas")
+  panCompania: 'dropdown_mm52feqr',
+  panCobertura: 'dropdown_mm5frxag',
   // Subitem (cotización)
   subPropuestaElegida: 'boolean_mm5bn41n',
   subCompania: 'dropdown_mm51f4va',
@@ -171,6 +178,33 @@ const cliente = {
   razonSocial: valorDe(clienteCv, COL.cliRazonSocial),
   documento: valorDe(clienteCv, COL.cliCedula),
   tipo: valorDe(clienteCv, COL.cliTipo),
+}
+
+// Equivalencias de cobertura cargadas en PANEL. El nombre de la fila es el texto tal
+// cual lo escribe la compañía en la póliza; la columna Cobertura (multi-select) dice a
+// qué coberturas nuestras equivale. Es multi-select porque un mismo texto no equivale a
+// una sola: "Daños, Hurto, Incendio y RC" de PORTO es cualquiera de las Total, que entre
+// ellas se diferencian por el deducible y no por lo que cubren.
+const equivalencias = (input.coberturas || []).map((fila) => {
+  const cv = fila.column_values || fila.columnValues || []
+  return {
+    texto: String(fila.name ?? '').trim(),
+    compania: valorDe(cv, COL.panCompania),
+    nuestras: valorDe(cv, COL.panCobertura).split(',').map((c) => c.trim()).filter(Boolean),
+  }
+})
+
+// Se busca por texto y compañía. Una fila sin compañía vale para todas: sirve para los
+// textos genéricos que usan varias.
+const equivalenciaDe = (texto, compania) => {
+  const t = normalizar(texto)
+  if (!t) return null
+  const candidatas = equivalencias.filter((e) => normalizar(e.texto) === t && e.nuestras.length)
+  return (
+    candidatas.find((e) => e.compania && normalizar(e.compania) === normalizar(compania)) ||
+    candidatas.find((e) => !e.compania) ||
+    null
+  )
 }
 
 // La cotización elegida sale de los subitems: es la que tiene "Propuesta elegida" tildada.
@@ -325,10 +359,23 @@ let cotizacion
 const familiaCot = elegida ? familiaDeCatalogo(elegida.cobertura) : null
 const familiaPol = familiaDeTextoPoliza(poliza.cobertura)
 const etiqueta = (familia) => (familia === 'TOTAL' ? 'cobertura total' : 'cobertura parcial')
+const equivalencia = equivalenciaDe(poliza.cobertura, poliza.compania)
 if (!elegida) {
   cotizacion = mal('No se puede validar: la oportunidad no tiene una cotización marcada como elegida.')
 } else if (!poliza.cobertura) {
   cotizacion = mal('No se puede validar: no se pudo leer la cobertura en la póliza.')
+} else if (equivalencia) {
+  // Con la equivalencia cargada no hay nada que interpretar: alguien ya dijo qué es.
+  const nuestras = equivalencia.nuestras.map((c) => normalizar(c))
+  // Un texto puede equivaler a media docena de coberturas nuestras: listarlas todas hace
+  // un motivo ilegible, y lo que importa es que la cotizada no está entre ellas.
+  const listado =
+    equivalencia.nuestras.length > 3
+      ? equivalencia.nuestras.slice(0, 3).join(", ") + " u otras " + (equivalencia.nuestras.length - 3)
+      : equivalencia.nuestras.join(" o ")
+  cotizacion = nuestras.includes(normalizar(elegida.cobertura))
+    ? ok()
+    : mal(`La póliza dice "${poliza.cobertura}", que según PANEL es ${listado}, y se cotizó ${elegida.cobertura}.`)
 } else if (COBERTURAS_SIN_FAMILIA.includes(String(elegida.cobertura ?? '').trim().toUpperCase())) {
   // Se cotizó una cobertura que el sistema no clasifica como total ni parcial: no hay
   // contra qué comparar la familia, solo queda el nombre.
@@ -358,6 +405,10 @@ if (!elegida) {
   }
   cotizacion = ok(partes.join(' '))
 }
+
+// Si el texto de la póliza no está en PANEL, lo de arriba lo resolvió adivinando por las
+// palabras. Se avisa para que alguien cargue la fila y la próxima no haya que adivinar.
+if (poliza.cobertura && !equivalencia) faltantes.push(`equivalencia de "${poliza.cobertura}" en PANEL`)
 
 // Lo que la IA haya anotado al leer va al motivo de la cotización: casi siempre es sobre
 // la cobertura, y es el aviso de que la lectura no estaba segura de algo.
