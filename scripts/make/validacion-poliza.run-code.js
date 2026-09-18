@@ -13,8 +13,8 @@
 //                       [{ id, text }, ...]
 //   input.subitems    = subitems de la Oportunidad, cada uno con sus column_values.
 //                       De ahí sale la cotización elegida, sin tener que mapearla.
-//   input.cliente     = el ítem del Cliente vinculado: { name, column_values }. El dato
-//                       de la persona vive ahí; la CI de la oportunidad es una copia.
+//   input.cliente     = opcional, el ítem del Cliente vinculado: { name, column_values }.
+//                       Solo se usa como respaldo si la oportunidad no trae el dato.
 //   input.poliza      = lo leído del PDF: { cedula, rut, titular, matricula, chasis,
 //                       motor, marca, anio, compania, cobertura, premio, observaciones }
 //                       La IA devuelve TEXTO LITERAL: no conoce nuestro catálogo de
@@ -201,16 +201,17 @@ const faltantes = []
 // Persona: el documento manda (es único); el nombre es de apoyo, porque se escribe de
 // mil formas y un acento de más no es un error de emisión.
 //
-// El titular puede ser una persona (cédula) o una empresa (RUT). Hoy el sistema guarda
-// un solo documento por cliente y no distingue cuál es: un RUT tiene 12 dígitos y una
-// cédula 7 u 8, así que comparar uno contra otro daría "no coincide" siempre, en todas
-// las pólizas de empresas. Cuando pasa eso no se miente: se compara por nombre y se dice
-// que el documento no se pudo comparar.
+// El documento sale de la CI de la OPORTUNIDAD, que es contra lo que se cotizó. Esa
+// columna va a pasar a llamarse "CI/RUT": el titular puede ser una persona (cédula) o
+// una empresa (RUT) y ahí va el que corresponda. Mientras tanto puede tener una cédula
+// de 8 dígitos donde la póliza trae un RUT de 12: eso no es "no coincide", son dos
+// documentos distintos que no se pueden comparar. Cuando pasa, se resuelve por nombre y
+// el motivo dice que el documento no se pudo comparar, en vez de inventar un error.
 let persona
 const docPoliza = soloDigitos(poliza.rut) || soloDigitos(poliza.cedula)
 const esEmpresa = Boolean(soloDigitos(poliza.rut))
-const docNuestro = soloDigitos(cliente.documento) || soloDigitos(op.cedula)
-const nombreNuestro = cliente.razonSocial || cliente.nombre || op.nombre
+const docNuestro = soloDigitos(op.cedula) || soloDigitos(cliente.documento)
+const nombreNuestro = op.nombre || cliente.razonSocial || cliente.nombre
 const titular = String(poliza.titular ?? '').trim()
 // Los nombres de empresa cambian de forma ("S.A.", "SA", "S. A.") sin ser otra empresa:
 // se comparan sin puntuación, sin espacios y sin el sufijo societario del final.
@@ -227,29 +228,29 @@ const nombreComparable = (v) => {
 if (!docPoliza && !titular) {
   persona = mal('No se puede validar: la póliza no trae ni documento ni nombre del titular.')
 } else if (!docNuestro && !nombreNuestro) {
-  faltantes.push('documento o nombre del cliente')
-  persona = mal('No se puede validar: la oportunidad no tiene cliente con documento ni nombre cargado.')
+  faltantes.push('CI/RUT o nombre en la oportunidad')
+  persona = mal('No se puede validar: la oportunidad no tiene documento ni nombre cargado.')
 } else if (docPoliza && docNuestro && docPoliza === docNuestro) {
   persona =
     titular && nombreNuestro && nombreComparable(titular) !== nombreComparable(nombreNuestro)
-      ? ok(`El documento coincide. El nombre figura distinto: "${titular}" en la póliza y "${nombreNuestro}" en el cliente.`)
+      ? ok(`El documento coincide. El nombre figura distinto: "${titular}" en la póliza y "${nombreNuestro}" en la oportunidad.`)
       : ok()
 } else if (docPoliza && docNuestro && esEmpresa && docNuestro.length <= 9) {
   // RUT contra cédula: no son comparables. Se resuelve por nombre y se avisa qué falta.
-  faltantes.push('RUT del cliente')
+  faltantes.push('RUT en la oportunidad')
   persona =
     titular && nombreNuestro && nombreComparable(titular) === nombreComparable(nombreNuestro)
-      ? ok(`La póliza está a nombre de ${titular} (RUT ${poliza.rut}), que coincide con el cliente. El RUT no se pudo comparar: el sistema guarda ${cliente.documento || op.cedula}, que no es un RUT.`)
-      : mal(`La póliza está a nombre de ${titular || 'una empresa'} (RUT ${poliza.rut}) y el cliente es ${nombreNuestro || 'otro'} (${docNuestro}). El sistema no guarda RUT, así que no se pudo comparar el documento.`)
+      ? ok(`La póliza está a nombre de ${titular} (RUT ${poliza.rut}), que coincide con la oportunidad. El RUT no se pudo comparar: en la oportunidad figura ${op.cedula || docNuestro}, que no es un RUT.`)
+      : mal(`La póliza está a nombre de ${titular || 'una empresa'} (RUT ${poliza.rut}) y la oportunidad es de ${nombreNuestro || 'otro'} (${docNuestro}). En la oportunidad no está el RUT, así que no se pudo comparar el documento.`)
 } else if (docPoliza && docNuestro) {
   persona = mal(
-    `La póliza está a nombre del documento ${poliza.rut || poliza.cedula}${titular ? ` (${titular})` : ''} y el cliente es ${docNuestro}${nombreNuestro ? ` (${nombreNuestro})` : ''}.`
+    `La póliza está a nombre del documento ${poliza.rut || poliza.cedula}${titular ? ` (${titular})` : ''} y la oportunidad es de ${docNuestro}${nombreNuestro ? ` (${nombreNuestro})` : ''}.`
   )
 } else if (titular && nombreNuestro) {
   persona =
     nombreComparable(titular) === nombreComparable(nombreNuestro)
       ? ok('Confirmado por nombre; no había documento para comparar de los dos lados.')
-      : mal(`La póliza está a nombre de "${titular}" y el cliente es "${nombreNuestro}". No hay documento para comparar de los dos lados.`)
+      : mal(`La póliza está a nombre de "${titular}" y la oportunidad es de "${nombreNuestro}". No hay documento para comparar de los dos lados.`)
 } else {
   persona = mal('No se puede validar: falta el documento o el nombre de alguno de los dos lados.')
 }
