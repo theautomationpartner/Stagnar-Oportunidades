@@ -39,16 +39,18 @@ const env = Object.fromEntries(
 const APLICAR = process.argv.includes('--apply')
 const BOARD = '18420863013'
 
-// Los colores son los índices reales de monday: 6 gris (sin validar), 1 verde (válido),
-// 2 rojo (incorrecto), 0 naranja (revisado a mano: pasó una persona, no el sistema).
+// Los índices son los de la paleta de monday: 5 es el gris que monday usa como valor por
+// defecto de una columna de estado, así que una oportunidad sin validar se lee "Sin
+// validar" en vez de quedar en blanco. 1 verde (válido), 2 rojo (incorrecto) y 0 naranja
+// para "revisado a mano", que no es lo mismo que válido: lo pasó una persona, no el sistema.
 const ESTADOS_VALIDACION = {
-  labels: { 6: 'Sin validar', 1: 'Válido', 2: 'Incorrecto', 0: 'Revisado a mano' },
+  labels: { 5: 'Sin validar', 1: 'Válido', 2: 'Incorrecto', 0: 'Revisado a mano' },
 }
 
 // El general lleva además "Validando", que es lo que la app muestra en vivo mientras el
 // escenario corre.
 const ESTADO_GENERAL = {
-  labels: { 6: 'Sin validar', 3: 'Validando', 1: 'Datos válidos', 2: 'Con diferencias' },
+  labels: { 5: 'Sin validar', 3: 'Validando', 1: 'Datos válidos', 2: 'Con diferencias' },
 }
 
 const COLUMNAS = [
