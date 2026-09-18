@@ -13,8 +13,12 @@
 //                       [{ id, text }, ...]
 //   input.subitems    = subitems de la Oportunidad, cada uno con sus column_values.
 //                       De ahí sale la cotización elegida, sin tener que mapearla.
-//   input.poliza      = lo leído del PDF: { cedula, titular, matricula, chasis, motor,
-//                       marca, anio, compania, cobertura, premio }
+//   input.cliente     = el ítem del Cliente vinculado: { name, column_values }. El dato
+//                       de la persona vive ahí; la CI de la oportunidad es una copia.
+//   input.poliza      = lo leído del PDF: { cedula, rut, titular, matricula, chasis,
+//                       motor, marca, anio, compania, cobertura, premio, observaciones }
+//                       La IA devuelve TEXTO LITERAL: no conoce nuestro catálogo de
+//                       coberturas ni normaliza documentos. Eso se resuelve acá.
 //
 // SALIDA:
 //   { accion, general, persona, vehiculo, compania, cotizacion, faltantes }
@@ -36,6 +40,10 @@ const COL = {
   cartaAutomovil: 'file_mm51jy06',
   cedulaArchivo: 'file_mm5pc008',
   estadoLectura: 'color_mm5rzrhk',
+  // Cliente
+  cliCedula: 'text_mm4vk9aq',
+  cliRazonSocial: 'text_mm51hysn',
+  cliTipo: 'color_mm51rgar',
   // Subitem (cotización)
   subPropuestaElegida: 'boolean_mm5bn41n',
   subCompania: 'dropdown_mm51f4va',
@@ -48,6 +56,19 @@ const COL = {
 // que vio el cliente se calcula en la app con bonificación y recargos, así que un calce
 // exacto no existe. Por eso el monto avisa pero no define identidad.
 const TOLERANCIA_PREMIO = 0.1
+
+// Familia de cada cobertura del catálogo, igual que coberturaGroups.js en la app: TOTAL
+// es todo riesgo (cubre daños propios) y PARCIAL es responsabilidad civil, hurto e
+// incendio. Se compara por familia y no por nombre exacto porque la póliza describe la
+// cobertura con las palabras de la compañía ("1- Daños, Hurto, Incendio y Responsabilidad
+// Civil"), que no son las del catálogo.
+const FAMILIA_POR_COBERTURA = {
+  'GLOBAL - ANUAL': 'TOTAL', 'GLOBAL - 3X2': 'TOTAL', GLOBAL: 'TOTAL', 'GLOBAL DED ALTO': 'TOTAL',
+  'TOTAL 600': 'TOTAL', 'TOTAL 800': 'TOTAL', 'TOTAL 1500': 'TOTAL', 'TOTAL 2500': 'TOTAL',
+  TOTAL: 'TOTAL', 'TOTAL PLUS': 'TOTAL',
+  'TRIPLE - ANUAL': 'PARCIAL', 'TRIPLE - 3X2': 'PARCIAL', TRIPLE: 'PARCIAL',
+  PARCIAL: 'PARCIAL', 'PARCIAL PLUS': 'PARCIAL', '4 EN 1': 'PARCIAL',
+}
 
 const ESTADO = { valido: 'Válido', incorrecto: 'Incorrecto', sinValidar: 'Sin validar' }
 const GENERAL = { validando: 'Validando', validos: 'Datos válidos', conDiferencias: 'Con diferencias' }
@@ -63,7 +84,7 @@ const valorDe = (columnValues, id) => {
 const normalizar = (v) =>
   String(v ?? '')
     .normalize('NFD')
-    .replace(/[̀-ͯ]/g, '')
+    .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase()
@@ -97,6 +118,25 @@ const matriculaConfiable = (m) => {
   return v.length >= 6 && v.length <= 8
 }
 
+// La familia de una cobertura del catálogo.
+const familiaDeCatalogo = (cobertura) => FAMILIA_POR_COBERTURA[String(cobertura ?? '').trim().toUpperCase()] || null
+
+// La familia que describe el texto de la póliza. Lo que separa una de otra es si cubre
+// DAÑOS al propio vehículo: una parcial solo cubre responsabilidad civil, hurto e
+// incendio. Si el texto no alcanza para decidir, devuelve null y se dice que no se pudo
+// confirmar, en vez de adivinar.
+const familiaDeTextoPoliza = (texto) => {
+  const t = normalizar(texto)
+  if (!t) return null
+  if (familiaDeCatalogo(texto)) return familiaDeCatalogo(texto)
+  // "daños a terceros" es responsabilidad civil, no daño propio: si no se saca antes,
+  // toda parcial que lo diga con esas palabras se leería como total.
+  const propios = t.replace(/dan(o|os|io|ios) (a|contra) (terceros|personas|cosas|bienes)/g, ' ')
+  if (/dan(o|os|io|ios)|todo riesgo|casco/.test(propios)) return 'TOTAL'
+  if (/responsabilidad civil|hurto|incendio/.test(t)) return 'PARCIAL'
+  return null
+}
+
 const ok = (motivo) => ({ estado: ESTADO.valido, motivo: motivo || '' })
 const mal = (motivo) => ({ estado: ESTADO.incorrecto, motivo })
 
@@ -116,6 +156,15 @@ const op = {
   tieneCarta: Boolean(valorDe(oportunidad, COL.cartaAutomovil)),
   tieneCedula: Boolean(valorDe(oportunidad, COL.cedulaArchivo)),
   estadoLectura: valorDe(oportunidad, COL.estadoLectura),
+}
+
+// El cliente vinculado, si vino. Sin él se cae a lo que tenga la oportunidad.
+const clienteCv = (input.cliente && (input.cliente.column_values || input.cliente.columnValues)) || []
+const cliente = {
+  nombre: (input.cliente && input.cliente.name) || '',
+  razonSocial: valorDe(clienteCv, COL.cliRazonSocial),
+  documento: valorDe(clienteCv, COL.cliCedula),
+  tipo: valorDe(clienteCv, COL.cliTipo),
 }
 
 // La cotización elegida sale de los subitems: es la que tiene "Propuesta elegida" tildada.
@@ -149,22 +198,60 @@ if (faltaIdentificacion && op.tieneCarta && !yaSeLeyo) {
 // ───────────── 2) veredictos ─────────────
 const faltantes = []
 
-// Persona: la cédula manda (es única); el nombre es de apoyo, porque se escribe de mil
-// formas y un acento de más no es un error de emisión.
+// Persona: el documento manda (es único); el nombre es de apoyo, porque se escribe de
+// mil formas y un acento de más no es un error de emisión.
+//
+// El titular puede ser una persona (cédula) o una empresa (RUT). Hoy el sistema guarda
+// un solo documento por cliente y no distingue cuál es: un RUT tiene 12 dígitos y una
+// cédula 7 u 8, así que comparar uno contra otro daría "no coincide" siempre, en todas
+// las pólizas de empresas. Cuando pasa eso no se miente: se compara por nombre y se dice
+// que el documento no se pudo comparar.
 let persona
-if (!op.cedula) {
-  faltantes.push('cédula del cliente')
-  persona = mal('No se puede validar: la oportunidad no tiene cédula cargada.')
-} else if (!soloDigitos(poliza.cedula)) {
-  persona = mal('No se puede validar: no se pudo leer la cédula del titular en la póliza.')
-} else if (soloDigitos(poliza.cedula) !== soloDigitos(op.cedula)) {
+const docPoliza = soloDigitos(poliza.rut) || soloDigitos(poliza.cedula)
+const esEmpresa = Boolean(soloDigitos(poliza.rut))
+const docNuestro = soloDigitos(cliente.documento) || soloDigitos(op.cedula)
+const nombreNuestro = cliente.razonSocial || cliente.nombre || op.nombre
+const titular = String(poliza.titular ?? '').trim()
+// Los nombres de empresa cambian de forma ("S.A.", "SA", "S. A.") sin ser otra empresa:
+// se comparan sin puntuación, sin espacios y sin el sufijo societario del final.
+const SUFIJOS_SOCIALES = ['sociedadanonima', 'srl', 'sas', 'ltda', 'sa']
+const nombreComparable = (v) => {
+  let t = normalizar(v).replace(/[^a-z0-9]/g, '')
+  for (const sufijo of SUFIJOS_SOCIALES) {
+    // El mínimo evita comer el nombre cuando termina en esas letras por casualidad.
+    if (t.endsWith(sufijo) && t.length - sufijo.length >= 4) return t.slice(0, -sufijo.length)
+  }
+  return t
+}
+
+if (!docPoliza && !titular) {
+  persona = mal('No se puede validar: la póliza no trae ni documento ni nombre del titular.')
+} else if (!docNuestro && !nombreNuestro) {
+  faltantes.push('documento o nombre del cliente')
+  persona = mal('No se puede validar: la oportunidad no tiene cliente con documento ni nombre cargado.')
+} else if (docPoliza && docNuestro && docPoliza === docNuestro) {
+  persona =
+    titular && nombreNuestro && nombreComparable(titular) !== nombreComparable(nombreNuestro)
+      ? ok(`El documento coincide. El nombre figura distinto: "${titular}" en la póliza y "${nombreNuestro}" en el cliente.`)
+      : ok()
+} else if (docPoliza && docNuestro && esEmpresa && docNuestro.length <= 9) {
+  // RUT contra cédula: no son comparables. Se resuelve por nombre y se avisa qué falta.
+  faltantes.push('RUT del cliente')
+  persona =
+    titular && nombreNuestro && nombreComparable(titular) === nombreComparable(nombreNuestro)
+      ? ok(`La póliza está a nombre de ${titular} (RUT ${poliza.rut}), que coincide con el cliente. El RUT no se pudo comparar: el sistema guarda ${cliente.documento || op.cedula}, que no es un RUT.`)
+      : mal(`La póliza está a nombre de ${titular || 'una empresa'} (RUT ${poliza.rut}) y el cliente es ${nombreNuestro || 'otro'} (${docNuestro}). El sistema no guarda RUT, así que no se pudo comparar el documento.`)
+} else if (docPoliza && docNuestro) {
   persona = mal(
-    `La póliza está a nombre de la cédula ${poliza.cedula}${poliza.titular ? ` (${poliza.titular})` : ''} y la oportunidad es de ${op.cedula}${op.nombre ? ` (${op.nombre})` : ''}.`
+    `La póliza está a nombre del documento ${poliza.rut || poliza.cedula}${titular ? ` (${titular})` : ''} y el cliente es ${docNuestro}${nombreNuestro ? ` (${nombreNuestro})` : ''}.`
   )
-} else if (poliza.titular && op.nombre && normalizar(poliza.titular) !== normalizar(op.nombre)) {
-  persona = ok(`La cédula coincide. El nombre figura distinto: "${poliza.titular}" en la póliza y "${op.nombre}" en la oportunidad.`)
+} else if (titular && nombreNuestro) {
+  persona =
+    nombreComparable(titular) === nombreComparable(nombreNuestro)
+      ? ok('Confirmado por nombre; no había documento para comparar de los dos lados.')
+      : mal(`La póliza está a nombre de "${titular}" y el cliente es "${nombreNuestro}". No hay documento para comparar de los dos lados.`)
 } else {
-  persona = ok()
+  persona = mal('No se puede validar: falta el documento o el nombre de alguno de los dos lados.')
 }
 
 // Vehículo: el chasis es el único identificador real — es único y no cambia nunca. La
@@ -222,26 +309,46 @@ if (!elegida) {
 // Cotización: la cobertura define; el monto solo avisa. El precio guardado es el contado
 // del portal y lo que vio el cliente se calcula con bonificación y recargos, así que un
 // calce exacto no existe y exigirlo daría error siempre.
+//
+// La cobertura se compara por FAMILIA (total / parcial) y no por nombre: la póliza la
+// describe con las palabras de la compañía ("1- Daños, Hurto, Incendio y Responsabilidad
+// Civil") y exigir el nombre del catálogo daría "no coincide" en casi todas. Lo que
+// importa es que no se haya emitido una parcial cuando se cotizó una total.
 let cotizacion
+const familiaCot = elegida ? familiaDeCatalogo(elegida.cobertura) : null
+const familiaPol = familiaDeTextoPoliza(poliza.cobertura)
+const etiqueta = (familia) => (familia === 'TOTAL' ? 'cobertura total' : 'cobertura parcial')
 if (!elegida) {
   cotizacion = mal('No se puede validar: la oportunidad no tiene una cotización marcada como elegida.')
 } else if (!poliza.cobertura) {
   cotizacion = mal('No se puede validar: no se pudo leer la cobertura en la póliza.')
-} else if (normalizar(poliza.cobertura) !== normalizar(elegida.cobertura)) {
-  cotizacion = mal(`La póliza es ${poliza.cobertura} y se cotizó ${elegida.cobertura}.`)
+} else if (!familiaCot) {
+  // No es un problema de la póliza: es una cobertura nueva que este código no conoce.
+  cotizacion = mal(`No se puede validar: la cobertura cotizada ("${elegida.cobertura}") no figura en la lista de coberturas de este código. Hay que agregarla.`)
+} else if (!familiaPol) {
+  cotizacion = mal(`No se pudo determinar si la póliza es total o parcial. Dice: "${poliza.cobertura}". Se cotizó ${elegida.cobertura}.`)
+} else if (familiaPol !== familiaCot) {
+  cotizacion = mal(`La póliza es ${etiqueta(familiaPol)} ("${poliza.cobertura}") y se cotizó ${etiqueta(familiaCot)} (${elegida.cobertura}).`)
 } else {
+  const partes = []
+  if (normalizar(poliza.cobertura) !== normalizar(elegida.cobertura)) {
+    partes.push(`Coincide la ${etiqueta(familiaCot)}: la póliza la nombra "${poliza.cobertura}" y en el sistema es ${elegida.cobertura}.`)
+  }
   const premio = numero(poliza.premio)
   const contado = numero(elegida.contado)
   if (premio && contado) {
     const diferencia = Math.abs(premio - contado) / contado
-    cotizacion =
-      diferencia > TOLERANCIA_PREMIO
-        ? ok(`La cobertura coincide. El premio de la póliza (${premio}) difiere ${Math.round(diferencia * 100)}% del precio cotizado (${contado}); conviene revisarlo.`)
-        : ok()
-  } else {
-    cotizacion = ok()
+    if (diferencia > TOLERANCIA_PREMIO) {
+      partes.push(`El premio de la póliza (${premio}) difiere ${Math.round(diferencia * 100)}% del precio cotizado (${contado}); conviene revisarlo.`)
+    }
   }
+  cotizacion = ok(partes.join(' '))
 }
+
+// Lo que la IA haya anotado al leer va al motivo de la cotización: casi siempre es sobre
+// la cobertura, y es el aviso de que la lectura no estaba segura de algo.
+const notaLectura = String(poliza.observaciones ?? '').trim()
+if (notaLectura) cotizacion.motivo = `${cotizacion.motivo} Nota de la lectura: ${notaLectura}`.trim()
 
 const hayDiferencias = [persona, vehiculo, compania, cotizacion].some((v) => v.estado === ESTADO.incorrecto)
 
