@@ -70,6 +70,12 @@ const FAMILIA_POR_COBERTURA = {
   PARCIAL: 'PARCIAL', 'PARCIAL PLUS': 'PARCIAL', '4 EN 1': 'PARCIAL',
 }
 
+// "TOTAL c/ Mov" (SURA) está a propósito sin familia: se sacó de Total a pedido y en la
+// app aparece solo en la solapa General (ver coberturaGroups.js). No es que falte
+// mapearla, así que no se puede decidir por familia y hay que mirarla a mano. Se
+// distingue de una cobertura desconocida para que el motivo no acuse un error que no es.
+const COBERTURAS_SIN_FAMILIA = ['TOTAL C/ MOV']
+
 const ESTADO = { valido: 'Válido', incorrecto: 'Incorrecto', sinValidar: 'Sin validar' }
 const GENERAL = { validando: 'Validando', validos: 'Datos válidos', conDiferencias: 'Con diferencias' }
 
@@ -323,6 +329,13 @@ if (!elegida) {
   cotizacion = mal('No se puede validar: la oportunidad no tiene una cotización marcada como elegida.')
 } else if (!poliza.cobertura) {
   cotizacion = mal('No se puede validar: no se pudo leer la cobertura en la póliza.')
+} else if (COBERTURAS_SIN_FAMILIA.includes(String(elegida.cobertura ?? '').trim().toUpperCase())) {
+  // Se cotizó una cobertura que el sistema no clasifica como total ni parcial: no hay
+  // contra qué comparar la familia, solo queda el nombre.
+  cotizacion =
+    normalizar(poliza.cobertura) === normalizar(elegida.cobertura)
+      ? ok(`La póliza dice lo mismo que se cotizó (${elegida.cobertura}).`)
+      : mal(`Hay que revisarla a mano: se cotizó ${elegida.cobertura}, que el sistema no clasifica como total ni parcial, y la póliza dice "${poliza.cobertura}".`)
 } else if (!familiaCot) {
   // No es un problema de la póliza: es una cobertura nueva que este código no conoce.
   cotizacion = mal(`No se puede validar: la cobertura cotizada ("${elegida.cobertura}") no figura en la lista de coberturas de este código. Hay que agregarla.`)
