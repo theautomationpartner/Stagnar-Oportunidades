@@ -183,10 +183,15 @@ const cliente = {
 }
 
 // Equivalencias de cobertura cargadas en PANEL. El nombre de la fila es el texto tal
-// cual lo escribe la compañía en la póliza; la columna Cobertura (multi-select) dice a
-// qué coberturas nuestras equivale. Es multi-select porque un mismo texto no equivale a
-// una sola: "Daños, Hurto, Incendio y RC" de PORTO es cualquiera de las Total, que entre
-// ellas se diferencian por el deducible y no por lo que cubren.
+// cual lo escribe la compañía en la póliza y la columna Cobertura dice a cuál de las
+// nuestras equivale.
+//
+// Una cobertura por fila, porque esa columna admite una sola (label_limit_count: 1) y no
+// se va a cambiar: las otras 100 filas de PANEL se refieren a una cobertura cada una. Con
+// eso alcanza igual, porque abajo se compara por familia: si PANEL dice que el texto de
+// PORTO es GLOBAL, una GLOBAL ded Alto cotizada también valida, que es lo correcto —
+// entre ellas cambia el deducible, no lo que cubren. Si hace falta más precisión se
+// agrega otra fila con el mismo texto y otra cobertura.
 // Se filtra acá y no en la consulta a propósito: en monday, filtrar una columna de estado
 // por el TEXTO de la etiqueta devuelve cero filas y ningún error (hay que pasar el índice
 // numérico). Un escenario armado así mostraría "no hay equivalencias cargadas" para
@@ -199,23 +204,21 @@ const equivalencias = (input.coberturas || [])
       grupo: valorDe(cv, COL.panGrupo),
       texto: String(fila.name ?? '').trim(),
       compania: valorDe(cv, COL.panCompania),
-      nuestras: valorDe(cv, COL.panCobertura).split(',').map((c) => c.trim()).filter(Boolean),
+      nuestra: valorDe(cv, COL.panCobertura),
     }
   })
   // Sin la columna Grupo se asume que ya vinieron filtradas.
   .filter((e) => !e.grupo || normalizar(e.grupo) === 'coberturas')
 
-// Se busca por texto y compañía. Una fila sin compañía vale para todas: sirve para los
-// textos genéricos que usan varias.
-const equivalenciaDe = (texto, compania) => {
+// Todas las coberturas nuestras cargadas para ese texto. Se busca por texto y compañía;
+// las filas sin compañía valen para todas, para los textos genéricos que usan varias.
+// Mandan las de la compañía si existen: lo específico le gana a lo general.
+const coberturasEquivalentes = (texto, compania) => {
   const t = normalizar(texto)
-  if (!t) return null
-  const candidatas = equivalencias.filter((e) => normalizar(e.texto) === t && e.nuestras.length)
-  return (
-    candidatas.find((e) => e.compania && normalizar(e.compania) === normalizar(compania)) ||
-    candidatas.find((e) => !e.compania) ||
-    null
-  )
+  if (!t) return []
+  const filas = equivalencias.filter((e) => normalizar(e.texto) === t && e.nuestra)
+  const propias = filas.filter((e) => e.compania && normalizar(e.compania) === normalizar(compania))
+  return (propias.length ? propias : filas.filter((e) => !e.compania)).map((e) => e.nuestra)
 }
 
 // La cotización elegida sale de los subitems: es la que tiene "Propuesta elegida" tildada.
@@ -370,23 +373,23 @@ let cotizacion
 const familiaCot = elegida ? familiaDeCatalogo(elegida.cobertura) : null
 const familiaPol = familiaDeTextoPoliza(poliza.cobertura)
 const etiqueta = (familia) => (familia === 'TOTAL' ? 'cobertura total' : 'cobertura parcial')
-const equivalencia = equivalenciaDe(poliza.cobertura, poliza.compania)
+const equivalentes = coberturasEquivalentes(poliza.cobertura, poliza.compania)
 if (!elegida) {
   cotizacion = mal('No se puede validar: la oportunidad no tiene una cotización marcada como elegida.')
 } else if (!poliza.cobertura) {
   cotizacion = mal('No se puede validar: no se pudo leer la cobertura en la póliza.')
-} else if (equivalencia) {
+} else if (equivalentes.length) {
   // Con la equivalencia cargada no hay nada que interpretar: alguien ya dijo qué es.
-  const nuestras = equivalencia.nuestras.map((c) => normalizar(c))
-  // Un texto puede equivaler a media docena de coberturas nuestras: listarlas todas hace
-  // un motivo ilegible, y lo que importa es que la cotizada no está entre ellas.
-  const listado =
-    equivalencia.nuestras.length > 3
-      ? equivalencia.nuestras.slice(0, 3).join(", ") + " u otras " + (equivalencia.nuestras.length - 3)
-      : equivalencia.nuestras.join(" o ")
-  cotizacion = nuestras.includes(normalizar(elegida.cobertura))
-    ? ok()
-    : mal(`La póliza dice "${poliza.cobertura}", que según PANEL es ${listado}, y se cotizó ${elegida.cobertura}.`)
+  const cotizada = normalizar(elegida.cobertura)
+  const misma = equivalentes.some((c) => normalizar(c) === cotizada)
+  // Misma familia y distinto nombre es un deducible distinto, no otra cobertura. Eso lo
+  // define el precio, que se mira aparte; acá lo que importa es que no se haya emitido
+  // una parcial habiendo cotizado una total.
+  const mismaFamilia = Boolean(familiaCot) && equivalentes.some((c) => familiaDeCatalogo(c) === familiaCot)
+  const listado = equivalentes.join(' o ')
+  if (misma) cotizacion = ok()
+  else if (mismaFamilia) cotizacion = ok(`La póliza dice "${poliza.cobertura}", que en PANEL figura como ${listado}; se cotizó ${elegida.cobertura}, de la misma familia.`)
+  else cotizacion = mal(`La póliza dice "${poliza.cobertura}", que según PANEL es ${listado}, y se cotizó ${elegida.cobertura}.`)
 } else if (COBERTURAS_SIN_FAMILIA.includes(String(elegida.cobertura ?? '').trim().toUpperCase())) {
   // Se cotizó una cobertura que el sistema no clasifica como total ni parcial: no hay
   // contra qué comparar la familia, solo queda el nombre.
@@ -419,7 +422,7 @@ if (!elegida) {
 
 // Si el texto de la póliza no está en PANEL, lo de arriba lo resolvió adivinando por las
 // palabras. Se avisa para que alguien cargue la fila y la próxima no haya que adivinar.
-if (poliza.cobertura && !equivalencia) faltantes.push(`equivalencia de "${poliza.cobertura}" en PANEL`)
+if (poliza.cobertura && !equivalentes.length) faltantes.push(`equivalencia de "${poliza.cobertura}" en PANEL`)
 
 // Lo que la IA haya anotado al leer va al motivo de la cotización: casi siempre es sobre
 // la cobertura, y es el aviso de que la lectura no estaba segura de algo.

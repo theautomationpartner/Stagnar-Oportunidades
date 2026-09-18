@@ -7,10 +7,12 @@
 // tiene que adivinar por las palabras del texto, que acierta la mayoría de las veces pero
 // no siempre, y cuando falla lo hace en silencio.
 //
-// No hace falta ninguna columna nueva: PANEL ya tiene Compañias de Seguro y Cobertura, y
-// esta última es multi-select. Eso último importa: un texto de la póliza no equivale a
-// UNA cobertura nuestra. "Daños, Hurto, Incendio y RC" es cualquiera de las Total, que
-// entre ellas se diferencian por el deducible, no por lo que cubren. Se marcan todas.
+// No hace falta ninguna columna nueva: PANEL ya tiene Compañias de Seguro y Cobertura.
+// Una cobertura por fila, porque esa columna admite una sola (label_limit_count: 1) y no
+// se cambia: las otras 100 filas de PANEL se refieren a una cobertura cada una. Alcanza
+// igual, porque el Run code compara por familia — si acá dice que el texto de PORTO es
+// GLOBAL, una GLOBAL ded Alto cotizada también valida. Si hace falta más precisión, se
+// agrega otra fila con el mismo texto y otra cobertura.
 //
 // Cómo se completa: el nombre de la fila es el texto TAL CUAL figura en la póliza. Si no
 // coincide letra por letra no se encuentra, así que conviene copiarlo y pegarlo del PDF.
@@ -41,15 +43,13 @@ const COMPANIA_COLUMN = 'dropdown_mm52feqr'
 const COBERTURA_COLUMN = 'dropdown_mm5frxag'
 const GRUPO = 'Coberturas'
 
-// Todas las Total del catálogo. Un texto de póliza que describe todo riesgo equivale a
-// cualquiera de ellas: se diferencian por deducible, no por lo que cubren.
-const TODAS_LAS_TOTAL = ['TOTAL 600', 'TOTAL 800', 'TOTAL 1500', 'TOTAL 2500', 'TOTAL', 'TOTAL PLUS', 'TOTAL c/ Mov', 'GLOBAL', 'GLOBAL - anual', 'GLOBAL - 3x2', 'GLOBAL ded Alto']
-
+// PORTO usa GLOBAL, GLOBAL ded Alto y TRIPLE. El texto describe todo riesgo, así que se
+// mapea a GLOBAL y la familia cubre la variante de deducible.
 const FILAS = [
   {
     texto: '1- Daños, Hurto, Incendio y Responsabilidad Civil',
     compania: 'PORTO',
-    nuestras: TODAS_LAS_TOTAL,
+    nuestra: 'GLOBAL',
   },
 ]
 
@@ -78,7 +78,7 @@ if (!etiquetasGrupo.includes(GRUPO)) {
 }
 
 const coberturasValidas = Object.values(JSON.parse(board.columns.find((c) => c.id === COBERTURA_COLUMN).settings_str).labels || {}).map((l) => (typeof l === 'string' ? l : l.name))
-const desconocidas = [...new Set(FILAS.flatMap((f) => f.nuestras))].filter((c) => !coberturasValidas.includes(c))
+const desconocidas = [...new Set(FILAS.map((f) => f.nuestra))].filter((c) => !coberturasValidas.includes(c))
 if (desconocidas.length) {
   console.error(`Estas coberturas no existen en el dropdown de PANEL: ${desconocidas.join(', ')}`)
   process.exit(1)
@@ -96,7 +96,7 @@ const faltan = FILAS.filter((f) => !existentes.has(f.texto.trim().toLowerCase())
 console.log(`${existentes.size} filas ya en el grupo "${GRUPO}", ${faltan.length} a crear`)
 for (const f of faltan) {
   console.log(`  crear  ${f.compania || '(todas)'}  "${f.texto}"`)
-  console.log(`         → ${f.nuestras.join(', ')}`)
+  console.log(`         → ${f.nuestra}`)
 }
 
 if (!faltan.length) {
@@ -108,7 +108,7 @@ if (!faltan.length) {
   for (const f of faltan) {
     const valores = {
       [GRUPO_COLUMN]: { label: GRUPO },
-      [COBERTURA_COLUMN]: { labels: f.nuestras },
+      [COBERTURA_COLUMN]: { labels: [f.nuestra] },
     }
     if (f.compania) valores[COMPANIA_COLUMN] = { labels: [f.compania] }
     const creado = await gql(
