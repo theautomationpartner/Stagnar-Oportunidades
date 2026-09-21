@@ -1196,6 +1196,9 @@ export default function OpportunityDetail({
   // 4): update_assets_on_item con "files: []" vacía la columna (ver mondayApi.js —
   // change_simple_column_value no soporta columnas file). Genérico por columnId, igual
   // que handleUploadDocument.
+  // Devuelve si el borrado salió bien: el error ya queda mostrado acá adentro
+  // (docUploadError), pero quien encadena algo después (ver handleDeletePoliza)
+  // necesita saber si seguir.
   const handleDeleteDocument = async (columnId) => {
     onOpportunityAction?.()
     setDeletingDoc((prev) => ({ ...prev, [columnId]: true }))
@@ -1206,8 +1209,10 @@ export default function OpportunityDetail({
         ...prev,
         column_values: prev.column_values.map((cv) => (cv.id === columnId ? { ...cv, text: '' } : cv)),
       }))
+      return true
     } catch (err) {
       setDocUploadError((prev) => ({ ...prev, [columnId]: err.message }))
+      return false
     } finally {
       setDeletingDoc((prev) => ({ ...prev, [columnId]: false }))
     }
@@ -1217,7 +1222,15 @@ export default function OpportunityDetail({
   // "Concretada" sola (antes lo hacía apenas confirmaba la subida); eso se movió al
   // botón "Concretar Oportunidad" (ver handleConfirmarEmision más abajo), que es la
   // acción explícita que de verdad cierra la oportunidad.
-  const pedirValidacionPoliza = async () => {
+  // Deja la validación como recién nacida: veredictos en "Sin validar", motivos vacíos y
+  // el "Bien Asegurado" desvinculado — ese vínculo es el vehículo que el escenario
+  // EXTRAJO del PDF anterior (matrícula/chasis/motor leídos de esa póliza), y dejarlo
+  // haría que la comparación (ver polizaCheck.js) siga acusando diferencias contra una
+  // póliza que ya no está. Lo único que difiere entre los dos usos es `estadoGeneral`:
+  // 'Validar' cuando hay una póliza nueva (pedirValidacionPoliza — el escenario la toma),
+  // 'Sin validar' cuando la póliza se ELIMINÓ (a pedido: los veredictos eran DE esa
+  // póliza, y sin archivo no hay nada para pedir).
+  const limpiarValidacionPoliza = async (estadoGeneral) => {
     const limpios = VALIDACIONES_POLIZA.flatMap((v) => [
       [v.estadoColumnId, ESTADO_VALIDACION.sinValidar],
       [v.motivoColumnId, ''],
@@ -1225,27 +1238,41 @@ export default function OpportunityDetail({
     for (const [columnId, valor] of limpios) {
       await setSimpleColumnValue(opportunityId, columnId, valor)
     }
-    // A pedido, "Bien Asegurado" también se limpia al mandar a validar: es el vehículo
-    // que el escenario EXTRAJO del PDF anterior (con matrícula/chasis/motor leídos de esa
-    // póliza). Dejarlo vinculado mientras corre la validación nueva haría que la
-    // comparación (ver polizaCheck.js) muestre diferencias contra una póliza que ya no
-    // existe. El escenario vincula el vehículo nuevo al terminar.
     await setBoardRelationItems(opportunityId, BIEN_ASEGURADO_COLUMN_ID, [])
-    // El pedido va último: recién cuando los veredictos viejos ya no están, así el
-    // escenario no puede llegar a leer una mezcla de los dos.
-    await setSimpleColumnValue(opportunityId, VALIDACION_POLIZA_COLUMN_ID, ESTADO_GENERAL.validar)
+    // El estado general va último: si es el pedido ('Validar'), recién cuando los
+    // veredictos viejos ya no están — así el escenario no puede llegar a leer una mezcla
+    // de la corrida vieja y la nueva.
+    await setSimpleColumnValue(opportunityId, VALIDACION_POLIZA_COLUMN_ID, estadoGeneral)
     setItem((prev) => ({
       ...prev,
       column_values: prev.column_values.map((cv) => {
         const limpio = limpios.find(([columnId]) => columnId === cv.id)
         if (limpio) return { ...cv, text: limpio[1] }
-        if (cv.id === VALIDACION_POLIZA_COLUMN_ID) return { ...cv, text: ESTADO_GENERAL.validar }
+        if (cv.id === VALIDACION_POLIZA_COLUMN_ID) return { ...cv, text: estadoGeneral }
         // El vehículo desvinculado también sale del estado local: sin esto, la pantalla
         // seguiría comparando contra el extraído viejo hasta el próximo refresco.
         if (cv.id === BIEN_ASEGURADO_COLUMN_ID) return { ...cv, text: '', linked_items: [] }
         return cv
       }),
     }))
+  }
+
+  const pedirValidacionPoliza = () => limpiarValidacionPoliza(ESTADO_GENERAL.validar)
+
+  // A pedido: eliminar la póliza también limpia la validación. Solo si el borrado salió
+  // bien — si falló, la póliza sigue ahí y sus veredictos siguen valiendo. Un fallo de
+  // la limpieza se muestra en el mismo lugar que los errores del archivo.
+  const handleDeletePoliza = async () => {
+    const borrada = await handleDeleteDocument(POLIZA_COLUMN_ID)
+    if (!borrada) return
+    try {
+      await limpiarValidacionPoliza(ESTADO_GENERAL.sinValidar)
+    } catch (err) {
+      setDocUploadError((prev) => ({
+        ...prev,
+        [POLIZA_COLUMN_ID]: `La póliza se eliminó pero no se pudo limpiar la validación (${err.message}).`,
+      }))
+    }
   }
 
   const handleUploadPoliza = async (file) => {
@@ -2266,7 +2293,7 @@ export default function OpportunityDetail({
               deleting={Boolean(deletingDoc[POLIZA_COLUMN_ID])}
               error={docUploadError[POLIZA_COLUMN_ID]}
               onUploadPoliza={handleUploadPoliza}
-              onDeletePoliza={() => handleDeleteDocument(POLIZA_COLUMN_ID)}
+              onDeletePoliza={handleDeletePoliza}
               estadoCreacion={opportunity.estadoCreacion}
               estadoCreacionColor={opportunity.estadoCreacionColor}
               polling={polizaPolling}
