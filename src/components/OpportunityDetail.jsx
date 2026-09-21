@@ -1235,14 +1235,9 @@ export default function OpportunityDetail({
       [v.estadoColumnId, ESTADO_VALIDACION.sinValidar],
       [v.motivoColumnId, ''],
     ])
-    for (const [columnId, valor] of limpios) {
-      await setSimpleColumnValue(opportunityId, columnId, valor)
-    }
-    await setBoardRelationItems(opportunityId, BIEN_ASEGURADO_COLUMN_ID, [])
-    // El estado general va último: si es el pedido ('Validar'), recién cuando los
-    // veredictos viejos ya no están — así el escenario no puede llegar a leer una mezcla
-    // de la corrida vieja y la nueva.
-    await setSimpleColumnValue(opportunityId, VALIDACION_POLIZA_COLUMN_ID, estadoGeneral)
+    // La pantalla PRIMERO (optimista, como el resto de las escrituras del detalle): el
+    // cambio se ve al instante en vez de esperar las ~10 escrituras a monday. Si alguna
+    // falla, quien llama muestra el error y el poller reconcilia con lo que quedó.
     setItem((prev) => ({
       ...prev,
       column_values: prev.column_values.map((cv) => {
@@ -1255,6 +1250,15 @@ export default function OpportunityDetail({
         return cv
       }),
     }))
+    // Las limpiezas no dependen entre sí: van en PARALELO (antes eran una por una y el
+    // borrado tardaba varios segundos). Lo único que espera a todas es el estado
+    // general: si es el pedido ('Validar'), el escenario no puede llegar a leer una
+    // mezcla de la corrida vieja y la nueva.
+    await Promise.all([
+      ...limpios.map(([columnId, valor]) => setSimpleColumnValue(opportunityId, columnId, valor)),
+      setBoardRelationItems(opportunityId, BIEN_ASEGURADO_COLUMN_ID, []),
+    ])
+    await setSimpleColumnValue(opportunityId, VALIDACION_POLIZA_COLUMN_ID, estadoGeneral)
   }
 
   const pedirValidacionPoliza = () => limpiarValidacionPoliza(ESTADO_GENERAL.validar)
