@@ -192,53 +192,9 @@
   font-size: 14px;
 }
 
-/* EST-06: recuadro propio en vez de un renglón gris suelto. Fondo verde muy lavado +
-   filo verde a la izquierda: se lee como el destacado que es (la forma de pago que se
-   ofrece primero), sin competir con el COSTO TOTAL, que sigue siendo lo más grande de
-   la tarjeta. Va a lo ancho de la tarjeta, debajo de las 2 columnas (ver el JSX): el
-   monto a la izquierda y la condición a la derecha, en el mismo renglón mientras entre.
-   Sin min-height de ninguno de los dos — el recuadro tiene fondo propio, así que
-   cualquier alto reservado de más se ve como un hueco vacío adentro de una caja de
-   color (era el bug reportado), a diferencia de un renglón de texto suelto donde no se
-   notaba. Las tarjetas no necesitan medir lo mismo: .opp-detail__quotes es grid con
-   align-items:start y cada una mide su propio contenido. */
-.quote-card__promo {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: baseline;
-  justify-content: space-between;
-  column-gap: 12px;
-  row-gap: 2px;
-  padding: 8px 12px;
-  border-radius: 6px;
-  border-left: 3px solid var(--color-verde);
-  background: var(--tint-success);
-}
-
-.quote-card__promo-main {
-  font-size: 12px;
-  color: var(--text-dark);
-}
-
-.quote-card__promo-flag {
-  margin-left: 6px;
-  font-size: 10px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.03em;
-  color: var(--green-dark);
-}
-
-/* EST-06 (parte visual de LOG-16): la condición dejó la cursiva chiquita al 85% de
-   opacidad y pasó a leerse como el resto de la letra chica de la tarjeta — es una
-   condición para acceder al precio, no una nota al pie. Solo BSE y SURA la tienen; en
-   SANCOR/PORTO el elemento directamente no se dibuja. */
-.quote-card__promo-condicion {
-  font-size: 11px;
-  line-height: 15px;
-  color: var(--text-gray);
-}
-
+/* La promo "SIN RECARGO" (EST-06) salió de la tarjeta a pedido, junto con el desglose
+   de cuotas: el cliente la recibe en la imagen de WhatsApp, y el desglose se consulta
+   en "Cuotas y recargos" adentro de Parámetros. */
 .quote-card__cuotas-table {
   border-collapse: collapse;
   font-size: 12px;
@@ -261,20 +217,6 @@
   color: var(--text-dark);
 }
 
-/* A pedido: cuotas (izquierda) y etiquetas (derecha) en 2 columnas, Flexbox — antes
-   cada una era un renglón propio a lo ancho completo de la tarjeta. */
-.quote-card__body {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 16px;
-  width: 100%;
-}
-
-.quote-card__cuotas {
-  flex: 1;
-}
-
 .quote-card__total {
   display: flex;
   flex-direction: column;
@@ -295,16 +237,13 @@
   color: var(--color-verde);
 }
 
-/* Tags de qué parámetros tiene esta cotización puntual — columna propia al lado de la
-   tabla de cuotas (ver .quote-card__body más arriba), en flujo de FILA que envuelve.
-   Antes esta columna tenía un alto FIJO de 120px para que todas las tarjetas midieran
-   lo mismo: con pocas etiquetas (SANCOR, 3) sobraba un hueco vacío grande debajo, y con
-   muchas (PORTO, 6) se recortaban. Ya no hace falta reservar nada — .opp-detail__quotes
-   es un grid con align-items:start, así que cada tarjeta mide su propio contenido y
-   ninguna estira a sus vecinas (ver el comentario en OpportunityDetail.css: es
-   justamente por eso que NO se usa stretch ahí). */
+/* Tags de qué parámetros tiene esta cotización puntual — a lo ANCHO completo de la
+   tarjeta (a pedido, la tabla de cuotas que las acompañaba en 2 columnas salió de la
+   vista: vive en "Cuotas y recargos" adentro de Parámetros), en flujo de FILA que
+   envuelve. Sin alto reservado: .opp-detail__quotes es un grid con align-items:start,
+   cada tarjeta mide su propio contenido y ninguna estira a sus vecinas. */
 .quote-card__override-tags {
-  flex: 1;
+  width: 100%;
   display: flex;
   flex-direction: row;
   flex-wrap: wrap;
@@ -532,26 +471,10 @@
 }
 
 
-/* Los montos no se parten en 2 líneas ("$" arriba, "22.583" abajo): cada fila de cuotas
-   mide lo mismo en todas las tarjetas. Solo la columna de montos va en nowrap — la de
-   etiquetas (derecha) cede ancho y envuelve, así la tarjeta nunca desborda. */
+/* Los montos no se parten en 2 líneas ("$" arriba, "22.583" abajo). */
 .quote-card__cuotas-table th,
 .quote-card__cuotas-table td:nth-child(2) {
   white-space: nowrap;
-}
-
-.quote-card__cuotas {
-  flex: 0 0 auto;
-}
-
-.quote-card__body > :last-child:not(.quote-card__cuotas) {
-  flex: 1 1 0;
-  min-width: 0;
-  flex-wrap: wrap;
-}
-
-.quote-card__promo-main {
-  line-height: 1.4;
 }
 
 /* El renglón reservado mide lo mismo vacío o con texto (antes 17px vacío vs ~20px con

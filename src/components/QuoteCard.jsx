@@ -28,9 +28,9 @@ const SURA_DEDUCIBLE_OPTIONS = ['1', '1.3', '2']
 
 // Datos "de tarifa" — vienen fijos de monday y no se editan por cotización: el Contado
 // base y el Deducible general son parte de la tarifa cargada, no un parámetro que el
-// vendedor deba tocar. Los recargos por cuota se sacaron de acá (a pedido) y se muestran
-// arriba, en la propia tabla de cuotas (ver quote-card__cuotas-table) — y Edad se sacó
-// directamente, ya no se muestra.
+// vendedor deba tocar. Los recargos por cuota van en la tabla "Cuotas y recargos" de
+// este mismo panel (a pedido, el desglose de cuotas salió de la vista de la tarjeta) —
+// y Edad se sacó directamente, ya no se muestra.
 const FIXED_FIELDS = [
   { key: 'contado', label: 'Contado/Costo', kind: 'money' },
   { key: 'deducibleBase', label: 'Deducible', kind: 'text' },
@@ -394,86 +394,39 @@ function QuoteCard({
         </p>
       )}
 
-      {/* A pedido: cuotas y etiquetas ahora conviven en 2 columnas (Flexbox) adentro de
-          un mismo wrapper, en vez de un renglón a lo ancho completo cada una — mejor
-          aprovechamiento del ancho de la tarjeta. */}
-      <div className="quote-card__body">
-        {/* A pedido: el Recargo de cada cuota (antes en "Datos fijos", adentro de
-            Parámetros) se muestra acá, en la misma tabla que cuotas/valor — con un
-            encabezado que aclara qué es cada columna. La promo "N cuotas SIN RECARGO"
-            va al final de la columna, no arriba de todo. */}
-        <div className="quote-card__cuotas">
-          <table className="quote-card__cuotas-table">
-            <thead>
-              <tr>
-                <th>Cuotas</th>
-                <th>Valor cuota</th>
-                <th>Recargo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {CUOTA_COUNTS.map((n) => (
-                <tr key={n}>
-                  <td>{n}x</td>
-                  <td>{formatMoney(quote.cuotas[n].valor)}</td>
-                  <td>{toPercentString(raw[`recargo${n}`])}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-
-        {/* A pedido: TODAS las etiquetas posibles para esta compañía (Bonificación,
-            Descuento, RC, Deducible/Edad específicos, Opcionales PORTO), no solo las
-            que tengan un valor cargado — en gris mientras no lo tengan, coloreadas con
-            el valor puesto apenas lo tienen (override de "Parámetros ajustables", o el
-            dato real que ya traía el subitem de monday), sin tener que abrir
-            "Parámetros" para verlo. Columna propia al lado de la tabla de cuotas (antes
-            renglón aparte a lo ancho completo). */}
-        <div className="quote-card__override-tags">
-          {fields.map((field) => {
-            const active = hasTagValue(field, raw, overrides)
-            const label = field.label.replace(/\s*\(%\)$/, '')
+      {/* A pedido, tarjeta restructurada: ni el desglose de cuotas ni la promo de "SIN
+          RECARGO" van a la vista — el cliente recibe todo entero en la imagen de
+          WhatsApp ("Formas de pago" + la banda de promo), y para consultar el desglose
+          acá está "Cuotas y recargos" adentro de Parámetros. Lo que queda en la tarjeta
+          son las ETIQUETAS a lo ancho completo: todas las posibles para esta compañía
+          (Bonificación, Descuento, RC, Deducible/Edad específicos, Opcionales PORTO) —
+          gris mientras no tengan valor, coloreadas con el valor puesto apenas lo tienen
+          (override de "Parámetros ajustables", o el dato real del subitem). */}
+      <div className="quote-card__override-tags">
+        {fields.map((field) => {
+          const active = hasTagValue(field, raw, overrides)
+          const label = field.label.replace(/\s*\(%\)$/, '')
+          return (
+            <span
+              key={field.key}
+              className={active ? 'quote-card__tag quote-card__tag--active' : 'quote-card__tag quote-card__tag--empty'}
+            >
+              {active ? `${label}: ${tagValueDisplay(field, raw, overrides)}` : label}
+            </span>
+          )
+        })}
+        {opcionalesDeLaCompania.map((opt) => {
+            const active = Boolean(raw[opt.field])
             return (
               <span
-                key={field.key}
+                key={opt.field}
                 className={active ? 'quote-card__tag quote-card__tag--active' : 'quote-card__tag quote-card__tag--empty'}
               >
-                {active ? `${label}: ${tagValueDisplay(field, raw, overrides)}` : label}
+                {opt.label}
               </span>
             )
           })}
-          {opcionalesDeLaCompania.map((opt) => {
-              const active = Boolean(raw[opt.field])
-              return (
-                <span
-                  key={opt.field}
-                  className={active ? 'quote-card__tag quote-card__tag--active' : 'quote-card__tag quote-card__tag--empty'}
-                >
-                  {opt.label}
-                </span>
-              )
-            })}
-        </div>
       </div>
-
-      {/* EST-06: la promo es un destacado con recuadro propio — es la forma de pago que
-          se termina vendiendo — y va a lo ANCHO de la tarjeta, debajo de las dos
-          columnas. Adentro de la columna de cuotas quedaba un recuadro angosto con el
-          texto arriba y aire muerto abajo (la columna de al lado es más alta), que es
-          justo lo que se veía roto. A lo ancho, el recuadro mide lo que mide su
-          contenido y la condición (BSE/SURA) entra en el mismo renglón, a la derecha. */}
-      {quote.promo && (
-        <div className="quote-card__promo">
-          <span className="quote-card__promo-main">
-            {quote.promo.count} cuotas de {formatMoney(quote.promo.valor)}
-            <strong className="quote-card__promo-flag">SIN RECARGO</strong>
-          </span>
-          {quote.promo.condicion && (
-            <span className="quote-card__promo-condicion">{quote.promo.condicion}</span>
-          )}
-        </div>
-      )}
 
       {/* A pedido, estética tipo mockup: 2 botones separados en vez de un solo "Ver
           más" — Parámetros abre datos fijos + ajustables (+ opcionales PORTO si es
@@ -528,6 +481,29 @@ function QuoteCard({
               </div>
             ))}
           </div>
+
+          {/* El desglose que antes vivía a la vista en la tarjeta (a pedido salió de
+              ahí): al cliente le llega entero en la imagen de WhatsApp, y acá queda
+              para consultarlo sin ensuciar la tarjeta. */}
+          <div className="quote-card__params-subtitle">Cuotas y recargos</div>
+          <table className="quote-card__cuotas-table">
+            <thead>
+              <tr>
+                <th>Cuotas</th>
+                <th>Valor cuota</th>
+                <th>Recargo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {CUOTA_COUNTS.map((n) => (
+                <tr key={n}>
+                  <td>{n}x</td>
+                  <td>{formatMoney(quote.cuotas[n].valor)}</td>
+                  <td>{toPercentString(raw[`recargo${n}`])}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
 
           <div className="quote-card__params-subtitle">Parámetros ajustables</div>
           {/* A pedido: "Restablecer" (más chico, azul) va al lado de la grilla de campos
