@@ -429,6 +429,11 @@
   margin-bottom: 12px;
 }
 
+/* A pedido: el RC a lo ancho de toda la fila — sus valores son los más largos. */
+.quote-card__params-field--ancho {
+  grid-column: 1 / -1;
+}
+
 .quote-card__params-field {
   display: flex;
   flex-direction: column;
