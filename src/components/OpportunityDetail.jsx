@@ -19,6 +19,7 @@ import './PillTabs.css'
 import {
   fetchOpportunityDetail,
   setSimpleColumnValue,
+  setBoardRelationItems,
   fetchColumnText,
   setItemName,
   setDropdownColumnValue,
@@ -144,6 +145,10 @@ const INCLUIR_PROPUESTA_COLUMN_ID = 'boolean_mm4wjdnw'
 const LIBRETA_CONDUCIR_COLUMN_ID = 'file_mm51jy06'
 const CEDULA_COLUMN_ID = 'file_mm5pc008'
 const POLIZA_COLUMN_ID = 'file_mm5bzdd4'
+// "Bien Asegurado": el ítem de 🚘 Vehículos que crea el escenario de validación con lo
+// leído del PDF de la póliza (ver polizaCheck.js). Se desvincula al pedir una validación
+// nueva (ver pedirValidacionPoliza).
+const BIEN_ASEGURADO_COLUMN_ID = 'board_relation_mm4pngbs'
 const PROPUESTA_ELEGIDA_COLUMN_ID = 'boolean_mm5bn41n'
 // Columnas de los opcionales que se tildan por cotización (ver pricingEngine.js#OPCIONALES
 // y handleToggleOpcional / handleAutoExtraChange más abajo).
@@ -1220,6 +1225,12 @@ export default function OpportunityDetail({
     for (const [columnId, valor] of limpios) {
       await setSimpleColumnValue(opportunityId, columnId, valor)
     }
+    // A pedido, "Bien Asegurado" también se limpia al mandar a validar: es el vehículo
+    // que el escenario EXTRAJO del PDF anterior (con matrícula/chasis/motor leídos de esa
+    // póliza). Dejarlo vinculado mientras corre la validación nueva haría que la
+    // comparación (ver polizaCheck.js) muestre diferencias contra una póliza que ya no
+    // existe. El escenario vincula el vehículo nuevo al terminar.
+    await setBoardRelationItems(opportunityId, BIEN_ASEGURADO_COLUMN_ID, [])
     // El pedido va último: recién cuando los veredictos viejos ya no están, así el
     // escenario no puede llegar a leer una mezcla de los dos.
     await setSimpleColumnValue(opportunityId, VALIDACION_POLIZA_COLUMN_ID, ESTADO_GENERAL.validar)
@@ -1229,6 +1240,9 @@ export default function OpportunityDetail({
         const limpio = limpios.find(([columnId]) => columnId === cv.id)
         if (limpio) return { ...cv, text: limpio[1] }
         if (cv.id === VALIDACION_POLIZA_COLUMN_ID) return { ...cv, text: ESTADO_GENERAL.validar }
+        // El vehículo desvinculado también sale del estado local: sin esto, la pantalla
+        // seguiría comparando contra el extraído viejo hasta el próximo refresco.
+        if (cv.id === BIEN_ASEGURADO_COLUMN_ID) return { ...cv, text: '', linked_items: [] }
         return cv
       }),
     }))

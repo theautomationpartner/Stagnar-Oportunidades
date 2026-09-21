@@ -1225,6 +1225,20 @@ export function fetchMondayUsers() {
   return usuariosMondayPromesa
 }
 
+// Deja una columna connect-boards de la Oportunidad con exactamente estos ítems
+// vinculados (lista vacía = desvincular todo). Va por change_column_value con JSON:
+// las connect-boards no aceptan el atajo "simple". Usado para limpiar "Bien Asegurado"
+// al pedir la validación de la póliza (ver pedirValidacionPoliza en OpportunityDetail).
+export async function setBoardRelationItems(itemId, columnId, itemIds = []) {
+  const data = await callMondayApi(CHANGE_COLUMN_VALUE_MUTATION, {
+    boardId: OPPORTUNITIES_BOARD_ID,
+    itemId,
+    columnId,
+    value: JSON.stringify({ item_ids: itemIds.map(Number) }),
+  })
+  return data.change_column_value
+}
+
 // Cambia el "Asignado" de una oportunidad ya creada. deal_owner es una columna people: se
 // escribe con change_column_value y {personsAndTeams}, no con un string. Sin id = dejarla
 // sin asignar.
