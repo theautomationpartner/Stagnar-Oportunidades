@@ -47,7 +47,7 @@ export const ESTADO_VALIDACION = {
   sinValidar: 'Sin validar',
   valido: 'Válido',
   incorrecto: 'Incorrecto',
-  revisado: 'Revisado a mano',
+  revisado: 'Revisado manualmente',
 }
 
 export const ESTADO_GENERAL = {
@@ -67,7 +67,7 @@ export const COLUMNAS_VALIDACION_POLIZA = [
   ...VALIDACIONES_POLIZA.flatMap((v) => [v.estadoColumnId, v.motivoColumnId]),
 ]
 
-// Una validación frena la emisión mientras esté en "Incorrecto". "Revisado a mano" no
+// Una validación frena la emisión mientras esté en "Incorrecto". "Revisado manualmente" no
 // frena: es justamente la salida para cuando el dato de la póliza es el correcto y el que
 // hay que corregir es el de la oportunidad, o cuando la diferencia es aceptable y alguien
 // se hace cargo.

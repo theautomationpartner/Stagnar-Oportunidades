@@ -108,21 +108,19 @@ compania
 ----------------------------------------------------------------
 cobertura
 ----------------------------------------------------------------
-- El nombre del PLAN/PRODUCTO de la compañía tal como lo llama la póliza
-  (etiquetas "Cobertura", "Plan", "Producto", "Riesgo"), NO el nombre
-  comercial de fantasía ni la descripción larga.
-- Catálogo con el que se cotiza (si el texto de la póliza coincide
-  claramente con uno de estos, devolvelo con ESTA grafía exacta):
-    GLOBAL - anual · GLOBAL - 3x2 · GLOBAL · GLOBAL ded Alto
-    TRIPLE - anual · TRIPLE - 3X2 · TRIPLE
-    TOTAL 600 · TOTAL 800 · TOTAL 1500 · TOTAL 2500 · TOTAL PLUS ·
-    TOTAL c/ Mov · TOTAL
-    PARCIAL PLUS · PARCIAL
-    4 EN 1
-- Si la póliza dice algo que no matchea claramente con el catálogo (ej.
-  "Todo riesgo deducible 0"), transcribilo TAL CUAL y anotá en
-  "observaciones" que no coincide con el catálogo. No fuerces un mapeo
-  dudoso: la comparación es exacta y un mapeo forzado valida mal.
+- El nombre del PLAN/PRODUCTO tal cual lo imprime la póliza (etiquetas
+  "Cobertura", "Plan", "Producto", "Riesgo"), TRANSCRIPTO LITERAL:
+  "SEGURO GLOBAL", "1- Daños, Hurto e Incendio", "TOTAL 2500", etc.
+- NO lo traduzcas a ningún catálogo ni lo acortes: el sistema que recibe
+  este JSON tiene sus propias tablas de equivalencia por compañía y hace el
+  mapeo él. Un texto pre-mapeado le hace perder información ("SEGURO
+  GLOBAL" -> "GLOBAL" le esconde que era el plan GLOBAL de BSE).
+- Sí dejá afuera la descripción larga de condiciones: cobertura es el
+  nombre del plan (una línea), no el listado de riesgos cubiertos que a
+  veces lo sigue.
+- Si además del plan figura una modalidad o promoción (ej. "PROMOCIÓN
+  3 X 2", vigencia trianual), anotala en "observaciones" — no la mezcles
+  dentro de cobertura salvo que sea parte del nombre impreso del plan.
 
 ----------------------------------------------------------------
 premio
@@ -154,8 +152,8 @@ AUTO-VERIFICACIÓN ANTES DE RESPONDER
   [ ] chasis/motor/matricula: mayúsculas, sin separadores, transcriptos tal
       cual — nada reconstruido; padrón no es matrícula.
   [ ] compania es EXACTAMENTE BSE, PORTO, SANCOR o SURA, o null.
-  [ ] cobertura es del catálogo con su grafía exacta, o el texto tal cual de
-      la póliza (explicado en observaciones), o null.
+  [ ] cobertura es el nombre del plan TAL CUAL impreso (sin mapear a ningún
+      catálogo, sin la descripción larga), o null.
   [ ] premio es un número sin moneda ni miles.
   [ ] anio es un entero de 4 cifras plausible, del vehículo (no la vigencia).
   [ ] Cada valor lo podés señalar en el PDF; lo razonado va en null.

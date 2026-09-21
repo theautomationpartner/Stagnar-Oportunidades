@@ -58,12 +58,15 @@ const COL = {
   subCompania: 'dropdown_mm51f4va',
   subCobertura: 'dropdown_mm4w8n8p',
   subContado: 'numeric_mm4pc2y1',
+  subBonif: 'numeric_mm52ey7f',
 }
 
-// Cuánto puede alejarse el premio de la póliza del precio cotizado sin que se considere
-// un problema. El precio guardado en el subitem es el CONTADO que devolvió el portal; lo
-// que vio el cliente se calcula en la app con bonificación y recargos, así que un calce
-// exacto no existe. Por eso el monto avisa pero no define identidad.
+// Cuánto puede alejarse el premio de la póliza del precio cotizado (con la Bonificación
+// de la cotización aplicada) sin que se considere un problema. Un calce exacto no existe:
+// los recargos por cuotas y los opcionales quedan cubiertos por esta tolerancia.
+// A pedido: pasada la tolerancia, Cotización queda "Incorrecto" — frena la emisión hasta
+// que alguien la revise y la pase a "Revisado manualmente" (botón "Lo revisé, está bien"
+// en la app, o a mano en monday).
 const TOLERANCIA_PREMIO = 0.1
 
 // Familia de cada cobertura del catálogo, igual que coberturaGroups.js en la app: TOTAL
@@ -294,6 +297,7 @@ const elegida = elegidaItem
       compania: valorDe(elegidaItem.column_values || elegidaItem.columnValues, COL.subCompania),
       cobertura: valorDe(elegidaItem.column_values || elegidaItem.columnValues, COL.subCobertura),
       contado: valorDe(elegidaItem.column_values || elegidaItem.columnValues, COL.subContado),
+      bonif: valorDe(elegidaItem.column_values || elegidaItem.columnValues, COL.subBonif),
     }
   : null
 
@@ -480,12 +484,33 @@ if (!elegida) {
   const premio = numero(poliza.premio)
   const contado = numero(elegida.contado)
   if (premio && contado) {
-    const diferencia = Math.abs(premio - contado) / contado
+    // El precio que vio el cliente no es el contado pelado: es el contado con la
+    // Bonificación de la cotización aplicada — misma fórmula que la app,
+    // total = contado × (1 − bonif/100) (ver pricingEngine.js#computeQuote; los
+    // recargos por cuotas y los opcionales quedan cubiertos por la tolerancia).
+    const bonifPct = numero(elegida.bonif) || 0
+    const esperado = Math.round(contado * (1 - bonifPct / 100) * 100) / 100
+    const diferencia = Math.abs(premio - esperado) / esperado
     if (diferencia > TOLERANCIA_PREMIO) {
-      partes.push(`El premio de la póliza (${premio}) difiere ${Math.round(diferencia * 100)}% del precio cotizado (${contado}); conviene revisarlo.`)
+      // A pedido: el monto fuera de tolerancia deja Cotización en "Incorrecto" — no se
+      // puede concretar hasta que alguien lo mire y lo pase a "Revisado manualmente".
+      // Caso típico con bonificación: la póliza salió al precio de lista, sin aplicar
+      // el descuento cotizado. Se dice eso, que es accionable, en vez de un % suelto.
+      const difSinBonif = Math.abs(premio - contado) / contado
+      const motivoPremio =
+        bonifPct > 0 && difSinBonif <= TOLERANCIA_PREMIO
+          ? `El premio de la póliza (${premio}) es el precio SIN la bonificación del ${bonifPct}% que tenía la cotización (con bonificación se esperaba ${esperado}). Si el monto es correcto, marcala como revisada.`
+          : `El premio de la póliza (${premio}) difiere ${Math.round(diferencia * 100)}% del precio cotizado${bonifPct > 0 ? ` con su bonificación del ${bonifPct}%` : ''} (${esperado}). Si el monto es correcto, marcala como revisada.`
+      cotizacion = mal([...partes, motivoPremio].join(' '))
+    } else {
+      if (bonifPct > 0) {
+        partes.push(`El premio (${premio}) cierra con el cotizado aplicando la bonificación del ${bonifPct}% (${esperado}).`)
+      }
+      cotizacion = ok(partes.join(' '))
     }
+  } else {
+    cotizacion = ok(partes.join(' '))
   }
-  cotizacion = ok(partes.join(' '))
 }
 
 // Si el texto de la póliza no está en PANEL, lo de arriba lo resolvió adivinando por las

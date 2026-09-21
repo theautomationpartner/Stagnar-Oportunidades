@@ -1324,7 +1324,7 @@ export default function OpportunityDetail({
     setRevisandoValidacion(validacion.key)
     try {
       const quien = usuarioSesion?.nombre || usuarioSesion?.email || 'un usuario de la app'
-      const nota = `Revisado a mano por ${quien} el ${new Date().toLocaleDateString('es-UY')}.`
+      const nota = `Revisado manualmente por ${quien} el ${new Date().toLocaleDateString('es-UY')}.`
       const motivoActual = opportunity?.validacionesPoliza?.[validacion.key]?.motivo ?? ''
       const motivoNuevo = motivoActual ? `${motivoActual} — ${nota}` : nota
       await setSimpleColumnValue(opportunityId, validacion.estadoColumnId, ESTADO_VALIDACION.revisado)

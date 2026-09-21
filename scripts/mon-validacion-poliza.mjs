@@ -18,7 +18,7 @@
 //
 // Qué escribe cada lado:
 //   - Make: los cuatro estados, los cuatro motivos y el estado general.
-//   - La app: solo "Revisado a mano" cuando alguien decide emitir igual, y deja en el
+//   - La app: solo "Revisado manualmente" cuando alguien decide emitir igual, y deja en el
 //     motivo quién lo revisó.
 //
 // Idempotente: si una columna ya existe la deja como está.
@@ -42,9 +42,9 @@ const BOARD = '18420863013'
 // Los índices son los de la paleta de monday: 5 es el gris que monday usa como valor por
 // defecto de una columna de estado, así que una oportunidad sin validar se lee "Sin
 // validar" en vez de quedar en blanco. 1 verde (válido), 2 rojo (incorrecto) y 0 naranja
-// para "revisado a mano", que no es lo mismo que válido: lo pasó una persona, no el sistema.
+// para "revisado manualmente", que no es lo mismo que válido: lo pasó una persona, no el sistema.
 const ESTADOS_VALIDACION = {
-  labels: { 5: 'Sin validar', 1: 'Válido', 2: 'Incorrecto', 0: 'Revisado a mano' },
+  labels: { 5: 'Sin validar', 1: 'Válido', 2: 'Incorrecto', 0: 'Revisado manualmente' },
 }
 
 // El general marca el ciclo completo: la app pide "Validar" al subir la póliza, el
