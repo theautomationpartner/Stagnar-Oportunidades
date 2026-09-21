@@ -100,7 +100,7 @@ export default function UbicacionParaCotizar({ opportunity, dropdownOptions, onG
   const opciones = [
     {
       key: 'cliente',
-      titulo: 'La del cliente',
+      titulo: 'Cliente',
       detalle: delCliente
         ? `${delCliente.localidad} · ${delCliente.departamento}`
         : 'El cliente no tiene localidad y departamento cargados',
@@ -108,7 +108,10 @@ export default function UbicacionParaCotizar({ opportunity, dropdownOptions, onG
     },
     {
       key: 'montevideo',
-      titulo: 'Montevideo',
+      // A pedido se llama por lo que significa y no por el lugar: Montevideo es la zona
+      // más cara, la que se elige cuando no se sabe dónde circula el vehículo. Cuál es
+      // sigue a la vista en el detalle de abajo.
+      titulo: 'Más cara',
       detalle: `${UBICACION_MONTEVIDEO.localidad} · ${UBICACION_MONTEVIDEO.departamento}`,
       deshabilitada: !montevideo.departamentoId || !montevideo.localidadId,
     },
@@ -125,10 +128,7 @@ export default function UbicacionParaCotizar({ opportunity, dropdownOptions, onG
       <h3 className="ubicacion-cotizar__titulo">
         <MdPlace /> ¿Con qué ubicación se cotiza?
       </h3>
-      <p className="ubicacion-cotizar__sub">
-        Define la zona de circulación del vehículo, así que cambia el precio. Se puede
-        modificar después desde &quot;Editar&quot;.
-      </p>
+      <p className="ubicacion-cotizar__sub">Define la zona de circulación del vehículo.</p>
 
       <div className="ubicacion-cotizar__opciones">
         {opciones.map((o) => (
