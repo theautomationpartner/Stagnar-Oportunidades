@@ -12,6 +12,7 @@ import {
   estaValidando,
   hayValidacion,
   validacionesQueBloquean,
+  generalConDiferencias,
 } from '../services/validacionPoliza'
 import { revisarCampo, revisarIdentificacion } from '../services/vehiculoIdentificacion'
 import FileUploadField from './FileUploadField'
@@ -88,6 +89,11 @@ export default function EmitirStepPanel({
   const validandoPoliza = estaValidando(opportunity.validacionPolizaEstado)
   const tieneValidacion = hayValidacion(validaciones, opportunity.validacionPolizaEstado)
   const bloqueantes = validacionesQueBloquean(validaciones)
+  // A pedido: "Con diferencias" bloquea aunque no haya veredictos en rojo (el escenario
+  // pudo dejar la diferencia — típicamente el premio — solo en la nota). Con rojos, el
+  // camino ya existente es revisarlos uno a uno; sin rojos, el botón de acá abajo.
+  const conDiferencias = generalConDiferencias(opportunity.validacionPolizaEstado)
+  const difSinRojo = conDiferencias && bloqueantes.length === 0 && !validandoPoliza
 
   // Red distinta de la de arriba: acá no se comparan los dos lados, se mira si cada valor
   // PUEDE ser lo que dice ser (un chasis de 5 caracteres no es un chasis). Un dato mal
@@ -199,6 +205,23 @@ export default function EmitirStepPanel({
               No se puede concretar hasta corregir {bloqueantes.map((v) => v.label.toLowerCase()).join(', ')} o
               marcarlo como revisado.
             </p>
+          )}
+          {difSinRojo && (
+            <div className="emitir-step__validacion-aviso">
+              La validación terminó <strong>con diferencias</strong> — el detalle está en las notas de arriba.
+              No se puede concretar hasta que alguien las revise y las marque a mano.
+              {onRevisarValidacion && (
+                <Button
+                  kind="secondary"
+                  size="small"
+                  className="emitir-step__revisar-dif"
+                  disabled={revisandoValidacion === 'cotizacion'}
+                  onClick={() => onRevisarValidacion(VALIDACIONES_POLIZA.find((v) => v.key === 'cotizacion'))}
+                >
+                  {revisandoValidacion === 'cotizacion' ? 'Marcando...' : 'Lo revisé, marcar como revisadas'}
+                </Button>
+              )}
+            </div>
           )}
         </section>
       )}
@@ -371,7 +394,7 @@ export default function EmitirStepPanel({
             kind="primary"
             className="emitir-step__confirmar-btn"
             onClick={handleConcretarAttempt}
-            disabled={confirmandoEmision || polling || validandoPoliza || bloqueantes.length > 0}
+            disabled={confirmandoEmision || polling || validandoPoliza || bloqueantes.length > 0 || conDiferencias}
           >
             <MdCheckCircle /> {confirmandoEmision ? 'Confirmando...' : 'Concretar Oportunidad'}
           </Button>

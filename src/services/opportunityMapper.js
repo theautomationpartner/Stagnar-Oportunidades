@@ -3,7 +3,11 @@
 // Los colores de estado NO se hardcodean: vienen de statusColors, leido en el momento
 // desde la config real de las columnas (ver services/boardSchema.js).
 
-import { VALIDACIONES_POLIZA, VALIDACION_POLIZA_COLUMN_ID } from './validacionPoliza'
+import {
+  VALIDACIONES_POLIZA,
+  VALIDACION_POLIZA_COLUMN_ID,
+  normalizarEstadoValidacion,
+} from './validacionPoliza'
 import { formatShortDate } from './format'
 import { textOf, boardRelationDisplayOf } from './mondayColumns'
 
@@ -142,7 +146,12 @@ export function mapOpportunityItem(item, statusColors = {}) {
     validacionesPoliza: Object.fromEntries(
       VALIDACIONES_POLIZA.map((v) => [
         v.key,
-        { estado: textOf(cv, v.estadoColumnId), motivo: textOf(cv, v.motivoColumnId) },
+        {
+          // normalizar: el tablero puede tener la etiqueta vieja "Revisado a mano" (ver
+          // validacionPoliza.js) — acá se traduce para que el resto compare un solo nombre.
+          estado: normalizarEstadoValidacion(textOf(cv, v.estadoColumnId)),
+          motivo: textOf(cv, v.motivoColumnId),
+        },
       ])
     ),
     libretaConducir: textOf(cv, 'file_mm51jy06'),

@@ -276,13 +276,13 @@ const COLUMNS_SETTINGS_QUERY = `
 // numero, fecha, ubicacion (como texto simple), dropdown y status (por label).
 // Usada por el botón "Cotizar" del paso 1 y por la edición de campos del paso Cotizar.
 const CHANGE_SIMPLE_VALUE_MUTATION = `
-  mutation ChangeSimpleColumnValue($boardId: ID!, $itemId: ID!, $columnId: String!, $value: String!) {
+  mutation ChangeSimpleColumnValue($boardId: ID!, $itemId: ID!, $columnId: String!, $value: String!, $createLabels: Boolean!) {
     change_simple_column_value(
       board_id: $boardId
       item_id: $itemId
       column_id: $columnId
       value: $value
-      create_labels_if_missing: false
+      create_labels_if_missing: $createLabels
     ) {
       id
     }
@@ -772,12 +772,18 @@ export async function setItemName(itemId, nombre, boardId = OPPORTUNITIES_BOARD_
   return data.change_multiple_column_values
 }
 
-export async function setSimpleColumnValue(itemId, columnId, value) {
+// crearLabelSiFalta: por defecto NO se crean labels (un typo en un estado crearía una
+// etiqueta basura en la columna sin que nadie lo note). Se prende solo donde el label
+// puede legítimamente no existir todavía en el tablero — hoy, "Revisado manualmente"
+// (ver handleRevisarValidacion): monday no deja renombrar labels por API, así que el
+// tablero puede seguir con la etiqueta vieja aunque el código ya use la nueva.
+export async function setSimpleColumnValue(itemId, columnId, value, { crearLabelSiFalta = false } = {}) {
   const data = await callMondayApi(CHANGE_SIMPLE_VALUE_MUTATION, {
     boardId: OPPORTUNITIES_BOARD_ID,
     itemId,
     columnId,
     value: value ?? '',
+    createLabels: crearLabelSiFalta,
   })
   return data.change_simple_column_value
 }

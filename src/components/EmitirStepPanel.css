@@ -142,20 +142,24 @@
   color: #fff !important;
 }
 
-.emitir-step__confirmar-btn:hover {
+.emitir-step__confirmar-btn:hover:not(:disabled):not([aria-disabled='true']) {
   filter: brightness(0.92);
 }
 
-/* A pedido: el botón queda deshabilitado mientras corre la automatización (ver
-   `polling` en el JSX) — @vibe/core atenúa los botones disabled con opacity baja, que
-   sobre el fondo verde de este botón quedaba prácticamente ilegible (verde clarito
-   sobre verde clarito). Se pisa esa opacity y se define una combinación propia con
-   contraste real en vez de depender de la atenuación genérica de la librería. */
-.emitir-step__confirmar-btn:disabled {
+/* A pedido: mientras la validación no terminó en buenas (corriendo, con rojos o "Con
+   diferencias") el botón va GRIS y no se puede clickear — antes quedaba en un verde
+   lavado que seguía pareciendo habilitado. Se cubre también [aria-disabled] porque el
+   Button de @vibe/core no siempre usa el disabled nativo (con solo :disabled el botón
+   bloqueado se veía igual que el activo). pointer-events corta el click aunque la
+   librería lo dejara pasar, y se pisa la opacity genérica para que el gris quede
+   legible y parejo. */
+.emitir-step__confirmar-btn:disabled,
+.emitir-step__confirmar-btn[aria-disabled='true'] {
   opacity: 1;
-  background-color: #9cc9c3 !important;
-  border-color: #9cc9c3 !important;
-  color: #04473f !important;
+  pointer-events: none;
+  background-color: #dcdfe7 !important;
+  border-color: #dcdfe7 !important;
+  color: #676879 !important;
 }
 
 .emitir-step__error {
@@ -294,4 +298,34 @@
   margin: 10px 0 0;
   font-size: 13px;
   color: #d83a52;
+}
+
+/* Botón "Lo revisé, marcar como revisadas" del aviso de "Con diferencias" sin veredictos
+   en rojo (ver EmitirStepPanel): en su propio renglón, separado del texto. A pedido va
+   en el azul de la app (--primary-blue, el del Stepper y los CTA de fábrica): lo despega
+   del rojo del aviso (no es un peligro) y del verde de Concretar (no cierra nada, solo
+   destraba). Los !important pisan los colores por tema de @vibe/core, igual que
+   .emitir-step__confirmar-btn. */
+.emitir-step__revisar-dif {
+  display: block;
+  margin-top: 10px;
+  background-color: var(--primary-blue) !important;
+  border-color: var(--primary-blue) !important;
+  color: #fff !important;
+}
+
+.emitir-step__revisar-dif:hover:not(:disabled):not([aria-disabled='true']) {
+  filter: brightness(0.92);
+}
+
+/* Mientras escribe ("Marcando...") — misma razón que .emitir-step__confirmar-btn: la
+   opacity genérica de @vibe/core dejaría el azul lavado ilegible; combinación propia
+   con contraste real. */
+.emitir-step__revisar-dif:disabled,
+.emitir-step__revisar-dif[aria-disabled='true'] {
+  opacity: 1;
+  pointer-events: none;
+  background-color: #b3d1f2 !important;
+  border-color: #b3d1f2 !important;
+  color: #114b8f !important;
 }

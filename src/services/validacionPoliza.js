@@ -50,6 +50,19 @@ export const ESTADO_VALIDACION = {
   revisado: 'Revisado manualmente',
 }
 
+// "Revisado manualmente" se llamaba "Revisado a mano" (renombrado en el código y en el
+// script de setup, ver mon-validacion-poliza.mjs) — pero monday no deja renombrar labels
+// de una columna de estado por API, así que el tablero real puede seguir teniendo la
+// etiqueta vieja, y los ítems marcados antes (o a mano en monday) llegan con ese texto.
+// Se normaliza al leer (ver opportunityMapper) para que el resto de la app compare
+// contra un solo nombre; sin esto, un ítem revisado con la etiqueta vieja se pintaría
+// gris como "pendiente".
+const REVISADO_LABEL_VIEJA = 'Revisado a mano'
+
+export function normalizarEstadoValidacion(estado) {
+  return estado === REVISADO_LABEL_VIEJA ? ESTADO_VALIDACION.revisado : estado
+}
+
 export const ESTADO_GENERAL = {
   sinValidar: 'Sin validar',
   // Lo escribe la app al subir la póliza: es el pedido, igual que "Cotizar" en Estado
@@ -77,6 +90,16 @@ export function bloqueaEmision(validacion) {
 
 export function validacionesQueBloquean(validaciones) {
   return VALIDACIONES_POLIZA.filter((v) => bloqueaEmision(validaciones?.[v.key]))
+}
+
+// A pedido: el estado general "Con diferencias" bloquea Concretar aunque ningún
+// veredicto esté en "Incorrecto" — hay corridas (versiones del run code del escenario)
+// que dejan la diferencia, típicamente el premio, solo en el general y la nota, con el
+// veredicto en "Válido". La salida es marcarlas como revisadas desde la app (ver
+// EmitirStepPanel), que deja constancia de quién y promueve el general a "Datos
+// válidos".
+export function generalConDiferencias(general) {
+  return general === ESTADO_GENERAL.conDiferencias
 }
 
 // Mientras el escenario corre no tiene sentido dejar emitir ni mostrar un veredicto a

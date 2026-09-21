@@ -1358,7 +1358,12 @@ export default function OpportunityDetail({
       const nota = `Revisado manualmente por ${quien} el ${new Date().toLocaleDateString('es-UY')}.`
       const motivoActual = opportunity?.validacionesPoliza?.[validacion.key]?.motivo ?? ''
       const motivoNuevo = motivoActual ? `${motivoActual} — ${nota}` : nota
-      await setSimpleColumnValue(opportunityId, validacion.estadoColumnId, ESTADO_VALIDACION.revisado)
+      // crearLabelSiFalta: el tablero puede seguir con la etiqueta vieja "Revisado a
+      // mano" (monday no deja renombrarlas por API, ver validacionPoliza.js) — sin esto,
+      // la primera revisión real rebotaría con "label not found".
+      await setSimpleColumnValue(opportunityId, validacion.estadoColumnId, ESTADO_VALIDACION.revisado, {
+        crearLabelSiFalta: true,
+      })
       await setSimpleColumnValue(opportunityId, validacion.motivoColumnId, motivoNuevo)
       setItem((prev) => ({
         ...prev,
@@ -1368,6 +1373,26 @@ export default function OpportunityDetail({
           return cv
         }),
       }))
+      // A pedido: si con esta revisión ya no queda NINGÚN veredicto en rojo y el estado
+      // general sigue en "Con diferencias", se promueve a "Datos válidos" — el general
+      // también bloquea Concretar (ver EmitirStepPanel), y con todo revisado a mano su
+      // única salida es esta. Cubre además el caso de una corrida vieja del escenario
+      // que dejó la diferencia (típicamente el premio) solo en la nota, con los cuatro
+      // veredictos en "Válido".
+      const quedanRojas = VALIDACIONES_POLIZA.some(
+        (v) =>
+          v.key !== validacion.key &&
+          opportunity?.validacionesPoliza?.[v.key]?.estado === ESTADO_VALIDACION.incorrecto
+      )
+      if (!quedanRojas && opportunity?.validacionPolizaEstado === ESTADO_GENERAL.conDiferencias) {
+        await setSimpleColumnValue(opportunityId, VALIDACION_POLIZA_COLUMN_ID, ESTADO_GENERAL.validos)
+        setItem((prev) => ({
+          ...prev,
+          column_values: prev.column_values.map((cv) =>
+            cv.id === VALIDACION_POLIZA_COLUMN_ID ? { ...cv, text: ESTADO_GENERAL.validos } : cv
+          ),
+        }))
+      }
     } catch (err) {
       console.warn('No se pudo marcar la validación como revisada', err)
     } finally {
