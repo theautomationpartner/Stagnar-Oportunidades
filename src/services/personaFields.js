@@ -69,6 +69,28 @@ export function ciError(value) {
   return null
 }
 
+// El RUT uruguayo son 12 dígitos. Acá se exige el largo, a diferencia de ciError, por
+// una razón concreta: la búsqueda de duplicados clasifica el número por su pinta (ver
+// tipoDeTerminoNumerico) y con menos de 11 dígitos lo toma por otra cosa, así que un RUT
+// a medias no encuentra la empresa que ya está cargada y el duplicado entra igual.
+export function rutError(value) {
+  if (!value) return null
+  const digits = stripCi(value)
+  if (!/^\d+$/.test(digits)) return 'El RUT debe contener solo números (podés incluir puntos y guion).'
+  if (digits.length !== 12) return 'El RUT tiene 12 dígitos.'
+  return null
+}
+
+// Qué documento pide el alta según el tipo de cliente. Una empresa no tiene cédula: su
+// documento es el RUT y vive en su propia columna del tablero Clientes. Tenerlos
+// separados no es cosmético — la búsqueda de duplicados mira cada uno en su columna, así
+// que un RUT guardado como CI no encontraría a la empresa que ya existe.
+export function documentoDelTipoCliente(tipoCliente) {
+  return tipoCliente === 'Empresa'
+    ? { label: 'RUT', placeholder: 'Ej: 216261300015', validar: rutError }
+    : { label: 'CI', placeholder: 'Ej: 4.123.456-7', validar: ciError }
+}
+
 // A pedido: <input type="date"> nativo (calendario desplegable) en vez del texto
 // enmascarado dd/mm/aaaa de antes — el value que entrega el navegador ya viene en
 // "aaaa-mm-dd", el mismo formato que espera monday para columnas date (mismo que ya

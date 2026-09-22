@@ -10,7 +10,7 @@
 // que había antes de la extracción.
 import { useState } from 'react'
 import { Modal, ModalContent, ModalFooter } from '@vibe/core'
-import { ciError, fechaError, fieldStateClass, maxFechaNacimiento, NACIONALIDAD_URUGUAY, stripCi } from '../../services/personaFields'
+import { documentoDelTipoCliente, fechaError, fieldStateClass, maxFechaNacimiento, NACIONALIDAD_URUGUAY, stripCi } from '../../services/personaFields'
 import { ExtranjeroFields, Required, RequiredDropdown } from './FormPrimitives'
 
 // Localidades filtradas por el departamento elegido (antes copiado en los 2 popups y en
@@ -209,7 +209,10 @@ export function EditarLeadModal({ form, departamentoOptions, localidades, nacion
     localidadId
   )
 
-  const ciErr = ciError(ci)
+  // El mismo criterio que el alta: una empresa lleva RUT, no cédula. El tipo viene en el
+  // form que se está editando, así que el modal no necesita saber nada nuevo.
+  const documento = documentoDelTipoCliente(form.tipoCliente)
+  const ciErr = documento.validar(ci)
   const fechaErr = fechaError(fechaNacimiento)
   const canSave =
     nombre.trim() &&
@@ -236,7 +239,7 @@ export function EditarLeadModal({ form, departamentoOptions, localidades, nacion
             <input type="text" value={apellido} onChange={(e) => setApellido(e.target.value)} />
           </label>
           <label className={`crear-op__field${fieldStateClass(ci, ciErr)}`}>
-            <span>CI <Required /></span>
+            <span>{documento.label} <Required /></span>
             <input type="text" value={ci} onChange={(e) => setCi(e.target.value)} />
             {ciErr && <span className="crear-op__field-error" role="alert">{ciErr}</span>}
           </label>

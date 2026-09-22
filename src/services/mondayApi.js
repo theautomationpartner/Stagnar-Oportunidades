@@ -1503,7 +1503,7 @@ export async function findContactoByCedula(ci) {
 // numérica: contains_text no aplica, se busca por igualdad con any_of (verificado contra
 // la API real: any_of sobre numbers con el valor como string no da error y matchea).
 // Devuelve { cliente, motivo: 'ci' | 'rut' } o null.
-const CLIENTE_RUT_COLUMN_ID = 'numeric_mm51eyk2'
+export const CLIENTE_RUT_COLUMN_ID = 'numeric_mm51eyk2'
 export async function findClientePorDocumento(documento) {
   const digits = (documento ?? '').replace(/\D/g, '')
   const tipo = tipoDeTerminoNumerico(documento)

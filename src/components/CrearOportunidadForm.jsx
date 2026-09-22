@@ -58,6 +58,7 @@ import {
   OPORTUNIDAD_CONTACTO_CRM_COLUMN_ID,
   OPORTUNIDAD_CONTACTO_COLUMN_ID,
   CLIENTE_TIPO_COLUMN_ID,
+  CLIENTE_RUT_COLUMN_ID,
   CONTACTO_CI_COLUMN_ID,
   CONTACTO_FECHA_NACIMIENTO_COLUMN_ID,
   CONTACTO_LOCALIDAD_COLUMN_ID,
@@ -74,7 +75,7 @@ import {
 } from '../services/mondayApi'
 import { mapOpportunities } from '../services/opportunityMapper'
 import { revisarIdentificacion } from '../services/vehiculoIdentificacion'
-import { ciError, fechaError, fieldStateClass, maxFechaNacimiento, NACIONALIDAD_URUGUAY, normalizeFechaIA, splitNombreApellido, splitTelefono, stripCi, telefonoError, buildMondayPhone, emailError, buildMondayEmail } from '../services/personaFields'
+import { ciError, documentoDelTipoCliente, fechaError, fieldStateClass, maxFechaNacimiento, NACIONALIDAD_URUGUAY, normalizeFechaIA, splitNombreApellido, splitTelefono, stripCi, telefonoError, buildMondayPhone, emailError, buildMondayEmail } from '../services/personaFields'
 import { clearPersistedSearch, loadPersistedSearch, savePersistedSearch } from '../services/persistedSearch'
 import { publicarTrabajoEnCrear } from '../services/crearEnCurso'
 import { ContactoFields, DocumentChoiceToggle, ExtranjeroFields, Required, RequiredDropdown, SectionTitle, StepHeading } from './crear/FormPrimitives'
@@ -750,6 +751,14 @@ export default function CrearOportunidadForm({
     destino?.()
   }
 
+  // Una empresa no tiene cédula: si el alta declara Empresa, el campo del documento pasa
+  // a ser el RUT —etiqueta, ejemplo y validación— y al guardar va a la columna RUT de
+  // Clientes. El valor sigue viviendo en form.ci: es "el documento" de esta persona, y
+  // separarlo en dos campos obligaría a decidir qué hacer con el otro cada vez que se
+  // cambia el tipo.
+  const documento = documentoDelTipoCliente(form.tipoCliente)
+  const esEmpresa = form.tipoCliente === 'Empresa'
+
   // Solo corre cuando NO hay un resultado elegido a propósito por "Buscar Persona" (search
   // salteada — "crear de 0" — y el usuario sigue completando Nombre/Apellido/CI a mano) —
   // avisa (sin bloquear) si esa persona ya está cargada como Contacto, por Cédula o por
@@ -765,7 +774,7 @@ export default function CrearOportunidadForm({
       return undefined
     }
     const digits = stripCi(form.ci)
-    const ciValida = digits && !ciError(form.ci)
+    const ciValida = digits && !documento.validar(form.ci)
     const nombreCompleto = form.nombre.trim() && form.apellido.trim() ? `${form.nombre} ${form.apellido}`.trim() : ''
     // A pedido: también por Teléfono (misma validación que la Cédula, ver
     // findContactoByTelefono en mondayApi.js) — solo con un número ya válido, para no
@@ -1050,7 +1059,7 @@ export default function CrearOportunidadForm({
           form.nombre &&
           form.apellido &&
           form.ci &&
-          !ciError(form.ci) &&
+          !documento.validar(form.ci) &&
           form.fechaNacimiento &&
           !fechaError(form.fechaNacimiento) &&
           // MON-14: Teléfono y Email son del Contacto. El teléfono sigue siendo
@@ -1134,7 +1143,7 @@ export default function CrearOportunidadForm({
     }
     pedir(!form.nombre, false, 'nombre')
     pedir(!form.apellido, false, 'apellido')
-    pedir(!form.ci, ciError(form.ci), 'CI')
+    pedir(!form.ci, documento.validar(form.ci), documento.label)
     pedir(!form.fechaNacimiento, fechaError(form.fechaNacimiento), 'fecha de nacimiento')
     pedir(!form.codigoPais || !form.telefono, telefonoError(form.telefono, form.codigoPais), 'teléfono')
     // El email es opcional: solo molesta si está escrito y mal.
@@ -1409,7 +1418,12 @@ export default function CrearOportunidadForm({
       [CLIENTE_TIPO_COLUMN_ID]: form.tipoCliente || 'Particular',
       [CONTACTO_NOMBRE_COLUMN_ID]: form.nombre.trim(),
       [CONTACTO_APELLIDO_COLUMN_ID]: form.apellido.trim(),
-      [CONTACTO_CI_COLUMN_ID]: stripCi(form.ci),
+      // Cada documento a su columna: la búsqueda de duplicados mira el RUT en la suya y
+      // la cédula en la otra, así que guardar un RUT como CI dejaría entrar la empresa
+      // repetida (ver findClientePorDocumento).
+      ...(esEmpresa
+        ? { [CLIENTE_RUT_COLUMN_ID]: stripCi(form.ci) }
+        : { [CONTACTO_CI_COLUMN_ID]: stripCi(form.ci) }),
       [CONTACTO_FECHA_NACIMIENTO_COLUMN_ID]: form.fechaNacimiento,
       [CONTACTO_LOCALIDAD_COLUMN_ID]: { item_ids: [Number(form.localidadId)] },
       [CONTACTO_DEPARTAMENTO_COLUMN_ID]: { item_ids: [Number(form.departamentoId)] },
@@ -2105,16 +2119,16 @@ export default function CrearOportunidadForm({
                             size="medium"
                             key={`ci-${textFieldsResetKey}`}
                             wrapperClassName="crear-op__field"
-                            title="CI"
+                            title={documento.label}
                             required
-                            placeholder="Ej: 4.123.456-7"
+                            placeholder={documento.placeholder}
                             value={form.ci}
                             onChange={(value) => handleChange('ci', value)}
                             icon={MdClear}
                             onIconClick={() => handleChange('ci', '')}
                             validation={
-                              ciError(form.ci)
-                                ? { status: 'error', text: ciError(form.ci) }
+                              documento.validar(form.ci)
+                                ? { status: 'error', text: documento.validar(form.ci) }
                                 : form.ci
                                   ? { status: 'success' }
                                   : undefined
