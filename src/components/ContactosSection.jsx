@@ -1,10 +1,13 @@
 import { useEffect, useMemo, useState } from 'react'
-import { MdChevronLeft, MdChevronRight, MdSearch } from 'react-icons/md'
+import { MdChevronLeft, MdChevronRight, MdContactPhone, MdGroups, MdPeopleAlt, MdSearch } from 'react-icons/md'
 import { Table, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell, EmptyState, TextField } from '@vibe/core'
 import Avatar from './Avatar'
 import { fetchContactosCrmTodos } from '../services/mondayApi'
 import { initialsOf } from '../services/personaFields'
 import { normalizarParaMatch } from '../services/format'
+// El estilo pill-tabs se importa por componente (no es global), igual que en Clientes y
+// Grupos: sin esto las solapas quedan como botones pelados.
+import './PillTabs.css'
 import './ContactosSection.css'
 
 // Tabla del tablero Contactos: a quién se le manda la información. Es una vista de
@@ -54,7 +57,7 @@ function clientesDeContacto(c) {
   }
 }
 
-export default function ContactosSection() {
+export default function ContactosSection({ onIrAClientes, onIrAGrupos }) {
   const [contactos, setContactos] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -105,9 +108,23 @@ export default function ContactosSection() {
         <p>A quién se le manda la información. Un contacto puede pertenecer a varios clientes.</p>
       </header>
 
+      {/* Las tres solapas son las tres vistas de lo mismo: por cliente, por grupo
+          económico y por contacto. Misma barra que Clientes y Grupos. */}
       <div className="contactos__toolbar">
+        <div className="pill-tabs contactos__tabs" role="tablist">
+          <button type="button" role="tab" aria-selected="false" className="pill-tabs__tab" onClick={onIrAClientes}>
+            <MdPeopleAlt aria-hidden="true" /> Clientes
+          </button>
+          <button type="button" role="tab" aria-selected="false" className="pill-tabs__tab" onClick={onIrAGrupos}>
+            <MdGroups aria-hidden="true" /> Grupos económicos
+          </button>
+          <button type="button" role="tab" aria-selected="true" className="pill-tabs__tab pill-tabs__tab--active">
+            <MdContactPhone aria-hidden="true" /> Contactos
+          </button>
+        </div>
         <TextField
           size="medium"
+          wrapperClassName="contactos__buscador"
           placeholder="Buscar por nombre, teléfono, email o cliente..."
           icon={MdSearch}
           value={busqueda}

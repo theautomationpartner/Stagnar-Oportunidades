@@ -25,7 +25,9 @@
   margin-bottom: 16px;
 }
 
-.contactos__toolbar > :first-child {
+/* Por clase y no por posición: al agregar las solapas adelante, un ":first-child"
+   dejaba de ser el buscador y le pasaba el ancho a las solapas. */
+.contactos__buscador {
   flex: 0 1 380px;
 }
 
@@ -132,4 +134,10 @@
     flex-direction: column;
     align-items: stretch;
   }
+}
+
+/* Las solapas van pegadas a la izquierda de la barra, antes del buscador — misma fila
+   que en Clientes y Grupos, para que las tres vistas se sientan la misma pantalla. */
+.contactos__tabs {
+  flex-shrink: 0;
 }
