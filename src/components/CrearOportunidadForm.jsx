@@ -57,6 +57,7 @@ import {
   setContactoCrmColumnValues,
   OPORTUNIDAD_CONTACTO_CRM_COLUMN_ID,
   OPORTUNIDAD_CONTACTO_COLUMN_ID,
+  CLIENTE_TIPO_COLUMN_ID,
   CONTACTO_CI_COLUMN_ID,
   CONTACTO_FECHA_NACIMIENTO_COLUMN_ID,
   CONTACTO_LOCALIDAD_COLUMN_ID,
@@ -118,6 +119,10 @@ function buildInitialForm() {
     apellido: '',
     ci: '',
     fechaNacimiento: '',
+    // Tipo Cliente (color_mm51rgar en Clientes): el alta pregunta solo Empresa o
+    // Particular (a pedido) — "Otro" existe en el tablero pero se pone desde la ficha
+    // de gestión (ver ClienteGestion). Particular es el caso típico.
+    tipoCliente: 'Particular',
     // MON-14: Teléfono y Email son del CONTACTO (tablero Contactos), no del Cliente —
     // "el contacto es a quien le mando la información". Siguen viviendo en el form con
     // estos nombres para no renombrar todo el circuito de validación y autocompletado;
@@ -429,6 +434,7 @@ export default function CrearOportunidadForm({
         apellido: '',
         ci: '',
         fechaNacimiento: '',
+        tipoCliente: 'Particular',
         codigoPais: '+598',
         telefono: '',
         email: '',
@@ -1083,6 +1089,52 @@ export default function CrearOportunidadForm({
     return false
   }
 
+  // Qué falta para salir del paso del Cliente, con nombre y apellido. Es el espejo de
+  // isStepValid(0): un requisito nuevo allá hay que nombrarlo acá, o el aviso vuelve a
+  // decir que falta algo sin decir qué, que es justo lo que se está arreglando.
+  //
+  // Lo que falta y lo que está mal van separados a propósito: decir "falta la CI" cuando
+  // hay una escrita manda a buscar un campo vacío que no existe.
+  const datosPendientesDelCliente = () => {
+    const faltan = []
+    const revisar = []
+    const pedir = (vacio, mal, nombre) => {
+      if (vacio) faltan.push(nombre)
+      else if (mal) revisar.push(nombre)
+    }
+    pedir(!form.nombre, false, 'nombre')
+    pedir(!form.apellido, false, 'apellido')
+    pedir(!form.ci, ciError(form.ci), 'CI')
+    pedir(!form.fechaNacimiento, fechaError(form.fechaNacimiento), 'fecha de nacimiento')
+    pedir(!form.codigoPais || !form.telefono, telefonoError(form.telefono, form.codigoPais), 'teléfono')
+    // El email es opcional: solo molesta si está escrito y mal.
+    if (form.email && emailError(form.email)) revisar.push('email')
+    pedir(!form.departamentoId, false, 'departamento')
+    pedir(!form.localidadId, false, 'localidad')
+    pedir(!form.nacionalidad, false, 'nacionalidad')
+    const contactoDefinido =
+      form.contactoId ||
+      (form.contactoModo === 'nuevo' &&
+        (form.contactoMismoCliente !== false ? !contactoHomonimo : form.contactoNombre?.trim()))
+    if (!contactoDefinido) faltan.push('contacto')
+    return { faltan, revisar }
+  }
+
+  // "a, b y c": con "y" antes del último, como se lee en voz alta.
+  const enumerar = (xs) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}`)
+
+  const avisoDatosDelCliente = () => {
+    const { faltan, revisar } = datosPendientesDelCliente()
+    const partes = []
+    if (faltan.length) partes.push(`Falta cargar ${enumerar(faltan)}.`)
+    if (revisar.length) partes.push(`Hay que revisar ${enumerar(revisar)}.`)
+    // Puede no haber nada que nombrar —una búsqueda todavía sin resolver, por ejemplo—:
+    // ahí queda el aviso de siempre en vez de un cartel vacío.
+    return partes.length
+      ? partes.join(' ')
+      : 'Completá los datos del cliente para continuar con la selección del riesgo.'
+  }
+
   // Para saltar directo a `target` (clickeando el Stepper) hacen falta TODOS los pasos
   // anteriores completos, no solo el inmediato anterior — antes solo se validaba
   // isStepValid(target - 1), y como el paso 1 (Tipo de Riesgo) casi siempre es válido de
@@ -1314,6 +1366,10 @@ export default function CrearOportunidadForm({
     if (resultadoSeleccionado?.id) return resultadoSeleccionado.id
     const created = await createContactoItem(`${form.nombre} ${form.apellido}`.trim(), {
       [CONTACTO_ESTADO_COLUMN_ID]: 'Lead',
+      // A pedido: el alta declara si el cliente es una Empresa o un Particular (Tipo
+      // Cliente) — la gestión posterior depende de esto (ej. "Empresa donde trabaja"
+      // solo ofrece clientes de tipo Empresa, ver ClienteGestion).
+      [CLIENTE_TIPO_COLUMN_ID]: form.tipoCliente || 'Particular',
       [CONTACTO_NOMBRE_COLUMN_ID]: form.nombre.trim(),
       [CONTACTO_APELLIDO_COLUMN_ID]: form.apellido.trim(),
       [CONTACTO_CI_COLUMN_ID]: stripCi(form.ci),
@@ -1882,9 +1938,7 @@ export default function CrearOportunidadForm({
                       pero en silencio). Se apaga sola apenas se completa lo que
                       falte (por "Editar", ver EditarContactoModal). */}
                   {!isStepValid(0) && (
-                    <AttentionBox type="warning">
-                      Completá los datos del cliente para continuar con la selección del riesgo.
-                    </AttentionBox>
+                    <AttentionBox type="warning">{avisoDatosDelCliente()}</AttentionBox>
                   )}
                   </>
                 ) : (
@@ -1945,6 +1999,26 @@ export default function CrearOportunidadForm({
                         <div className="crear-op__section-subblock">
                           <SectionTitle icon={MdPerson}>Datos personales</SectionTitle>
                           <div className="crear-op__fields--grid crear-op__fields--grid-3">
+                          {/* A pedido: el alta declara si es una Empresa o un Particular
+                              (Tipo Cliente del tablero Clientes). Siempre tiene valor
+                              (arranca en Particular, el caso típico), así que no lleva
+                              asterisco de requerido. */}
+                          <label className="crear-op__field">
+                            <span>Tipo de cliente</span>
+                            <RequiredDropdown
+                              size="medium"
+                              clearable={false}
+                              searchable={false}
+                              options={[
+                                { value: 'Particular', label: 'Particular' },
+                                { value: 'Empresa', label: 'Empresa' },
+                              ]}
+                              value={{ value: form.tipoCliente, label: form.tipoCliente }}
+                              onChange={(option) => {
+                                if (option) handleChange('tipoCliente', option.value)
+                              }}
+                            />
+                          </label>
                           {/* TextField nativo de @vibe/core en vez de <label> + ClearableInput a
                               mano — ya trae label (title/required), botón de limpiar (icon/
                               onIconClick/clearOnIconClick) y el borde verde/rojo (validation) de
@@ -2076,9 +2150,7 @@ export default function CrearOportunidadForm({
                             reconoció la Ubicación), y sin esto no había ninguna pista
                             de por qué "Continuar" seguía gris. */}
                         {!isStepValid(0) && (
-                          <AttentionBox type="warning">
-                            Completá los datos del cliente para continuar con la selección del riesgo.
-                          </AttentionBox>
+                          <AttentionBox type="warning">{avisoDatosDelCliente()}</AttentionBox>
                         )}
                       </>
                     )}

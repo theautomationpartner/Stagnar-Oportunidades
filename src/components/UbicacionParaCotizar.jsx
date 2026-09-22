@@ -108,10 +108,10 @@ export default function UbicacionParaCotizar({ opportunity, dropdownOptions, onG
     },
     {
       key: 'montevideo',
-      // A pedido se llama por lo que significa y no por el lugar: Montevideo es la zona
-      // más cara, la que se elige cuando no se sabe dónde circula el vehículo. Cuál es
-      // sigue a la vista en el detalle de abajo.
-      titulo: 'Más cara',
+      // A pedido se llama por lo que es y no por el lugar: Montevideo - CP11500 es la
+      // ubicación con la que nacía toda oportunidad, la que queda cuando nadie elige
+      // otra. Cuál es sigue a la vista en el detalle de abajo.
+      titulo: 'Por defecto',
       detalle: `${UBICACION_MONTEVIDEO.localidad} · ${UBICACION_MONTEVIDEO.departamento}`,
       deshabilitada: !montevideo.departamentoId || !montevideo.localidadId,
     },
