@@ -2252,6 +2252,15 @@ const MIEMBRO_CLIENTE_COLUMN_ID = 'board_relation_mm78bdp0'
 const MIEMBRO_ROL_COLUMN_ID = 'color_mm78jt9k'
 export const ROLES_GRUPO = ['Titular / Controlante', 'Miembro', 'Empresa vinculada']
 export const ROL_GRUPO_DEFAULT = 'Miembro'
+// A pedido: el rol en el grupo depende del Tipo Cliente — una Empresa solo puede ser
+// "Empresa vinculada" (Titular y Miembro son roles de personas), y un Particular solo
+// Titular/Controlante o Miembro. "Otro" o sin tipo cargado: se ofrecen todos.
+export const ROL_GRUPO_EMPRESA = 'Empresa vinculada'
+export function rolesGrupoParaTipo(tipo) {
+  if (tipo === 'Empresa') return [ROL_GRUPO_EMPRESA]
+  if (tipo === 'Particular') return ['Titular / Controlante', 'Miembro']
+  return ROLES_GRUPO
+}
 
 const CLIENTE_GESTION_COLUMN_IDS = [
   CONTACTO_NOMBRE_COLUMN_ID,

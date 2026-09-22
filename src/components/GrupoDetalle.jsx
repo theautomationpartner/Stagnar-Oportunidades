@@ -10,8 +10,9 @@ import {
   quitarClienteDeGrupo,
   setRolEnGrupo,
   deleteItem,
-  ROLES_GRUPO,
   ROL_GRUPO_DEFAULT,
+  ROL_GRUPO_EMPRESA,
+  rolesGrupoParaTipo,
 } from '../services/mondayApi'
 import Avatar from './Avatar'
 import { initialsOf } from '../services/personaFields'
@@ -201,12 +202,16 @@ export default function GrupoDetalle({ grupoId, onBack, onOpenCliente }) {
                     {!m.clienteId && <span className="grupos__aviso-suave">Sin cliente vinculado</span>}
                   </div>
                   <div className="grupos__miembro-acciones">
+                    {/* Los roles posibles dependen del Tipo Cliente (a pedido): una
+                        Empresa solo "Empresa vinculada", un Particular solo Titular o
+                        Miembro — la única opción de más que se ve es la que permite
+                        corregir un dato viejo mal cargado. */}
                     <Dropdown
                       size="small"
                       className="grupos__rol"
                       clearable={false}
                       searchable={false}
-                      options={ROLES_GRUPO.map((r) => ({ value: r, label: r }))}
+                      options={rolesGrupoParaTipo(cli?.tipo).map((r) => ({ value: r, label: r }))}
                       value={m.rol ? { value: m.rol, label: m.rol } : null}
                       placeholder="Sin rol"
                       disabled={ocupado === `rol-${m.subitemId}`}
@@ -254,12 +259,14 @@ export default function GrupoDetalle({ grupoId, onBack, onOpenCliente }) {
             </div>
             <label className="grupos__rol-label">
               <span>Rol con el que entra</span>
+              {/* Rol para PERSONAS (Titular/Miembro, a pedido): las empresas no lo usan
+                  — entran siempre como "Empresa vinculada", se avisa en su fila. */}
               <Dropdown
                 size="small"
                 className="grupos__rol"
                 clearable={false}
                 searchable={false}
-                options={ROLES_GRUPO.map((r) => ({ value: r, label: r }))}
+                options={rolesGrupoParaTipo('Particular').map((r) => ({ value: r, label: r }))}
                 value={{ value: rolElegido, label: rolElegido }}
                 onChange={(op) => {
                   if (op) setRolElegido(op.value)
@@ -271,37 +278,50 @@ export default function GrupoDetalle({ grupoId, onBack, onOpenCliente }) {
             )}
             {(resultados ?? []).length > 0 && (
               <ul className="grupos__resultados">
-                {resultados.map((c) => (
-                  <li key={c.id} className="grupos__miembro grupos__miembro--sinrol">
-                    <div className="grupos__miembro-nombre">
-                      <span className="grupos__miembro-titulo">{c.name}</span>
-                      <span className="grupos__resultado-meta">
-                        {[c.ci && `CI: ${c.ci}`, c.rut && `RUT: ${c.rut}`, c.tipo].filter(Boolean).join(' · ')}
-                      </span>
-                    </div>
-                    <Button
-                      kind="secondary"
-                      size="small"
-                      disabled={ocupado === 'agregar'}
-                      loading={ocupado === 'agregar'}
-                      onClick={() =>
-                        accion('agregar', async () => {
-                          await agregarClienteAGrupo({
-                            clienteId: c.id,
-                            clienteNombre: c.name,
-                            grupoId: grupo.id,
-                            rol: rolElegido,
+                {resultados.map((c) => {
+                  // A pedido: una Empresa entra SIEMPRE como "Empresa vinculada", elija
+                  // lo que elija el selector de rol (que es para personas).
+                  const esEmpresaResultado = c.tipo === 'Empresa'
+                  const rolEfectivo = esEmpresaResultado ? ROL_GRUPO_EMPRESA : rolElegido
+                  return (
+                    <li key={c.id} className="grupos__miembro grupos__miembro--sinrol">
+                      <div className="grupos__miembro-nombre">
+                        <span className="grupos__miembro-titulo">{c.name}</span>
+                        <span className="grupos__resultado-meta">
+                          {[
+                            c.ci && !esEmpresaResultado && `CI: ${c.ci}`,
+                            c.rut && `RUT: ${c.rut}`,
+                            c.tipo,
+                            esEmpresaResultado && 'entra como Empresa vinculada',
+                          ]
+                            .filter(Boolean)
+                            .join(' · ')}
+                        </span>
+                      </div>
+                      <Button
+                        kind="secondary"
+                        size="small"
+                        disabled={ocupado === 'agregar'}
+                        loading={ocupado === 'agregar'}
+                        onClick={() =>
+                          accion('agregar', async () => {
+                            await agregarClienteAGrupo({
+                              clienteId: c.id,
+                              clienteNombre: c.name,
+                              grupoId: grupo.id,
+                              rol: rolEfectivo,
+                            })
+                            setBusqueda('')
+                            setResultados(null)
+                            setRolElegido(ROL_GRUPO_DEFAULT)
                           })
-                          setBusqueda('')
-                          setResultados(null)
-                          setRolElegido(ROL_GRUPO_DEFAULT)
-                        })
-                      }
-                    >
-                      Agregar
-                    </Button>
-                  </li>
-                ))}
+                        }
+                      >
+                        Agregar
+                      </Button>
+                    </li>
+                  )
+                })}
               </ul>
             )}
           </div>

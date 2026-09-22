@@ -23,9 +23,11 @@ import {
   quitarClienteDeGrupo,
   setRolEnGrupo,
   TIPOS_CLIENTE,
-  ROLES_GRUPO,
   ROL_GRUPO_DEFAULT,
+  ROL_GRUPO_EMPRESA,
+  rolesGrupoParaTipo,
 } from '../services/mondayApi'
+import { normalizarParaMatch } from '../services/format'
 import { buildMondayPhone, buildMondayEmail, initialsOf } from '../services/personaFields'
 import './ClienteGestion.css'
 
@@ -37,6 +39,66 @@ import './ClienteGestion.css'
 // Todas las escrituras van directo a monday y después se relee lo afectado (recargar) —
 // acá no hay optimismo de pantalla: cada acción es puntual, con su botón en "ocupado", y
 // releer garantiza que lo simétrico (los dos lados de cada conexión) quedó como se ve.
+
+// A pedido: nada de dropdowns con live search para elegir clientes/empresas/grupos (son
+// muchos datos) — el gesto es escribir y apretar Buscar (o Enter), como en el resto de
+// la app. La búsqueda es local (las listas ya están en memoria) e ignora tildes.
+function BuscadorLocal({ placeholder, sinOpciones, textoAccion, opciones, ocupado, onElegir }) {
+  const [busqueda, setBusqueda] = useState('')
+  const [resultados, setResultados] = useState(null)
+  const buscar = () => {
+    const q = normalizarParaMatch(busqueda)
+    if (q.length < 2) return
+    setResultados(
+      opciones.filter((o) => [o.label, o.meta].filter(Boolean).some((v) => normalizarParaMatch(v).includes(q)))
+    )
+  }
+  return (
+    <div className="gcli__buscador-local">
+      <div className="gcli__buscar">
+        <TextField
+          size="medium"
+          placeholder={opciones.length ? placeholder : sinOpciones}
+          value={busqueda}
+          disabled={!opciones.length}
+          onChange={(v) => {
+            setBusqueda(v)
+            setResultados(null)
+          }}
+          onKeyDown={(e) => e.key === 'Enter' && buscar()}
+        />
+        <Button kind="secondary" size="medium" disabled={busqueda.trim().length < 2} onClick={buscar}>
+          Buscar
+        </Button>
+      </div>
+      {resultados !== null && resultados.length === 0 && <p className="gcli__vacio">Sin resultados.</p>}
+      {(resultados ?? []).length > 0 && (
+        <ul className="gcli__resultados">
+          {resultados.map((o) => (
+            <li key={o.id} className="gcli__fila">
+              <div className="gcli__fila-datos">
+                <strong>{o.label}</strong>
+                {o.meta && <span>{o.meta}</span>}
+              </div>
+              <Button
+                kind="secondary"
+                size="small"
+                disabled={ocupado}
+                onClick={() => {
+                  setBusqueda('')
+                  setResultados(null)
+                  onElegir(o)
+                }}
+              >
+                {textoAccion}
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
 
 export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
   const [cliente, setCliente] = useState(null)
@@ -56,8 +118,8 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
   const [buscandoContacto, setBuscandoContacto] = useState(false)
   const [creandoContacto, setCreandoContacto] = useState(false)
 
-  // Selecciones pendientes de "Agregar al grupo".
-  const [grupoElegido, setGrupoElegido] = useState(null)
+  // Rol pendiente de "Agregar al grupo" (solo personas — las empresas entran fijas
+  // como Empresa vinculada).
   const [rolElegido, setRolElegido] = useState(ROL_GRUPO_DEFAULT)
 
   const recargar = useCallback(async () => {
@@ -349,22 +411,19 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
                 <MdClear /> Quitar
               </Button>
             </div>
-          ) : empresas.length === 0 ? (
-            <p className="gcli__vacio">Todavía no hay clientes de tipo Empresa para elegir.</p>
           ) : (
-            <div className="gcli__selector">
-              <Dropdown
-                size="medium"
-                clearable={false}
-                options={empresas.map((e) => ({ value: e.id, label: e.name }))}
-                value={null}
-                placeholder="Elegí la empresa"
-                disabled={ocupado === 'empresa'}
-                onChange={(op) => {
-                  if (op) accion('empresa', () => setClienteEmpresa(clienteId, op.value))
-                }}
-              />
-            </div>
+            <BuscadorLocal
+              placeholder="Buscar la empresa por nombre o RUT"
+              sinOpciones="Todavía no hay clientes de tipo Empresa para elegir"
+              textoAccion="Elegir"
+              ocupado={ocupado === 'empresa'}
+              opciones={empresas.map((e) => ({
+                id: e.id,
+                label: e.name,
+                meta: [e.rut && `RUT: ${e.rut}`, e.razonSocial].filter(Boolean).join(' · '),
+              }))}
+              onElegir={(o) => accion('empresa', () => setClienteEmpresa(clienteId, o.id))}
+            />
           )}
         </section>
       )}
@@ -397,19 +456,18 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
             </li>
           ))}
         </ul>
-        <div className="gcli__selector">
-          <Dropdown
-            size="medium"
-            clearable={false}
-            options={posiblesRelaciones.map((c) => ({ value: c.id, label: c.name }))}
-            value={null}
-            placeholder="Agregar un cliente relacionado"
-            disabled={ocupado === 'agregar-relacion'}
-            onChange={(op) => {
-              if (op) accion('agregar-relacion', () => vincularRelacionClientes(clienteId, op.value))
-            }}
-          />
-        </div>
+        <BuscadorLocal
+          placeholder="Buscar un cliente por nombre, CI o RUT"
+          sinOpciones="No quedan clientes para relacionar"
+          textoAccion="Vincular"
+          ocupado={ocupado === 'agregar-relacion'}
+          opciones={posiblesRelaciones.map((c) => ({
+            id: c.id,
+            label: c.name,
+            meta: [c.ci && `CI: ${c.ci}`, c.rut && `RUT: ${c.rut}`, c.tipo].filter(Boolean).join(' · '),
+          }))}
+          onElegir={(o) => accion('agregar-relacion', () => vincularRelacionClientes(clienteId, o.id))}
+        />
       </section>
 
       {/* ---- Grupo económico ---- */}
@@ -427,11 +485,13 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
               <strong>{cliente.grupo.name}</strong>
               <label className="gcli__rol">
                 <span>Rol en el grupo</span>
+                {/* Los roles posibles dependen del Tipo Cliente (a pedido): Empresa solo
+                    "Empresa vinculada", Particular solo Titular/Miembro. */}
                 <Dropdown
                   size="small"
                   clearable={false}
                   searchable={false}
-                  options={ROLES_GRUPO.map((r) => ({ value: r, label: r }))}
+                  options={rolesGrupoParaTipo(cliente.tipo).map((r) => ({ value: r, label: r }))}
                   value={rolActual ? { value: rolActual, label: rolActual } : null}
                   placeholder="Sin rol"
                   disabled={ocupado === 'rol' || miembrosDelCliente.length === 0}
@@ -469,48 +529,49 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
               <MdClear /> Quitar del grupo
             </Button>
           </div>
-        ) : grupos.length === 0 ? (
-          <p className="gcli__vacio">Todavía no hay grupos económicos creados en monday.</p>
         ) : (
           <div className="gcli__grupo-alta">
-            <Dropdown
-              size="medium"
-              clearable={false}
-              options={grupos.map((g) => ({ value: g.id, label: g.alias ? `${g.name} (${g.alias})` : g.name }))}
-              value={grupoElegido}
-              placeholder="Elegí el grupo"
-              onChange={(op) => setGrupoElegido(op ?? null)}
-            />
-            <Dropdown
-              size="medium"
-              clearable={false}
-              searchable={false}
-              options={ROLES_GRUPO.map((r) => ({ value: r, label: r }))}
-              value={{ value: rolElegido, label: rolElegido }}
-              onChange={(op) => {
-                if (op) setRolElegido(op.value)
-              }}
-            />
-            <Button
-              kind="primary"
-              size="medium"
-              disabled={!grupoElegido || ocupado === 'agregar-grupo'}
-              loading={ocupado === 'agregar-grupo'}
-              onClick={() =>
+            {esEmpresa ? (
+              // A pedido: una Empresa entra siempre como "Empresa vinculada" — no hay
+              // rol para elegir.
+              <p className="gcli__hint">Una empresa entra al grupo como <strong>Empresa vinculada</strong>.</p>
+            ) : (
+              <label className="gcli__rol">
+                <span>Rol con el que entra</span>
+                <Dropdown
+                  size="small"
+                  clearable={false}
+                  searchable={false}
+                  options={rolesGrupoParaTipo(cliente.tipo).map((r) => ({ value: r, label: r }))}
+                  value={{ value: rolElegido, label: rolElegido }}
+                  onChange={(op) => {
+                    if (op) setRolElegido(op.value)
+                  }}
+                />
+              </label>
+            )}
+            <BuscadorLocal
+              placeholder="Buscar el grupo por nombre o alias"
+              sinOpciones="Todavía no hay grupos económicos creados en monday"
+              textoAccion="Agregar"
+              ocupado={ocupado === 'agregar-grupo'}
+              opciones={grupos.map((g) => ({
+                id: g.id,
+                label: g.alias ? `${g.name} (${g.alias})` : g.name,
+                meta: `${g.miembros.length} miembro${g.miembros.length === 1 ? '' : 's'}`,
+              }))}
+              onElegir={(o) =>
                 accion('agregar-grupo', async () => {
                   await agregarClienteAGrupo({
                     clienteId,
                     clienteNombre: cliente.name,
-                    grupoId: grupoElegido.value,
-                    rol: rolElegido,
+                    grupoId: o.id,
+                    rol: esEmpresa ? ROL_GRUPO_EMPRESA : rolElegido,
                   })
-                  setGrupoElegido(null)
                   setRolElegido(ROL_GRUPO_DEFAULT)
                 })
               }
-            >
-              Agregar al grupo
-            </Button>
+            />
           </div>
         )}
       </section>

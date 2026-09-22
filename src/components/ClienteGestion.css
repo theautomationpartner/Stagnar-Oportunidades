@@ -255,20 +255,30 @@
   color: var(--text-warning);
 }
 
+/* Alta al grupo: rol (si aplica) arriba y el buscador de grupos debajo. */
 .gcli__grupo-alta {
   display: flex;
+  flex-direction: column;
   gap: 10px;
-  flex-wrap: wrap;
-  align-items: center;
 }
 
-.gcli__grupo-alta > :nth-child(1) {
-  flex: 1 1 260px;
-  max-width: 380px;
+/* Buscador local (escribir + Buscar, sin live search — a pedido) reusado por Empresa
+   donde trabaja / Relaciones / Grupo económico. */
+.gcli__buscador-local {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
 }
 
-.gcli__grupo-alta > :nth-child(2) {
-  flex: 0 1 220px;
+.gcli__resultados {
+  list-style: none;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--border-input);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
 }
 
 @media (max-width: 640px) {
