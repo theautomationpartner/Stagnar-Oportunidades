@@ -1912,6 +1912,22 @@ export default function OpportunityDetail({
   ]
   const activeStepIndex = steps.findIndex((s) => s.key === activeStep)
 
+  // Abrir una oportunidad tenía DOS esperas seguidas y distintas: primero la pantalla
+  // verde del fallback de Suspense mientras bajaba el chunk, y después una blanca acá
+  // mientras llegaban los datos. Se veía como si algo hubiera fallado y volviera a
+  // empezar.
+  //
+  // Es la misma pantalla y con el mismo texto que el fallback (ver App.jsx): así las dos
+  // esperas se leen como una sola, sin parpadeo de título ni cambio de fondo.
+  if (loading) {
+    return (
+      <LoadingScreen
+        title="Abriendo la oportunidad"
+        message="Estamos trayendo los datos del cliente y las cotizaciones desde monday."
+      />
+    )
+  }
+
   return (
     <div className="app">
       <div className="opp-detail__breadcrumb">
@@ -1961,16 +1977,9 @@ export default function OpportunityDetail({
         </div>
       )}
 
-      {loading && (
-        <LoadingScreen
-          compact
-          title="Cargando la oportunidad"
-          message="Estamos trayendo los datos del cliente, el vehículo y las cotizaciones desde monday."
-        />
-      )}
       {error && <div className="opp-detail__status opp-detail__status--error">Error: {error}</div>}
 
-      {!loading && !error && opportunity && (
+      {!error && opportunity && (
         <>
           {/* A pedido: título dinámico por paso (antes "Cotizaciones" fijo sin importar
               en qué paso estuvieras) — con el número a la izquierda del nombre, en un

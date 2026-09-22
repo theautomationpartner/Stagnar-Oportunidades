@@ -30,10 +30,6 @@
   box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
 }
 
-.loading-screen--compact {
-  min-height: 240px;
-}
-
 .loading-screen__title {
   margin: 8px 0 0;
   font-size: 18px;
@@ -47,25 +43,4 @@
   font-size: 14px;
   color: rgb(255 255 255 / 85%);
   line-height: 1.5;
-}
-
-/* La variante compacta vive ADENTRO de paneles blancos — ahí el verde de marca a fondo
-   completo sería un parche: mantiene el look neutro de siempre. */
-.loading-screen--compact {
-  background: var(--bg-canvas);
-}
-
-.loading-screen--compact .loading-screen__spinner {
-  width: auto;
-  height: auto;
-  background: transparent;
-  box-shadow: none;
-}
-
-.loading-screen--compact .loading-screen__title {
-  color: var(--text-dark);
-}
-
-.loading-screen--compact .loading-screen__message {
-  color: var(--text-gray);
 }

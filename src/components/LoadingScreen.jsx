@@ -6,9 +6,9 @@ import './LoadingScreen.css'
 // pintaba en negro, con stroke:currentColor) ni centrado vertical. Acá: spinner de
 // marca (mismo GradientSpinner de los popups de "procesando"), centrado en el alto de
 // la pantalla, título + mensaje descriptivo, y anunciado a lectores de pantalla.
-export default function LoadingScreen({ title = 'Cargando...', message, compact = false }) {
+export default function LoadingScreen({ title = 'Cargando...', message }) {
   return (
-    <div className={compact ? 'loading-screen loading-screen--compact' : 'loading-screen'} role="status" aria-live="polite">
+    <div className="loading-screen" role="status" aria-live="polite">
       <span className="loading-screen__spinner">
         <GradientSpinner size={56} />
       </span>
