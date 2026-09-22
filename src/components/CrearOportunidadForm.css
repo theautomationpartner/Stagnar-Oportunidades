@@ -1409,6 +1409,26 @@
   border-color: var(--border-input);
 }
 
+/* Etiqueta del contacto que todavía no existe en el tablero Contactos: se crea recién
+   al guardar la oportunidad. Es solo visual — no cambia nada de lo que se guarda. */
+.crear-op__etiqueta-nuevo {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  border-radius: 999px;
+  background: var(--positive-soft, #e6f4ea);
+  color: var(--positive, #258750);
+  font-size: 12px;
+  font-weight: 600;
+  vertical-align: middle;
+}
+
+.crear-op__contacto-acciones {
+  display: inline-flex;
+  gap: 4px;
+  flex-shrink: 0;
+}
+
 /* Los Clientes a los que está vinculado un contacto: en gris y chico, porque son
    contexto para reconocerlo, no el dato que se está eligiendo. Con más de uno el chip es
    un botón (abre el detalle) y además lleva title, para el que pasa el mouse. */
