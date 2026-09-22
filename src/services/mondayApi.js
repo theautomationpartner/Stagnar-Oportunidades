@@ -2216,3 +2216,320 @@ export async function fetchOpportunityActivities(opportunityId) {
     link: textOf(item.column_values, ACTIVITY_COLUMN_IDS.link),
   }))
 }
+
+// ---------------------------------------------------------------------------
+// Gestión de Clientes (sección "Clientes" de la app): contactos del cliente, empresa
+// donde trabaja, relaciones familiares/societarias y Grupo Económico.
+//
+// Reglas del modelo (salen de la config real de los tableros):
+//  - Tipo Cliente (color_mm51rgar): Empresa | Particular | Otro. Se elige al crear el
+//    cliente y se puede corregir desde la ficha.
+//  - "Empresa donde trabaja" (board_relation_mm78ec7x) apunta al MISMO tablero
+//    Clientes, pero solo tiene sentido hacia un cliente de tipo Empresa — el selector
+//    de la app ofrece únicamente esos (monday no sabe filtrar una conexión por estado).
+//  - "Relación familiar / societaria" (board_relation_mm78csk7) es una auto-relación
+//    SIMÉTRICA por convención: monday no espeja conexiones, así que vincular o
+//    desvincular escribe SIEMPRE los dos lados.
+//  - Grupo Económico: el cliente guarda su grupo (board_relation_mm79x5fr) Y el grupo
+//    lleva un subitem "miembro" (tablero 18431168635) con el Cliente vinculado y su Rol
+//    — agregar o quitar del grupo mantiene las dos cosas juntas (el subitem se crea o
+//    se borra acá, no hay automatización que lo haga).
+// ---------------------------------------------------------------------------
+export const CLIENTE_TIPO_COLUMN_ID = 'color_mm51rgar'
+export const CLIENTE_EMPRESA_COLUMN_ID = 'board_relation_mm78ec7x'
+export const CLIENTE_RELACIONES_COLUMN_ID = 'board_relation_mm78csk7'
+export const CLIENTE_GRUPO_COLUMN_ID = 'board_relation_mm79x5fr'
+// CLIENTE_RUT_COLUMN_ID ya existe más arriba (búsqueda por RUT); acá solo falta la razón social.
+const CLIENTE_RAZON_SOCIAL_COLUMN_ID = 'text_mm51hysn'
+// Los labels reales de la columna Tipo Cliente. "Otro" existe en el tablero pero el
+// alta solo pregunta Empresa/Particular (a pedido) — desde la ficha se puede poner Otro.
+export const TIPOS_CLIENTE = ['Particular', 'Empresa', 'Otro']
+
+const GRUPOS_BOARD_ID = 18431168471
+const MIEMBROS_BOARD_ID = 18431168635
+const GRUPO_ALIAS_COLUMN_ID = 'text_mm78z7za'
+const MIEMBRO_CLIENTE_COLUMN_ID = 'board_relation_mm78bdp0'
+const MIEMBRO_ROL_COLUMN_ID = 'color_mm78jt9k'
+export const ROLES_GRUPO = ['Titular / Controlante', 'Miembro', 'Empresa vinculada']
+export const ROL_GRUPO_DEFAULT = 'Miembro'
+
+const CLIENTE_GESTION_COLUMN_IDS = [
+  CONTACTO_NOMBRE_COLUMN_ID,
+  CONTACTO_APELLIDO_COLUMN_ID,
+  CONTACTO_CI_COLUMN_ID,
+  CLIENTE_RUT_COLUMN_ID,
+  CLIENTE_RAZON_SOCIAL_COLUMN_ID,
+  CLIENTE_TIPO_COLUMN_ID,
+  CONTACTO_ESTADO_COLUMN_ID,
+  CLIENTE_CONTACTOS_COLUMN_ID,
+  CLIENTE_EMPRESA_COLUMN_ID,
+  CLIENTE_RELACIONES_COLUMN_ID,
+  CLIENTE_GRUPO_COLUMN_ID,
+]
+
+const CLIENTE_GESTION_FRAGMENT = `
+  id
+  name
+  column_values(ids: [${CLIENTE_GESTION_COLUMN_IDS.map((id) => `"${id}"`).join(', ')}]) {
+    id
+    text
+    ... on BoardRelationValue {
+      display_value
+      linked_items {
+        id
+        name
+      }
+    }
+  }
+`
+
+function mapClienteGestion(item) {
+  const cv = item.column_values
+  const rel = (id) =>
+    cv.find((c) => c.id === id)?.linked_items?.map((l) => ({ id: String(l.id), name: l.name })) ?? []
+  return {
+    id: String(item.id),
+    name: item.name,
+    nombre: textOf(cv, CONTACTO_NOMBRE_COLUMN_ID),
+    apellido: textOf(cv, CONTACTO_APELLIDO_COLUMN_ID),
+    ci: textOf(cv, CONTACTO_CI_COLUMN_ID),
+    rut: textOf(cv, CLIENTE_RUT_COLUMN_ID),
+    razonSocial: textOf(cv, CLIENTE_RAZON_SOCIAL_COLUMN_ID),
+    tipo: textOf(cv, CLIENTE_TIPO_COLUMN_ID),
+    estado: textOf(cv, CONTACTO_ESTADO_COLUMN_ID),
+    contactos: rel(CLIENTE_CONTACTOS_COLUMN_ID),
+    empresa: rel(CLIENTE_EMPRESA_COLUMN_ID)[0] ?? null,
+    relaciones: rel(CLIENTE_RELACIONES_COLUMN_ID),
+    grupo: rel(CLIENTE_GRUPO_COLUMN_ID)[0] ?? null,
+  }
+}
+
+const CLIENTES_GESTION_PAGE_QUERY = `
+  query ClientesGestionPage($boardId: ID!, $limit: Int!) {
+    boards(ids: [$boardId]) {
+      items_page(limit: $limit) {
+        cursor
+        items { ${CLIENTE_GESTION_FRAGMENT} }
+      }
+    }
+  }
+`
+
+const CLIENTES_GESTION_NEXT_QUERY = `
+  query ClientesGestionNext($cursor: String!, $limit: Int!) {
+    next_items_page(cursor: $cursor, limit: $limit) {
+      cursor
+      items { ${CLIENTE_GESTION_FRAGMENT} }
+    }
+  }
+`
+
+// TODOS los clientes del tablero, con sus vínculos de gestión. El tablero de Clientes es
+// chico (decenas, no miles) — se trae entero y la búsqueda de la tabla filtra local, que
+// además permite buscar por RUT/razón social sin armar reglas por columna.
+export async function fetchClientesGestion() {
+  const items = []
+  let cursor = null
+  do {
+    const data = cursor
+      ? await callMondayApi(CLIENTES_GESTION_NEXT_QUERY, { cursor, limit: 100 })
+      : await callMondayApi(CLIENTES_GESTION_PAGE_QUERY, { boardId: CLIENTES_BOARD_ID, limit: 100 })
+    const pagina = cursor ? data.next_items_page : data.boards[0].items_page
+    items.push(...pagina.items)
+    cursor = pagina.cursor
+  } while (cursor)
+  return items.map(mapClienteGestion)
+}
+
+const CLIENTE_GESTION_BY_ID_QUERY = `
+  query ClienteGestion($ids: [ID!]) {
+    items(ids: $ids) { ${CLIENTE_GESTION_FRAGMENT} }
+  }
+`
+
+export async function fetchClienteGestion(clienteId) {
+  const data = await callMondayApi(CLIENTE_GESTION_BY_ID_QUERY, { ids: [clienteId] })
+  const item = data.items?.[0]
+  return item ? mapClienteGestion(item) : null
+}
+
+export async function setClienteTipo(clienteId, tipo) {
+  return setContactoColumnValues(clienteId, { [CLIENTE_TIPO_COLUMN_ID]: tipo })
+}
+
+// null/'' desvincula. La conexión permite un solo ítem (la ficha lo garantiza).
+export async function setClienteEmpresa(clienteId, empresaId) {
+  return setContactoColumnValues(clienteId, {
+    [CLIENTE_EMPRESA_COLUMN_ID]: { item_ids: empresaId ? [Number(empresaId)] : [] },
+  })
+}
+
+// Espejo de vincularContactoACliente: saca el vínculo de los DOS lados sin tocar los
+// demás contactos/clientes que cada uno tenga.
+export async function desvincularContactoDeCliente(contactoId, clienteId) {
+  const [contacto] = await fetchContactosCrm([contactoId])
+  const clienteIds = (contacto?.clienteIds ?? []).filter((id) => String(id) !== String(clienteId))
+  await callMondayApi(CHANGE_MULTIPLE_COLUMN_VALUES_MUTATION, {
+    boardId: CONTACTOS_BOARD_ID,
+    itemId: contactoId,
+    columnValues: JSON.stringify({ [CONTACTO_CRM_CLIENTE_COLUMN_ID]: { item_ids: clienteIds.map(Number) } }),
+  })
+  const existentes = await fetchClienteContactos(clienteId).catch(() => [])
+  await setContactoColumnValues(clienteId, {
+    [CLIENTE_CONTACTOS_COLUMN_ID]: {
+      item_ids: existentes.filter((c) => String(c.id) !== String(contactoId)).map((c) => Number(c.id)),
+    },
+  })
+}
+
+const CLIENTE_RELACIONES_QUERY = `
+  query ClienteRelaciones($ids: [ID!]) {
+    items(ids: $ids) {
+      id
+      column_values(ids: ["${CLIENTE_RELACIONES_COLUMN_ID}"]) {
+        ... on BoardRelationValue {
+          linked_items { id }
+        }
+      }
+    }
+  }
+`
+
+async function relacionesDe(ids) {
+  const data = await callMondayApi(CLIENTE_RELACIONES_QUERY, { ids: ids.map(String) })
+  return Object.fromEntries(
+    (data.items ?? []).map((item) => [
+      String(item.id),
+      item.column_values?.[0]?.linked_items?.map((l) => String(l.id)) ?? [],
+    ])
+  )
+}
+
+// Relación familiar/societaria: se escribe en los dos clientes (monday no espeja) — las
+// listas se releen en el momento para no pisar vínculos que otro haya agregado.
+export async function vincularRelacionClientes(aId, bId) {
+  const listas = await relacionesDe([aId, bId])
+  const deA = [...new Set([...(listas[String(aId)] ?? []), String(bId)])]
+  const deB = [...new Set([...(listas[String(bId)] ?? []), String(aId)])]
+  await setContactoColumnValues(aId, { [CLIENTE_RELACIONES_COLUMN_ID]: { item_ids: deA.map(Number) } })
+  await setContactoColumnValues(bId, { [CLIENTE_RELACIONES_COLUMN_ID]: { item_ids: deB.map(Number) } })
+}
+
+export async function desvincularRelacionClientes(aId, bId) {
+  const listas = await relacionesDe([aId, bId])
+  const deA = (listas[String(aId)] ?? []).filter((id) => id !== String(bId))
+  const deB = (listas[String(bId)] ?? []).filter((id) => id !== String(aId))
+  await setContactoColumnValues(aId, { [CLIENTE_RELACIONES_COLUMN_ID]: { item_ids: deA.map(Number) } })
+  await setContactoColumnValues(bId, { [CLIENTE_RELACIONES_COLUMN_ID]: { item_ids: deB.map(Number) } })
+}
+
+const FETCH_GRUPOS_QUERY = `
+  query GruposEconomicos($boardId: ID!) {
+    boards(ids: [$boardId]) {
+      items_page(limit: 100) {
+        items {
+          id
+          name
+          column_values(ids: ["${GRUPO_ALIAS_COLUMN_ID}"]) {
+            id
+            text
+          }
+          subitems {
+            id
+            name
+            column_values(ids: ["${MIEMBRO_CLIENTE_COLUMN_ID}", "${MIEMBRO_ROL_COLUMN_ID}"]) {
+              id
+              text
+              ... on BoardRelationValue {
+                linked_items { id name }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+`
+
+// Grupos con sus miembros resueltos ({subitemId, clienteId, clienteNombre, rol}) — la
+// ficha usa los miembros para saber QUÉ subitem borrar al quitar un cliente del grupo y
+// qué rol tiene hoy.
+export async function fetchGruposEconomicos() {
+  const data = await callMondayApi(FETCH_GRUPOS_QUERY, { boardId: GRUPOS_BOARD_ID })
+  return (data.boards[0]?.items_page.items ?? []).map((g) => ({
+    id: String(g.id),
+    name: g.name,
+    alias: textOf(g.column_values, GRUPO_ALIAS_COLUMN_ID),
+    miembros: (g.subitems ?? []).map((s) => {
+      const clienteLink = s.column_values.find((c) => c.id === MIEMBRO_CLIENTE_COLUMN_ID)?.linked_items?.[0]
+      return {
+        subitemId: String(s.id),
+        clienteId: clienteLink ? String(clienteLink.id) : null,
+        clienteNombre: clienteLink?.name ?? s.name,
+        rol: textOf(s.column_values, MIEMBRO_ROL_COLUMN_ID),
+      }
+    }),
+  }))
+}
+
+// Alta de un grupo económico desde la app (ver GruposSection). El alias es opcional.
+export async function createGrupoEconomico({ nombre, alias = '' }) {
+  const created = await callMondayApi(CREATE_ITEM_MUTATION, { boardId: GRUPOS_BOARD_ID, itemName: nombre })
+  const id = created.create_item.id
+  if (alias.trim()) {
+    await callMondayApi(CHANGE_MULTIPLE_COLUMN_VALUES_MUTATION, {
+      boardId: GRUPOS_BOARD_ID,
+      itemId: id,
+      columnValues: JSON.stringify({ [GRUPO_ALIAS_COLUMN_ID]: alias.trim() }),
+    })
+  }
+  return { id: String(id) }
+}
+
+const CREATE_SUBITEM_MUTATION = `
+  mutation CreateSubitem($parentItemId: ID!, $itemName: String!) {
+    create_subitem(parent_item_id: $parentItemId, item_name: $itemName) {
+      id
+      board { id }
+    }
+  }
+`
+
+// Alta en el grupo = las DOS escrituras juntas: el subitem miembro (con Cliente + Rol) y
+// la conexión del lado del cliente. El subitem primero — si algo falla a mitad, un
+// miembro sin conexión en el cliente se nota menos que un cliente que "dice" estar en un
+// grupo donde no figura.
+export async function agregarClienteAGrupo({ clienteId, clienteNombre, grupoId, rol = ROL_GRUPO_DEFAULT }) {
+  const created = await callMondayApi(CREATE_SUBITEM_MUTATION, {
+    parentItemId: grupoId,
+    itemName: clienteNombre,
+  })
+  const sub = created.create_subitem
+  await callMondayApi(CHANGE_MULTIPLE_COLUMN_VALUES_MUTATION, {
+    boardId: sub.board?.id ?? MIEMBROS_BOARD_ID,
+    itemId: sub.id,
+    columnValues: JSON.stringify({
+      [MIEMBRO_CLIENTE_COLUMN_ID]: { item_ids: [Number(clienteId)] },
+      [MIEMBRO_ROL_COLUMN_ID]: rol,
+    }),
+  })
+  await setContactoColumnValues(clienteId, { [CLIENTE_GRUPO_COLUMN_ID]: { item_ids: [Number(grupoId)] } })
+  return { subitemId: String(sub.id) }
+}
+
+// Baja del grupo: borra el/los subitems del cliente en ese grupo y limpia la conexión.
+// `subitemIds` sale de fetchGruposEconomicos (los miembros de su grupo actual).
+export async function quitarClienteDeGrupo({ clienteId, subitemIds = [] }) {
+  for (const id of subitemIds) {
+    await deleteItem(id)
+  }
+  await setContactoColumnValues(clienteId, { [CLIENTE_GRUPO_COLUMN_ID]: { item_ids: [] } })
+}
+
+export async function setRolEnGrupo(subitemId, rol) {
+  return callMondayApi(CHANGE_MULTIPLE_COLUMN_VALUES_MUTATION, {
+    boardId: MIEMBROS_BOARD_ID,
+    itemId: subitemId,
+    columnValues: JSON.stringify({ [MIEMBRO_ROL_COLUMN_ID]: rol }),
+  })
+}
