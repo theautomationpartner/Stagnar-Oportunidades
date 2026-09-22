@@ -255,6 +255,17 @@ export default function App() {
   }
   const isTableRoute = route.seg === 'oportunidades' && !route.id
   const tableVisitsRef = useRef(0)
+
+  // La tabla de Oportunidades mostraba bloques grises mientras cargaba, mientras que
+  // Clientes, Contactos y Grupos muestran la pantalla verde: eran dos cargas distintas
+  // para lo mismo. Ahora la primera también es la verde.
+  //
+  // Solo la PRIMERA: buscar y traer más también prenden `loading`, y ahí una pantalla
+  // completa taparía el buscador donde se acaba de tipear. Se recuerda con una ref que la
+  // tabla ya se mostró una vez, para que no pueda volver a pasar en la misma visita.
+  const tablaYaSeVioRef = useRef(false)
+  if (!loading) tablaYaSeVioRef.current = true
+  const primeraCargaDeLaTabla = loading && !tablaYaSeVioRef.current
   useEffect(() => {
     if (!isTableRoute || !schema) return
     // La primera vez la lista ya viene del load inicial; de ahí en más se refresca.
@@ -364,6 +375,13 @@ export default function App() {
           }}
         />
       </Suspense>
+    )
+  } else if (primeraCargaDeLaTabla) {
+    main = (
+      <LoadingScreen
+        title="Cargando oportunidades"
+        message="Un momento, estamos trayendo la lista de oportunidades desde monday."
+      />
     )
   } else {
     main = (
