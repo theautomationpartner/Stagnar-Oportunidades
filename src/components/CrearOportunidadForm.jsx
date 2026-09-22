@@ -1057,11 +1057,11 @@ export default function CrearOportunidadForm({
       return Boolean(
         busquedaResuelta &&
           form.nombre &&
-          form.apellido &&
+          // Una empresa no tiene apellido ni fecha de nacimiento: esos dos campos no se
+          // muestran y no se piden. El nombre pasa a ser la razón social, que va solo.
+          (esEmpresa || (form.apellido && form.fechaNacimiento && !fechaError(form.fechaNacimiento))) &&
           form.ci &&
           !documento.validar(form.ci) &&
-          form.fechaNacimiento &&
-          !fechaError(form.fechaNacimiento) &&
           // MON-14: Teléfono y Email son del Contacto. El teléfono sigue siendo
           // obligatorio (sin él no hay a quién mandarle la cotización) y el email
           // opcional. Si el contacto NO es el propio cliente, hace falta su nombre.
@@ -1141,10 +1141,10 @@ export default function CrearOportunidadForm({
       if (vacio) faltan.push(nombre)
       else if (mal) revisar.push(nombre)
     }
-    pedir(!form.nombre, false, 'nombre')
-    pedir(!form.apellido, false, 'apellido')
+    pedir(!form.nombre, false, esEmpresa ? 'razón social' : 'nombre')
+    if (!esEmpresa) pedir(!form.apellido, false, 'apellido')
     pedir(!form.ci, documento.validar(form.ci), documento.label)
-    pedir(!form.fechaNacimiento, fechaError(form.fechaNacimiento), 'fecha de nacimiento')
+    if (!esEmpresa) pedir(!form.fechaNacimiento, fechaError(form.fechaNacimiento), 'fecha de nacimiento')
     pedir(!form.codigoPais || !form.telefono, telefonoError(form.telefono, form.codigoPais), 'teléfono')
     // El email es opcional: solo molesta si está escrito y mal.
     if (form.email && emailError(form.email)) revisar.push('email')
@@ -1209,9 +1209,11 @@ export default function CrearOportunidadForm({
     const columnValues = {
       deal_stage: 'Nueva',
       text_mm51b055: form.nombre,
-      text_mm51ez7e: form.apellido,
       numeric_mm51mb0s: stripCi(form.ci),
-      date_mm516agw: form.fechaNacimiento,
+      // De una empresa no se escriben apellido ni nacimiento: quedarían con lo que se
+      // hubiera tipeado antes de cambiar el tipo, y un dato viejo escondido es peor que
+      // uno vacío.
+      ...(esEmpresa ? {} : { text_mm51ez7e: form.apellido, date_mm516agw: form.fechaNacimiento }),
       phone_mm519m27: buildMondayPhone(form.codigoPais, form.telefono),
       color_mm5atxav: form.tipoRiesgo,
       board_relation_mm5sqf8t: { item_ids: [Number(form.localidadId)] },
@@ -1410,21 +1412,23 @@ export default function CrearOportunidadForm({
   // (ver contactoOportunidades más arriba) se empiece a llenar solo de acá en adelante.
   const ensureContactoId = async () => {
     if (resultadoSeleccionado?.id) return resultadoSeleccionado.id
-    const created = await createContactoItem(`${form.nombre} ${form.apellido}`.trim(), {
+    const created = await createContactoItem(
+      (esEmpresa ? form.nombre : `${form.nombre} ${form.apellido}`).trim(),
+      {
       [CONTACTO_ESTADO_COLUMN_ID]: 'Lead',
       // A pedido: el alta declara si el cliente es una Empresa o un Particular (Tipo
       // Cliente) — la gestión posterior depende de esto (ej. "Empresa donde trabaja"
       // solo ofrece clientes de tipo Empresa, ver ClienteGestion).
       [CLIENTE_TIPO_COLUMN_ID]: form.tipoCliente || 'Particular',
       [CONTACTO_NOMBRE_COLUMN_ID]: form.nombre.trim(),
-      [CONTACTO_APELLIDO_COLUMN_ID]: form.apellido.trim(),
+      ...(esEmpresa ? {} : { [CONTACTO_APELLIDO_COLUMN_ID]: form.apellido.trim() }),
       // Cada documento a su columna: la búsqueda de duplicados mira el RUT en la suya y
       // la cédula en la otra, así que guardar un RUT como CI dejaría entrar la empresa
       // repetida (ver findClientePorDocumento).
       ...(esEmpresa
         ? { [CLIENTE_RUT_COLUMN_ID]: stripCi(form.ci) }
         : { [CONTACTO_CI_COLUMN_ID]: stripCi(form.ci) }),
-      [CONTACTO_FECHA_NACIMIENTO_COLUMN_ID]: form.fechaNacimiento,
+      ...(esEmpresa ? {} : { [CONTACTO_FECHA_NACIMIENTO_COLUMN_ID]: form.fechaNacimiento }),
       [CONTACTO_LOCALIDAD_COLUMN_ID]: { item_ids: [Number(form.localidadId)] },
       [CONTACTO_DEPARTAMENTO_COLUMN_ID]: { item_ids: [Number(form.departamentoId)] },
       [CONTACTO_DIRECCION_COLUMN_ID]: { text: form.direccion.trim() },
@@ -2102,19 +2106,21 @@ export default function CrearOportunidadForm({
                             onIconClick={() => handleChange('nombre', '')}
                             validation={form.nombre ? { status: 'success' } : undefined}
                           />
-                          <TextField
-                            size="medium"
-                            key={`apellido-${textFieldsResetKey}`}
-                            wrapperClassName="crear-op__field"
-                            title="Apellido"
-                            required
-                            placeholder="Ingresa el apellido"
-                            value={form.apellido}
-                            onChange={(value) => handleChange('apellido', value)}
-                            icon={MdClear}
-                            onIconClick={() => handleChange('apellido', '')}
-                            validation={form.apellido ? { status: 'success' } : undefined}
-                          />
+                          {!esEmpresa && (
+                            <TextField
+                              size="medium"
+                              key={`apellido-${textFieldsResetKey}`}
+                              wrapperClassName="crear-op__field"
+                              title="Apellido"
+                              required
+                              placeholder="Ingresa el apellido"
+                              value={form.apellido}
+                              onChange={(value) => handleChange('apellido', value)}
+                              icon={MdClear}
+                              onIconClick={() => handleChange('apellido', '')}
+                              validation={form.apellido ? { status: 'success' } : undefined}
+                            />
+                          )}
                           <TextField
                             size="medium"
                             key={`ci-${textFieldsResetKey}`}
@@ -2134,6 +2140,7 @@ export default function CrearOportunidadForm({
                                   : undefined
                             }
                           />
+                          {!esEmpresa && (
                           <label className={`crear-op__field${fieldStateClass(form.fechaNacimiento, fechaError(form.fechaNacimiento))}`}>
                             <span>Fecha Nacimiento <Required /></span>
                             <div className="crear-op__date-wrap">
@@ -2158,6 +2165,7 @@ export default function CrearOportunidadForm({
                               <span className="crear-op__field-error" role="alert">{fechaError(form.fechaNacimiento)}</span>
                             )}
                           </label>
+                          )}
                           </div>
                         </div>
                       )}
