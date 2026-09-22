@@ -160,3 +160,141 @@
 .contactos__tabs .pill-tabs__tab {
   min-width: 170px;
 }
+
+/* La fila abre la card con la ficha del contacto. */
+.contactos__row {
+  cursor: pointer;
+}
+
+/* --- Card "ficha del contacto" (ContactoFichaModal) --- */
+/* Mismo padding que los demás ModalContent de la app (ver el popup de contacto nuevo):
+   sin esto la X de cerrar quedaba descolgada sobre el contenido. */
+.contactos__ficha {
+  padding: 28px 32px 8px;
+}
+
+.contactos__ficha-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0 0 16px;
+  /* aire para la X de cerrar del Modal */
+  padding-right: 36px;
+}
+
+.contactos__ficha-cabecera h2 {
+  font-size: 18px;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin: 0;
+}
+
+.contactos__ficha-cabecera p {
+  font-size: 12px;
+  color: var(--text-gray);
+  margin: 2px 0 0;
+}
+
+.contactos__ficha-aviso {
+  margin: 0 0 14px;
+}
+
+/* Una columna: cada dato en su renglón entero — a dos columnas el email largo se
+   cortaba a mitad de palabra. */
+.contactos__ficha-datos {
+  display: grid;
+  grid-template-columns: 1fr;
+  gap: 12px;
+  margin: 0 0 16px;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  background: var(--bg-subtle);
+}
+
+.contactos__ficha-datos dt {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+  margin: 0 0 2px;
+}
+
+.contactos__ficha-datos dd {
+  font-size: 14px;
+  font-weight: 600;
+  color: var(--text-dark);
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.contactos__ficha-notas {
+  grid-column: 1 / -1;
+}
+
+.contactos__ficha-notas dd {
+  font-weight: 400;
+  white-space: pre-wrap;
+}
+
+.contactos__ficha-clientes h3 {
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin: 0 0 8px;
+}
+
+.contactos__ficha-clientes ul {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Chip clickeable que salta a la ficha de gestión de ese cliente. */
+.contactos__ficha-link {
+  border: 1px solid var(--tint-info-bd);
+  background: var(--tint-info);
+  color: var(--tint-info-text);
+  border-radius: 16px;
+  padding: 5px 12px;
+  font-size: 13px;
+  font-weight: 600;
+  cursor: pointer;
+}
+
+.contactos__ficha-link:hover {
+  text-decoration: underline;
+}
+
+/* Modo edición de la card: los mismos lugares, ahora con inputs. */
+.contactos__ficha-nombre-input {
+  flex: 1;
+  /* aire para la X de cerrar del Modal */
+  margin-right: 36px;
+}
+
+.contactos__ficha-datos dd .crear-op__phone {
+  margin-top: 2px;
+}
+
+.contactos__ficha-notas-input {
+  width: 100%;
+  margin-top: 2px;
+  padding: 8px 10px;
+  border: 1px solid var(--border-input);
+  border-radius: 6px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-dark);
+  resize: vertical;
+  background: #fff;
+}
+
+.contactos__ficha-notas-input:focus {
+  outline: none;
+  border-color: var(--primary-blue);
+}

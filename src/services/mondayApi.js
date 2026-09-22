@@ -2533,3 +2533,77 @@ export async function setRolEnGrupo(subitemId, rol) {
     columnValues: JSON.stringify({ [MIEMBRO_ROL_COLUMN_ID]: rol }),
   })
 }
+
+// Ficha completa de UN contacto (la card "ver datos" de la vista Contactos): además del
+// teléfono/email trae los clientes vinculados con id+nombre (para navegar a su ficha),
+// las Notas y el estado de Revisión con su motivo — lo que la tabla resume, acá entero.
+const CONTACTO_NOTAS_COLUMN_ID = 'long_text4'
+const CONTACTO_REVISION_COLUMN_ID = 'color_mm798hsj'
+const CONTACTO_MOTIVO_REVISION_COLUMN_ID = 'text_mm795he6'
+
+const CONTACTO_FICHA_QUERY = `
+  query ContactoFicha($ids: [ID!]) {
+    items(ids: $ids) {
+      id
+      name
+      column_values(ids: ["${CONTACTO_CRM_TELEFONO_COLUMN_ID}", "${CONTACTO_CRM_EMAIL_COLUMN_ID}", "${CONTACTO_CRM_CLIENTE_COLUMN_ID}", "${CONTACTO_NOTAS_COLUMN_ID}", "${CONTACTO_REVISION_COLUMN_ID}", "${CONTACTO_MOTIVO_REVISION_COLUMN_ID}"]) {
+        id
+        text
+        value
+        ... on BoardRelationValue {
+          linked_items {
+            id
+            name
+          }
+        }
+      }
+    }
+  }
+`
+
+// Edición desde la card del contacto: escribe SOLO lo que se le pasa (undefined = no
+// tocar; '' vacía el campo). El nombre va por change_multiple con el id reservado "name",
+// igual que el renombre de oportunidades (ver setItemName).
+export async function updateContactoCrmFicha(contactoId, { name, phone, email, notas } = {}) {
+  const columnValues = {}
+  if (name !== undefined && name.trim()) columnValues.name = name.trim()
+  if (phone !== undefined) {
+    columnValues[CONTACTO_CRM_TELEFONO_COLUMN_ID] = phone?.phone ? phone : { phone: '', countryShortName: '' }
+  }
+  if (email !== undefined) {
+    columnValues[CONTACTO_CRM_EMAIL_COLUMN_ID] = email ? { email, text: email } : { email: '', text: '' }
+  }
+  if (notas !== undefined) columnValues[CONTACTO_NOTAS_COLUMN_ID] = { text: notas }
+  if (!Object.keys(columnValues).length) return null
+  return callMondayApi(CHANGE_MULTIPLE_COLUMN_VALUES_MUTATION, {
+    boardId: CONTACTOS_BOARD_ID,
+    itemId: contactoId,
+    columnValues: JSON.stringify(columnValues),
+  })
+}
+
+export async function fetchContactoFicha(contactoId) {
+  const data = await callMondayApi(CONTACTO_FICHA_QUERY, { ids: [String(contactoId)] })
+  const item = data.items?.[0]
+  if (!item) return null
+  const byId = Object.fromEntries(item.column_values.map((cv) => [cv.id, cv]))
+  let telefono = ''
+  try {
+    telefono = byId[CONTACTO_CRM_TELEFONO_COLUMN_ID]?.value
+      ? JSON.parse(byId[CONTACTO_CRM_TELEFONO_COLUMN_ID].value)?.phone || ''
+      : ''
+  } catch {
+    // sin teléfono usable — la ficha lo muestra vacío en vez de romper
+  }
+  return {
+    id: String(item.id),
+    name: item.name,
+    telefono,
+    email: byId[CONTACTO_CRM_EMAIL_COLUMN_ID]?.text?.trim() || '',
+    clientes:
+      byId[CONTACTO_CRM_CLIENTE_COLUMN_ID]?.linked_items?.map((l) => ({ id: String(l.id), name: l.name })) ?? [],
+    notas: byId[CONTACTO_NOTAS_COLUMN_ID]?.text?.trim() || '',
+    revision: byId[CONTACTO_REVISION_COLUMN_ID]?.text?.trim() || '',
+    motivoRevision: byId[CONTACTO_MOTIVO_REVISION_COLUMN_ID]?.text?.trim() || '',
+  }
+}

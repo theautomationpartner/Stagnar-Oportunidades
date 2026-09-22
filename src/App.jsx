@@ -330,7 +330,11 @@ export default function App() {
   } else if (route.seg === 'contactos') {
     main = (
       <Suspense fallback={<LoadingScreen title="Cargando contactos" message="Un momento, estamos trayendo la lista de contactos desde monday." />}>
-        <ContactosSection onIrAClientes={() => go('clientes')} onIrAGrupos={() => go('grupos')} />
+        <ContactosSection
+          onIrAClientes={() => go('clientes')}
+          onIrAGrupos={() => go('grupos')}
+          onOpenCliente={(id) => go('clientes', id)}
+        />
       </Suspense>
     )
   } else if (route.seg === 'grupos' && route.id) {
@@ -440,7 +444,9 @@ export default function App() {
             accionActual={
               route.seg === 'crear'
                 ? 'crear'
-                : route.seg === 'clientes' || route.seg === 'grupos'
+                : // Contactos es la tercera solapa de la gestión de clientes — en el
+                  // dropdown no tiene entrada propia, la tarea sigue siendo esa.
+                  route.seg === 'clientes' || route.seg === 'grupos' || route.seg === 'contactos'
                   ? 'clientes'
                   : 'consultar'
             }

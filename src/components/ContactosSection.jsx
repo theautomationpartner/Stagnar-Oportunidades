@@ -1,11 +1,20 @@
 import { useEffect, useMemo, useState } from 'react'
-import { MdChevronLeft, MdChevronRight, MdContactPhone, MdGroups, MdPeopleAlt, MdSearch } from 'react-icons/md'
-import { Table, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell, EmptyState, TextField } from '@vibe/core'
+import { MdChevronLeft, MdChevronRight, MdClear, MdContactPhone, MdGroups, MdPeopleAlt, MdSearch } from 'react-icons/md'
+import { AttentionBox, EmptyState, Modal, ModalContent, ModalFooter, Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, TextField } from '@vibe/core'
 import Avatar from './Avatar'
 import LoadingScreen from './LoadingScreen'
-import { fetchContactosCrmTodos } from '../services/mondayApi'
-import { initialsOf } from '../services/personaFields'
+import {
+  fetchContactosCrmTodos,
+  fetchContactoFicha,
+  updateContactoCrmFicha,
+  buscarContactosCrmLibre,
+} from '../services/mondayApi'
+import { buildMondayPhone, CODIGO_PAIS_OPTIONS, emailError, initialsOf, telefonoError } from '../services/personaFields'
+import { RequiredDropdown, codigoPaisDropdownProps, Required } from './crear/FormPrimitives'
 import { normalizarParaMatch } from '../services/format'
+// Estilos de los campos del modo edición (crear-op__field / crear-op__phone) — los
+// mismos del wizard, para que los inputs de la card se vean como el resto de la app.
+import './CrearOportunidadForm.css'
 // El estilo pill-tabs se importa por componente (no es global), igual que en Clientes y
 // Grupos: sin esto las solapas quedan como botones pelados.
 import './PillTabs.css'
@@ -61,7 +70,325 @@ function clientesDeContacto(c) {
   }
 }
 
-export default function ContactosSection({ onIrAClientes, onIrAGrupos }) {
+// El teléfono se guarda con el código de país pegado ("59809...") — para editar se
+// separa contra la lista real de códigos (el más largo que matchee) y si ninguno
+// matchea se asume Uruguay con el número tal cual vino.
+function separarTelefono(digits) {
+  const limpio = String(digits ?? '').replace(/\D/g, '')
+  const codigos = [...CODIGO_PAIS_OPTIONS].sort((a, b) => b.value.length - a.value.length)
+  const match = codigos.find((o) => limpio.startsWith(o.value.replace('+', '')))
+  if (match) return { codigoPais: match.value, numero: limpio.slice(match.value.replace('+', '').length) }
+  return { codigoPais: '+598', numero: limpio }
+}
+
+const colaTelefono = (s) => String(s ?? '').replace(/\D/g, '').slice(-8)
+
+// Card con la ficha del contacto (a pedido): se abre al clickear la fila. La tabla ya
+// sabe nombre/teléfono/email — con eso se pinta al instante — y por atrás se pide lo que
+// la fila no tiene: los clientes vinculados con su id (para saltar a la ficha de cada
+// uno), las Notas y el estado de Revisión que deja la lectura automática.
+//
+// "Editar" (a pedido) transforma los textos en inputs EN EL MISMO lugar: nombre,
+// teléfono (con código de país), email y notas. El teléfono editado se verifica contra
+// Contactos igual que en el alta (debounce, excluyéndose a sí mismo): repetido, no se
+// puede guardar.
+function ContactoFichaModal({ contacto, onOpenCliente, onActualizado, onClose }) {
+  const [ficha, setFicha] = useState(null)
+  const [editando, setEditando] = useState(false)
+  const [nombre, setNombre] = useState('')
+  const [codigoPais, setCodigoPais] = useState('+598')
+  const [telefono, setTelefono] = useState('')
+  const [email, setEmail] = useState('')
+  const [notas, setNotas] = useState('')
+  const [guardando, setGuardando] = useState(false)
+  const [errorGuardar, setErrorGuardar] = useState(null)
+  // Verificación del teléfono editado: 'sin' | 'buscando' | 'libre' | 'duplicado'.
+  const [chequeo, setChequeo] = useState('sin')
+  const [dupTelefono, setDupTelefono] = useState(null)
+
+  useEffect(() => {
+    let vivo = true
+    fetchContactoFicha(contacto.id)
+      .then((f) => vivo && f && setFicha(f))
+      .catch(() => {
+        // sin detalle extra, la card se queda con lo que la fila ya mostraba
+      })
+    return () => {
+      vivo = false
+    }
+  }, [contacto.id])
+  const datos = ficha ?? { ...contacto, clientes: null, notas: '', revision: '', motivoRevision: '' }
+
+  const telErr = telefonoError(telefono, codigoPais)
+  const mailErr = emailError(email)
+  const telefonoCambio = editando && colaTelefono(buildMondayPhone(codigoPais, telefono).phone) !== colaTelefono(datos.telefono)
+
+  // Mismo criterio que el popup de contacto nuevo: apenas hay un número válido y
+  // DISTINTO del actual, se consulta Contactos y Guardar queda en gris hasta saber que
+  // está libre. El propio contacto no cuenta como duplicado.
+  useEffect(() => {
+    if (!editando || !telefono.trim() || telErr || !telefonoCambio) {
+      setChequeo('sin')
+      setDupTelefono(null)
+      return undefined
+    }
+    let cancelado = false
+    setChequeo('buscando')
+    setDupTelefono(null)
+    const timer = setTimeout(() => {
+      const cola = colaTelefono(telefono)
+      buscarContactosCrmLibre(cola)
+        .then((encontrados) => {
+          if (cancelado) return
+          const repetido =
+            encontrados.find((c) => String(c.id) !== String(contacto.id) && colaTelefono(c.telefono) === cola) ?? null
+          setDupTelefono(repetido)
+          setChequeo(repetido ? 'duplicado' : 'libre')
+        })
+        .catch(() => {
+          // monday no respondió: no se traba la edición por una consulta caída
+          if (cancelado) return
+          setDupTelefono(null)
+          setChequeo('libre')
+        })
+    }, 500)
+    return () => {
+      cancelado = true
+      clearTimeout(timer)
+    }
+  }, [editando, telefono, codigoPais, telErr, telefonoCambio, contacto.id])
+
+  const entrarEdicion = () => {
+    const { codigoPais: cp, numero } = separarTelefono(datos.telefono)
+    setNombre(datos.name)
+    setCodigoPais(cp)
+    setTelefono(numero)
+    setEmail(datos.email ?? '')
+    setNotas(datos.notas ?? '')
+    setErrorGuardar(null)
+    setEditando(true)
+  }
+
+  const puedeGuardar =
+    Boolean(nombre.trim()) &&
+    Boolean(telefono.trim()) &&
+    !telErr &&
+    !mailErr &&
+    (!telefonoCambio || chequeo === 'libre') &&
+    !guardando
+
+  const guardar = async () => {
+    if (!puedeGuardar) return
+    setGuardando(true)
+    setErrorGuardar(null)
+    try {
+      await updateContactoCrmFicha(contacto.id, {
+        name: nombre.trim() !== datos.name ? nombre : undefined,
+        phone: telefonoCambio ? buildMondayPhone(codigoPais, telefono) : undefined,
+        email: (email ?? '').trim() !== (datos.email ?? '') ? email.trim() : undefined,
+        notas: (notas ?? '') !== (datos.notas ?? '') ? notas : undefined,
+      })
+      const f = await fetchContactoFicha(contacto.id).catch(() => null)
+      if (f) {
+        setFicha(f)
+        // La fila de la tabla de atrás se actualiza en el momento, sin recargar todo.
+        onActualizado?.(f)
+      }
+      setEditando(false)
+    } catch (err) {
+      setErrorGuardar(err.message)
+    } finally {
+      setGuardando(false)
+    }
+  }
+
+  return (
+    <Modal id="contacto-ficha-modal" show onClose={onClose} size="medium">
+      <ModalContent className="contactos__ficha">
+        <div className="contactos__ficha-cabecera">
+          <Avatar label={initialsOf(editando ? nombre || datos.name : datos.name)} />
+          {editando ? (
+            <TextField
+              size="medium"
+              wrapperClassName="contactos__ficha-nombre-input"
+              title="Nombre"
+              required
+              value={nombre}
+              onChange={setNombre}
+              icon={MdClear}
+              onIconClick={() => setNombre('')}
+              validation={nombre.trim() ? { status: 'success' } : { status: 'error' }}
+            />
+          ) : (
+            <div>
+              <h2>{datos.name}</h2>
+              <p>
+                Contacto
+                {datos.clientes?.length
+                  ? ` de ${datos.clientes.length} cliente${datos.clientes.length === 1 ? '' : 's'}`
+                  : ''}
+              </p>
+            </div>
+          )}
+        </div>
+
+        {datos.revision === 'Si' && !editando && (
+          <AttentionBox type="warning" title="Marcado para revisión" className="contactos__ficha-aviso">
+            {datos.motivoRevision || 'Hay un dato de este contacto para revisar.'}
+          </AttentionBox>
+        )}
+
+        {editando && chequeo === 'duplicado' && dupTelefono && (
+          <AttentionBox type="danger" title="Ese teléfono ya está cargado" className="contactos__ficha-aviso">
+            Es de <strong>{dupTelefono.name}</strong>
+            {dupTelefono.clienteNombre ? ` (contacto de ${dupTelefono.clienteNombre})` : ''}. Dos contactos con el
+            mismo teléfono son la misma persona cargada dos veces — cambiá el número.
+          </AttentionBox>
+        )}
+
+        {errorGuardar && (
+          <AttentionBox type="danger" title="No se pudo guardar" className="contactos__ficha-aviso">
+            {errorGuardar}
+          </AttentionBox>
+        )}
+
+        {/* El mismo panel en los dos modos: "Editar" transforma cada dato en su input,
+            en el mismo lugar donde se estaba leyendo. */}
+        <dl className="contactos__ficha-datos">
+          <div>
+            <dt>Teléfono{editando && <Required />}</dt>
+            <dd>
+              {editando ? (
+                <div className="crear-op__phone">
+                  <div className="crear-op__phone-code">
+                    <RequiredDropdown
+                      size="medium"
+                      options={CODIGO_PAIS_OPTIONS}
+                      value={CODIGO_PAIS_OPTIONS.find((o) => o.value === codigoPais) ?? null}
+                      {...codigoPaisDropdownProps}
+                      onChange={(option) => setCodigoPais(option?.value ?? '')}
+                    />
+                  </div>
+                  <TextField
+                    size="medium"
+                    wrapperClassName="crear-op__phone-number"
+                    placeholder="Ej: 099 123 456"
+                    value={telefono}
+                    onChange={setTelefono}
+                    icon={MdClear}
+                    onIconClick={() => setTelefono('')}
+                    validation={
+                      telErr || chequeo === 'duplicado'
+                        ? { status: 'error' }
+                        : telefono && (!telefonoCambio || chequeo === 'libre')
+                          ? { status: 'success' }
+                          : undefined
+                    }
+                  />
+                </div>
+              ) : (
+                datos.telefono || '—'
+              )}
+              {editando && telErr && (
+                <span className="crear-op__field-error" role="alert">
+                  {telErr}
+                </span>
+              )}
+            </dd>
+          </div>
+          <div>
+            <dt>Email</dt>
+            <dd>
+              {editando ? (
+                <>
+                  <TextField
+                    size="medium"
+                    type="email"
+                    placeholder="Ej: nombre@dominio.com"
+                    value={email}
+                    onChange={setEmail}
+                    icon={MdClear}
+                    onIconClick={() => setEmail('')}
+                    validation={mailErr ? { status: 'error' } : email.trim() ? { status: 'success' } : undefined}
+                  />
+                  {mailErr && (
+                    <span className="crear-op__field-error" role="alert">
+                      {mailErr}
+                    </span>
+                  )}
+                </>
+              ) : (
+                datos.email || '—'
+              )}
+            </dd>
+          </div>
+          {(editando || datos.notas) && (
+            <div className="contactos__ficha-notas">
+              <dt>Notas</dt>
+              <dd>
+                {editando ? (
+                  <textarea
+                    className="contactos__ficha-notas-input"
+                    rows={3}
+                    placeholder="Notas del contacto"
+                    value={notas}
+                    onChange={(e) => setNotas(e.target.value)}
+                  />
+                ) : (
+                  datos.notas
+                )}
+              </dd>
+            </div>
+          )}
+        </dl>
+
+        <div className="contactos__ficha-clientes">
+          <h3>Clientes vinculados</h3>
+          {datos.clientes === null ? (
+            <p className="contactos__vacio">Cargando...</p>
+          ) : datos.clientes.length === 0 ? (
+            <p className="contactos__vacio">Sin clientes vinculados.</p>
+          ) : (
+            <ul>
+              {datos.clientes.map((cl) => (
+                <li key={cl.id}>
+                  <button type="button" className="contactos__ficha-link" onClick={() => onOpenCliente?.(cl.id)}>
+                    {cl.name}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </ModalContent>
+      {editando ? (
+        <ModalFooter
+          secondaryButton={{ text: 'Cancelar', onClick: () => setEditando(false) }}
+          primaryButton={{
+            text:
+              chequeo === 'buscando'
+                ? 'Verificando teléfono...'
+                : guardando
+                  ? 'Guardando...'
+                  : 'Guardar cambios',
+            disabled: !puedeGuardar,
+            onClick: guardar,
+          }}
+        />
+      ) : (
+        <ModalFooter
+          // Editar recién cuando llegó la ficha completa: editar sobre los datos a
+          // medias de la fila pisaría notas que todavía no se vieron.
+          secondaryButton={{ text: 'Editar', disabled: !ficha, onClick: entrarEdicion }}
+          primaryButton={{ text: 'Cerrar', onClick: onClose }}
+        />
+      )}
+    </Modal>
+  )
+}
+
+export default function ContactosSection({ onIrAClientes, onIrAGrupos, onOpenCliente }) {
+  const [fichaDe, setFichaDe] = useState(null)
   const [contactos, setContactos] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
@@ -168,26 +495,41 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos }) {
           <TableBody>
             {pagina.map((c) => {
               const clientes = clientesDeContacto(c)
+              // La fila entera abre la card con la ficha del contacto (a pedido) — el
+              // click vive en cada celda porque TableRow no acepta onClick.
+              const abrir = () => setFichaDe(c)
               return (
                 <TableRow key={c.id} className="contactos__row">
                   <TableCell>
-                    <div className="contactos__celda contactos__celda--contacto">
+                    <div
+                      className="contactos__celda contactos__celda--contacto"
+                      role="button"
+                      tabIndex={0}
+                      aria-label={`Ver la ficha de ${c.name}`}
+                      onClick={abrir}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' || e.key === ' ') {
+                          e.preventDefault()
+                          abrir()
+                        }
+                      }}
+                    >
                       <Avatar label={initialsOf(c.name)} />
                       <span className="contactos__nombre">{c.name}</span>
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="contactos__celda">
+                    <div className="contactos__celda" onClick={abrir}>
                       {c.telefono || <span className="contactos__vacio">—</span>}
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="contactos__celda">
+                    <div className="contactos__celda" onClick={abrir}>
                       {c.email || <span className="contactos__vacio">—</span>}
                     </div>
                   </TableCell>
                   <TableCell>
-                    <div className="contactos__celda">
+                    <div className="contactos__celda" onClick={abrir}>
                       {clientes ? (
                         <span
                           className={clientes.varios ? 'contactos__clientes contactos__clientes--varios' : 'contactos__clientes'}
@@ -252,6 +594,19 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos }) {
             </button>
           </div>
         </div>
+      )}
+
+      {fichaDe && (
+        <ContactoFichaModal
+          contacto={fichaDe}
+          onOpenCliente={onOpenCliente}
+          onActualizado={(f) =>
+            setContactos((prev) =>
+              prev.map((c) => (c.id === f.id ? { ...c, name: f.name, telefono: f.telefono, email: f.email } : c))
+            )
+          }
+          onClose={() => setFichaDe(null)}
+        />
       )}
     </section>
   )

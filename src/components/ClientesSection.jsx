@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { MdChevronLeft, MdChevronRight, MdContactPhone, MdGroups, MdPeopleAlt, MdSearch } from 'react-icons/md'
 import { Table, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell, EmptyState, TextField } from '@vibe/core'
 import Avatar from './Avatar'
+import LoadingScreen from './LoadingScreen'
 import StatusBadge from './StatusBadge'
 import { fetchClientesGestion } from '../services/mondayApi'
 import { initialsOf } from '../services/personaFields'
@@ -95,6 +96,12 @@ export default function ClientesSection({ onOpenCliente, onIrAGrupos, onIrAConta
   const primeraFila = filtrados.length === 0 ? 0 : (paginaActual - 1) * PAGE_SIZE + 1
   const ultimaFila = filtrados.length === 0 ? 0 : primeraFila + pagina.length - 1
 
+  // La misma pantalla verde que Grupos y el fallback de Suspense: el esqueleto de la
+  // tabla era otra espera distinta para lo mismo.
+  if (loading) {
+    return <LoadingScreen title="Cargando clientes" message="Estamos trayendo la lista de clientes desde monday." />
+  }
+
   return (
     <section className="clientes">
       <header className="clientes__head">
@@ -130,17 +137,19 @@ export default function ClientesSection({ onOpenCliente, onIrAGrupos, onIrAConta
             }}
           />
           <span className="clientes__conteo">
-            {loading ? 'Cargando...' : `${filtrados.length} de ${clientes.length} clientes`}
+            {`${filtrados.length} de ${clientes.length} clientes`}
           </span>
         </div>
       </div>
 
       <div className="clientes__tabla">
+        {/* isLoading en false siempre: mientras carga, el componente devuelve la
+            pantalla de carga y no llega a renderizar la tabla. */}
         <Table
           columns={COLUMNS}
           size="large"
           style={{ '--table-row-size': '68px' }}
-          dataState={{ isLoading: loading, isError: Boolean(error) }}
+          dataState={{ isLoading: false, isError: Boolean(error) }}
           errorState={<EmptyState title="Error" description={error || 'No se pudieron cargar los clientes.'} />}
           emptyState={<EmptyState title="Sin clientes" description="No se encontraron clientes para mostrar." />}
         >
