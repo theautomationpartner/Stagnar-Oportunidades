@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { MdSend, MdCheckCircle, MdArrowForward, MdImage, MdNotes, MdLibraryAddCheck } from 'react-icons/md'
 import { Modal, ModalHeader, ModalContent, ModalFooter, AttentionBox, TextField, Dropdown } from '@vibe/core'
 import { sendQuotesToWhatsApp, getMakeWebhookUrl } from '../services/makeWebhook'
-import { fetchTelefonosEnvioHabilitados } from '../services/mondayApi'
+import { fetchClienteContactos, fetchContactosCrm, fetchTelefonosEnvioHabilitados } from '../services/mondayApi'
 import { splitTelefono } from '../services/personaFields'
 import GradientSpinner from './GradientSpinner'
 import ErrorDetailBox from './ErrorDetailBox'
@@ -52,6 +52,56 @@ export default function WhatsAppSendModal({
   // equivocada. Si no hay contacto vinculado, el número es la copia de la oportunidad y
   // el nombre que corresponde es el del cliente.
   const nombreDestinatario = opportunity.contactoNombre || opportunity.clienteNombre || ''
+
+  // A pedido: el destinatario se ELIGE entre los contactos del cliente en vez de tipear
+  // un número. Un cliente suele tener más de uno (el titular, un familiar que gestiona,
+  // el contador de la empresa) y acá se decide a cuál de ellos le llega la cotización.
+  //
+  // Se piden en dos pasos porque la conexión del Cliente solo trae id y nombre: los
+  // teléfonos viven en el ítem de cada Contacto.
+  //
+  // null mientras se cargan o si no se pudieron traer. Ahí abajo se muestra el campo de
+  // texto de siempre: quedarse sin poder mandar la cotización porque una consulta falló
+  // sería peor que tipear el número a mano.
+  const [contactosCliente, setContactosCliente] = useState(null)
+
+  useEffect(() => {
+    if (!opportunity.clienteId) return undefined
+    let vivo = true
+    fetchClienteContactos(opportunity.clienteId)
+      .then((vinculados) => fetchContactosCrm(vinculados.map((c) => c.id)))
+      .then((completos) => {
+        if (vivo) setContactosCliente(completos)
+      })
+      .catch((err) => {
+        console.warn('No se pudieron traer los contactos del cliente', err)
+        if (vivo) setContactosCliente([])
+      })
+    return () => {
+      vivo = false
+    }
+  }, [opportunity.clienteId])
+
+  // Se listan TODOS los contactos del cliente, también los que no tienen teléfono:
+  // esconderlos haría pensar que el cliente no los tiene. Van deshabilitados — se ven,
+  // se entiende por qué no se pueden elegir, y queda claro qué hay que completar en
+  // Contactos para poder mandarles algo.
+  const opcionesContacto = (contactosCliente ?? []).map((c) => ({
+    value: c.id,
+    label: c.telefono ? `${c.name} — ${c.telefono}` : `${c.name} — sin teléfono`,
+    telefono: c.telefono,
+    disabled: !c.telefono,
+  }))
+  // Si ninguno tiene teléfono, un desplegable entero en gris no deja mandar nada: ahí se
+  // vuelve al campo de texto.
+  const hayContactos = opcionesContacto.some((o) => !o.disabled)
+  // Preseleccionado: el contacto de la oportunidad. Si no está entre los del cliente
+  // —quedó desvinculado, o la oportunidad es vieja— se cae al que tenga el mismo número
+  // que se venía proponiendo, para no cambiarle el destinatario a nadie sin avisar.
+  const contactoSeleccionado =
+    opcionesContacto.find((o) => o.value === opportunity.contactoId) ??
+    opcionesContacto.find((o) => o.telefono.replace(/\D/g, '') === String(phone).replace(/\D/g, '')) ??
+    null
   const [formato, setFormato] = useState('imagen')
   const mandaImagen = formato === 'imagen' || formato === 'ambos'
   const mandaTexto = formato === 'texto' || formato === 'ambos'
@@ -221,14 +271,30 @@ export default function WhatsAppSendModal({
             {/* A pedido: el input achicado y el aviso de origen al lado, no arriba —
                 ocupaban demasiado alto para un dato secundario. */}
             <div className="wa-modal__telefono-row">
-              {/* TextField nativo de @vibe/core en vez de <label>+<input> a mano. */}
-              <TextField
-                wrapperClassName="wa-modal__field wa-modal__field--telefono"
-                title={nombreDestinatario ? `Teléfono de ${nombreDestinatario}` : 'Número de teléfono'}
-                placeholder="Ej: 099 123 456"
-                value={phone}
-                onChange={(value) => setPhone(value)}
-              />
+              {hayContactos ? (
+                <label className="wa-modal__field wa-modal__field--telefono">
+                  <span className="wa-modal__field-title">Enviar a</span>
+                  <Dropdown
+                    size="small"
+                    options={opcionesContacto}
+                    value={contactoSeleccionado}
+                    clearable={false}
+                    searchable={opcionesContacto.length > 6}
+                    placeholder="Elegí el contacto"
+                    onChange={(opcion) => setPhone(opcion?.telefono ?? '')}
+                  />
+                </label>
+              ) : (
+                /* Sin contactos con teléfono (o falló la consulta): el campo de siempre.
+                   TextField nativo de @vibe/core en vez de <label>+<input> a mano. */
+                <TextField
+                  wrapperClassName="wa-modal__field wa-modal__field--telefono"
+                  title={nombreDestinatario ? `Teléfono de ${nombreDestinatario}` : 'Número de teléfono'}
+                  placeholder="Ej: 099 123 456"
+                  value={phone}
+                  onChange={(value) => setPhone(value)}
+                />
+              )}
               {telefonosEnvio.length === 1 && telefonoEnvioFormateado && (
                 <p className="wa-modal__telefono-envio">
                   Se va a enviar desde <strong>{telefonoEnvioFormateado}</strong>

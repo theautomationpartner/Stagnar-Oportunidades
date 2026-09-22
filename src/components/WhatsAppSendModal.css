@@ -264,3 +264,13 @@
   white-space: pre-wrap;
   word-break: break-word;
 }
+
+/* El destinatario es un Dropdown y no un TextField, así que el título va a mano — el
+   TextField lo trae de fábrica (prop `title`) y el Dropdown no. Mismo tamaño y color que
+   los de @vibe/core para que las dos variantes se vean iguales. */
+.wa-modal__field-title {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 13px;
+  color: var(--text-gray);
+}
