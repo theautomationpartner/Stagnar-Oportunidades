@@ -2,14 +2,19 @@
    propósito: son dos vistas que se van a mover por separado, y compartir clases hace que
    tocar una cambie la otra sin que nadie lo pida. */
 
+/* Los valores de esta sección son los mismos que los de la tabla de Clientes: las tres
+   vistas (Clientes, Grupos, Contactos) son la misma pantalla con otra tabla adentro y
+   tienen que verse iguales. Están repetidos y no compartidos porque ClientesSection.css
+   todavía se está escribiendo en paralelo; conviene unificarlos en una hoja común cuando
+   eso se asiente. */
 .contactos {
-  padding: 24px 32px 40px;
+  margin: 20px var(--page-gutter, 32px) 32px;
 }
 
 .contactos__head h1 {
   margin: 0 0 4px;
   font-size: 24px;
-  font-weight: 600;
+  font-weight: 700;
   color: var(--text-dark);
 }
 
@@ -21,14 +26,21 @@
 .contactos__toolbar {
   display: flex;
   align-items: center;
-  gap: 12px;
-  margin-bottom: 16px;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 0 0 14px;
 }
 
-/* Por clase y no por posición: al agregar las solapas adelante, un ":first-child"
-   dejaba de ser el buscador y le pasaba el ancho a las solapas. */
 .contactos__buscador {
-  flex: 0 1 380px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1 1 320px;
+}
+
+.contactos__buscador > :first-child {
+  flex: 1;
+  max-width: 560px;
 }
 
 .contactos__conteo {
@@ -61,9 +73,9 @@
   color: var(--text-gray);
 }
 
-/* Los clientes del contacto se resumen por cantidad; los nombres viven en el title, así
-   que el cursor de ayuda avisa que hay algo más al pasar el mouse. */
-.contactos__clientes {
+/* El subrayado punteado y el cursor de ayuda solo cuando hay algo más para ver: con un
+   único cliente, el texto visible ya es el nombre completo. */
+.contactos__clientes--varios {
   cursor: help;
   text-decoration: underline dotted;
   text-underline-offset: 2px;
@@ -139,5 +151,12 @@
 /* Las solapas van pegadas a la izquierda de la barra, antes del buscador — misma fila
    que en Clientes y Grupos, para que las tres vistas se sientan la misma pantalla. */
 .contactos__tabs {
-  flex-shrink: 0;
+  display: inline-flex;
+  flex: none;
+}
+
+/* Mismo porte que las solapas de Clientes (cada tab con cuerpo, no un botoncito al ras
+   del texto). */
+.contactos__tabs .pill-tabs__tab {
+  min-width: 170px;
 }

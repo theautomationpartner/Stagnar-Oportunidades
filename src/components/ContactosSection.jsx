@@ -55,6 +55,9 @@ function clientesDeContacto(c) {
   return {
     resumen: cuantos === 1 ? c.clienteNombre : `${cuantos} clientes`,
     detalle: c.clienteNombre,
+    // Con un solo cliente el resumen YA es el nombre: el subrayado punteado prometía un
+    // detalle al pasar el mouse que era exactamente lo mismo que se estaba leyendo.
+    varios: cuantos > 1,
   }
 }
 
@@ -129,20 +132,21 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos }) {
             <MdContactPhone aria-hidden="true" /> Contactos
           </button>
         </div>
-        <TextField
-          size="medium"
-          wrapperClassName="contactos__buscador"
-          placeholder="Buscar por nombre, teléfono, email o cliente..."
-          icon={MdSearch}
-          value={busqueda}
-          onChange={(v) => {
-            setBusqueda(v)
-            setPage(1)
-          }}
-        />
-        <span className="contactos__conteo">
-          {`${filtrados.length} de ${contactos.length} contactos`}
-        </span>
+        <div className="contactos__buscador">
+          <TextField
+            size="medium"
+            placeholder="Buscar por nombre, teléfono, email o cliente..."
+            icon={MdSearch}
+            value={busqueda}
+            onChange={(v) => {
+              setBusqueda(v)
+              setPage(1)
+            }}
+          />
+          <span className="contactos__conteo">
+            {`${filtrados.length} de ${contactos.length} contactos`}
+          </span>
+        </div>
       </div>
 
       <div className="contactos__tabla">
@@ -185,7 +189,10 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos }) {
                   <TableCell>
                     <div className="contactos__celda">
                       {clientes ? (
-                        <span className="contactos__clientes" title={clientes.detalle}>
+                        <span
+                          className={clientes.varios ? 'contactos__clientes contactos__clientes--varios' : 'contactos__clientes'}
+                          title={clientes.varios ? clientes.detalle : undefined}
+                        >
                           {clientes.resumen}
                         </span>
                       ) : (
