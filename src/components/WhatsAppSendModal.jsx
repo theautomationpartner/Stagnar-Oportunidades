@@ -46,6 +46,12 @@ export default function WhatsAppSendModal({
   // solo si la oportunidad no tiene contacto vinculado (las anteriores a MON-14), la copia
   // que quedó en la propia oportunidad. Editable igual, como siempre.
   const [phone, setPhone] = useState(opportunity.contactoTelefono || opportunity.telefono || '')
+  // A quién se le manda, al lado del número. El del remitente ya decía de quién era
+  // ("celular de X") y el del destinatario no: un número suelto no se reconoce de un
+  // vistazo, y acá es el último momento para darse cuenta de que va a la persona
+  // equivocada. Si no hay contacto vinculado, el número es la copia de la oportunidad y
+  // el nombre que corresponde es el del cliente.
+  const nombreDestinatario = opportunity.contactoNombre || opportunity.clienteNombre || ''
   const [formato, setFormato] = useState('imagen')
   const mandaImagen = formato === 'imagen' || formato === 'ambos'
   const mandaTexto = formato === 'texto' || formato === 'ambos'
@@ -218,7 +224,7 @@ export default function WhatsAppSendModal({
               {/* TextField nativo de @vibe/core en vez de <label>+<input> a mano. */}
               <TextField
                 wrapperClassName="wa-modal__field wa-modal__field--telefono"
-                title="Número de teléfono"
+                title={nombreDestinatario ? `Teléfono de ${nombreDestinatario}` : 'Número de teléfono'}
                 placeholder="Ej: 099 123 456"
                 value={phone}
                 onChange={(value) => setPhone(value)}
