@@ -213,11 +213,13 @@
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 8px 10px;
-  padding: 10px 12px;
+  gap: 8px 12px;
+  padding: 12px 14px;
   border: 1px solid var(--border);
   border-left-width: 4px;
-  border-radius: 8px;
+  border-radius: 10px;
+  background: #fff;
+  box-shadow: var(--shadow-sm);
 }
 
 .grupos__miembro--titular {
@@ -252,11 +254,19 @@
   margin-top: 2px;
 }
 
+/* Cabecera de la tarjeta del integrante: nombre grande + insignia de rol en la misma
+   línea (envuelve si no entra), la ficha (CI/RUT · tipo) debajo. */
+.grupos__miembro-cabecera {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
 /* A pedido: el nombre del cliente es lo que manda en la fila — más grande y en negrita
    que todo lo demás. */
 .grupos__miembro-titulo,
 .grupos__link--principal {
-  display: block;
   font-size: 15px;
   font-weight: 700;
   color: var(--text-dark);
@@ -266,10 +276,25 @@
   color: var(--tint-info-text);
 }
 
+.grupos__miembro-meta {
+  display: block;
+  margin-top: 2px;
+  font-size: 12px;
+  color: var(--text-gray);
+}
+
+/* Rol y Quitar apilados a la derecha, alineados entre sí. */
+.grupos__miembro-acciones {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
 /* Insignia del rol, con el mismo tono que el borde de la fila. */
 .grupos__rol-chip {
   display: inline-block;
-  margin-top: 4px;
   padding: 2px 10px;
   border: 1px solid;
   border-radius: 12px;

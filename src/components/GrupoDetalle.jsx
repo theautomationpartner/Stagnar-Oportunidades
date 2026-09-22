@@ -13,6 +13,8 @@ import {
   ROLES_GRUPO,
   ROL_GRUPO_DEFAULT,
 } from '../services/mondayApi'
+import Avatar from './Avatar'
+import { initialsOf } from '../services/personaFields'
 import { normalizarParaMatch } from '../services/format'
 import './GruposSection.css'
 
@@ -79,6 +81,9 @@ export default function GrupoDetalle({ grupoId, onBack, onOpenCliente }) {
 
   const grupo = grupos.find((g) => g.id === String(grupoId)) ?? null
   const clientesSinGrupo = useMemo(() => clientes.filter((c) => !c.grupo), [clientes])
+  // La ficha completa de cada miembro (CI/RUT, tipo) — los clientes ya están cargados
+  // para el alta, así que la tarjeta del integrante los muestra sin pedir nada extra.
+  const clientePorId = useMemo(() => new Map(clientes.map((c) => [c.id, c])), [clientes])
 
   const buscar = () => {
     // Sin distinguir tildes (normalizarParaMatch): "logistica" encuentra "Logística".
@@ -159,46 +164,69 @@ export default function GrupoDetalle({ grupoId, onBack, onOpenCliente }) {
             <p className="grupos__vacio">Sin miembros todavía — agregá el primero desde la derecha.</p>
           )}
           <ul className="grupos__miembros">
-            {grupo.miembros.map((m) => (
-              <li key={m.subitemId} className={`grupos__miembro grupos__miembro--${claseRol(m.rol)}`}>
-                <div className="grupos__miembro-nombre">
-                  {m.clienteId ? (
-                    <button
-                      type="button"
-                      className="grupos__link grupos__link--principal"
-                      onClick={() => onOpenCliente?.(m.clienteId)}
+            {grupo.miembros.map((m) => {
+              const cli = m.clienteId ? clientePorId.get(m.clienteId) : null
+              const meta = cli
+                ? [
+                    cli.tipo === 'Empresa'
+                      ? cli.rut && `RUT: ${cli.rut}`
+                      : cli.ci && `CI: ${cli.ci}`,
+                    cli.tipo,
+                    cli.empresa && `Trabaja en ${cli.empresa.name}`,
+                  ]
+                    .filter(Boolean)
+                    .join(' · ')
+                : ''
+              return (
+                <li key={m.subitemId} className={`grupos__miembro grupos__miembro--${claseRol(m.rol)}`}>
+                  <Avatar label={initialsOf(m.clienteNombre)} />
+                  <div className="grupos__miembro-nombre">
+                    <div className="grupos__miembro-cabecera">
+                      {m.clienteId ? (
+                        <button
+                          type="button"
+                          className="grupos__link grupos__link--principal"
+                          onClick={() => onOpenCliente?.(m.clienteId)}
+                        >
+                          {m.clienteNombre}
+                        </button>
+                      ) : (
+                        <span className="grupos__miembro-titulo">{m.clienteNombre}</span>
+                      )}
+                      <span className={`grupos__rol-chip grupos__rol-chip--${claseRol(m.rol)}`}>
+                        {m.rol || 'Sin rol'}
+                      </span>
+                    </div>
+                    {meta && <span className="grupos__miembro-meta">{meta}</span>}
+                    {!m.clienteId && <span className="grupos__aviso-suave">Sin cliente vinculado</span>}
+                  </div>
+                  <div className="grupos__miembro-acciones">
+                    <Dropdown
+                      size="small"
+                      className="grupos__rol"
+                      clearable={false}
+                      searchable={false}
+                      options={ROLES_GRUPO.map((r) => ({ value: r, label: r }))}
+                      value={m.rol ? { value: m.rol, label: m.rol } : null}
+                      placeholder="Sin rol"
+                      disabled={ocupado === `rol-${m.subitemId}`}
+                      onChange={(op) => {
+                        if (op && op.value !== m.rol)
+                          accion(`rol-${m.subitemId}`, () => setRolEnGrupo(m.subitemId, op.value))
+                      }}
+                    />
+                    <Button
+                      kind="tertiary"
+                      size="small"
+                      disabled={ocupado === `quitar-${m.subitemId}`}
+                      onClick={() => quitarMiembro(m)}
                     >
-                      {m.clienteNombre}
-                    </button>
-                  ) : (
-                    <span className="grupos__miembro-titulo">{m.clienteNombre}</span>
-                  )}
-                  <span className={`grupos__rol-chip grupos__rol-chip--${claseRol(m.rol)}`}>{m.rol || 'Sin rol'}</span>
-                  {!m.clienteId && <span className="grupos__aviso-suave">Sin cliente vinculado</span>}
-                </div>
-                <Dropdown
-                  size="small"
-                  className="grupos__rol"
-                  clearable={false}
-                  searchable={false}
-                  options={ROLES_GRUPO.map((r) => ({ value: r, label: r }))}
-                  value={m.rol ? { value: m.rol, label: m.rol } : null}
-                  placeholder="Sin rol"
-                  disabled={ocupado === `rol-${m.subitemId}`}
-                  onChange={(op) => {
-                    if (op && op.value !== m.rol) accion(`rol-${m.subitemId}`, () => setRolEnGrupo(m.subitemId, op.value))
-                  }}
-                />
-                <Button
-                  kind="tertiary"
-                  size="small"
-                  disabled={ocupado === `quitar-${m.subitemId}`}
-                  onClick={() => quitarMiembro(m)}
-                >
-                  <MdClear /> Quitar
-                </Button>
-              </li>
-            ))}
+                      <MdClear /> Quitar
+                    </Button>
+                  </div>
+                </li>
+              )
+            })}
           </ul>
         </section>
 
