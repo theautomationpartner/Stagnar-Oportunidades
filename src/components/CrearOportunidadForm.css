@@ -1383,3 +1383,34 @@
   grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
   gap: 4px 24px;
 }
+
+/* Sección Contacto — tres niveles que antes se veían iguales (renglones de radio/check
+   idénticos, donde "es el mismo cliente" parecía una opción hermana más):
+   · Los caminos Vincular/Crear son CAJAS que se seleccionan (a pedido): reusan
+     .crear-op__risk-option, el mismo control que el "¿Tenés la Cédula?" de arriba.
+   · .crear-op__opcion: cada contacto ya vinculado al Cliente, como fila-tarjeta.
+   · .crear-op__subopcion: lo que despliega el camino elegido (el tilde "es el mismo
+     cliente", el buscador de vincular, el nombre del contacto) anidado con una guía a
+     la izquierda — es configuración DEL camino, no una opción más. */
+.crear-op__contacto-caminos {
+  margin: 4px 0 4px;
+}
+
+.crear-op__opcion {
+  border: 1px solid var(--border);
+  border-radius: var(--radius-md);
+  padding: 10px 14px;
+  margin: 0 0 8px;
+  background: var(--bg);
+  transition: border-color 0.15s ease;
+}
+
+.crear-op__opcion:hover {
+  border-color: var(--border-input);
+}
+
+.crear-op__subopcion {
+  margin: 10px 0 16px 15px;
+  padding: 4px 0 0 16px;
+  border-left: 2px solid var(--tint-info-bd);
+}

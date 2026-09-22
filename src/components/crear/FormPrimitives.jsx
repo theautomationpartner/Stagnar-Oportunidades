@@ -2,7 +2,7 @@
 // CrearOportunidadForm.jsx (auditoría). Los estilos siguen en CrearOportunidadForm.css.
 import { useState } from 'react'
 import { Button, Dropdown, TextField } from '@vibe/core'
-import { MdCall, MdClear, MdDescription, MdEdit } from 'react-icons/md'
+import { MdCall, MdClear, MdDescription, MdEdit, MdPersonAdd, MdPersonSearch } from 'react-icons/md'
 import { CODIGO_PAIS_OPTIONS, emailError, telefonoError } from '../../services/personaFields'
 import FlagIcon from './FlagIcon'
 import { matchesSearchQuery } from '../../services/format'
@@ -293,9 +293,12 @@ export function ContactoFields({
               {/* En pantallas anchas los contactos van en 2 columnas (auto-fit) — la fila
                   entera para un solo radio dejaba media pantalla vacía. Las opciones de
                   camino (Vincular/Crear) quedan a lo ancho, cierran la lista. */}
+              {/* Los contactos ya vinculados al Cliente van como filas-tarjeta (ver
+                  .crear-op__opcion) — antes radios y checkbox eran renglones idénticos
+                  y "es el mismo cliente" parecía una opción hermana más. */}
               <div className="crear-op__contactos-radios">
                 {contactosDelCliente.map((c) => (
-                  <label key={c.id} className="crear-op__checkbox">
+                  <label key={c.id} className="crear-op__checkbox crear-op__opcion">
                     <input
                       type="radio"
                       name="contacto-oportunidad"
@@ -306,31 +309,43 @@ export function ContactoFields({
                   </label>
                 ))}
               </div>
-              {permitirVincular && (
-                <label className="crear-op__checkbox">
-                  <input
-                    type="radio"
-                    name="contacto-oportunidad"
-                    checked={form.contactoModo === 'vincular'}
-                    onChange={() => onContactoModo?.('vincular')}
-                  />
-                  <span>Vincular un contacto existente</span>
-                </label>
-              )}
-              <label className="crear-op__checkbox">
-                <input
-                  type="radio"
-                  name="contacto-oportunidad"
-                  checked={form.contactoModo === 'nuevo'}
-                  onChange={() => onContactoModo?.('nuevo')}
-                />
-                <span>Crear un contacto nuevo</span>
-              </label>
+              {/* A pedido: los dos caminos son CAJAS que se seleccionan — el mismo
+                  control que el "¿Tenés la Cédula?" de más arriba (DocumentChoiceToggle,
+                  .crear-op__risk-option), así el paso 1 usa un solo lenguaje para
+                  "elegí uno de estos". */}
+              <div className="crear-op__risk-toggle crear-op__contacto-caminos">
+                {permitirVincular && (
+                  <button
+                    type="button"
+                    className={
+                      form.contactoModo === 'vincular'
+                        ? 'crear-op__risk-option crear-op__risk-option--active'
+                        : 'crear-op__risk-option'
+                    }
+                    onClick={() => onContactoModo?.('vincular')}
+                  >
+                    <MdPersonSearch className="crear-op__risk-option-icon" />
+                    Vincular un contacto existente
+                  </button>
+                )}
+                <button
+                  type="button"
+                  className={
+                    form.contactoModo === 'nuevo'
+                      ? 'crear-op__risk-option crear-op__risk-option--active'
+                      : 'crear-op__risk-option'
+                  }
+                  onClick={() => onContactoModo?.('nuevo')}
+                >
+                  <MdPersonAdd className="crear-op__risk-option-icon" />
+                  Crear un contacto nuevo
+                </button>
+              </div>
             </>
           )}
 
           {form.contactoModo === 'vincular' && (
-            <div className="crear-op__section-subblock">
+            <div className="crear-op__subopcion">
               <div className="crear-op__buscar-contacto">
                 <TextField
                   size="medium"
@@ -379,7 +394,7 @@ export function ContactoFields({
           )}
 
           {form.contactoModo === 'nuevo' && (
-            <>
+            <div className="crear-op__subopcion">
               <label className="crear-op__checkbox">
                 <input
                   type="checkbox"
@@ -417,7 +432,7 @@ export function ContactoFields({
                   />
                 </div>
               )}
-            </>
+            </div>
           )}
         </>
       )}
