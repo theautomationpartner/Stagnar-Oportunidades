@@ -181,6 +181,34 @@
   margin: 0;
 }
 
+/* MON-14: bajada de la sección "Contacto" — explica de una línea la diferencia entre
+   Cliente (a quién se le cotiza) y Contacto (a quién se le manda), que es lo único no
+   evidente del paso. Va pegada al título, arriba del check. */
+.crear-op__section-hint {
+  font-size: 13px;
+  color: var(--text-muted, #676879);
+  margin: -8px 0 14px;
+}
+
+/* Check "El contacto es el mismo cliente" (ver ContactoFields) — marcado por defecto,
+   que es el caso típico. */
+.crear-op__checkbox {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 0 0 16px;
+  font-size: 14px;
+  color: var(--text-dark);
+  cursor: pointer;
+}
+
+.crear-op__checkbox input {
+  width: 16px;
+  height: 16px;
+  accent-color: var(--primary-blue);
+  cursor: pointer;
+}
+
 /* A pedido: "ficha" de solo lectura para un Cliente/Lead ya elegido (en vez del
    formulario editable de siempre) — tarjeta con nombre grande, ubicación con ícono y
    badges (CI/Nacimiento/Teléfono) en vez de la grilla plana de label+valor de antes,
@@ -1320,4 +1348,38 @@
   font-weight: 600;
   color: var(--text-gray);
   white-space: nowrap;
+}
+
+/* Contacto elegido (sección Contacto del paso 1): chip con los datos y el botón Quitar
+   a la derecha — deshacer la selección es un botón visible, no un link dentro de texto. */
+.crear-op__contacto-elegido {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 12px;
+  background: #eef6ff;
+  border: 1px solid #cce0ff;
+  border-radius: 8px;
+  font-size: 14px;
+}
+
+/* Buscador de "Vincular un contacto existente": input + botón Buscar en una fila (la
+   búsqueda es a demanda, no live) — el input estira y el botón queda alineado abajo. */
+.crear-op__buscar-contacto {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.crear-op__buscar-contacto > :first-child {
+  flex: 1;
+}
+
+/* Radios de contactos del cliente: 2 columnas cuando el ancho da (auto-fit), una en
+   pantallas chicas — una fila entera por radio desperdiciaba la mitad del ancho. */
+.crear-op__contactos-radios {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 4px 24px;
 }

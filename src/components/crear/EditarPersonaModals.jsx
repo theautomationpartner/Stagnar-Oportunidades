@@ -6,13 +6,12 @@
 //   tocar Nombre/Apellido/CI (datos de identidad de un Contacto ya dado de alta).
 // - EditarLeadModal solo actualiza el `form` local (todavía no hay ítem) e incluye
 //   Nombre/Apellido/CI porque son justo los datos que la IA pudo leer mal.
-// Las validaciones (telefonoError/fechaError/ciError y los canSave) son las mismas
+// Las validaciones (fechaError/ciError y los canSave) son las mismas
 // que había antes de la extracción.
 import { useState } from 'react'
-import { MdClear } from 'react-icons/md'
-import { Modal, ModalContent, ModalFooter, TextField } from '@vibe/core'
-import { CODIGO_PAIS_OPTIONS, ciError, emailError, fechaError, fieldStateClass, maxFechaNacimiento, NACIONALIDAD_URUGUAY, stripCi, telefonoError } from '../../services/personaFields'
-import { ExtranjeroFields, Required, RequiredDropdown, codigoPaisDropdownProps } from './FormPrimitives'
+import { Modal, ModalContent, ModalFooter } from '@vibe/core'
+import { ciError, fechaError, fieldStateClass, maxFechaNacimiento, NACIONALIDAD_URUGUAY, stripCi } from '../../services/personaFields'
+import { ExtranjeroFields, Required, RequiredDropdown } from './FormPrimitives'
 
 // Localidades filtradas por el departamento elegido (antes copiado en los 2 popups y en
 // otros 2 lugares del formulario) — mismo criterio: sin departamento, todas.
@@ -123,9 +122,6 @@ function UbicacionFields({
 // identidad, no se tocan desde una Oportunidad puntual.
 export function EditarContactoModal({ form, departamentoOptions, localidades, nacionalidadOptions, onSave, onClose, saving, error }) {
   const [fechaNacimiento, setFechaNacimiento] = useState(form.fechaNacimiento)
-  const [codigoPais, setCodigoPais] = useState(form.codigoPais)
-  const [telefono, setTelefono] = useState(form.telefono)
-  const [email, setEmail] = useState(form.email ?? '')
   const [departamentoId, setDepartamentoId] = useState(form.departamentoId)
   const [localidadId, setLocalidadId] = useState(form.localidadId)
   const [direccion, setDireccion] = useState(form.direccion)
@@ -138,58 +134,20 @@ export function EditarContactoModal({ form, departamentoOptions, localidades, na
     localidadId
   )
 
-  const telefonoErr = telefonoError(telefono, codigoPais)
   const fechaErr = fechaError(fechaNacimiento)
-  const emailErr = emailError(email)
   // Dirección opcional (a pedido: se pide en el paso 3 de la oportunidad).
-  const canSave = !telefonoErr && !fechaErr && !emailErr && departamentoId && localidadId && nacionalidad
+  const canSave = !fechaErr && departamentoId && localidadId && nacionalidad
 
   return (
     <Modal id="editar-contacto-modal" show onClose={onClose} size="medium">
       <ModalContent className="crear-op__editar-contacto-content">
         <h2 className="crear-op__editar-contacto-title">Editar cliente</h2>
         {error && <p className="crear-op__error" role="alert">Error: {error}</p>}
+        {/* MON-14: Teléfono y Email NO están acá — son del Contacto, no del Cliente, y se
+            editan en la sección "Contacto" del paso 1 (ver ContactoFields). Este popup
+            escribe directo en el ítem de Clientes, donde esas columnas ya no existen. */}
         <div className="crear-op__fields--grid">
           <FechaNacimientoField value={fechaNacimiento} onChange={setFechaNacimiento} />
-          <label className="crear-op__field crear-op__field--full">
-            <span>Teléfono <Required /></span>
-            <div className="crear-op__phone">
-              <div className="crear-op__phone-code">
-                <RequiredDropdown
-                  size="medium"
-                  options={CODIGO_PAIS_OPTIONS}
-                  value={CODIGO_PAIS_OPTIONS.find((o) => o.value === codigoPais) ?? null}
-                  {...codigoPaisDropdownProps}
-                  onChange={(option) => setCodigoPais(option?.value ?? '')}
-                />
-              </div>
-              <TextField
-                size="medium"
-                wrapperClassName="crear-op__phone-number"
-                placeholder="Ej: 099 123 456"
-                value={telefono}
-                onChange={setTelefono}
-                icon={MdClear}
-                onIconClick={() => setTelefono('')}
-                validation={telefonoErr ? { status: 'error' } : telefono ? { status: 'success' } : undefined}
-              />
-            </div>
-            {telefonoErr && <span className="crear-op__field-error" role="alert">{telefonoErr}</span>}
-          </label>
-          <label className="crear-op__field crear-op__field--full">
-            <span>Email</span>
-            <TextField
-              size="medium"
-              type="email"
-              placeholder="Ej: nombre@dominio.com"
-              value={email}
-              onChange={setEmail}
-              icon={MdClear}
-              onIconClick={() => setEmail('')}
-              validation={emailErr ? { status: 'error' } : email.trim() ? { status: 'success' } : undefined}
-            />
-            {emailErr && <span className="crear-op__field-error" role="alert">{emailErr}</span>}
-          </label>
           <UbicacionFields
             departamentoOptions={departamentoOptions}
             selectedDepartamento={selectedDepartamento}
@@ -218,9 +176,6 @@ export function EditarContactoModal({ form, departamentoOptions, localidades, na
           onClick: () =>
             onSave({
               fechaNacimiento,
-              codigoPais,
-              telefono,
-              email,
               departamentoId,
               localidadId,
               direccion,

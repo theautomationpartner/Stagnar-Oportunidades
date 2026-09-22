@@ -86,8 +86,23 @@ export function mapOpportunityItem(item, statusColors = {}) {
   const clienteLocalidad = boardRelationDisplayOf(ccv, 'board_relation_mm65e7he')
   const clienteDepartamento = boardRelationDisplayOf(ccv, 'board_relation_mm657jse')
   const clienteSituacion = textOf(ccv, 'color_mm6570m0')
-  // Email del Cliente/Lead (columna email_mm6539g3 de Clientes) — solo lectura acá.
-  const clienteEmail = textOf(ccv, 'email_mm6539g3')
+
+  // MON-14: el Contacto de esta oportunidad — con quien se habló y a quien se le mandó la
+  // información. El Teléfono y el Email son SUYOS (ya no del Cliente: esas columnas se
+  // borraron del tablero Clientes). Puede ser la misma persona que el Cliente o no.
+  // Igual que el Cliente, solo llega en el detalle. Las oportunidades viejas (creadas
+  // antes de MON-14) no tienen contacto vinculado y quedan en null.
+  const contactoItem = cv.find((c) => c.id === 'board_relation_mm4t623x')?.linked_items?.[0] ?? null
+  const cocv = contactoItem?.column_values ?? []
+  const contactoEmail = textOf(cocv, 'contact_email')
+  // El código de país solo viaja en el JSON de `value`, no en `text`.
+  let contactoTelefono = ''
+  try {
+    const raw = cocv.find((c) => c.id === 'contact_phone')?.value
+    contactoTelefono = raw ? JSON.parse(raw)?.phone || '' : ''
+  } catch {
+    // teléfono ilegible: se cae al de la oportunidad (abajo), que es la copia local
+  }
 
   // LOG-21: el vehículo REALMENTE asegurado — el ítem de 🚘 Vehículos que crea el
   // escenario de póliza con lo que leyó del PDF, vinculado en "Bien Asegurado". Igual que
@@ -114,7 +129,16 @@ export function mapOpportunityItem(item, statusColors = {}) {
     clienteNombre,
     clienteId: clienteItem?.id ?? null,
     clienteSituacion,
-    clienteEmail,
+    // MON-14: datos del Contacto (a quien se le manda la info). `contactoTelefono` es el
+    // número VIGENTE del contacto; `telefono` (más abajo) es la copia que quedó en la
+    // oportunidad al cotizar — se mantienen los dos a propósito: la copia es el registro
+    // de a qué número se cotizó, aunque el contacto después cambie de número.
+    contactoId: contactoItem?.id ?? null,
+    // linked_items solo viaja en el detalle; en el listado (CAMPOS_FILA) el nombre del
+    // contacto llega como display_value de la conexión — alcanza para la tabla.
+    contactoNombre: contactoItem?.name ?? boardRelationDisplayOf(cv, 'board_relation_mm4t623x'),
+    contactoEmail,
+    contactoTelefono,
     clienteDireccion,
     clienteLocalidad,
     clienteDepartamento,

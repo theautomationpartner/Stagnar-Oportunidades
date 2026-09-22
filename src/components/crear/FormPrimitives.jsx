@@ -1,7 +1,7 @@
 // Primitivas de formulario del wizard "Crear Oportunidad" — extraídas de
 // CrearOportunidadForm.jsx (auditoría). Los estilos siguen en CrearOportunidadForm.css.
 import { useState } from 'react'
-import { Dropdown, TextField } from '@vibe/core'
+import { Button, Dropdown, TextField } from '@vibe/core'
 import { MdCall, MdClear, MdDescription, MdEdit } from 'react-icons/md'
 import { CODIGO_PAIS_OPTIONS, emailError, telefonoError } from '../../services/personaFields'
 import FlagIcon from './FlagIcon'
@@ -173,15 +173,257 @@ export function SectionTitle({ icon: Icon, children }) {
   )
 }
 
-// Fila de Teléfono, reusada tanto por el formulario manual ("No tengo la Cédula") como
-// por el perfil leído con IA ("Sí" + lectura ok) — la IA no devuelve teléfono, así que
-// en los 2 casos hay que pedirlo aparte.
-// `inline`: devuelve solo los 2 campos (Teléfono, Email) para meterlos en la grilla de
-// otra sección (ver "Datos personales" en CrearOportunidadForm.jsx: así Nombre/Apellido/
-// CI y Fecha/Teléfono/Email quedan en 2 filas de 3 y el paso entra en una pantalla).
-export function TelefonoField({ form, handleChange, resetKey, inline = false }) {
-  const fields = (
-    <>
+// MON-14: sección "Contacto" — a quién se le manda la información. El Teléfono y el
+// Email son DEL CONTACTO, no del Cliente (esas columnas ya no existen en el tablero
+// Clientes). En el caso típico el contacto es el propio cliente y alcanza con el check
+// marcado; destildarlo pide el nombre de la otra persona (un familiar, el administrativo
+// de una empresa).
+//
+// Reusada tanto por el formulario manual ("No tengo la Cédula") como por el perfil leído
+// con IA ("Sí" + lectura ok) — la IA no devuelve teléfono, así que en los 2 casos hay que
+// pedirlo aparte.
+// Sección Contacto del paso 1 — máquina de estados de la selección (a pedido, la
+// oportunidad SIEMPRE queda con exactamente un Cliente y un Contacto marcado explícito):
+//
+//   contactoId cargado          -> resumen "se reusa X" + botón Cambiar. Resuelto.
+//   sin contactoId              -> radios, UNO por camino posible:
+//     · un radio por cada contacto ya vinculado al Cliente (elegirlo = contactoId)
+//     · "Vincular un contacto existente" (solo `permitirVincular`, ruta Cliente nuevo):
+//       buscador contra el tablero Contactos por nombre/teléfono/email (onBuscarContacto)
+//       y un radio por resultado (elegirlo = onVincularContacto -> contactoId)
+//     · "Crear un contacto nuevo": el formulario de siempre (mismo cliente / nombre)
+//   Nada marcado (contactoModo null y sin contactoId) bloquea Continuar — la selección
+//   es explícita incluso cuando el Cliente tiene UN solo contacto (antes se auto-elegía).
+//
+// El teléfono/email quedan visibles también con contacto elegido: solo completan lo que
+// al contacto le falte (ensureContactoCrmId nunca pisa lo que ya tenía cargado).
+export function ContactoFields({
+  form,
+  handleChange,
+  resetKey,
+  contactosDelCliente = [],
+  onElegirContacto,
+  onContactoModo,
+  permitirVincular = false,
+  onBuscarContacto,
+  onVincularContacto,
+  // Contacto del Cliente con el MISMO nombre que el cliente (lo calcula el form): con el
+  // check "es el mismo cliente" tildado se ofrece usarlo en vez de crear un duplicado.
+  homonimo = null,
+}) {
+  const mismoCliente = form.contactoMismoCliente !== false
+  const nombreCliente = `${form.nombre} ${form.apellido}`.trim()
+  // El elegido puede no estar en contactosDelCliente (vino de "Vincular" o del aviso de
+  // duplicados): se arma el resumen con lo que el form ya tiene de él.
+  const contactoElegido = form.contactoId
+    ? contactosDelCliente.find((c) => c.id === form.contactoId) ?? {
+        id: form.contactoId,
+        name: form.contactoNombre || 'Contacto seleccionado',
+        telefono: form.telefono,
+        email: form.email,
+      }
+    : null
+  const hayOpciones = contactosDelCliente.length > 0 || permitirVincular
+  // A pedido: con "es el mismo cliente" tildado y un contacto homónimo ya cargado, crear
+  // otro sería duplicarlo — se avisa y no se muestran campos hasta resolverlo.
+  const bloqueadoPorHomonimo = form.contactoModo === 'nuevo' && mismoCliente && Boolean(homonimo) && !contactoElegido
+  // A pedido: los datos que el contacto elegido YA tiene no se tocan (ni se muestran como
+  // campos) — como mucho se SUMA lo que le falta. El chip de arriba ya muestra lo cargado.
+  const mostrarTelefono =
+    form.contactoModo === 'nuevo'
+      ? !contactoElegido && !bloqueadoPorHomonimo
+      : contactoElegido && !contactoElegido.telefono
+  const mostrarEmail =
+    form.contactoModo === 'nuevo'
+      ? !contactoElegido && !bloqueadoPorHomonimo
+      : contactoElegido && !contactoElegido.email
+
+  // Buscador de "Vincular un contacto existente" — a pedido, NO es live search: se busca
+  // recién al apretar "Buscar" (o Enter). Buscar es una acción deliberada acá — el
+  // usuario tipea un dato completo (nombre, teléfono, email) y pide resultados una vez,
+  // no espera sugerencias a medio tipear. `resultados === null` = todavía no buscó nada
+  // (no se muestra "sin resultados" antes de la primera búsqueda).
+  const [busqueda, setBusqueda] = useState('')
+  const [resultados, setResultados] = useState(null)
+  const [buscando, setBuscando] = useState(false)
+  const ejecutarBusqueda = async () => {
+    if (!onBuscarContacto || busqueda.trim().length < 2) return
+    setBuscando(true)
+    try {
+      setResultados(await onBuscarContacto(busqueda))
+    } catch {
+      setResultados([])
+    } finally {
+      setBuscando(false)
+    }
+  }
+
+  const etiquetaContacto = (c) =>
+    [c.name, c.telefono, c.email, c.clienteNombre ? `(cliente: ${c.clienteNombre})` : '']
+      .filter(Boolean)
+      .join(' — ')
+
+  return (
+    <div className="crear-op__section">
+      <SectionTitle icon={MdCall}>Contacto</SectionTitle>
+      <p className="crear-op__section-hint">A quién le mandás la cotización.</p>
+
+      {contactoElegido ? (
+        // Resuelto: se reusa tal cual está en Contactos. "Quitar" deshace la selección
+        // (a pedido: arrepentirse tiene que ser un botón obvio, no releer un párrafo).
+        <div className="crear-op__contacto-elegido">
+          <span>
+            <strong>{contactoElegido.name}</strong>
+            {[contactoElegido.telefono, contactoElegido.email].filter(Boolean).length > 0 && (
+              <> — {[contactoElegido.telefono, contactoElegido.email].filter(Boolean).join(' — ')}</>
+            )}
+          </span>
+          <Button kind="tertiary" size="small" onClick={() => onElegirContacto?.(null)}>
+            <MdClear /> Quitar
+          </Button>
+        </div>
+      ) : (
+        <>
+          {hayOpciones && (
+            <>
+              {/* En pantallas anchas los contactos van en 2 columnas (auto-fit) — la fila
+                  entera para un solo radio dejaba media pantalla vacía. Las opciones de
+                  camino (Vincular/Crear) quedan a lo ancho, cierran la lista. */}
+              <div className="crear-op__contactos-radios">
+                {contactosDelCliente.map((c) => (
+                  <label key={c.id} className="crear-op__checkbox">
+                    <input
+                      type="radio"
+                      name="contacto-oportunidad"
+                      checked={false}
+                      onChange={() => onElegirContacto?.(c.id)}
+                    />
+                    <span>{etiquetaContacto(c)}</span>
+                  </label>
+                ))}
+              </div>
+              {permitirVincular && (
+                <label className="crear-op__checkbox">
+                  <input
+                    type="radio"
+                    name="contacto-oportunidad"
+                    checked={form.contactoModo === 'vincular'}
+                    onChange={() => onContactoModo?.('vincular')}
+                  />
+                  <span>Vincular un contacto existente</span>
+                </label>
+              )}
+              <label className="crear-op__checkbox">
+                <input
+                  type="radio"
+                  name="contacto-oportunidad"
+                  checked={form.contactoModo === 'nuevo'}
+                  onChange={() => onContactoModo?.('nuevo')}
+                />
+                <span>Crear un contacto nuevo</span>
+              </label>
+            </>
+          )}
+
+          {form.contactoModo === 'vincular' && (
+            <div className="crear-op__section-subblock">
+              <div className="crear-op__buscar-contacto">
+                <TextField
+                  size="medium"
+                  title="Buscar contacto"
+                  placeholder="Nombre, teléfono o email"
+                  value={busqueda}
+                  onChange={setBusqueda}
+                  onKeyDown={(e) => e.key === 'Enter' && ejecutarBusqueda()}
+                  icon={MdClear}
+                  onIconClick={() => {
+                    setBusqueda('')
+                    setResultados(null)
+                  }}
+                />
+                <Button
+                  kind="secondary"
+                  size="medium"
+                  loading={buscando}
+                  disabled={busqueda.trim().length < 2}
+                  onClick={ejecutarBusqueda}
+                >
+                  Buscar
+                </Button>
+              </div>
+              {resultados !== null && !buscando && resultados.length === 0 && (
+                <p className="crear-op__section-hint">Sin resultados en el tablero Contactos.</p>
+              )}
+              {/* A pedido: los resultados se eligen con el mismo Dropdown que usa el
+                  resto de la página, no con radios. */}
+              {(resultados ?? []).length > 0 && (
+                <label className="crear-op__field crear-op__field--full">
+                  <span>Resultados ({resultados.length})</span>
+                  <Dropdown
+                    size="medium"
+                    options={resultados.map((c) => ({ value: c.id, label: etiquetaContacto(c) }))}
+                    value={null}
+                    placeholder="Elegí el contacto a vincular"
+                    onChange={(option) => {
+                      const contacto = resultados.find((c) => c.id === option?.value)
+                      if (contacto) onVincularContacto?.(contacto)
+                    }}
+                  />
+                </label>
+              )}
+            </div>
+          )}
+
+          {form.contactoModo === 'nuevo' && (
+            <>
+              <label className="crear-op__checkbox">
+                <input
+                  type="checkbox"
+                  checked={mismoCliente}
+                  onChange={(e) => handleChange('contactoMismoCliente', e.target.checked)}
+                />
+                <span>
+                  El contacto es el mismo cliente{nombreCliente ? ` (${nombreCliente})` : ''}
+                </span>
+              </label>
+
+              {bloqueadoPorHomonimo && (
+                <p className="crear-op__field-error" role="alert">
+                  {nombreCliente} ya tiene su propio contacto cargado — no hace falta crearlo de nuevo.{' '}
+                  <Button kind="tertiary" size="small" onClick={() => onElegirContacto?.(homonimo.id)}>
+                    Usar ese contacto
+                  </Button>
+                </p>
+              )}
+
+              {!mismoCliente && (
+                <div className="crear-op__fields--grid">
+                  <TextField
+                    size="medium"
+                    key={`contacto-nombre-${resetKey}`}
+                    wrapperClassName="crear-op__field"
+                    title="Nombre del contacto"
+                    required
+                    placeholder="Ej: María Pérez (hija)"
+                    value={form.contactoNombre ?? ''}
+                    onChange={(value) => handleChange('contactoNombre', value)}
+                    icon={MdClear}
+                    onIconClick={() => handleChange('contactoNombre', '')}
+                    validation={form.contactoNombre?.trim() ? { status: 'success' } : undefined}
+                  />
+                </div>
+              )}
+            </>
+          )}
+        </>
+      )}
+
+      {/* Teléfono/Email: con "crear nuevo" son los datos del contacto; con uno elegido
+          solo aparecen los que le FALTAN (los cargados no se editan desde acá). Con nada
+          marcado todavía, no hay a quién cargarle datos y no se muestra ninguno. */}
+      {(mostrarTelefono || mostrarEmail) && (
+      <div className="crear-op__fields--grid">
+        {mostrarTelefono && (
         <label className="crear-op__field">
           <span>Teléfono <Required /></span>
           <div className="crear-op__phone">
@@ -216,8 +458,10 @@ export function TelefonoField({ form, handleChange, resetKey, inline = false }) 
             <span className="crear-op__field-error" role="alert">{telefonoError(form.telefono, form.codigoPais)}</span>
           )}
         </label>
-        {/* A pedido: Email del Cliente/Lead (columna email_mm6539g3 de Clientes). Opcional,
+        )}
+        {/* Email del Contacto (columna contact_email del tablero Contactos). Opcional,
             pero si se carga se valida el formato (ver emailError). */}
+        {mostrarEmail && (
         <label className="crear-op__field">
           <span>Email</span>
           <TextField
@@ -237,13 +481,9 @@ export function TelefonoField({ form, handleChange, resetKey, inline = false }) 
             <span className="crear-op__field-error" role="alert">{emailError(form.email)}</span>
           )}
         </label>
-    </>
-  )
-  if (inline) return fields
-  return (
-    <div className="crear-op__section">
-      <SectionTitle icon={MdCall}>Contacto</SectionTitle>
-      <div className="crear-op__fields--grid">{fields}</div>
+        )}
+      </div>
+      )}
     </div>
   )
 }

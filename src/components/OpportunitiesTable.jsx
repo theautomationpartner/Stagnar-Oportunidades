@@ -10,14 +10,17 @@ import { initialsOf } from '../services/personaFields'
 // (se veían cortadas); "Última cotización" ahora es una fecha corta (dd/mm/aa, ver
 // formatShortDate) y "Asignado a" solo un avatar, así que les alcanza con bastante
 // menos.
+// A pedido: sin "Compañías cotizadas" (no aportaba a encontrar la fila), el Bien reducido
+// a Marca Modelo (Año), y Cliente y Contacto en columnas SEPARADAS — son dos entidades
+// distintas (a quién se le cotiza vs. con quién se habla) y venían mezcladas en una celda.
 const COLUMNS = [
   { id: 'oportunidad', title: 'Oportunidad', width: '13%' },
-  { id: 'cliente', title: 'Cliente', width: '21%' },
-  { id: 'bien', title: 'Bien', width: '21%' },
-  { id: 'companias', title: 'Compañías cotizadas', width: '15%' },
+  { id: 'cliente', title: 'Cliente', width: '19%' },
+  { id: 'contacto', title: 'Contacto', width: '15%' },
+  { id: 'bien', title: 'Bien', width: '19%' },
   { id: 'estado', title: 'Estado', width: '14%' },
-  { id: 'ultimaCotizacion', title: 'Última cotización', width: '9%' },
-  { id: 'asignado', title: 'Asignado a', width: '7%' },
+  { id: 'ultimaCotizacion', title: 'Última cotización', width: '11%' },
+  { id: 'asignado', title: 'Asignado a', width: '9%' },
 ]
 
 function handleRowKeyDown(event, onOpen) {
@@ -144,6 +147,17 @@ export default function OpportunitiesTable({
                         <div className="opps-table__cliente-name">{opp.clienteNombre}</div>
                         <div className="opps-table__cliente-meta">
                           {opp.ci && <span>CI: {opp.ci}</span>}
+                        </div>
+                      </div>
+                    </div>
+                  </ClickableCell>
+                </TableCell>
+                <TableCell>
+                  <ClickableCell onOpen={openThisOpportunity}>
+                    <div className="opps-table__cliente">
+                      <div>
+                        <div className="opps-table__cliente-name">{opp.contactoNombre || '—'}</div>
+                        <div className="opps-table__cliente-meta">
                           {opp.telefono && <span>Tel: {opp.telefono}</span>}
                         </div>
                       </div>
@@ -153,13 +167,12 @@ export default function OpportunitiesTable({
                 <TableCell>
                   <ClickableCell onOpen={openThisOpportunity}>
                     <div className="opps-table__bien">
-                      <div>{opp.bienLinea1}</div>
-                      {opp.bienLinea2 && <div className="opps-table__bien-meta">{opp.bienLinea2}</div>}
+                      <div>
+                        {[opp.marca, opp.modelo].filter(Boolean).join(' ') || opp.bienLinea1}
+                        {opp.anio ? ` (${opp.anio})` : ''}
+                      </div>
                     </div>
                   </ClickableCell>
-                </TableCell>
-                <TableCell>
-                  <ClickableCell onOpen={openThisOpportunity}>{opp.companias}</ClickableCell>
                 </TableCell>
                 <TableCell>
                   <ClickableCell onOpen={openThisOpportunity}>

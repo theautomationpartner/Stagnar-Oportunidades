@@ -76,9 +76,11 @@ export default function ClientFicha({
       <div className="client-ficha__badges">
         <span className="client-ficha__badge">CI: {opportunity.ci || '—'}</span>
         <span className="client-ficha__badge">Nacimiento: {opportunity.fechaNacimiento ? formatShortDate(opportunity.fechaNacimiento) : "—"}</span>
+        {/* MON-14: el teléfono es del Contacto de la oportunidad; las anteriores a MON-14
+            no tienen contacto y caen a la copia guardada en la propia oportunidad. */}
         <span className="client-ficha__badge">
           <MdSmartphone />
-          {opportunity.telefono || '—'}
+          {opportunity.contactoTelefono || opportunity.telefono || '—'}
         </span>
         {/* A pedido: id real del ítem en monday, como dato extra — útil para ir a
             buscarlo directo en monday si hace falta (soporte, debug), sin tener que

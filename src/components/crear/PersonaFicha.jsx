@@ -1,24 +1,24 @@
-import { MdEdit, MdEmail, MdLocationOn, MdPublic, MdSmartphone } from 'react-icons/md'
+import { MdEdit, MdLocationOn, MdPublic } from 'react-icons/md'
 import { Button } from '@vibe/core'
 import FileUploadField from '../FileUploadField'
 import { formatShortDate } from '../../services/format'
 
 // Ficha de solo lectura de la persona elegida/leída en el paso 1 de "Crear Oportunidad"
 // (auditoría: antes estaba escrita 2 veces casi idénticas en CrearOportunidadForm.jsx —
-// una para un Cliente/Lead existente y otra para el Lead recién leído con IA; la única
-// diferencia real era el badge de teléfono y qué popup abre "Editar"). Los estilos
-// (.crear-op__ficha*) siguen en CrearOportunidadForm.css.
+// una para un Cliente/Lead existente y otra para el Lead recién leído con IA). Los
+// estilos (.crear-op__ficha*) siguen en CrearOportunidadForm.css.
+//
+// MON-14: acá va solo el CLIENTE (a quien se le cotiza). El Teléfono y el Email ya no
+// salen en esta ficha: son del Contacto, y se muestran y editan en su propia sección
+// (ver ContactoFields) — repetirlos acá daba a entender que eran datos del cliente.
 //
 // - source: 'contacto' | 'lead' → tag "Cliente"/"Lead".
-// - showTelefono: la ficha del Lead leído con IA no lo muestra (la IA no lo devuelve,
-//   se pide aparte con TelefonoField justo debajo).
 // - cedula: { file, uploading?, onChange } para el campo "Cédula de Identidad (frente)".
 export default function PersonaFicha({
   form,
   selectedLocalidad,
   selectedDepartamento,
   source,
-  showTelefono = true,
   onEdit,
   cedula,
   children,
@@ -59,18 +59,6 @@ export default function PersonaFicha({
             ? `Extranjero · ${form.nacionalidad || 'Sin nacionalidad'}`
             : form.nacionalidad || 'Sin nacionalidad'}
         </span>
-        {showTelefono && (
-          <span className="crear-op__ficha-badge">
-            <MdSmartphone />
-            {form.telefono ? `${form.codigoPais} ${form.telefono}` : '—'}
-          </span>
-        )}
-        {showTelefono && form.email && (
-          <span className="crear-op__ficha-badge">
-            <MdEmail />
-            {form.email}
-          </span>
-        )}
       </div>
       <span className={`crear-op__source-tag crear-op__source-tag--${source}`}>
         {source === 'contacto' ? 'Cliente' : 'Lead'}

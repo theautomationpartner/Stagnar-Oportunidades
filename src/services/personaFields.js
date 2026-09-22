@@ -12,8 +12,7 @@ export const NACIONALIDAD_URUGUAY = 'URUGUAY'
 // cargar un cliente con otro código — no hay columna real de monday detrás todavía.
 // A pedido: código de país compacto con bandera (ver FlagIcon.jsx: SVG, porque los
 // emoji de banderas no se ven en Windows). `label` es el texto plano (búsqueda/lectores
-// de pantalla); lo visual lo arman valueRenderer/optionRenderer en TelefonoField y
-// EditarContactoModal.
+// de pantalla); lo visual lo arman valueRenderer/optionRenderer en ContactoFields.
 export const CODIGO_PAIS_OPTIONS = [
   { value: '+598', label: '+598 Uruguay', iso: 'UY', pais: 'Uruguay' },
   { value: '+54', label: '+54 Argentina', iso: 'AR', pais: 'Argentina' },
@@ -153,9 +152,10 @@ export function normalizeFechaIA(raw) {
   return `${y}-${m.padStart(2, '0')}-${d.padStart(2, '0')}`
 }
 
-// Payload que espera la columna "phone" de monday (phone_mm519m27 en Oportunidades,
-// CONTACTO_TELEFONO_COLUMN_ID en Clientes): código de país + número, solo dígitos, y el
-// countryShortName. Antes estaba copiado 3 veces en CrearOportunidadForm.jsx.
+// Payload que espera la columna "phone" de monday (contact_phone en Contactos —desde
+// MON-14 el teléfono es del Contacto, no del Cliente— y phone_mm519m27 en Oportunidades,
+// donde queda la copia de a qué número se cotizó): código de país + número, solo dígitos,
+// y el countryShortName. Antes estaba copiado 3 veces en CrearOportunidadForm.jsx.
 export function buildMondayPhone(codigoPais, telefono) {
   return {
     phone: `${(codigoPais ?? '').replace('+', '')}${(telefono ?? '').replace(/\D/g, '')}`,
@@ -184,7 +184,7 @@ export function emailError(value) {
   return null
 }
 
-// Payload de una columna "email" de monday (email_mm6539g3 en Clientes): {email, text}.
+// Payload de una columna "email" de monday (contact_email en Contactos): {email, text}.
 export function buildMondayEmail(email) {
   const v = (email ?? '').trim()
   return { email: v, text: v }

@@ -1,23 +1,32 @@
 import { useEffect, useState } from 'react'
 import { MdPersonAddAlt, MdCheckCircle } from 'react-icons/md'
 import { AttentionBox, Button, TextField } from '@vibe/core'
-import { fetchClienteContactos, createContactoCrm, setContactoColumnValues, CONTACTO_EMAIL_COLUMN_ID } from '../services/mondayApi'
+import {
+  fetchClienteContactos,
+  createContactoCrm,
+  setMultipleColumnValues,
+  OPORTUNIDAD_CONTACTO_CRM_COLUMN_ID,
+} from '../services/mondayApi'
 import { buildMondayEmail, countryShortNameFromDigits, emailError } from '../services/personaFields'
 import './CrearContactoCard.css'
 
-// Paso 4, oportunidad ya Concretada (a pedido): si el Cliente/Lead vinculado todavía no
-// tiene ningún contacto en el tablero Contactos, se ofrece crearlo con los datos que ya
-// tenemos (nombre, teléfono) y la posibilidad de cargar/corregir el email acá mismo, y
-// se vincula al Cliente. Si ya tiene contactos, no se muestra nada.
+// Paso 4, oportunidad ya Concretada: rescate para las oportunidades ANTERIORES a MON-14,
+// que nacieron sin Contacto (antes el teléfono y el email eran del Cliente). Se ofrece
+// crear el contacto con los datos que ya tenemos y vincularlo al Cliente y a esta
+// oportunidad.
+//
+// Las oportunidades nuevas ya nacen con su contacto (ver CrearOportunidadForm: el paso 1
+// lo crea o lo reusa), así que para esas la tarjeta no aparece nunca.
 export default function CrearContactoCard({ opportunity }) {
   const [state, setState] = useState('checking') // checking | offer | creating | done | dismissed | hidden
   const [existing, setExisting] = useState([])
-  const [email, setEmail] = useState(opportunity.clienteEmail || '')
+  const [email, setEmail] = useState(opportunity.contactoEmail || '')
   const [error, setError] = useState(null)
 
   useEffect(() => {
     let cancelled = false
-    if (!opportunity.clienteId) {
+    // Ya tiene contacto propio: no hay nada que ofrecer.
+    if (!opportunity.clienteId || opportunity.contactoId) {
       setState('hidden')
       return undefined
     }
@@ -34,11 +43,7 @@ export default function CrearContactoCard({ opportunity }) {
     return () => {
       cancelled = true
     }
-  }, [opportunity.clienteId])
-
-  useEffect(() => {
-    if (opportunity.clienteEmail && !email) setEmail(opportunity.clienteEmail)
-  }, [opportunity.clienteEmail])
+  }, [opportunity.clienteId, opportunity.contactoId])
 
   if (state === 'checking' || state === 'hidden' || state === 'dismissed') return null
 
@@ -50,7 +55,7 @@ export default function CrearContactoCard({ opportunity }) {
     setState('creating')
     setError(null)
     try {
-      await createContactoCrm({
+      const { id } = await createContactoCrm({
         name: nombre,
         phone: telefonoDigits
           ? { phone: telefonoDigits, countryShortName: countryShortNameFromDigits(telefonoDigits) }
@@ -59,13 +64,15 @@ export default function CrearContactoCard({ opportunity }) {
         clienteId: opportunity.clienteId,
         existingContactIds: existing.map((c) => c.id),
       })
-      // Si el email se cargó acá y el Cliente/Lead no tenía, se guarda también en su ficha.
-      if (email.trim() && !opportunity.clienteEmail) {
-        try {
-          await setContactoColumnValues(opportunity.clienteId, { [CONTACTO_EMAIL_COLUMN_ID]: buildMondayEmail(email) })
-        } catch {
-          // El contacto ya quedó creado y vinculado; el email en la ficha es un extra.
-        }
+      // MON-14: además del Cliente, el contacto se vincula a ESTA oportunidad — es el
+      // registro de a quién se le mandó la información. No bloqueante: si falla, el
+      // contacto ya quedó creado y vinculado al Cliente, que es lo importante.
+      try {
+        await setMultipleColumnValues(opportunity.id, {
+          [OPORTUNIDAD_CONTACTO_CRM_COLUMN_ID]: { item_ids: [Number(id)] },
+        })
+      } catch {
+        // el vínculo con la oportunidad se puede poner a mano en monday
       }
       setState('done')
     } catch (err) {
@@ -92,7 +99,7 @@ export default function CrearContactoCard({ opportunity }) {
           <h3 className="crear-contacto__title">¿Querés crear un contacto para {nombre}?</h3>
           <p className="crear-contacto__subtitle">
             Todavía no tiene ninguno en el tablero Contactos. Se crea con estos datos y queda vinculado al
-            {opportunity.clienteSituacion?.toLowerCase() === 'lead' ? ' lead' : ' cliente'}.
+            {opportunity.clienteSituacion?.toLowerCase() === 'lead' ? ' lead' : ' cliente'} y a esta oportunidad.
           </p>
         </div>
       </div>

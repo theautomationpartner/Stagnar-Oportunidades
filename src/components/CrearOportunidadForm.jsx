@@ -9,7 +9,6 @@ import {
   MdEdit,
   MdCheck,
   MdLocationOn,
-  MdSmartphone,
   MdPerson,
 } from 'react-icons/md'
 import {
@@ -42,23 +41,29 @@ import {
   deleteItem,
   fetchItemState,
   searchContactos,
-  findContactoByCedula,
+  findClientePorDocumento,
   findContactoByTelefono,
   findContactoByEmail,
+  vincularContactoACliente,
+  buscarContactosCrmLibre,
   fetchContactoOportunidades,
   createContactoItem,
   fetchFileColumnAsFile,
   setContactoColumnValues,
+  // MON-14: tablero Contactos (a quién se le manda la información)
+  createContactoCrm,
+  fetchClienteContactos,
+  fetchContactosCrm,
+  setContactoCrmColumnValues,
+  OPORTUNIDAD_CONTACTO_CRM_COLUMN_ID,
   OPORTUNIDAD_CONTACTO_COLUMN_ID,
   CONTACTO_CI_COLUMN_ID,
-  CONTACTO_TELEFONO_COLUMN_ID,
   CONTACTO_FECHA_NACIMIENTO_COLUMN_ID,
   CONTACTO_LOCALIDAD_COLUMN_ID,
   CONTACTO_DEPARTAMENTO_COLUMN_ID,
   CONTACTO_CI_FRENTE_COLUMN_ID,
   CONTACTO_ESTADO_COLUMN_ID,
   CONTACTO_DIRECCION_COLUMN_ID,
-  CONTACTO_EMAIL_COLUMN_ID,
   CONTACTO_ARCHIVOS_COLUMN_ID,
   CONTACTO_NOMBRE_COLUMN_ID,
   CONTACTO_APELLIDO_COLUMN_ID,
@@ -71,7 +76,7 @@ import { revisarIdentificacion } from '../services/vehiculoIdentificacion'
 import { ciError, fechaError, fieldStateClass, maxFechaNacimiento, NACIONALIDAD_URUGUAY, normalizeFechaIA, splitNombreApellido, splitTelefono, stripCi, telefonoError, buildMondayPhone, emailError, buildMondayEmail } from '../services/personaFields'
 import { clearPersistedSearch, loadPersistedSearch, savePersistedSearch } from '../services/persistedSearch'
 import { publicarTrabajoEnCrear } from '../services/crearEnCurso'
-import { DocumentChoiceToggle, ExtranjeroFields, Required, RequiredDropdown, SectionTitle, StepHeading, TelefonoField } from './crear/FormPrimitives'
+import { ContactoFields, DocumentChoiceToggle, ExtranjeroFields, Required, RequiredDropdown, SectionTitle, StepHeading } from './crear/FormPrimitives'
 import { ExistingRecordSearch } from './crear/ExistingRecordSearch'
 import { VehiculoManualFields } from './crear/VehiculoManualFields'
 import { EditarContactoModal, EditarLeadModal } from './crear/EditarPersonaModals'
@@ -113,10 +118,23 @@ function buildInitialForm() {
     apellido: '',
     ci: '',
     fechaNacimiento: '',
+    // MON-14: Teléfono y Email son del CONTACTO (tablero Contactos), no del Cliente —
+    // "el contacto es a quien le mando la información". Siguen viviendo en el form con
+    // estos nombres para no renombrar todo el circuito de validación y autocompletado;
+    // lo que cambió es a qué ítem de monday se escriben (ver ensureContactoCrmId).
     codigoPais: '+598',
     telefono: '',
-    // A pedido: email del Cliente/Lead (opcional, columna email_mm6539g3 de Clientes).
     email: '',
+    // Contacto: por defecto es el propio cliente (caso típico). Destildarlo pide el
+    // nombre de la otra persona, o deja elegir uno que el Cliente ya tenga cargado
+    // (contactoId).
+    contactoMismoCliente: true,
+    contactoNombre: '',
+    contactoId: null,
+    // Qué camino se marcó en la sección Contacto: 'nuevo' | 'vincular' | null. Arranca
+    // en 'nuevo' (crear de cero no tiene otra opción); al elegir un Cliente con
+    // contactos pasa a null — la selección es explícita y sin marcar no se avanza.
+    contactoModo: 'nuevo',
     localidadId: '',
     departamentoId: '',
     // LOG-06 / LOG-08: personas del exterior. "Extranjero" arranca en No (el caso
@@ -301,6 +319,10 @@ export default function CrearOportunidadForm({
   // fetchFileColumnAsFile) — este estado solo prende un cartelito mientras se descarga,
   // no bloquea nada del resto del form.
   const [cedulaAutofillLoading, setCedulaAutofillLoading] = useState(false)
+  // MON-14: los Contactos que el Cliente elegido ya tiene cargados, con su teléfono y
+  // email ([{id, name, telefono, email, ...}]) — para poder reusar uno en vez de crear un
+  // duplicado. Vacío si se está creando un Lead desde cero.
+  const [contactosDelCliente, setContactosDelCliente] = useState([])
   // Primera decisión del paso 1: se "resuelve" cuando el usuario elige un resultado de la
   // búsqueda O aprieta "Saltear" — recién ahí se muestran Nombre/Apellido/CI en adelante
   // (antes no es una columna real de monday, solo gatea qué se muestra acá).
@@ -370,9 +392,11 @@ export default function CrearOportunidadForm({
   }, [])
 
   // Al elegir un resultado (Cliente o Lead), se completan los datos personales y se abre
-  // el resto del formulario. Los 2 ya traen Fecha Nacimiento/Teléfono/Departamento/
-  // Localidad (ver searchContactos en mondayApi.js) — ninguno tiene columnas separadas
-  // de Nombre/Apellido, se parte el nombre completo (ver splitNombreApellido).
+  // el resto del formulario. Los 2 ya traen Fecha Nacimiento/Departamento/Localidad (ver
+  // searchContactos en mondayApi.js) — ninguno tiene columnas separadas de Nombre/
+  // Apellido, se parte el nombre completo (ver splitNombreApellido). MON-14: el Teléfono
+  // y el Email NO vienen acá, son del Contacto y se piden aparte
+  // (handleAutofillContactos, justo abajo).
   const handleResultadoSeleccionado = (resultado) => {
     setResultadoSeleccionado(resultado)
     if (!resultado) {
@@ -388,12 +412,17 @@ export default function CrearOportunidadForm({
         codigoPais: '+598',
         telefono: '',
         email: '',
+        contactoMismoCliente: true,
+        contactoNombre: '',
+        contactoId: null,
+        contactoModo: 'nuevo',
         departamentoId: '',
         localidadId: '',
         extranjero: 'No',
         nacionalidad: NACIONALIDAD_URUGUAY,
         direccion: '',
       }))
+      setContactosDelCliente([])
       setTextFieldsResetKey((k) => k + 1)
       return
     }
@@ -402,7 +431,6 @@ export default function CrearOportunidadForm({
     // mondayApi.js), hay que matchearlos contra la lista real para sacar el id que
     // necesita el Dropdown — mismo criterio que ya usa cotizarFields.js para los campos
     // "connected".
-    const { codigoPais, telefono } = splitTelefono(resultado.telefono, resultado.telefonoCountryShortName)
     const departamentoMatch = (schema?.departamentos ?? []).find(
       (d) => d.name.toLowerCase() === (resultado.departamentoNombre || '').toLowerCase()
     )
@@ -424,12 +452,9 @@ export default function CrearOportunidadForm({
       apellido: apellido || prev.apellido,
       ci: resultado.ci || prev.ci,
       fechaNacimiento: resultado.fechaNacimiento || prev.fechaNacimiento,
-      codigoPais: codigoPais || prev.codigoPais,
-      telefono: telefono || prev.telefono,
       departamentoId: departamentoMatch?.id ?? prev.departamentoId,
       localidadId: localidadMatch?.id ?? prev.localidadId,
       direccion: resultado.direccion || prev.direccion,
-      email: resultado.email || prev.email,
       // LOG-06: si el Cliente/Lead ya tenía cargado Extranjero/Nacionalidad se respeta
       // lo que dice monday; los ítems viejos (creados antes de estas columnas) vienen
       // vacíos y caen al default de siempre (No / URUGUAY).
@@ -441,6 +466,81 @@ export default function CrearOportunidadForm({
     // la misma columna sin importar cuál de los dos sea. Fire-and-forget: no bloquea el
     // resto del autocompletado ni la confirmación si tarda o si no tenía archivo.
     handleAutofillCedula(resultado.id)
+    // MON-14: el Teléfono y el Email ya no vienen con el Cliente — son de sus Contactos.
+    // Se traen los que tenga cargados: si tiene UNO solo se autocompleta con ese (el caso
+    // típico, y lo que antes hacía el Cliente); si tiene varios se deja elegir en la
+    // sección Contacto y no se asume ninguno.
+    handleAutofillContactos(resultado.contactos ?? [])
+  }
+
+  // Trae teléfono/email de los contactos ya vinculados al Cliente elegido. Silencioso: si
+  // falla, los campos quedan vacíos y se completan a mano, igual que un cliente que
+  // todavía no tiene contactos cargados.
+  const handleAutofillContactos = async (contactosVinculados) => {
+    if (!contactosVinculados.length) {
+      setContactosDelCliente([])
+      // Cliente sin contactos: crear uno es el único camino, no hay nada que marcar.
+      setForm((prev) => ({ ...prev, contactoModo: 'nuevo', contactoId: null }))
+      return
+    }
+    try {
+      const contactos = await fetchContactosCrm(contactosVinculados.map((c) => c.id))
+      setContactosDelCliente(contactos)
+      // A pedido: la selección del contacto de la oportunidad es EXPLÍCITA — aunque el
+      // Cliente tenga un solo contacto, alguien tiene que marcarlo (antes se aplicaba
+      // solo). Con modo null y sin contactoId, Continuar queda bloqueado (isStepValid).
+      setForm((prev) => ({ ...prev, contactoModo: null, contactoId: null }))
+    } catch {
+      setContactosDelCliente([])
+      setForm((prev) => ({ ...prev, contactoModo: 'nuevo' }))
+    }
+  }
+
+  // A pedido: si el Cliente YA tiene un contacto homónimo (él mismo, cargado antes),
+  // "crear uno nuevo" con el check "es el mismo cliente" tildado duplicaría el contacto.
+  // Se detecta acá (mismo criterio de comparación que aplicarContacto) para avisar en la
+  // sección Contacto y bloquear el avance hasta elegirlo o destildar.
+  const contactoHomonimo =
+    contactosDelCliente.find(
+      (c) => c.name.trim().toLowerCase() === `${form.nombre} ${form.apellido}`.trim().toLowerCase()
+    ) ?? null
+
+  // Radio de la sección Contacto: 'vincular' (buscar uno existente) o 'nuevo'. Cambiar a
+  // 'nuevo' suelta el contacto elegido, si había.
+  const handleContactoModo = (modo) => {
+    setForm((prev) => ({ ...prev, contactoModo: modo, contactoId: modo === 'nuevo' ? null : prev.contactoId }))
+  }
+
+  // Vuelca un Contacto ya existente en el form (teléfono, email, y de quién es). Lo usan
+  // el autocompletado de arriba y el desplegable de la sección Contacto.
+  const aplicarContacto = (contacto) => {
+    const { codigoPais, telefono } = splitTelefono(contacto.telefono, contacto.telefonoCountryShortName)
+    setForm((prev) => ({
+      ...prev,
+      contactoId: contacto.id,
+      // Un contacto elegido siempre deja el modo en 'existente' — si venía de 'nuevo'
+      // (ej. reusado desde el aviso de duplicados), los campos de tel/email pasan a la
+      // regla "solo lo que falte" en vez de quedar editables como si fuera nuevo.
+      contactoModo: 'existente',
+      contactoNombre: contacto.name,
+      // Si el contacto se llama igual que el cliente, es el propio cliente: el check
+      // queda marcado y no se repite el nombre en pantalla.
+      contactoMismoCliente:
+        contacto.name.trim().toLowerCase() === `${prev.nombre} ${prev.apellido}`.trim().toLowerCase(),
+      codigoPais: codigoPais || prev.codigoPais,
+      telefono: telefono || prev.telefono,
+      email: contacto.email || prev.email,
+    }))
+  }
+
+  // Desplegable "o elegí uno ya cargado" de la sección Contacto.
+  const handleElegirContacto = (contactoId) => {
+    if (!contactoId) {
+      setForm((prev) => ({ ...prev, contactoId: null }))
+      return
+    }
+    const contacto = contactosDelCliente.find((c) => c.id === contactoId)
+    if (contacto) aplicarContacto(contacto)
   }
 
   // Descarga la Cédula Identidad (CI Frente) ya subida en un Cliente/Lead anterior y la
@@ -494,6 +594,12 @@ export default function CrearOportunidadForm({
             codigoPais: form.codigoPais,
             telefono: form.telefono,
             email: form.email,
+            // MON-14: a quién se le manda (ver ContactoFields) — sin esto, volver al
+            // formulario reponía el teléfono pero se olvidaba de quién era.
+            contactoMismoCliente: form.contactoMismoCliente,
+            contactoNombre: form.contactoNombre,
+            contactoId: form.contactoId,
+            contactoModo: form.contactoModo,
             departamentoId: form.departamentoId,
             localidadId: form.localidadId,
             direccion: form.direccion,
@@ -638,20 +744,25 @@ export default function CrearOportunidadForm({
     }
     let cancelled = false
     const timer = setTimeout(() => {
-      // Orden de prioridad: CI exacto > Teléfono exacto > Email exacto > Nombre+Apellido (laxo). Se
-      // recuerda por cuál se encontró (`motivo`) para que el popup diga qué coincidió.
+      // Orden de prioridad: CI/RUT exacto > Teléfono exacto > Email exacto > Nombre+Apellido
+      // (laxo). Se recuerda por cuál se encontró (`motivo`) para que el popup diga qué
+      // coincidió. Cliente y Contacto son entidades separadas y puede existir cualquiera de
+      // los dos sin el otro: por CI/RUT se encuentra un CLIENTE; por teléfono/email se
+      // encuentra un CONTACTO, que puede venir con su Cliente vinculado (contacto) o suelto
+      // (solo contactoCrm) — los dos casos se avisan.
       const lookup = (async () => {
         if (ciValida) {
-          const porCi = await findContactoByCedula(digits)
-          if (porCi) return { contacto: porCi, motivo: 'ci' }
+          const porDoc = await findClientePorDocumento(digits)
+          if (porDoc) return { contacto: porDoc.cliente, motivo: porDoc.motivo }
         }
         if (telefonoValido) {
           const porTelefono = await findContactoByTelefono(form.codigoPais, form.telefono)
-          if (porTelefono) return { contacto: porTelefono, motivo: 'telefono' }
+          if (porTelefono)
+            return { contacto: porTelefono.cliente, contactoCrm: porTelefono.contactoCrm, motivo: 'telefono' }
         }
         if (emailValido) {
           const porEmail = await findContactoByEmail(form.email)
-          if (porEmail) return { contacto: porEmail, motivo: 'email' }
+          if (porEmail) return { contacto: porEmail.cliente, contactoCrm: porEmail.contactoCrm, motivo: 'email' }
         }
         if (!ciValida && nombreCompleto) {
           const porNombre = (await searchContactos(nombreCompleto))[0] ?? null
@@ -663,7 +774,7 @@ export default function CrearOportunidadForm({
         .then((result) => {
           if (cancelled) return
           setDuplicadoCheck(result)
-          if (result.contacto) setShowDuplicadoModal(true)
+          if (result.contacto || result.contactoCrm) setShowDuplicadoModal(true)
         })
         .catch(() => {
           if (!cancelled) setDuplicadoCheck(null)
@@ -692,9 +803,9 @@ export default function CrearOportunidadForm({
 
   // "Usar el cliente existente" — aplica directo los datos de ese Contacto (mismo circuito que elegir un
   // resultado en "Buscar Persona", ver handleSearchPreview/handleResultadoSeleccionado)
-  // en vez de solo avisar: pisa los datos personales con los reales del Contacto
-  // encontrado (ya viene completo — CI/Fecha Nacimiento/Teléfono/Departamento/
-  // Localidad, ver mapContactoItem). También se guarda en searchPreview para que el
+  // en vez de solo avisar: pisa los datos personales con los reales del Cliente
+  // encontrado (ya viene completo — CI/Fecha Nacimiento/Departamento/Localidad, ver
+  // mapContactoItem). También se guarda en searchPreview para que el
   // buscador de arriba y el cartelito "Contacto seleccionado" de abajo lo reflejen.
   const handleConfirmDuplicadoContacto = () => {
     if (!duplicadoCheck?.contacto) return
@@ -703,6 +814,16 @@ export default function CrearOportunidadForm({
     setShowDuplicadoModal(false)
     setSearchPreview(resultado)
     handleResultadoSeleccionado(resultado)
+  }
+
+  // Variante del popup para un Contacto SUELTO (teléfono/email repetido en un contacto
+  // sin Cliente vinculado): no hay cliente que reusar, pero sí el contacto — se aplica al
+  // form (aplicarContacto), y al guardar ensureContactoCrmId lo reusa y lo vincula al
+  // Cliente que se está creando en vez de fabricar un contacto duplicado.
+  const handleUsarContactoCrmSuelto = () => {
+    if (!duplicadoCheck?.contactoCrm) return
+    aplicarContacto(duplicadoCheck.contactoCrm)
+    setShowDuplicadoModal(false)
   }
 
   // "Guardar" del popup "Editar contacto" (ver EditarContactoModal) — a diferencia del
@@ -714,9 +835,10 @@ export default function CrearOportunidadForm({
     setSavingContacto(true)
     setSavingContactoError(null)
     try {
+      // MON-14: acá SOLO van datos del Cliente. El teléfono y el email son del Contacto
+      // (se escriben en ensureContactoCrmId, al guardar la oportunidad).
       await setContactoColumnValues(resultadoSeleccionado.id, {
         [CONTACTO_FECHA_NACIMIENTO_COLUMN_ID]: values.fechaNacimiento,
-        [CONTACTO_TELEFONO_COLUMN_ID]: buildMondayPhone(values.codigoPais, values.telefono),
         [CONTACTO_LOCALIDAD_COLUMN_ID]: { item_ids: [Number(values.localidadId)] },
         // A diferencia de antes (mirror automático desde Localidad), ahora Departamento
         // es una conexión propia — hay que escribirla explícitamente.
@@ -728,8 +850,6 @@ export default function CrearOportunidadForm({
         ...(values.nacionalidad
           ? { [CONTACTO_NACIONALIDAD_COLUMN_ID]: { labels: [values.nacionalidad] } }
           : {}),
-        // Email opcional: solo se escribe si hay algo (no se puede vaciar desde acá).
-        ...(values.email?.trim() ? { [CONTACTO_EMAIL_COLUMN_ID]: buildMondayEmail(values.email) } : {}),
       })
       setForm((prev) => ({ ...prev, ...values }))
       setEditingContacto(false)
@@ -872,11 +992,24 @@ export default function CrearOportunidadForm({
           !ciError(form.ci) &&
           form.fechaNacimiento &&
           !fechaError(form.fechaNacimiento) &&
+          // MON-14: Teléfono y Email son del Contacto. El teléfono sigue siendo
+          // obligatorio (sin él no hay a quién mandarle la cotización) y el email
+          // opcional. Si el contacto NO es el propio cliente, hace falta su nombre.
           form.codigoPais &&
           form.telefono &&
           !telefonoError(form.telefono, form.codigoPais) &&
-          // Email opcional, pero si se cargó tiene que ser válido.
           !emailError(form.email) &&
+          // A pedido: exactamente UN contacto marcado explícito para la oportunidad —
+          // uno existente elegido (contactoId, de la lista del Cliente o del buscador de
+          // "Vincular"), o el radio "Crear un contacto nuevo" con sus datos. Con el
+          // Cliente teniendo contactos y nada marcado, no se avanza.
+          (form.contactoId ||
+            (form.contactoModo === 'nuevo' &&
+              // Con el check "es el mismo cliente" tildado y un homónimo ya cargado, no
+              // se avanza: hay que usar ese contacto o destildar y poner otro nombre.
+              (form.contactoMismoCliente !== false
+                ? !contactoHomonimo
+                : form.contactoNombre?.trim()))) &&
           form.localidadId &&
           form.departamentoId &&
           // LOG-06: en el caso común ya viene en URUGUAY, así que esto solo frena
@@ -1155,7 +1288,6 @@ export default function CrearOportunidadForm({
       [CONTACTO_NOMBRE_COLUMN_ID]: form.nombre.trim(),
       [CONTACTO_APELLIDO_COLUMN_ID]: form.apellido.trim(),
       [CONTACTO_CI_COLUMN_ID]: stripCi(form.ci),
-      [CONTACTO_TELEFONO_COLUMN_ID]: buildMondayPhone(form.codigoPais, form.telefono),
       [CONTACTO_FECHA_NACIMIENTO_COLUMN_ID]: form.fechaNacimiento,
       [CONTACTO_LOCALIDAD_COLUMN_ID]: { item_ids: [Number(form.localidadId)] },
       [CONTACTO_DEPARTAMENTO_COLUMN_ID]: { item_ids: [Number(form.departamentoId)] },
@@ -1165,9 +1297,74 @@ export default function CrearOportunidadForm({
       // create_labels_if_missing).
       [CONTACTO_EXTRANJERO_COLUMN_ID]: form.extranjero,
       ...(form.nacionalidad ? { [CONTACTO_NACIONALIDAD_COLUMN_ID]: { labels: [form.nacionalidad] } } : {}),
-      ...(form.email?.trim() ? { [CONTACTO_EMAIL_COLUMN_ID]: buildMondayEmail(form.email) } : {}),
     })
     return created.id
+  }
+
+  // MON-14: el CONTACTO de esta oportunidad — a quien se le manda la información. Tres
+  // caminos, en orden:
+  //   1. Se eligió uno ya cargado del Cliente (form.contactoId): se reusa, y si venía sin
+  //      teléfono/email se le completan con lo que se acaba de tipear.
+  //   2. El contacto es el propio cliente (check marcado): se crea uno homónimo.
+  //   3. Es otra persona: se crea con el nombre que se cargó.
+  // En los 3 casos queda vinculado al Cliente (los dos lados de la conexión los escribe
+  // createContactoCrm) y a la Oportunidad (ver handleGuardar).
+  //
+  // Devuelve { id, creado } — `creado` lo necesita el rollback para borrar SOLO lo que se
+  // creó en esta corrida, nunca un contacto que ya existía.
+  const ensureContactoCrmId = async (clienteId) => {
+    const phone = buildMondayPhone(form.codigoPais, form.telefono)
+    const email = form.email?.trim() ? buildMondayEmail(form.email) : null
+
+    if (form.contactoId) {
+      // Se relee el contacto en vez de confiar en contactosDelCliente: si el formulario se
+      // restauró de un borrador (ver persistedSearch) ese estado está vacío. Solo se
+      // completan huecos — lo que el contacto ya tenía cargado gana, es el dato real de la
+      // persona y no lo que se tipeó de memoria acá.
+      const [yaCargado] = await fetchContactosCrm([form.contactoId])
+      await setContactoCrmColumnValues(form.contactoId, {
+        phone: yaCargado?.telefono ? null : phone,
+        email: yaCargado?.email ? null : email,
+      })
+      // Contacto reutilizado que NO estaba vinculado a este Cliente (estaba suelto, o
+      // vino de "Vincular un contacto existente" y pertenece a otro cliente — un contacto
+      // puede atender a varios): recién acá existe el Cliente, se agrega el vínculo en
+      // los dos sentidos sin pisar los que ya tenía.
+      if (!(yaCargado?.clienteIds ?? []).map(String).includes(String(clienteId))) {
+        await vincularContactoACliente(form.contactoId, clienteId)
+      }
+      return { id: form.contactoId, creado: false }
+    }
+
+    const nombre =
+      form.contactoMismoCliente !== false
+        ? `${form.nombre} ${form.apellido}`.trim()
+        : form.contactoNombre.trim()
+    // Los contactos que el Cliente ya tiene se piden ACÁ y no se toman del estado por lo
+    // mismo de arriba: createContactoCrm REEMPLAZA la lista completa de la conexión, así
+    // que mandar una lista incompleta desvincularía contactos existentes. Un Cliente
+    // recién creado devuelve [] y no cuesta nada.
+    const existentes = await fetchClienteContactos(clienteId).catch(() => [])
+    // Red de seguridad contra contactos duplicados: si el Cliente ya tiene uno con este
+    // MISMO nombre (la UI lo avisa, pero un borrador restaurado puede saltearse el aviso),
+    // se reusa ese en vez de crear otro — completándole tel/email solo si le faltan.
+    const homonimo = existentes.find((c) => c.name.trim().toLowerCase() === nombre.toLowerCase())
+    if (homonimo) {
+      const [yaCargado] = await fetchContactosCrm([homonimo.id])
+      await setContactoCrmColumnValues(homonimo.id, {
+        phone: yaCargado?.telefono ? null : phone,
+        email: yaCargado?.email ? null : email,
+      })
+      return { id: homonimo.id, creado: false }
+    }
+    const { id } = await createContactoCrm({
+      name: nombre,
+      phone,
+      email,
+      clienteId,
+      existingContactIds: existentes.map((c) => c.id),
+    })
+    return { id, creado: true }
   }
 
   // A pedido: los pasos que se muestran en GuardandoOportunidadModal — "Guardando datos
@@ -1194,6 +1391,9 @@ export default function CrearOportunidadForm({
     setSaveError(null)
     let createdOpportunityId = null
     let createdContactoId = null
+    // MON-14: el ítem del tablero Contactos creado en esta corrida (si se creó uno) — el
+    // rollback lo borra igual que a los otros dos.
+    let createdContactoCrmId = null
     try {
       // LOG-22: esto eran 8 llamadas ENCADENADAS a monday (crear ítem → columnas base →
       // crear Cliente → conectar Cliente → archivos del Cliente → columnas del vehículo →
@@ -1213,14 +1413,20 @@ export default function CrearOportunidadForm({
       const itemId = resItem.value
       const contactoId = resContacto.value
 
+      // MON-14: el Contacto va después del Cliente porque necesita su id para vincularse.
+      const contactoCrm = await ensureContactoCrmId(contactoId)
+      if (contactoCrm.creado) createdContactoCrmId = contactoCrm.id
+
       // Tanda 2: TODAS las columnas de la Oportunidad en una sola mutation — las básicas,
-      // la conexión con el Cliente y (si aplica) las del vehículo. Antes eran 3 llamadas
-      // separadas sobre el mismo ítem. Sigue pasando después del create_item pelado, que
-      // es lo que necesitan las automatizaciones de monday (ver ensureItemId).
+      // las conexiones con el Cliente y el Contacto y (si aplica) las del vehículo. Antes
+      // eran 3 llamadas separadas sobre el mismo ítem. Sigue pasando después del
+      // create_item pelado, que es lo que necesitan las automatizaciones de monday (ver
+      // ensureItemId).
       setGuardarStepKey('datos')
       const columnValues = {
         ...buildBaseColumnValues(),
         [OPORTUNIDAD_CONTACTO_COLUMN_ID]: { item_ids: [Number(contactoId)] },
+        [OPORTUNIDAD_CONTACTO_CRM_COLUMN_ID]: { item_ids: [Number(contactoCrm.id)] },
       }
       if (esAutomovil) {
         columnValues.board_relation_mm5422v9 = { item_ids: [Number(form.modeloSeleccion.id)] }
@@ -1299,6 +1505,13 @@ export default function CrearOportunidadForm({
           await deleteItem(createdContactoId)
         } catch {
           rollbackFallidos.push(`Cliente ${createdContactoId}`)
+        }
+      }
+      if (createdContactoCrmId) {
+        try {
+          await deleteItem(createdContactoCrmId)
+        } catch {
+          rollbackFallidos.push(`Contacto ${createdContactoCrmId}`)
         }
       }
       // No dejar createdItemId apuntando a un ítem que ya no existe (se acaba de borrar
@@ -1480,6 +1693,7 @@ export default function CrearOportunidadForm({
                     type="warning"
                     title={
                       {
+                        rut: 'RUT ya registrado',
                         telefono: 'Teléfono ya registrado',
                         email: 'Email ya registrado',
                         nombre: 'Persona ya registrada',
@@ -1487,9 +1701,15 @@ export default function CrearOportunidadForm({
                     }
                     description={
                       <>
+                        {/* MON-14: por Teléfono/Email la coincidencia se encuentra en el
+                            tablero CONTACTOS (ahí viven esos datos) y se sube por la
+                            conexión hasta el Cliente — que es el que se muestra acá y el
+                            que se reusa al confirmar. Por CI/RUT se busca directo en
+                            Clientes (cada documento en su columna). */}
                         {{
-                          telefono: 'Encontramos este Teléfono ya cargado en el tablero Clientes:',
-                          email: 'Encontramos este Email ya cargado en el tablero Clientes:',
+                          rut: 'Encontramos este RUT ya cargado en el tablero Clientes:',
+                          telefono: 'Encontramos este Teléfono ya cargado en un Contacto del tablero Contactos, vinculado a este cliente:',
+                          email: 'Encontramos este Email ya cargado en un Contacto del tablero Contactos, vinculado a este cliente:',
                           nombre: 'Encontramos una persona con este Nombre y Apellido ya cargada en el tablero Clientes:',
                         }[duplicadoCheck.motivo] ?? 'Encontramos esta Cédula de Identidad ya cargada en el tablero Clientes:'}
                         <br />
@@ -1497,12 +1717,6 @@ export default function CrearOportunidadForm({
                         Nombre: <strong>{duplicadoCheck.contacto.name}</strong>
                         <br />
                         Situación: <strong>{duplicadoCheck.contacto.situacion || 'Cliente'}</strong>
-                        {duplicadoCheck.motivo === 'email' && duplicadoCheck.contacto.email && (
-                          <>
-                            <br />
-                            Email: <strong>{duplicadoCheck.contacto.email}</strong>
-                          </>
-                        )}
                         {(duplicadoCheck.motivo === 'telefono' || duplicadoCheck.motivo === 'email') && duplicadoCheck.contacto.ci && (
                           <>
                             <br />
@@ -1517,6 +1731,48 @@ export default function CrearOportunidadForm({
                     onClose={handleCancelDuplicadoModal}
                     secondaryButton={{ text: 'Seguir con el cliente nuevo', onClick: handleCancelDuplicadoModal }}
                     primaryButton={{ text: 'Usar el cliente existente', onClick: handleConfirmDuplicadoContacto }}
+                  />
+                )}
+
+                {/* Contacto SUELTO: el teléfono/email ya existe en un Contacto que no tiene
+                    ningún Cliente vinculado (Cliente y Contacto son entidades separadas y
+                    puede existir uno sin el otro). No hay cliente que reusar; se ofrece
+                    reusar el CONTACTO para la persona que se está cargando — al guardar
+                    queda vinculado al Cliente nuevo (ver ensureContactoCrmId). */}
+                {!resultadoSeleccionado && showDuplicadoModal && !duplicadoCheck?.contacto && duplicadoCheck?.contactoCrm && (
+                  <AlertModal
+                    id="duplicado-contacto-suelto-modal"
+                    type="warning"
+                    title={duplicadoCheck.motivo === 'email' ? 'Email ya registrado' : 'Teléfono ya registrado'}
+                    description={
+                      <>
+                        {duplicadoCheck.motivo === 'email'
+                          ? 'Encontramos este Email ya cargado en un Contacto del tablero Contactos que no tiene ningún Cliente vinculado:'
+                          : 'Encontramos este Teléfono ya cargado en un Contacto del tablero Contactos que no tiene ningún Cliente vinculado:'}
+                        <br />
+                        <br />
+                        Contacto: <strong>{duplicadoCheck.contactoCrm.name}</strong>
+                        {duplicadoCheck.contactoCrm.telefono && (
+                          <>
+                            <br />
+                            Teléfono: <strong>{duplicadoCheck.contactoCrm.telefono}</strong>
+                          </>
+                        )}
+                        {duplicadoCheck.contactoCrm.email && (
+                          <>
+                            <br />
+                            Email: <strong>{duplicadoCheck.contactoCrm.email}</strong>
+                          </>
+                        )}
+                        <br />
+                        <br />
+                        Si es la misma persona, conviene reusar ese contacto: queda vinculado al
+                        cliente que estás creando en vez de duplicarse.
+                      </>
+                    }
+                    onClose={handleCancelDuplicadoModal}
+                    secondaryButton={{ text: 'Seguir sin reusarlo', onClick: handleCancelDuplicadoModal }}
+                    primaryButton={{ text: 'Reusar ese contacto', onClick: handleUsarContactoCrmSuelto }}
                   />
                 )}
 
@@ -1569,11 +1825,25 @@ export default function CrearOportunidadForm({
                     }}
                   />
 
-                  {/* A pedido: documentos genéricos del Cliente/Lead — se leen y escriben
-                      directo en el ítem real de Clientes (ver ClienteArchivos). */}
+                  {/* A pedido: primero TODO lo del Cliente junto (ficha + sus documentos)
+                      y recién después la sección Contacto — intercalar datos del cliente
+                      con el contacto en el medio mareaba. */}
                   <ClienteArchivos
                     contactoId={resultadoSeleccionado.id}
                     tipo={resultadoSeleccionado.source === 'contacto' ? 'cliente' : 'lead'}
+                  />
+
+                  {/* MON-14: la sección Contacto también con un Cliente ya elegido —
+                      lista sus contactos como radios y obliga a marcar uno (o crear
+                      uno nuevo) antes de poder continuar. */}
+                  <ContactoFields
+                    form={form}
+                    handleChange={handleChange}
+                    resetKey={textFieldsResetKey}
+                    contactosDelCliente={contactosDelCliente}
+                    onElegirContacto={handleElegirContacto}
+                    onContactoModo={handleContactoModo}
+                    homonimo={contactoHomonimo}
                   />
 
                   {/* A pedido: la ficha de acá arriba es de solo lectura — sin esto,
@@ -1730,33 +2000,45 @@ export default function CrearOportunidadForm({
                               <span className="crear-op__field-error" role="alert">{fechaError(form.fechaNacimiento)}</span>
                             )}
                           </label>
-                          {/* Teléfono + Email en la misma grilla que los datos personales (2ª fila) */}
-                          <TelefonoField inline form={form} handleChange={handleChange} resetKey={textFieldsResetKey} />
                           </div>
                         </div>
                       )}
+
                     </div>
 
                     {tieneCedulaLead === 'Si' && leadPerfilListo && (
                       <>
                         {/* Misma ficha compartida que la de un Cliente/Lead existente
-                            (crear/PersonaFicha.jsx) — sin teléfono porque la IA no lo
-                            devuelve: se pide aparte justo debajo (TelefonoField). */}
+                            (crear/PersonaFicha.jsx) — solo datos del Cliente; el teléfono
+                            y el email del Contacto se piden justo debajo
+                            (ContactoFields), que además es lo que la IA no devuelve. */}
                         <PersonaFicha
                           form={form}
                           selectedLocalidad={selectedLocalidad}
                           selectedDepartamento={selectedDepartamento}
                           source="lead"
-                          showTelefono={false}
                           onEdit={() => setEditingLeadPerfil(true)}
                           cedula={{ file: form.cedulaIdentidad, onChange: handleCedulaIdentidadChange }}
                         />
 
-                        <TelefonoField form={form} handleChange={handleChange} resetKey={textFieldsResetKey} />
-
+                        {/* A pedido: primero todo lo del Lead junto (perfil + documentos)
+                            y el Contacto al final, sin intercalar. */}
                         <ClienteArchivos
                           pendingFiles={form.archivosCliente}
                           onPendingChange={(files) => handleChange('archivosCliente', files)}
+                        />
+
+                        <ContactoFields
+                          form={form}
+                          handleChange={handleChange}
+                          resetKey={textFieldsResetKey}
+                          contactosDelCliente={contactosDelCliente}
+                          onElegirContacto={handleElegirContacto}
+                          onContactoModo={handleContactoModo}
+                          homonimo={contactoHomonimo}
+                          permitirVincular
+                          onBuscarContacto={buscarContactosCrmLibre}
+                          onVincularContacto={aplicarContacto}
                         />
 
                         {/* A pedido: mismo aviso que la ficha de un Cliente/Lead ya
@@ -1834,6 +2116,22 @@ export default function CrearOportunidadForm({
                         <ClienteArchivos
                           pendingFiles={form.archivosCliente}
                           onPendingChange={(files) => handleChange('archivosCliente', files)}
+                        />
+
+                        {/* MON-14 / a pedido: el Contacto va al FINAL, después de todo lo
+                            del cliente (Datos personales → Ubicación → Documentos) — es
+                            otra entidad y otra decisión; intercalado en el medio mareaba. */}
+                        <ContactoFields
+                          form={form}
+                          handleChange={handleChange}
+                          resetKey={textFieldsResetKey}
+                          contactosDelCliente={contactosDelCliente}
+                          onElegirContacto={handleElegirContacto}
+                          onContactoModo={handleContactoModo}
+                          homonimo={contactoHomonimo}
+                          permitirVincular
+                          onBuscarContacto={buscarContactosCrmLibre}
+                          onVincularContacto={aplicarContacto}
                         />
                       </>
                     )}

@@ -42,7 +42,10 @@ export default function WhatsAppSendModal({
   sendPolling,
   envioErrorDetail,
 }) {
-  const [phone, setPhone] = useState(opportunity.telefono || '')
+  // MON-14: se manda al CONTACTO. Se propone su número vigente (tablero Contactos) y,
+  // solo si la oportunidad no tiene contacto vinculado (las anteriores a MON-14), la copia
+  // que quedó en la propia oportunidad. Editable igual, como siempre.
+  const [phone, setPhone] = useState(opportunity.contactoTelefono || opportunity.telefono || '')
   const [formato, setFormato] = useState('imagen')
   const mandaImagen = formato === 'imagen' || formato === 'ambos'
   const mandaTexto = formato === 'texto' || formato === 'ambos'

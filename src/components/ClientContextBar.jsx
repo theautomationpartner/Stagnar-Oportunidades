@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { MdEmail, MdExpandLess, MdExpandMore, MdSmartphone } from 'react-icons/md'
+import { MdEmail, MdExpandLess, MdExpandMore, MdPerson, MdSmartphone } from 'react-icons/md'
 import { Button } from '@vibe/core'
 import ClienteArchivos from './ClienteArchivos'
 import { formatShortDate, modeloSinMarca } from '../services/format'
@@ -101,16 +101,29 @@ export default function ClientContextBar({ opportunity, onEdit, actions, tag }) 
               <dt>CI</dt>
               <dd>{opportunity.ci || '—'}</dd>
             </div>
+            {/* MON-14: Teléfono y Email son del CONTACTO (a quien se le manda la
+                información), no del Cliente. Se muestra su nombre cuando es otra persona
+                — si es el mismo cliente repetirlo no aporta nada. El teléfono sale del
+                contacto si está vinculado; las oportunidades viejas (sin contacto) caen a
+                la copia que quedó en la propia oportunidad. */}
+            {opportunity.contactoNombre && opportunity.contactoNombre !== opportunity.clienteNombre && (
+              <div className="client-bar__detail">
+                <dt>Contacto</dt>
+                <dd>
+                  <MdPerson /> {opportunity.contactoNombre}
+                </dd>
+              </div>
+            )}
             <div className="client-bar__detail">
               <dt>Teléfono</dt>
               <dd>
-                <MdSmartphone /> {opportunity.telefono || '—'}
+                <MdSmartphone /> {opportunity.contactoTelefono || opportunity.telefono || '—'}
               </dd>
             </div>
             <div className="client-bar__detail">
               <dt>Email</dt>
               <dd>
-                <MdEmail /> {opportunity.clienteEmail || '—'}
+                <MdEmail /> {opportunity.contactoEmail || '—'}
               </dd>
             </div>
             <div className="client-bar__detail">

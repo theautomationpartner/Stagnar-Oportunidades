@@ -48,6 +48,10 @@ const OPPORTUNITY_COLUMN_IDS = [
   // Cliente/Lead vinculado — en el detalle trae además sus datos (linked_items, ver
   // OPPORTUNITY_DETAIL_QUERY): domicilio principal, Situación, etc.
   'board_relation_mm4qg1n2',
+  // MON-14: el Contacto al que se le mandó esta cotización (tablero Contactos) — es el
+  // que tiene el Teléfono y el Email, que ya no están en Clientes. En el detalle trae
+  // esos datos por linked_items.
+  'board_relation_mm4t623x',
   'color_mm4wr1t4', // Estado Envio
   'numeric_mm527wpm', // Edad
   'dropdown_mm5jqdk', // Tipo
@@ -235,9 +239,12 @@ const OPPORTUNITY_DETAIL_QUERY = `
           linked_items {
             id
             name
-            column_values(ids: ["long_text_mm6m7d8c", "board_relation_mm65e7he", "board_relation_mm657jse", "text_mm6mrx0a", "text_mm6mx38p", "color_mm6570m0", "email_mm6539g3", "text_mm4pj3gx", "text_mm4pwdp3", "text_mm4pygkk", "text_mm4pj57", "numeric_mm4p20j9"]) {
+            column_values(ids: ["long_text_mm6m7d8c", "board_relation_mm65e7he", "board_relation_mm657jse", "text_mm6mrx0a", "text_mm6mx38p", "color_mm6570m0", "contact_phone", "contact_email", "text_mm4pj3gx", "text_mm4pwdp3", "text_mm4pygkk", "text_mm4pj57", "numeric_mm4p20j9"]) {
               id
               text
+              # MON-14: el teléfono del Contacto necesita el JSON crudo — el código de
+              # país solo está en "value", no en "text".
+              value
               ... on BoardRelationValue {
                 display_value
               }
@@ -668,6 +675,18 @@ async function callMondayApi(query, variables) {
 // aplicando búsqueda y filtros. totalCount solo viene en la primera (la API no lo trae en
 // next_items_page).
 export async function fetchOpportunitiesPage({ limit = 10, cursor = null, search = '', filtros = {} } = {}) {
+  // A pedido: nombre/CI/RUT buscan por el CLIENTE y un teléfono por el CONTACTO. Nombre,
+  // CI y teléfono ya los cubren las reglas del servidor (COLUMNAS_BUSQUEDA — el teléfono
+  // del contacto queda copiado en phone_mm519m27 al crear la oportunidad). El RUT no vive
+  // en Oportunidades: se resuelve el Cliente acá y se busca por su nombre, que es como
+  // arranca el nombre de cada ítem.
+  let terminoBusqueda = search
+  const soloDigitosBusqueda = String(search ?? '').replace(/\D/g, '')
+  const pintaDeRut = /^[\d.\-\s]+$/.test(String(search ?? '').trim()) && soloDigitosBusqueda.length >= 11
+  if (pintaDeRut) {
+    const porRut = await findClientePorDocumento(soloDigitosBusqueda).catch(() => null)
+    if (porRut?.cliente?.name) terminoBusqueda = porRut.cliente.name
+  }
   if (cursor) {
     const data = await callMondayApi(NEXT_ITEMS_PAGE_QUERY, {
       limit,
@@ -682,7 +701,7 @@ export async function fetchOpportunitiesPage({ limit = 10, cursor = null, search
     boardId: OPPORTUNITIES_BOARD_ID,
     limit,
     columnIds: OPPORTUNITY_COLUMN_IDS,
-    queryParams: buildOpportunitiesQueryParams({ search, filtros }),
+    queryParams: buildOpportunitiesQueryParams({ search: terminoBusqueda, filtros }),
   })
   const board = data.boards?.[0]
   return {
@@ -1275,16 +1294,15 @@ export async function fetchPanelItems() {
 const CLIENTES_BOARD_ID = 18420863014
 const CONTACTO_ESTADO_COLUMN_ID = 'color_mm6570m0' // "Situación": Cliente | Lead
 const CONTACTO_CI_COLUMN_ID = 'text_mm4vk9aq'
-const CONTACTO_TELEFONO_COLUMN_ID = 'phone_mm65zhnn'
+// MON-14: Teléfono (phone_mm65zhnn) y Email (email_mm6539g3) YA NO EXISTEN en Clientes —
+// esos datos son del Contacto, no del Cliente (ver el bloque "Tablero Contactos (CRM)"
+// más abajo). Las columnas se borraron del tablero; pedirlas acá haría fallar la query.
 const CONTACTO_FECHA_NACIMIENTO_COLUMN_ID = 'date_mm65sgmw'
 const CONTACTO_CI_FRENTE_COLUMN_ID = 'file_mm65486d'
 // A pedido: domicilio principal = Departamento + Localidad (las 2 conexiones de abajo,
 // ya existían) + Dirección exacta (calle y número, texto largo — nueva). Los 3 son
 // obligatorios en la app (ver isStepValid en CrearOportunidadForm.jsx).
 const CONTACTO_DIRECCION_COLUMN_ID = 'long_text_mm6m7d8c'
-// A pedido: Email del Cliente/Lead (columna tipo email de monday: value {email, text}).
-// Opcional en la app — se valida el formato si se carga (ver emailError).
-const CONTACTO_EMAIL_COLUMN_ID = 'email_mm6539g3'
 // A pedido: además del nombre del ítem ("Nombre Apellido"), Nombre y Apellido van en
 // columnas propias — se escriben al crear y se leen al buscar (antes se partía el
 // nombre del ítem a ciegas, ver splitNombreApellido en CrearOportunidadForm.jsx).
@@ -1306,6 +1324,10 @@ const CONTACTO_LOCALIDAD_COLUMN_ID = 'board_relation_mm65e7he'
 // CrearOportunidadForm.jsx), no hace falta un mirror de un lado al otro.
 const CONTACTO_DEPARTAMENTO_COLUMN_ID = 'board_relation_mm657jse'
 const CONTACTO_OPORTUNIDADES_COLUMN_ID = 'board_relation_mm4tpep2'
+// MON-14: los Contactos del Cliente (tablero Contactos, ver ese bloque más abajo) — "el
+// cliente tiene su contacto vinculado". Se declara acá y no allá porque
+// SEARCH_CONTACTOS_QUERY lo interpola, y eso se evalúa al cargar el módulo.
+const CLIENTE_CONTACTOS_COLUMN_ID = 'board_relation_mm4t6dfm'
 // Columna en el tablero OPORTUNIDADES (no Clientes) que guarda la misma relación del
 // otro lado — se escribe acá cuando se crea una Oportunidad nueva para que el historial
 // de "oportunidades vinculadas" del Cliente se arme solo, sin backfill manual.
@@ -1314,6 +1336,38 @@ const CONTACTO_OPORTUNIDADES_COLUMN_ID = 'board_relation_mm4tpep2'
 // the connected boards". mm4qg1n2 es la columna nueva, ya conectada a Clientes.
 const OPORTUNIDAD_CONTACTO_COLUMN_ID = 'board_relation_mm4qg1n2'
 
+// Las columnas del Cliente que la app sabe mapear (ver mapContactoItem) — una sola lista
+// para las 2 formas de traerlo: buscando (SEARCH_CONTACTOS_QUERY) o por id
+// (FETCH_CLIENTES_QUERY), que si no se desincronizan.
+const CLIENTE_COLUMN_IDS = [
+  CONTACTO_ESTADO_COLUMN_ID,
+  CONTACTO_CI_COLUMN_ID,
+  CONTACTO_FECHA_NACIMIENTO_COLUMN_ID,
+  CONTACTO_LOCALIDAD_COLUMN_ID,
+  CONTACTO_DEPARTAMENTO_COLUMN_ID,
+  CONTACTO_DIRECCION_COLUMN_ID,
+  CONTACTO_NOMBRE_COLUMN_ID,
+  CONTACTO_APELLIDO_COLUMN_ID,
+  CONTACTO_EXTRANJERO_COLUMN_ID,
+  CONTACTO_NACIONALIDAD_COLUMN_ID,
+  CLIENTE_CONTACTOS_COLUMN_ID,
+]
+
+const CLIENTE_COLUMN_VALUES_FRAGMENT = `
+  column_values(ids: [${CLIENTE_COLUMN_IDS.map((id) => `"${id}"`).join(', ')}]) {
+    id
+    text
+    value
+    ... on BoardRelationValue {
+      display_value
+      linked_items {
+        id
+        name
+      }
+    }
+  }
+`
+
 const SEARCH_CONTACTOS_QUERY = `
   query SearchContactos($boardId: ID!, $rules: [ItemsQueryRule!], $limit: Int!) {
     boards(ids: [$boardId]) {
@@ -1321,35 +1375,26 @@ const SEARCH_CONTACTOS_QUERY = `
         items {
           id
           name
-          column_values(ids: ["${CONTACTO_ESTADO_COLUMN_ID}", "${CONTACTO_CI_COLUMN_ID}", "${CONTACTO_TELEFONO_COLUMN_ID}", "${CONTACTO_FECHA_NACIMIENTO_COLUMN_ID}", "${CONTACTO_LOCALIDAD_COLUMN_ID}", "${CONTACTO_DEPARTAMENTO_COLUMN_ID}", "${CONTACTO_DIRECCION_COLUMN_ID}", "${CONTACTO_EMAIL_COLUMN_ID}", "${CONTACTO_NOMBRE_COLUMN_ID}", "${CONTACTO_APELLIDO_COLUMN_ID}", "${CONTACTO_EXTRANJERO_COLUMN_ID}", "${CONTACTO_NACIONALIDAD_COLUMN_ID}"]) {
-            id
-            text
-            value
-            ... on BoardRelationValue {
-              display_value
-            }
-          }
+          ${CLIENTE_COLUMN_VALUES_FRAGMENT}
         }
       }
     }
   }
 `
 
+// Un Cliente concreto por id, con exactamente las mismas columnas que la búsqueda.
+const FETCH_CLIENTES_QUERY = `
+  query FetchClientes($ids: [ID!]) {
+    items(ids: $ids) {
+      id
+      name
+      ${CLIENTE_COLUMN_VALUES_FRAGMENT}
+    }
+  }
+`
+
 function mapContactoItem(item) {
   const byId = Object.fromEntries(item.column_values.map((cv) => [cv.id, cv]))
-  // Mismo formato que phone_mm519m27 de Oportunidades: el código de país solo está en
-  // el JSON de "value", no en "text".
-  let telefono = ''
-  let telefonoCountryShortName = ''
-  try {
-    const parsedPhone = byId[CONTACTO_TELEFONO_COLUMN_ID]?.value
-      ? JSON.parse(byId[CONTACTO_TELEFONO_COLUMN_ID].value)
-      : null
-    telefono = parsedPhone?.phone || ''
-    telefonoCountryShortName = parsedPhone?.countryShortName || ''
-  } catch {
-    // sin teléfono usable — se deja vacío en vez de romper el resto del resultado
-  }
   const situacion = byId[CONTACTO_ESTADO_COLUMN_ID]?.text?.trim() || ''
   return {
     id: item.id,
@@ -1364,12 +1409,13 @@ function mapContactoItem(item) {
     // funcionando igual que cuando venía de una columna numérica pura.
     ci: (byId[CONTACTO_CI_COLUMN_ID]?.text || '').replace(/\D/g, ''),
     fechaNacimiento: byId[CONTACTO_FECHA_NACIMIENTO_COLUMN_ID]?.text?.trim() || '',
-    telefono,
-    telefonoCountryShortName,
     localidadNombre: byId[CONTACTO_LOCALIDAD_COLUMN_ID]?.display_value?.trim() || '',
     departamentoNombre: byId[CONTACTO_DEPARTAMENTO_COLUMN_ID]?.display_value?.trim() || '',
     direccion: byId[CONTACTO_DIRECCION_COLUMN_ID]?.text?.trim() || '',
-    email: byId[CONTACTO_EMAIL_COLUMN_ID]?.text?.trim() || '',
+    // MON-14: los Contactos ya vinculados a este Cliente ([{id, name}]) — con esto el
+    // formulario puede ofrecerlos sin una segunda consulta. El Teléfono y el Email de
+    // cada uno se piden aparte (fetchContactosCrm) solo cuando hacen falta.
+    contactos: byId[CLIENTE_CONTACTOS_COLUMN_ID]?.linked_items ?? [],
     // Vacíos en ítems viejos (creados antes de estas columnas) — el form cae a partir
     // el nombre del ítem en ese caso.
     nombre: byId[CONTACTO_NOMBRE_COLUMN_ID]?.text?.trim() || '',
@@ -1379,15 +1425,34 @@ function mapContactoItem(item) {
   }
 }
 
-// A pedido: el modo de búsqueda depende de qué se tipeó — si tiene algún dígito, se
-// busca por Cédula; si es todo letras, por Nombre. No hace falta mezclar los dos modos
-// en la misma consulta.
+// A pedido: el modo de búsqueda depende de qué se tipeó. Nombre, CI y RUT buscan al
+// CLIENTE; un TELÉFONO busca al CONTACTO y devuelve sus Clientes vinculados (la persona
+// a la que se le cotiza). Cómo se distingue un teléfono de una CI: empieza con 0/+/598 o
+// tiene 9-10 dígitos (una cédula tiene 7-8); 11+ dígitos es un RUT/CUIT.
 export async function searchContactos(term) {
   const query = (term ?? '').trim()
   if (query.length < 2) return []
   const isNumeric = /\d/.test(query)
+  const digits = query.replace(/\D/g, '')
+
+  if (isNumeric) {
+    const pintaDeTelefono =
+      /^(\+|0|598)/.test(query.replace(/\s/g, '')) || digits.length === 9 || digits.length === 10
+    if (pintaDeTelefono) {
+      const contactos = await searchContactosCrm({ columnId: CONTACTO_CRM_TELEFONO_COLUMN_ID, value: digits, limit: 10 })
+      const clienteIds = [...new Set(contactos.flatMap((c) => c.clienteIds))]
+      if (!clienteIds.length) return []
+      const data = await callMondayApi(FETCH_CLIENTES_QUERY, { ids: clienteIds })
+      return (data.items ?? []).map(mapContactoItem)
+    }
+    if (digits.length >= 11) {
+      const porRut = await findClientePorDocumento(digits)
+      return porRut ? [porRut.cliente] : []
+    }
+  }
+
   const rules = isNumeric
-    ? [{ column_id: CONTACTO_CI_COLUMN_ID, compare_value: [query.replace(/\D/g, '')], operator: 'contains_text' }]
+    ? [{ column_id: CONTACTO_CI_COLUMN_ID, compare_value: [digits], operator: 'contains_text' }]
     : [{ column_id: 'name', compare_value: [query], operator: 'contains_text' }]
   const data = await callMondayApi(SEARCH_CONTACTOS_QUERY, { boardId: CLIENTES_BOARD_ID, rules, limit: 20 })
   const items = data.boards[0]?.items_page.items ?? []
@@ -1410,42 +1475,94 @@ export async function findContactoByCedula(ci) {
   return items.map(mapContactoItem).find((c) => c.ci === digits) ?? null
 }
 
+// A pedido: el duplicado de Cliente se chequea por CI **o RUT** — son columnas distintas
+// (CI text_mm4vk9aq, R.U.T numeric_mm51eyk2) y el largo del número dice cuál buscar: una
+// cédula uruguaya tiene 7-8 dígitos, un RUT 12 (y un CUIT argentino 11). R.U.T es columna
+// numérica: contains_text no aplica, se busca por igualdad con any_of (verificado contra
+// la API real: any_of sobre numbers con el valor como string no da error y matchea).
+// Devuelve { cliente, motivo: 'ci' | 'rut' } o null.
+const CLIENTE_RUT_COLUMN_ID = 'numeric_mm51eyk2'
+export async function findClientePorDocumento(documento) {
+  const digits = (documento ?? '').replace(/\D/g, '')
+  if (digits.length < 6) return null
+  if (digits.length >= 10) {
+    const data = await callMondayApi(SEARCH_CONTACTOS_QUERY, {
+      boardId: CLIENTES_BOARD_ID,
+      rules: [{ column_id: CLIENTE_RUT_COLUMN_ID, compare_value: [digits], operator: 'any_of' }],
+      limit: 5,
+    })
+    const item = (data.boards[0]?.items_page.items ?? [])[0]
+    return item ? { cliente: mapContactoItem(item), motivo: 'rut' } : null
+  }
+  const porCi = await findContactoByCedula(digits)
+  return porCi ? { cliente: porCi, motivo: 'ci' } : null
+}
+
+// MON-14: el Teléfono y el Email ya no están en Clientes, viven en el Contacto. Así que
+// el chequeo de duplicados busca del lado de Contactos y sube por la conexión "Cliente"
+// hasta la persona a la que se le cotiza. Un contacto SIN Cliente vinculado devuelve
+// null acá — pero el duplicado igual se avisa (ver findContactoByTelefono/Email, que
+// ahora devuelven el contacto encontrado aparte del cliente): que el contacto exista
+// suelto es justamente uno de los casos a detectar, no un motivo para callar.
+async function clienteDelContactoCrm(contacto) {
+  const clienteId = contacto?.clienteIds?.[0]
+  if (!clienteId) return null
+  const data = await callMondayApi(FETCH_CLIENTES_QUERY, { ids: [clienteId] })
+  const item = data.items?.[0]
+  return item ? mapContactoItem(item) : null
+}
+
 // Mismo criterio que findContactoByCedula pero por Teléfono — a pedido, para no cargar
 // dos veces la misma persona con distinta Cédula (o sin ella). Se compara el número
 // completo con código de país y solo dígitos ("59899123456"), que es exactamente como
-// la app lo guarda en la columna phone (ver createContactoItem en CrearOportunidadForm).
-// contains_text sobre la columna phone matchea por el número local, y después se filtra
-// por igualdad exacta para no confundir "99123456" con "199123456".
+// la app lo guarda en la columna phone. contains_text sobre la columna phone matchea por
+// el número local, y después se filtra por igualdad exacta para no confundir "99123456"
+// con "199123456".
+//
+// Devuelve { contactoCrm, cliente } o null: `contactoCrm` es el Contacto donde está el
+// dato repetido, `cliente` su Cliente vinculado si tiene (null si es un contacto suelto —
+// existir sin Cliente es uno de los 4 casos posibles y también hay que avisarlo).
 export async function findContactoByTelefono(codigoPais, telefono) {
   const localDigits = (telefono ?? '').replace(/\D/g, '')
   if (localDigits.length < 6) return null
   const fullDigits = `${(codigoPais ?? '').replace(/\D/g, '')}${localDigits}`
-  const data = await callMondayApi(SEARCH_CONTACTOS_QUERY, {
-    boardId: CLIENTES_BOARD_ID,
-    rules: [{ column_id: CONTACTO_TELEFONO_COLUMN_ID, compare_value: [localDigits], operator: 'contains_text' }],
-    limit: 5,
+  const contactos = await searchContactosCrm({ columnId: CONTACTO_CRM_TELEFONO_COLUMN_ID, value: localDigits })
+  const hit = contactos.find((c) => {
+    const stored = (c.telefono ?? '').replace(/\D/g, '')
+    return stored === fullDigits || stored === localDigits
   })
-  const items = data.boards[0]?.items_page.items ?? []
-  return (
-    items.map(mapContactoItem).find((c) => {
-      const stored = (c.telefono ?? '').replace(/\D/g, '')
-      return stored === fullDigits || stored === localDigits
-    }) ?? null
-  )
+  if (!hit) return null
+  return { contactoCrm: hit, cliente: await clienteDelContactoCrm(hit) }
 }
 
-// A pedido: duplicados también por Email (misma mecánica que findContactoByTelefono) —
-// búsqueda laxa en la API (contains_text) y match exacto, sin importar mayúsculas, acá.
+// A pedido: duplicados también por Email (misma mecánica que findContactoByTelefono,
+// mismo shape de retorno) — búsqueda laxa en la API (contains_text) y match exacto, sin
+// importar mayúsculas, acá.
 export async function findContactoByEmail(email) {
   const needle = (email ?? '').trim().toLowerCase()
   if (!needle.includes('@')) return null
-  const data = await callMondayApi(SEARCH_CONTACTOS_QUERY, {
-    boardId: CLIENTES_BOARD_ID,
-    rules: [{ column_id: CONTACTO_EMAIL_COLUMN_ID, compare_value: [needle], operator: 'contains_text' }],
-    limit: 5,
+  const contactos = await searchContactosCrm({ columnId: CONTACTO_CRM_EMAIL_COLUMN_ID, value: needle })
+  const hit = contactos.find((c) => (c.email ?? '').trim().toLowerCase() === needle)
+  if (!hit) return null
+  return { contactoCrm: hit, cliente: await clienteDelContactoCrm(hit) }
+}
+
+// Vincula un Contacto ya existente a un Cliente, en los DOS sentidos (monday no espeja
+// estas conexiones) y sin pisar lo que cada lado ya tenía. Lo usa el formulario cuando
+// se reusa un contacto que estaba suelto (sin Cliente) para una persona nueva.
+export async function vincularContactoACliente(contactoId, clienteId) {
+  const [contacto] = await fetchContactosCrm([contactoId])
+  const clienteIds = [...new Set([...(contacto?.clienteIds ?? []), String(clienteId)])]
+  await callMondayApi(CHANGE_MULTIPLE_COLUMN_VALUES_MUTATION, {
+    boardId: CONTACTOS_BOARD_ID,
+    itemId: contactoId,
+    columnValues: JSON.stringify({ [CONTACTO_CRM_CLIENTE_COLUMN_ID]: { item_ids: clienteIds.map(Number) } }),
   })
-  const items = data.boards[0]?.items_page.items ?? []
-  return items.map(mapContactoItem).find((c) => (c.email ?? '').trim().toLowerCase() === needle) ?? null
+  const existentes = await fetchClienteContactos(clienteId).catch(() => [])
+  const contactoIds = [...new Set([...existentes.map((c) => String(c.id)), String(contactoId)])]
+  await setContactoColumnValues(clienteId, {
+    [CLIENTE_CONTACTOS_COLUMN_ID]: { item_ids: contactoIds.map(Number) },
+  })
 }
 
 const FETCH_CONTACTO_OPORTUNIDADES_QUERY = `
@@ -1518,16 +1635,15 @@ export async function createContactoItem(itemName, columnValues) {
 
 export {
   CLIENTES_BOARD_ID,
+  CLIENTE_CONTACTOS_COLUMN_ID,
   OPORTUNIDAD_CONTACTO_COLUMN_ID,
   CONTACTO_CI_COLUMN_ID,
-  CONTACTO_TELEFONO_COLUMN_ID,
   CONTACTO_FECHA_NACIMIENTO_COLUMN_ID,
   CONTACTO_LOCALIDAD_COLUMN_ID,
   CONTACTO_DEPARTAMENTO_COLUMN_ID,
   CONTACTO_CI_FRENTE_COLUMN_ID,
   CONTACTO_ESTADO_COLUMN_ID,
   CONTACTO_DIRECCION_COLUMN_ID,
-  CONTACTO_EMAIL_COLUMN_ID,
   CONTACTO_EXTRANJERO_COLUMN_ID,
   CONTACTO_NACIONALIDAD_COLUMN_ID,
   CONTACTO_ARCHIVOS_COLUMN_ID,
@@ -1536,16 +1652,124 @@ export {
 }
 
 // ---------------------------------------------------------------------------
-// Tablero Contactos (CRM): personas de contacto vinculadas a un Cliente. A pedido: al
-// concretar una oportunidad (paso 4) se ofrece crear el contacto del Cliente/Lead si
-// todavía no tiene ninguno, con nombre + teléfono + email, y vincularlo en los dos
-// sentidos (Contactos.Clientes ↔ Clientes.Contactos).
+// Tablero Contactos (CRM) — MON-14.
+//
+// El Contacto es con quien se habla y a quien se le manda la información; el Cliente es
+// la persona real a la que se le cotiza. Pueden ser la misma persona (contacto homónimo)
+// o no (un familiar, el administrativo de una empresa). Por eso el Teléfono y el Email
+// viven ACÁ y ya no en Clientes.
+//
+// Un Cliente puede tener varios Contactos (Contactos.Cliente ↔ Clientes.Contactos, dos
+// conexiones de una sola vía: monday NO las espeja, hay que escribir los dos lados) y
+// cada Oportunidad guarda a cuál se le mandó (OPORTUNIDAD_CONTACTO_CRM_COLUMN_ID). No
+// hay "contacto principal": lo decide la oportunidad.
 // ---------------------------------------------------------------------------
 const CONTACTOS_BOARD_ID = 18420863016
 const CONTACTO_CRM_CLIENTE_COLUMN_ID = 'board_relation_mm4tdbm9'
 const CONTACTO_CRM_TELEFONO_COLUMN_ID = 'contact_phone'
 const CONTACTO_CRM_EMAIL_COLUMN_ID = 'contact_email'
-const CLIENTE_CONTACTOS_COLUMN_ID = 'board_relation_mm4t6dfm'
+// Columna en el tablero OPORTUNIDADES: a qué Contacto se le mandó esta cotización.
+export const OPORTUNIDAD_CONTACTO_CRM_COLUMN_ID = 'board_relation_mm4t623x'
+
+const CONTACTO_CRM_COLUMN_VALUES_FRAGMENT = `
+  column_values(ids: ["${CONTACTO_CRM_TELEFONO_COLUMN_ID}", "${CONTACTO_CRM_EMAIL_COLUMN_ID}", "${CONTACTO_CRM_CLIENTE_COLUMN_ID}"]) {
+    id
+    text
+    value
+    ... on BoardRelationValue {
+      display_value
+      linked_item_ids
+    }
+  }
+`
+
+const SEARCH_CONTACTOS_CRM_QUERY = `
+  query SearchContactosCrm($boardId: ID!, $rules: [ItemsQueryRule!], $limit: Int!) {
+    boards(ids: [$boardId]) {
+      items_page(limit: $limit, query_params: { rules: $rules, operator: and }) {
+        items {
+          id
+          name
+          ${CONTACTO_CRM_COLUMN_VALUES_FRAGMENT}
+        }
+      }
+    }
+  }
+`
+
+const FETCH_CONTACTOS_CRM_QUERY = `
+  query FetchContactosCrm($ids: [ID!]) {
+    items(ids: $ids) {
+      id
+      name
+      ${CONTACTO_CRM_COLUMN_VALUES_FRAGMENT}
+    }
+  }
+`
+
+function mapContactoCrmItem(item) {
+  const byId = Object.fromEntries(item.column_values.map((cv) => [cv.id, cv]))
+  // Mismo formato que phone_mm519m27 de Oportunidades: el código de país solo está en el
+  // JSON de "value", no en "text".
+  let telefono = ''
+  let telefonoCountryShortName = ''
+  try {
+    const parsed = byId[CONTACTO_CRM_TELEFONO_COLUMN_ID]?.value
+      ? JSON.parse(byId[CONTACTO_CRM_TELEFONO_COLUMN_ID].value)
+      : null
+    telefono = parsed?.phone || ''
+    telefonoCountryShortName = parsed?.countryShortName || ''
+  } catch {
+    // sin teléfono usable — se deja vacío en vez de romper el resto del resultado
+  }
+  return {
+    id: String(item.id),
+    name: item.name,
+    telefono,
+    telefonoCountryShortName,
+    email: byId[CONTACTO_CRM_EMAIL_COLUMN_ID]?.text?.trim() || '',
+    clienteIds: byId[CONTACTO_CRM_CLIENTE_COLUMN_ID]?.linked_item_ids?.map(String) ?? [],
+    clienteNombre: byId[CONTACTO_CRM_CLIENTE_COLUMN_ID]?.display_value?.trim() || '',
+  }
+}
+
+// Busca contactos por una columna puntual (contains_text, laxo — el match exacto lo hace
+// quien llama) o por nombre si no se pasa columna.
+export async function searchContactosCrm({ columnId, value, limit = 10 } = {}) {
+  const needle = (value ?? '').trim()
+  if (!needle) return []
+  const data = await callMondayApi(SEARCH_CONTACTOS_CRM_QUERY, {
+    boardId: CONTACTOS_BOARD_ID,
+    rules: [{ column_id: columnId ?? 'name', compare_value: [needle], operator: 'contains_text' }],
+    limit,
+  })
+  return (data.boards[0]?.items_page.items ?? []).map(mapContactoCrmItem)
+}
+
+// Buscador libre de Contactos para "Vincular un contacto existente" (ruta Cliente
+// nuevo): decide la columna por la pinta del término — con @ es email, mayoría de
+// dígitos (6+) es teléfono, si no el nombre del ítem — y devuelve los contactos con su
+// Cliente vinculado en el label (mapContactoCrmItem.clienteNombre) para distinguirlos.
+export async function buscarContactosCrmLibre(term) {
+  const q = (term ?? '').trim()
+  if (q.length < 2) return []
+  const digits = q.replace(/\D/g, '')
+  const esTelefono = digits.length >= 6 && /^[\d\s\-+().]+$/.test(q)
+  const columnId = q.includes('@')
+    ? CONTACTO_CRM_EMAIL_COLUMN_ID
+    : esTelefono
+      ? CONTACTO_CRM_TELEFONO_COLUMN_ID
+      : undefined
+  return searchContactosCrm({ columnId, value: esTelefono ? digits : q, limit: 10 })
+}
+
+// Contactos concretos por id, con su teléfono y email.
+export async function fetchContactosCrm(ids) {
+  const lista = (ids ?? []).map(String).filter(Boolean)
+  if (!lista.length) return []
+  const data = await callMondayApi(FETCH_CONTACTOS_CRM_QUERY, { ids: lista })
+  return (data.items ?? []).map(mapContactoCrmItem)
+}
 
 const FETCH_CLIENTE_CONTACTOS_QUERY = `
   query FetchClienteContactos($itemId: [ID!]) {
@@ -1569,8 +1793,9 @@ export async function fetchClienteContactos(clienteId) {
 }
 
 // Crea el contacto en el tablero Contactos y lo vincula al Cliente en los dos sentidos.
-// `existingContactIds`: los que el Cliente ya tenía (update_assets/relations reemplaza
-// la lista completa, hay que mandar todos).
+// `existingContactIds`: los que el Cliente ya tenía — change_multiple_column_values
+// REEMPLAZA la lista completa de una conexión, así que hay que mandar todos o se
+// desvinculan los anteriores.
 export async function createContactoCrm({ name, phone, email, clienteId, existingContactIds = [] }) {
   const created = await callMondayApi(CREATE_ITEM_MUTATION, { boardId: CONTACTOS_BOARD_ID, itemName: name })
   const id = created.create_item.id
@@ -1584,12 +1809,32 @@ export async function createContactoCrm({ name, phone, email, clienteId, existin
     itemId: id,
     columnValues: JSON.stringify(columnValues),
   })
-  // Lado Clientes: la relación puede ser de dos vías (monday la espeja sola), pero se
-  // escribe igual por si está configurada en un solo sentido.
+  // Lado Clientes: la conexión es de una sola vía (monday no la espeja), sin esto el
+  // Cliente queda sin su Contacto a la vista.
   await setContactoColumnValues(clienteId, {
     [CLIENTE_CONTACTOS_COLUMN_ID]: { item_ids: [...existingContactIds.map(Number), Number(id)] },
   })
   return { id }
+}
+
+// Actualiza teléfono/email de un contacto que ya existe (ej. se eligió un contacto viejo
+// que todavía no tenía email cargado). Solo escribe lo que se le pasa.
+export async function setContactoCrmColumnValues(contactoId, { phone, email } = {}) {
+  const columnValues = {}
+  if (phone?.phone) columnValues[CONTACTO_CRM_TELEFONO_COLUMN_ID] = phone
+  if (email?.email) columnValues[CONTACTO_CRM_EMAIL_COLUMN_ID] = email
+  if (!Object.keys(columnValues).length) return null
+  return callMondayApi(CHANGE_MULTIPLE_COLUMN_VALUES_MUTATION, {
+    boardId: CONTACTOS_BOARD_ID,
+    itemId: contactoId,
+    columnValues: JSON.stringify(columnValues),
+  })
+}
+
+// Borra un contacto — lo usa el rollback de "Crear Oportunidad" cuando el guardado falla
+// a mitad de camino y hay que deshacer lo creado en esa corrida.
+export async function deleteContactoCrm(contactoId) {
+  return deleteItem(contactoId)
 }
 
 // ---------------------------------------------------------------------------
