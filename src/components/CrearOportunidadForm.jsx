@@ -338,6 +338,10 @@ export default function CrearOportunidadForm({
   // hay Oportunidades con la Cédula que se está tipeando a mano, se avisa acá (ver el
   // useEffect debounced más abajo).
   const [duplicadoCheck, setDuplicadoCheck] = useState(null)
+  // Mientras la consulta está en curso no se sabe si hay duplicado, y dejar avanzar ahí
+  // sería dejar pasar justo el caso que se quiere frenar: alguien que completa la CI y
+  // aprieta Continuar antes de que el debounce dispare.
+  const [duplicadoPendiente, setDuplicadoPendiente] = useState(false)
   // A pedido: el aviso se muestra como popup (no como cartelito inline) y hay que
   // cerrarlo a mano — se prende solo cuando llega un Cliente nuevo para avisar (ver el
   // useEffect debounced más abajo), no en cada render.
@@ -757,6 +761,7 @@ export default function CrearOportunidadForm({
   useEffect(() => {
     if (!busquedaResuelta || resultadoSeleccionado) {
       setDuplicadoCheck(null)
+      setDuplicadoPendiente(false)
       return undefined
     }
     const digits = stripCi(form.ci)
@@ -770,9 +775,11 @@ export default function CrearOportunidadForm({
     const emailValido = (form.email ?? '').trim() && !emailError(form.email)
     if (!ciValida && !nombreCompleto && !telefonoValido && !emailValido) {
       setDuplicadoCheck(null)
+      setDuplicadoPendiente(false)
       return undefined
     }
     let cancelled = false
+    setDuplicadoPendiente(true)
     const timer = setTimeout(() => {
       // Orden de prioridad: CI/RUT exacto > Teléfono exacto > Email exacto > Nombre+Apellido
       // (laxo). Se recuerda por cuál se encontró (`motivo`) para que el popup diga qué
@@ -808,10 +815,16 @@ export default function CrearOportunidadForm({
         .then((result) => {
           if (cancelled) return
           setDuplicadoCheck(result)
+          setDuplicadoPendiente(false)
           if (result.contacto || result.contactoCrm) setShowDuplicadoModal(true)
         })
         .catch(() => {
-          if (!cancelled) setDuplicadoCheck(null)
+          // Si monday no responde no se traba la carga: se sigue como si no hubiera
+          // duplicado. Frenar una oportunidad porque falló una consulta sería peor que el
+          // duplicado que se está evitando, y el aviso vuelve a correr con cada cambio.
+          if (cancelled) return
+          setDuplicadoCheck(null)
+          setDuplicadoPendiente(false)
         })
     }, 500)
     return () => {
@@ -1017,6 +1030,19 @@ export default function CrearOportunidadForm({
   // Válido para avanzar de este paso al siguiente — todos los campos son obligatorios
   // (no vacíos) y, para CI/Fecha Nacimiento/Teléfono, además tienen que tener un
   // formato válido (ver ciError/fechaError/telefonoError).
+  // A pedido, estos dos no se pueden crear igual: dos clientes con el mismo documento o
+  // dos contactos con el mismo teléfono no son dos personas parecidas, son la misma
+  // cargada dos veces, y después no hay forma de saber cuál es la buena ni a cuál
+  // pertenece cada oportunidad.
+  //
+  // Nombre y email siguen siendo solo un aviso: dos personas pueden llamarse igual, y un
+  // email compartido —el de la empresa, el de un familiar— es normal.
+  const MOTIVOS_QUE_BLOQUEAN = ['ci', 'rut', 'telefono']
+  const duplicadoBloqueante =
+    !resultadoSeleccionado &&
+    MOTIVOS_QUE_BLOQUEAN.includes(duplicadoCheck?.motivo) &&
+    Boolean(duplicadoCheck?.contacto || duplicadoCheck?.contactoCrm)
+
   const isStepValid = (index) => {
     if (index === 0) {
       return Boolean(
@@ -1049,7 +1075,11 @@ export default function CrearOportunidadForm({
           form.departamentoId &&
           // LOG-06: en el caso común ya viene en URUGUAY, así que esto solo frena
           // cuando marcaron Extranjero = Sí y todavía no eligieron el país.
-          form.nacionalidad
+          form.nacionalidad &&
+          // Un duplicado que frena no deja salir del paso: si no, se llega hasta "Crear
+          // Oportunidad" con el cliente repetido ya cargado.
+          !duplicadoBloqueante &&
+          !duplicadoPendiente
         // A pedido: la Dirección ya no es obligatoria acá — se pide en el paso 3
         // (Confirmar) de la oportunidad, junto con los documentos.
       )
@@ -1124,6 +1154,13 @@ export default function CrearOportunidadForm({
   const enumerar = (xs) => (xs.length <= 1 ? xs.join('') : `${xs.slice(0, -1).join(', ')} y ${xs[xs.length - 1]}`)
 
   const avisoDatosDelCliente = () => {
+    if (duplicadoBloqueante) {
+      const quien = duplicadoCheck.contacto?.name || duplicadoCheck.contactoCrm?.name || 'otro registro'
+      return duplicadoCheck.motivo === 'telefono'
+        ? `Ese teléfono ya es de ${quien}. Usá ese contacto o poné otro número: no se puede cargar dos veces el mismo teléfono.`
+        : `Ese documento ya es de ${quien}. Usá ese cliente o corregí el documento: no se puede cargar dos veces el mismo.`
+    }
+    if (duplicadoPendiente) return 'Buscando si esta persona ya está cargada...'
     const { faltan, revisar } = datosPendientesDelCliente()
     const partes = []
     if (faltan.length) partes.push(`Falta cargar ${enumerar(faltan)}.`)
@@ -1814,7 +1851,9 @@ export default function CrearOportunidadForm({
                       </>
                     }
                     onClose={handleCancelDuplicadoModal}
-                    secondaryButton={{ text: 'Seguir con el cliente nuevo', onClick: handleCancelDuplicadoModal }}
+                    {...(duplicadoBloqueante
+                      ? {}
+                      : { secondaryButton: { text: 'Seguir con el cliente nuevo', onClick: handleCancelDuplicadoModal } })}
                     primaryButton={{ text: 'Usar el cliente existente', onClick: handleConfirmDuplicadoContacto }}
                   />
                 )}
@@ -1856,7 +1895,9 @@ export default function CrearOportunidadForm({
                       </>
                     }
                     onClose={handleCancelDuplicadoModal}
-                    secondaryButton={{ text: 'Seguir sin reusarlo', onClick: handleCancelDuplicadoModal }}
+                    {...(duplicadoBloqueante
+                      ? {}
+                      : { secondaryButton: { text: 'Seguir sin reusarlo', onClick: handleCancelDuplicadoModal } })}
                     primaryButton={{ text: 'Reusar ese contacto', onClick: handleUsarContactoCrmSuelto }}
                   />
                 )}
