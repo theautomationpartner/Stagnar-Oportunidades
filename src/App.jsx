@@ -328,7 +328,11 @@ export default function App() {
           totalFiltered={filteredOpportunities.length}
           hayBusqueda={hayBusqueda}
           boardTotalCount={boardTotalCount}
-          loading={loading}
+          // Bug reportado: ir a una página cuyas filas todavía se están trayendo (el
+          // efecto del cursor recién las pide ahí) mostraba "Sin oportunidades" en vez
+          // de cargando — parecía vacía hasta volver y entrar de nuevo. Si la página
+          // visible no tiene filas y hay una tanda en camino, es una carga, no un vacío.
+          loading={loading || (loadingMore && pagedOpportunities.length === 0)}
           error={error}
           page={page}
           totalPages={totalPages}
