@@ -2,7 +2,7 @@
 // CrearOportunidadForm.jsx (auditoría). Los estilos siguen en CrearOportunidadForm.css.
 import { useState } from 'react'
 import { Button, Dropdown, TextField } from '@vibe/core'
-import { MdCall, MdClear, MdDescription, MdEdit, MdPersonAdd, MdPersonSearch } from 'react-icons/md'
+import { MdCall, MdClear, MdDescription, MdEdit, MdInfoOutline, MdPersonAdd, MdPersonSearch } from 'react-icons/md'
 import { CODIGO_PAIS_OPTIONS, emailError, telefonoError } from '../../services/personaFields'
 import FlagIcon from './FlagIcon'
 import { matchesSearchQuery } from '../../services/format'
@@ -245,6 +245,9 @@ export function ContactoFields({
   // (no se muestra "sin resultados" antes de la primera búsqueda).
   const [busqueda, setBusqueda] = useState('')
   const [resultados, setResultados] = useState(null)
+  // Qué contacto tiene abierta la lista de sus clientes. Uno por vez: son filas cortas y
+  // abrir varias a la vez empuja el resto de la pantalla sin que nadie lo haya pedido.
+  const [detalleClientes, setDetalleClientes] = useState(null)
   // Qué término produjo los resultados de abajo — se muestra en el label para que nunca
   // queden resultados de "juan" bajo un input que ya dice "pedro".
   const [terminoBuscado, setTerminoBuscado] = useState('')
@@ -262,10 +265,29 @@ export function ContactoFields({
     }
   }
 
-  const etiquetaContacto = (c) =>
-    [c.name, c.telefono, c.email, c.clienteNombre ? `(cliente: ${c.clienteNombre})` : '']
-      .filter(Boolean)
-      .join(' — ')
+  const etiquetaContacto = (c) => [c.name, c.telefono, c.email].filter(Boolean).join(' — ')
+
+  // Un contacto puede estar vinculado a varios Clientes, y la lista entera no entra en
+  // una línea: se veía "(cliente: Valentina TAP, santiago tap, VALERIA DAIANA GRAJALES
+  // SOSA, Theautomationpartner)" tapando el nombre y el teléfono, que es lo que se está
+  // mirando para elegir. Se resume por cantidad y el detalle queda a un hover o un clic.
+  //
+  // La cantidad sale de clienteIds y no de contar comas en el texto: monday junta los
+  // nombres con ", " y un cliente con coma en el nombre daría un número inventado.
+  const clientesDeContacto = (c) => {
+    const cuantos = c.clienteIds?.length ?? (c.clienteNombre ? 1 : 0)
+    if (!cuantos || !c.clienteNombre) return null
+    // El caso más común es que el contacto SEA el cliente: repetir ahí el nombre no
+    // agrega nada y hace la fila más larga ("Ana Gomez — 099... — Ana Gomez").
+    const mismoNombre = c.clienteNombre.trim().toLowerCase() === String(c.name ?? '').trim().toLowerCase()
+    if (cuantos === 1 && mismoNombre) return null
+    // Con uno solo, el nombre entra y dice mucho más que "de 1 cliente".
+    return {
+      resumen: cuantos === 1 ? c.clienteNombre : `Contacto de ${cuantos} clientes`,
+      detalle: c.clienteNombre,
+      varios: cuantos > 1,
+    }
+  }
 
   return (
     <div className="crear-op__section">
@@ -297,17 +319,49 @@ export function ContactoFields({
                   .crear-op__opcion) — antes radios y checkbox eran renglones idénticos
                   y "es el mismo cliente" parecía una opción hermana más. */}
               <div className="crear-op__contactos-radios">
-                {contactosDelCliente.map((c) => (
-                  <label key={c.id} className="crear-op__checkbox crear-op__opcion">
-                    <input
-                      type="radio"
-                      name="contacto-oportunidad"
-                      checked={false}
-                      onChange={() => onElegirContacto?.(c.id)}
-                    />
-                    <span>{etiquetaContacto(c)}</span>
-                  </label>
-                ))}
+                {contactosDelCliente.map((c) => {
+                  const clientes = clientesDeContacto(c)
+                  return (
+                    <label key={c.id} className="crear-op__checkbox crear-op__opcion">
+                      <input
+                        type="radio"
+                        name="contacto-oportunidad"
+                        checked={false}
+                        onChange={() => onElegirContacto?.(c.id)}
+                      />
+                      <span>
+                        {etiquetaContacto(c)}
+                        {clientes && (
+                          <>
+                            {' — '}
+                            {clientes.varios ? (
+                              <button
+                                type="button"
+                                className="crear-op__clientes-chip"
+                                title={clientes.detalle}
+                                aria-expanded={detalleClientes === c.id}
+                                onClick={(e) => {
+                                  // El clic es del chip, no de la fila: sin esto elegiría
+                                  // el contacto solo por querer ver de quién es.
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  setDetalleClientes((prev) => (prev === c.id ? null : c.id))
+                                }}
+                              >
+                                {clientes.resumen} <MdInfoOutline />
+                              </button>
+                            ) : (
+                              <span className="crear-op__clientes-chip">{clientes.resumen}</span>
+                            )}
+                          </>
+                        )}
+                        {clientes && detalleClientes === c.id && (
+                          <span className="crear-op__clientes-detalle">{clientes.detalle}</span>
+                        )}
+                      </span>
+                    </label>
+                  )
+                })}
               </div>
               {/* A pedido: los dos caminos son CAJAS que se seleccionan — el mismo
                   control que el "¿Tenés la Cédula?" de más arriba (DocumentChoiceToggle,
@@ -380,7 +434,19 @@ export function ContactoFields({
                   <span>Resultados de «{terminoBuscado}» ({resultados.length})</span>
                   <Dropdown
                     size="medium"
-                    options={resultados.map((c) => ({ value: c.id, label: etiquetaContacto(c) }))}
+                    options={resultados.map((c) => {
+                      const clientes = clientesDeContacto(c)
+                      return {
+                        value: c.id,
+                        label: [etiquetaContacto(c), clientes?.resumen].filter(Boolean).join(' — '),
+                        detalleClientes: clientes?.detalle ?? '',
+                      }
+                    })}
+                    // En una opción de Dropdown no entra un botón, así que el detalle va
+                    // en el title: se ve al pasar el mouse por encima.
+                    optionRenderer={(option) => (
+                      <span title={option.detalleClientes || undefined}>{option.label}</span>
+                    )}
                     value={null}
                     placeholder="Elegí el contacto a vincular"
                     onChange={(option) => {

@@ -1979,7 +1979,12 @@ export default function CrearOportunidadForm({
 
                   {/* MON-14: la sección Contacto también con un Cliente ya elegido —
                       lista sus contactos como radios y obliga a marcar uno (o crear
-                      uno nuevo) antes de poder continuar. */}
+                      uno nuevo) antes de poder continuar.
+                      A pedido, acá también se puede vincular un contacto que ya existe
+                      en el tablero Contactos aunque no esté vinculado a este Cliente:
+                      la misma persona atiende a varios clientes (un corredor, un
+                      familiar que gestiona), y antes el único camino era crearla de
+                      nuevo y terminar con el mismo teléfono cargado dos veces. */}
                   <ContactoFields
                     form={form}
                     handleChange={handleChange}
@@ -1988,6 +1993,9 @@ export default function CrearOportunidadForm({
                     onElegirContacto={handleElegirContacto}
                     onContactoModo={handleContactoModo}
                     homonimo={contactoHomonimo}
+                    permitirVincular
+                    onBuscarContacto={buscarContactosCrmLibre}
+                    onVincularContacto={aplicarContacto}
                   />
 
                   {/* A pedido: la ficha de acá arriba es de solo lectura — sin esto,

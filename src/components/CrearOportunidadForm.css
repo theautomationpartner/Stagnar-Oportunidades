@@ -1409,6 +1409,38 @@
   border-color: var(--border-input);
 }
 
+/* Los Clientes a los que está vinculado un contacto: en gris y chico, porque son
+   contexto para reconocerlo, no el dato que se está eligiendo. Con más de uno el chip es
+   un botón (abre el detalle) y además lleva title, para el que pasa el mouse. */
+.crear-op__clientes-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  border: 0;
+  padding: 0;
+  background: none;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-gray);
+}
+
+button.crear-op__clientes-chip {
+  cursor: pointer;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+button.crear-op__clientes-chip:hover {
+  color: var(--text-dark);
+}
+
+.crear-op__clientes-detalle {
+  display: block;
+  margin-top: 4px;
+  font-size: 13px;
+  color: var(--text-gray);
+}
+
 .crear-op__subopcion {
   margin: 10px 0 16px 15px;
   padding: 4px 0 0 16px;
