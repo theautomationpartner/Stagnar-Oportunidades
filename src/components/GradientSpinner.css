@@ -1,8 +1,13 @@
 .gradient-spinner {
   /* transform-origin explícito: en SVG el default es la esquina (0 0), no el centro —
-     sin esto el arco "orbita" en vez de girar sobre sí mismo en algunos navegadores. */
+     sin esto el arco "orbita" en vez de girar sobre sí mismo en algunos navegadores.
+
+     SIN transform-box: fill-box. Ese valor resuelve el origen contra la caja del
+     CONTENIDO dibujado, que con un arco punteado no coincide con el centro del círculo:
+     medido en Chrome, el giro quedaba 6px más arriba del centro real y la rueda se veía
+     descentrada mientras giraba. Sin él, el 50% se resuelve contra la caja del propio
+     <svg>, que es cuadrada y está centrada por definición. */
   transform-origin: 50% 50%;
-  transform-box: fill-box;
   animation: gradient-spinner-spin 1s linear infinite;
 }
 
