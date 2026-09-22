@@ -1732,6 +1732,52 @@ const FETCH_CONTACTOS_CRM_QUERY = `
   }
 `
 
+// Todos los contactos del tablero, para la vista de Contactos. Se recorre con cursor
+// aunque hoy sean unas decenas: el límite por página de monday es 500 y una consulta sin
+// cursor se queda callada con lo que entró, que es la clase de error que aparece recién
+// cuando el tablero creció.
+const CONTACTOS_CRM_PAGE_QUERY = `
+  query ContactosCrmPage($boardId: ID!, $limit: Int!) {
+    boards(ids: [$boardId]) {
+      items_page(limit: $limit) {
+        cursor
+        items {
+          id
+          name
+          ${CONTACTO_CRM_COLUMN_VALUES_FRAGMENT}
+        }
+      }
+    }
+  }
+`
+
+const CONTACTOS_CRM_NEXT_QUERY = `
+  query ContactosCrmNext($cursor: String!, $limit: Int!) {
+    next_items_page(cursor: $cursor, limit: $limit) {
+      cursor
+      items {
+        id
+        name
+        ${CONTACTO_CRM_COLUMN_VALUES_FRAGMENT}
+      }
+    }
+  }
+`
+
+export async function fetchContactosCrmTodos() {
+  const items = []
+  let cursor = null
+  do {
+    const data = cursor
+      ? await callMondayApi(CONTACTOS_CRM_NEXT_QUERY, { cursor, limit: 100 })
+      : await callMondayApi(CONTACTOS_CRM_PAGE_QUERY, { boardId: CONTACTOS_BOARD_ID, limit: 100 })
+    const pagina = cursor ? data.next_items_page : data.boards[0].items_page
+    items.push(...pagina.items)
+    cursor = pagina.cursor
+  } while (cursor)
+  return items.map(mapContactoCrmItem)
+}
+
 function mapContactoCrmItem(item) {
   const byId = Object.fromEntries(item.column_values.map((cv) => [cv.id, cv]))
   // Mismo formato que phone_mm519m27 de Oportunidades: el código de país solo está en el

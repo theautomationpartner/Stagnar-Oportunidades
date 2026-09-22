@@ -1,0 +1,135 @@
+/* Vista de Contactos. Estilos propios y no compartidos con la tabla de Clientes a
+   propósito: son dos vistas que se van a mover por separado, y compartir clases hace que
+   tocar una cambie la otra sin que nadie lo pida. */
+
+.contactos {
+  padding: 24px 32px 40px;
+}
+
+.contactos__head h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.contactos__head p {
+  margin: 0 0 20px;
+  color: var(--text-gray);
+}
+
+.contactos__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.contactos__toolbar > :first-child {
+  flex: 0 1 380px;
+}
+
+.contactos__conteo {
+  font-size: 13px;
+  color: var(--text-gray);
+  white-space: nowrap;
+}
+
+.contactos__tabla {
+  background: var(--bg);
+  border-radius: var(--radius-md);
+}
+
+.contactos__celda {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+.contactos__nombre {
+  font-weight: 500;
+  color: var(--text-dark);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.contactos__vacio {
+  color: var(--text-gray);
+}
+
+/* Los clientes del contacto se resumen por cantidad; los nombres viven en el title, así
+   que el cursor de ayuda avisa que hay algo más al pasar el mouse. */
+.contactos__clientes {
+  cursor: help;
+  text-decoration: underline dotted;
+  text-underline-offset: 2px;
+}
+
+.contactos__paginado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-top: 16px;
+  flex-wrap: wrap;
+}
+
+.contactos__paginado-resumen {
+  font-size: 13px;
+  color: var(--text-gray);
+}
+
+.contactos__paginado-paginas {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.contactos__page-btn {
+  min-width: 32px;
+  height: 32px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm, 4px);
+  background: var(--bg);
+  color: var(--text-dark);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.contactos__page-btn:hover:not(:disabled) {
+  border-color: var(--border-input);
+}
+
+.contactos__page-btn:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.contactos__page-btn--activa {
+  background: var(--primary, #0073ea);
+  border-color: var(--primary, #0073ea);
+  color: #fff;
+}
+
+.contactos__page-gap {
+  padding: 0 4px;
+  color: var(--text-gray);
+}
+
+@media (max-width: 720px) {
+  .contactos {
+    padding: 16px;
+  }
+
+  .contactos__toolbar {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}
