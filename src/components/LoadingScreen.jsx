@@ -9,7 +9,9 @@ import './LoadingScreen.css'
 export default function LoadingScreen({ title = 'Cargando...', message, compact = false }) {
   return (
     <div className={compact ? 'loading-screen loading-screen--compact' : 'loading-screen'} role="status" aria-live="polite">
-      <GradientSpinner size={56} />
+      <span className="loading-screen__spinner">
+        <GradientSpinner size={56} />
+      </span>
       <p className="loading-screen__title">{title}</p>
       {message && <p className="loading-screen__message">{message}</p>}
     </div>

@@ -1,5 +1,10 @@
+/* A pedido: el loading de pantalla va centrado de verdad (ocupa todo el alto visible,
+   descontando la AccionBar) y con el verde de marca de fondo — el mismo degradé del
+   home (LandingScreen), para que la espera se vea "de la casa" y no una página en
+   blanco con el spinner arriba a la izquierda. */
 .loading-screen {
-  min-height: 60vh;
+  min-height: calc(100vh - 64px);
+  min-height: calc(100dvh - 64px);
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -7,7 +12,22 @@
   gap: 12px;
   padding: 40px var(--page-gutter);
   text-align: center;
-  background: var(--bg-canvas);
+  background:
+    radial-gradient(ellipse at 20% -10%, rgb(255 255 255 / 14%), transparent 55%),
+    linear-gradient(155deg, #00615e 0%, #008581 55%, #009d97 100%);
+}
+
+/* El spinner degradé (azul→verde) se fundía con el fondo verde: va sobre un disco
+   blanco, como una ficha. */
+.loading-screen__spinner {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 92px;
+  height: 92px;
+  border-radius: 50%;
+  background: #fff;
+  box-shadow: 0 6px 24px rgb(0 0 0 / 18%);
 }
 
 .loading-screen--compact {
@@ -18,13 +38,34 @@
   margin: 8px 0 0;
   font-size: 18px;
   font-weight: 600;
-  color: var(--text-dark);
+  color: #fff;
 }
 
 .loading-screen__message {
   margin: 0;
   max-width: 44ch;
   font-size: 14px;
-  color: var(--text-gray);
+  color: rgb(255 255 255 / 85%);
   line-height: 1.5;
+}
+
+/* La variante compacta vive ADENTRO de paneles blancos — ahí el verde de marca a fondo
+   completo sería un parche: mantiene el look neutro de siempre. */
+.loading-screen--compact {
+  background: var(--bg-canvas);
+}
+
+.loading-screen--compact .loading-screen__spinner {
+  width: auto;
+  height: auto;
+  background: transparent;
+  box-shadow: none;
+}
+
+.loading-screen--compact .loading-screen__title {
+  color: var(--text-dark);
+}
+
+.loading-screen--compact .loading-screen__message {
+  color: var(--text-gray);
 }
