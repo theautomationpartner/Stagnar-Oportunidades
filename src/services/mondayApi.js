@@ -682,7 +682,7 @@ export async function fetchOpportunitiesPage({ limit = 10, cursor = null, search
   // arranca el nombre de cada ítem.
   let terminoBusqueda = search
   const soloDigitosBusqueda = String(search ?? '').replace(/\D/g, '')
-  const pintaDeRut = /^[\d.\-\s]+$/.test(String(search ?? '').trim()) && soloDigitosBusqueda.length >= 11
+  const pintaDeRut = tipoDeTerminoNumerico(search) === 'rut'
   if (pintaDeRut) {
     const porRut = await findClientePorDocumento(soloDigitosBusqueda).catch(() => null)
     if (porRut?.cliente?.name) terminoBusqueda = porRut.cliente.name
@@ -1425,10 +1425,33 @@ function mapContactoItem(item) {
   }
 }
 
+// Clasifica un término NUMÉRICO por la pinta de los números uruguayos — la usan todos
+// los buscadores para decidir qué buscar sin preguntarle al usuario:
+//   telefono  +598..., 00..., 598 + 8-9 dígitos, cualquier cosa que empiece con 0
+//             (celular 09X XXX XXX, fijo 0800...), o 8 dígitos arrancando en 9 (celular
+//             tipeado sin el 0), o 9-10 dígitos sueltos.
+//   ci        6 a 8 dígitos (una cédula con verificador tiene 8 como mucho y nunca
+//             empieza con 0).
+//   rut       11-12 dígitos (RUT uruguayo 12, CUIT argentino 11) — salvo que arranque
+//             con 598, que es un teléfono con prefijo de país.
+//   null      no es numérico o no da para clasificar.
+export function tipoDeTerminoNumerico(term) {
+  const compacto = String(term ?? '').trim().replace(/[\s.\-()]/g, '')
+  if (!/^\+?\d+$/.test(compacto)) return null
+  const digits = compacto.replace(/\D/g, '')
+  if (compacto.startsWith('+') || compacto.startsWith('00') || digits.startsWith('598')) return 'telefono'
+  if (digits.startsWith('0')) return 'telefono'
+  if (digits.length === 8 && digits.startsWith('9')) return 'telefono'
+  if (digits.length >= 11) return 'rut'
+  if (digits.length >= 9) return 'telefono'
+  if (digits.length >= 6) return 'ci'
+  return null
+}
+
 // A pedido: el modo de búsqueda depende de qué se tipeó. Nombre, CI y RUT buscan al
 // CLIENTE; un TELÉFONO busca al CONTACTO y devuelve sus Clientes vinculados (la persona
-// a la que se le cotiza). Cómo se distingue un teléfono de una CI: empieza con 0/+/598 o
-// tiene 9-10 dígitos (una cédula tiene 7-8); 11+ dígitos es un RUT/CUIT.
+// a la que se le cotiza). Qué es cada cosa lo decide la pinta del número (ver
+// tipoDeTerminoNumerico).
 export async function searchContactos(term) {
   const query = (term ?? '').trim()
   if (query.length < 2) return []
@@ -1436,16 +1459,15 @@ export async function searchContactos(term) {
   const digits = query.replace(/\D/g, '')
 
   if (isNumeric) {
-    const pintaDeTelefono =
-      /^(\+|0|598)/.test(query.replace(/\s/g, '')) || digits.length === 9 || digits.length === 10
-    if (pintaDeTelefono) {
+    const tipo = tipoDeTerminoNumerico(query)
+    if (tipo === 'telefono') {
       const contactos = await searchContactosCrm({ columnId: CONTACTO_CRM_TELEFONO_COLUMN_ID, value: digits, limit: 10 })
       const clienteIds = [...new Set(contactos.flatMap((c) => c.clienteIds))]
       if (!clienteIds.length) return []
       const data = await callMondayApi(FETCH_CLIENTES_QUERY, { ids: clienteIds })
       return (data.items ?? []).map(mapContactoItem)
     }
-    if (digits.length >= 11) {
+    if (tipo === 'rut') {
       const porRut = await findClientePorDocumento(digits)
       return porRut ? [porRut.cliente] : []
     }
@@ -1484,8 +1506,11 @@ export async function findContactoByCedula(ci) {
 const CLIENTE_RUT_COLUMN_ID = 'numeric_mm51eyk2'
 export async function findClientePorDocumento(documento) {
   const digits = (documento ?? '').replace(/\D/g, '')
-  if (digits.length < 6) return null
-  if (digits.length >= 10) {
+  const tipo = tipoDeTerminoNumerico(documento)
+  // Con pinta de teléfono (09..., +598...) no es un documento: que lo resuelva el
+  // chequeo de Contactos, no un falso match contra CI/RUT.
+  if (tipo !== 'ci' && tipo !== 'rut') return null
+  if (tipo === 'rut') {
     const data = await callMondayApi(SEARCH_CONTACTOS_QUERY, {
       boardId: CLIENTES_BOARD_ID,
       rules: [{ column_id: CLIENTE_RUT_COLUMN_ID, compare_value: [digits], operator: 'any_of' }],
