@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react'
 import { MdChevronLeft, MdChevronRight, MdContactPhone, MdGroups, MdPeopleAlt, MdSearch } from 'react-icons/md'
 import { Table, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell, EmptyState, TextField } from '@vibe/core'
 import Avatar from './Avatar'
+import LoadingScreen from './LoadingScreen'
 import { fetchContactosCrmTodos } from '../services/mondayApi'
 import { initialsOf } from '../services/personaFields'
 import { normalizarParaMatch } from '../services/format'
@@ -101,6 +102,12 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos }) {
   const primeraFila = filtrados.length === 0 ? 0 : (paginaActual - 1) * PAGE_SIZE + 1
   const ultimaFila = filtrados.length === 0 ? 0 : primeraFila + pagina.length - 1
 
+  // La misma pantalla verde que Clientes, Grupos y el fallback de Suspense: el esqueleto
+  // de la tabla era otra espera distinta para lo mismo.
+  if (loading) {
+    return <LoadingScreen title="Cargando contactos" message="Estamos trayendo la lista de contactos desde monday." />
+  }
+
   return (
     <section className="contactos">
       <header className="contactos__head">
@@ -134,16 +141,18 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos }) {
           }}
         />
         <span className="contactos__conteo">
-          {loading ? 'Cargando...' : `${filtrados.length} de ${contactos.length} contactos`}
+          {`${filtrados.length} de ${contactos.length} contactos`}
         </span>
       </div>
 
       <div className="contactos__tabla">
+        {/* isLoading en false siempre: mientras carga, el componente devuelve la
+            pantalla de carga y no llega a renderizar la tabla. */}
         <Table
           columns={COLUMNS}
           size="large"
           style={{ '--table-row-size': '68px' }}
-          dataState={{ isLoading: loading, isError: Boolean(error) }}
+          dataState={{ isLoading: false, isError: Boolean(error) }}
           errorState={<EmptyState title="Error" description={error || 'No se pudieron cargar los contactos.'} />}
           emptyState={<EmptyState title="Sin contactos" description="No se encontraron contactos para mostrar." />}
         >

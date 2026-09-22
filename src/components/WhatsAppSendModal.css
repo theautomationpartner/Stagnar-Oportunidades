@@ -38,22 +38,25 @@
 
 /* A pedido: el input de teléfono más angosto, con el aviso de "desde qué número se
    manda" al lado en vez de arriba — juntos no necesitan todo el ancho del modal. */
+/* A pedido: el destinatario arriba y el remitente en su propio renglón abajo. En una
+   sola fila, el desplegable de contactos y el aviso de "se va a enviar desde" competían
+   por el ancho y se leían como un solo dato partido al medio. */
 .wa-modal__telefono-row {
   display: flex;
-  align-items: flex-end;
-  gap: 16px;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 8px;
   margin-bottom: 18px;
 }
 
 .wa-modal__telefono-row .wa-modal__field--telefono {
-  flex: 0 0 200px;
+  flex: 0 0 auto;
+  max-width: 340px;
   margin-bottom: 0;
 }
 
 .wa-modal__telefono-envio {
-  flex: 1;
-  min-width: 0;
-  margin: 0 0 8px;
+  margin: 0;
   font-size: 13px;
   color: var(--text-gray);
 }
