@@ -154,11 +154,16 @@ export default function OpportunitiesTable({
                 </TableCell>
                 <TableCell>
                   <ClickableCell onOpen={openThisOpportunity}>
+                    {/* Oportunidades viejas (sin contacto vinculado): el teléfono copiado
+                        sube a línea principal — "—" arriba y un Tel abajo parecían
+                        contradecirse. */}
                     <div className="opps-table__cliente">
                       <div>
-                        <div className="opps-table__cliente-name">{opp.contactoNombre || '—'}</div>
+                        <div className="opps-table__cliente-name">
+                          {opp.contactoNombre || opp.telefono || '—'}
+                        </div>
                         <div className="opps-table__cliente-meta">
-                          {opp.telefono && <span>Tel: {opp.telefono}</span>}
+                          {opp.contactoNombre && opp.telefono && <span>Tel: {opp.telefono}</span>}
                         </div>
                       </div>
                     </div>

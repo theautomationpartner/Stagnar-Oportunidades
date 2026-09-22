@@ -245,10 +245,14 @@ export function ContactoFields({
   // (no se muestra "sin resultados" antes de la primera búsqueda).
   const [busqueda, setBusqueda] = useState('')
   const [resultados, setResultados] = useState(null)
+  // Qué término produjo los resultados de abajo — se muestra en el label para que nunca
+  // queden resultados de "juan" bajo un input que ya dice "pedro".
+  const [terminoBuscado, setTerminoBuscado] = useState('')
   const [buscando, setBuscando] = useState(false)
   const ejecutarBusqueda = async () => {
     if (!onBuscarContacto || busqueda.trim().length < 2) return
     setBuscando(true)
+    setTerminoBuscado(busqueda.trim())
     try {
       setResultados(await onBuscarContacto(busqueda))
     } catch {
@@ -352,13 +356,13 @@ export function ContactoFields({
                 </Button>
               </div>
               {resultados !== null && !buscando && resultados.length === 0 && (
-                <p className="crear-op__section-hint">Sin resultados en el tablero Contactos.</p>
+                <p className="crear-op__section-hint">Sin resultados para «{terminoBuscado}» en Contactos.</p>
               )}
               {/* A pedido: los resultados se eligen con el mismo Dropdown que usa el
                   resto de la página, no con radios. */}
               {(resultados ?? []).length > 0 && (
                 <label className="crear-op__field crear-op__field--full">
-                  <span>Resultados ({resultados.length})</span>
+                  <span>Resultados de «{terminoBuscado}» ({resultados.length})</span>
                   <Dropdown
                     size="medium"
                     options={resultados.map((c) => ({ value: c.id, label: etiquetaContacto(c) }))}

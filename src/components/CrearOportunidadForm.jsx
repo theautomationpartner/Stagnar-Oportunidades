@@ -369,9 +369,29 @@ export default function CrearOportunidadForm({
     if (!restaurado?.id) return undefined
     let cancelled = false
     fetchItemState(restaurado.id)
-      .then((item) => {
+      .then(async (item) => {
         if (cancelled) return
-        if (item && item.state === 'active') return
+        if (item && item.state === 'active') {
+          // El borrador vuelve con el cliente elegido, pero contactosDelCliente es estado
+          // local que no se persiste: sin recargarlo, la sección Contacto quedaba VACÍA
+          // (ni radios ni formulario) y "Continuar" bloqueado si no había quedado un
+          // contacto marcado. Se repone acá; si la carga falla y no hay nada marcado, se
+          // cae a "crear uno nuevo" para que siempre haya un camino clickeable.
+          try {
+            const vinculados = await fetchClienteContactos(restaurado.id)
+            if (cancelled) return
+            const contactos = vinculados.length ? await fetchContactosCrm(vinculados.map((c) => c.id)) : []
+            if (cancelled) return
+            setContactosDelCliente(contactos)
+            setForm((prev) =>
+              prev.contactoId || prev.contactoModo || contactos.length ? prev : { ...prev, contactoModo: 'nuevo' }
+            )
+          } catch {
+            if (!cancelled)
+              setForm((prev) => (prev.contactoId || prev.contactoModo ? prev : { ...prev, contactoModo: 'nuevo' }))
+          }
+          return
+        }
         setResultadoSeleccionado(null)
         setSearchPreview(null)
         setBusquedaResuelta(false)
@@ -528,8 +548,12 @@ export default function CrearOportunidadForm({
       contactoMismoCliente:
         contacto.name.trim().toLowerCase() === `${prev.nombre} ${prev.apellido}`.trim().toLowerCase(),
       codigoPais: codigoPais || prev.codigoPais,
-      telefono: telefono || prev.telefono,
-      email: contacto.email || prev.email,
+      // Los datos pasan a ser LOS DEL CONTACTO, incluso vacíos: conservar lo tipeado
+      // antes hacía que el chip mostrara un teléfono/email que no era de él, y ese dato
+      // ajeno terminaba guardado como suyo. El campo faltante aparece vacío y lo que se
+      // sume ahí es deliberado.
+      telefono: telefono || '',
+      email: contacto.email || '',
     }))
   }
 
@@ -755,14 +779,18 @@ export default function CrearOportunidadForm({
           const porDoc = await findClientePorDocumento(digits)
           if (porDoc) return { contacto: porDoc.cliente, motivo: porDoc.motivo }
         }
+        // El contacto YA elegido para esta oportunidad no es un duplicado de sí mismo:
+        // aplicarContacto llena tel/email en el form y sin este guard el aviso saltaba
+        // de nuevo con el mismo contacto recién seleccionado (en loop, si era suelto).
         if (telefonoValido) {
           const porTelefono = await findContactoByTelefono(form.codigoPais, form.telefono)
-          if (porTelefono)
+          if (porTelefono && porTelefono.contactoCrm?.id !== form.contactoId)
             return { contacto: porTelefono.cliente, contactoCrm: porTelefono.contactoCrm, motivo: 'telefono' }
         }
         if (emailValido) {
           const porEmail = await findContactoByEmail(form.email)
-          if (porEmail) return { contacto: porEmail.cliente, contactoCrm: porEmail.contactoCrm, motivo: 'email' }
+          if (porEmail && porEmail.contactoCrm?.id !== form.contactoId)
+            return { contacto: porEmail.cliente, contactoCrm: porEmail.contactoCrm, motivo: 'email' }
         }
         if (!ciValida && nombreCompleto) {
           const porNombre = (await searchContactos(nombreCompleto))[0] ?? null
@@ -791,6 +819,7 @@ export default function CrearOportunidadForm({
     form.telefono,
     form.codigoPais,
     form.email,
+    form.contactoId,
     busquedaResuelta,
     resultadoSeleccionado,
   ])
