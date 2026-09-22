@@ -12,6 +12,15 @@ const OpportunityDetail = lazy(() => import('./components/OpportunityDetail'))
 import LandingScreen from './components/LandingScreen'
 import AccionBar from './components/AccionBar'
 const CrearOportunidadForm = lazy(() => import('./components/CrearOportunidadForm'))
+// Sección Clientes (gestión de contactos, relaciones y grupo económico) — mismo criterio
+// de lazy que el detalle/wizard: se carga recién al entrar.
+const ClientesSection = lazy(() => import('./components/ClientesSection'))
+// Tabla del tablero Contactos. Va lazy por lo mismo que las otras secciones: no se abre
+// en el camino normal de cotizar, y no tiene por qué pesar en el bundle inicial.
+const ContactosSection = lazy(() => import('./components/ContactosSection'))
+const ClienteGestion = lazy(() => import('./components/ClienteGestion'))
+const GruposSection = lazy(() => import('./components/GruposSection'))
+const GrupoDetalle = lazy(() => import('./components/GrupoDetalle'))
 import {
   fetchOpportunitiesPage,
   fetchDepartamentos,
@@ -286,8 +295,56 @@ export default function App() {
         />
       </Suspense>
     )
+  } else if (route.seg === 'clientes' && route.id) {
+    main = (
+      <Suspense fallback={<LoadingScreen title="Abriendo el cliente" message="Estamos trayendo sus contactos, relaciones y grupo económico desde monday." />}>
+        <ClienteGestion
+          key={route.id}
+          clienteId={route.id}
+          onBack={() => go('clientes')}
+          onOpenCliente={(id) => go('clientes', id)}
+        />
+      </Suspense>
+    )
+  } else if (route.seg === 'clientes') {
+    main = (
+      <Suspense fallback={<LoadingScreen title="Cargando clientes" message="Un momento, estamos trayendo la lista de clientes desde monday." />}>
+        <ClientesSection
+          onOpenCliente={(id) => go('clientes', id)}
+          onIrAGrupos={() => go('grupos')}
+          onIrAContactos={() => go('contactos')}
+        />
+      </Suspense>
+    )
+  } else if (route.seg === 'contactos') {
+    main = (
+      <Suspense fallback={<LoadingScreen title="Cargando contactos" message="Un momento, estamos trayendo la lista de contactos desde monday." />}>
+        <ContactosSection onIrAClientes={() => go('clientes')} onIrAGrupos={() => go('grupos')} />
+      </Suspense>
+    )
+  } else if (route.seg === 'grupos' && route.id) {
+    main = (
+      <Suspense fallback={<LoadingScreen title="Abriendo el grupo" message="Estamos trayendo sus miembros desde monday." />}>
+        <GrupoDetalle
+          key={route.id}
+          grupoId={route.id}
+          onBack={() => go('grupos')}
+          onOpenCliente={(id) => go('clientes', id)}
+        />
+      </Suspense>
+    )
+  } else if (route.seg === 'grupos') {
+    main = (
+      <Suspense fallback={<LoadingScreen title="Cargando grupos económicos" message="Estamos trayendo los grupos y sus miembros desde monday." />}>
+        <GruposSection
+          onOpenGrupo={(id) => go('grupos', id)}
+          onIrAClientes={() => go('clientes')}
+          onIrAContactos={() => go('contactos')}
+        />
+      </Suspense>
+    )
   } else if (route.seg === 'inicio') {
-    main = <LandingScreen onCreateNew={nav.goCreate} onSearchExisting={nav.goTable} />
+    main = <LandingScreen onCreateNew={nav.goCreate} onSearchExisting={nav.goTable} onClientes={() => go('clientes')} />
   } else if (route.seg === 'crear') {
     main = (
       <Suspense fallback={<LoadingScreen title="Preparando el formulario" message="Un momento, estamos cargando el asistente para crear la oportunidad." />}>
@@ -355,18 +412,26 @@ export default function App() {
   // igual que "Cerrar sesión". En su lugar, arriba de cada sección va la barra de
   // "¿Qué querés hacer?" (ver AccionBar): cambia de tarea desde cualquier pantalla,
   // avisando antes qué pasa con los datos.
-  const enDetalle = route.seg === 'oportunidades' && Boolean(route.id)
+  const enDetalle =
+    (route.seg === 'oportunidades' || route.seg === 'clientes' || route.seg === 'grupos') && Boolean(route.id)
   return (
     <AppProviders schema={schema} mondayUser={mondayUser} nav={nav}>
       <div className="app-shell">
         {route.seg !== 'inicio' && (
           <AccionBar
-            accionActual={route.seg === 'crear' ? 'crear' : 'consultar'}
+            accionActual={
+              route.seg === 'crear'
+                ? 'crear'
+                : route.seg === 'clientes' || route.seg === 'grupos'
+                  ? 'clientes'
+                  : 'consultar'
+            }
             enDetalle={enDetalle}
             onIrAInicio={nav.goHome}
             onCambiar={(accion) => {
               setOpenedFromCrearFlow(false)
               if (accion === 'crear') nav.goCreate()
+              else if (accion === 'clientes') go('clientes')
               else nav.goTable()
             }}
           />

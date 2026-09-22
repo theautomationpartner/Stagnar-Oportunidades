@@ -1,11 +1,16 @@
 // Primitivas de formulario del wizard "Crear Oportunidad" — extraídas de
 // CrearOportunidadForm.jsx (auditoría). Los estilos siguen en CrearOportunidadForm.css.
 import { useState } from 'react'
-import { Button, Dropdown, Modal, ModalContent, ModalFooter, TextField } from '@vibe/core'
+import { Button, Dropdown, TextField } from '@vibe/core'
 import { MdCall, MdClear, MdDescription, MdEdit, MdInfoOutline, MdPersonAdd, MdPersonSearch } from 'react-icons/md'
 import { CODIGO_PAIS_OPTIONS, emailError, telefonoError } from '../../services/personaFields'
 import FlagIcon from './FlagIcon'
 import { matchesSearchQuery } from '../../services/format'
+// El popup de contacto nuevo es COMPARTIDO (también lo usa la ficha de gestión del
+// cliente) y ahora verifica adentro el teléfono repetido contra Contactos — ver
+// ContactoNuevoModal.jsx. El import es circular (ese archivo importa RequiredDropdown y
+// compañía de acá) pero solo se tocan en render, nunca al evaluar el módulo.
+import ContactoNuevoModal from '../ContactoNuevoModal'
 
 // A pedido: asterisco de obligatorio en rojo en TODOS los campos — antes era texto
 // suelto (" *") sin ese color en los <label><span> armados a mano (Fecha Nacimiento,
@@ -182,128 +187,6 @@ export function SectionTitle({ icon: Icon, children }) {
 // Reusada tanto por el formulario manual ("No tengo la Cédula") como por el perfil leído
 // con IA ("Sí" + lectura ok) — la IA no devuelve teléfono, así que en los 2 casos hay que
 // pedirlo aparte.
-// Popup para cargar el contacto nuevo. Antes estos campos aparecían inline debajo de
-// "Crear un contacto nuevo" y empujaban el resto del paso hacia abajo justo cuando había
-// que comparar las opciones de arriba; acá se cargan aparte y el contacto vuelve a la
-// lista como uno más.
-//
-// Trabaja con estado propio y recién al confirmar toca el form: cancelar tiene que dejar
-// todo como estaba, y si escribiera directo en el form un teléfono a medio tipear
-// dispararía la búsqueda de duplicados contra un número que todavía no existe.
-function ContactoNuevoModal({ form, nombreCliente, homonimo, onElegirContacto, onGuardar, onClose }) {
-  const [mismoCliente, setMismoCliente] = useState(form.contactoMismoCliente !== false)
-  const [nombre, setNombre] = useState(form.contactoNombre ?? '')
-  const [codigoPais, setCodigoPais] = useState(form.codigoPais)
-  const [telefono, setTelefono] = useState(form.telefono ?? '')
-  const [email, setEmail] = useState(form.email ?? '')
-
-  const telErr = telefonoError(telefono, codigoPais)
-  const mailErr = emailError(email)
-  // Con "es el mismo cliente" tildado y un contacto homónimo ya cargado, crear otro sería
-  // duplicarlo: el popup no deja confirmar y ofrece usar el que ya está.
-  const bloqueadoPorHomonimo = mismoCliente && Boolean(homonimo)
-  const puedeGuardar =
-    (mismoCliente ? Boolean(nombreCliente) : Boolean(nombre.trim())) &&
-    Boolean(telefono.trim()) &&
-    !telErr &&
-    !mailErr &&
-    !bloqueadoPorHomonimo
-
-  return (
-    <Modal id="contacto-nuevo-modal" show onClose={onClose} size="medium">
-      <ModalContent className="crear-op__editar-contacto-content">
-        <h2 className="crear-op__editar-contacto-title">Contacto nuevo</h2>
-        <p className="crear-op__section-hint">A quién le mandás la cotización.</p>
-
-        <label className="crear-op__checkbox">
-          <input type="checkbox" checked={mismoCliente} onChange={(e) => setMismoCliente(e.target.checked)} />
-          <span>El contacto es el mismo cliente{nombreCliente ? ` (${nombreCliente})` : ''}</span>
-        </label>
-
-        {bloqueadoPorHomonimo && (
-          <p className="crear-op__field-error" role="alert">
-            {nombreCliente} ya tiene su propio contacto cargado — no hace falta crearlo de nuevo.{' '}
-            <Button
-              kind="tertiary"
-              size="small"
-              onClick={() => {
-                onElegirContacto?.(homonimo.id)
-                onClose()
-              }}
-            >
-              Usar ese contacto
-            </Button>
-          </p>
-        )}
-
-        <div className="crear-op__fields--grid">
-          {!mismoCliente && (
-            <TextField
-              size="medium"
-              wrapperClassName="crear-op__field"
-              title="Nombre del contacto"
-              required
-              placeholder="Ej: María Pérez (hija)"
-              value={nombre}
-              onChange={setNombre}
-              icon={MdClear}
-              onIconClick={() => setNombre('')}
-              validation={nombre.trim() ? { status: 'success' } : undefined}
-            />
-          )}
-          <label className="crear-op__field">
-            <span>Teléfono <Required /></span>
-            <div className="crear-op__phone">
-              <div className="crear-op__phone-code">
-                <RequiredDropdown
-                  size="medium"
-                  options={CODIGO_PAIS_OPTIONS}
-                  value={CODIGO_PAIS_OPTIONS.find((o) => o.value === codigoPais) ?? null}
-                  {...codigoPaisDropdownProps}
-                  onChange={(option) => setCodigoPais(option?.value ?? '')}
-                />
-              </div>
-              <TextField
-                size="medium"
-                wrapperClassName="crear-op__phone-number"
-                placeholder="Ej: 099 123 456"
-                value={telefono}
-                onChange={setTelefono}
-                icon={MdClear}
-                onIconClick={() => setTelefono('')}
-                validation={telErr ? { status: 'error' } : telefono ? { status: 'success' } : undefined}
-              />
-            </div>
-            {telErr && <span className="crear-op__field-error" role="alert">{telErr}</span>}
-          </label>
-          <label className="crear-op__field">
-            <span>Email</span>
-            <TextField
-              size="medium"
-              type="email"
-              placeholder="Ej: nombre@dominio.com"
-              value={email}
-              onChange={setEmail}
-              icon={MdClear}
-              onIconClick={() => setEmail('')}
-              validation={mailErr ? { status: 'error' } : email.trim() ? { status: 'success' } : undefined}
-            />
-            {mailErr && <span className="crear-op__field-error" role="alert">{mailErr}</span>}
-          </label>
-        </div>
-      </ModalContent>
-      <ModalFooter
-        secondaryButton={{ text: 'Cancelar', onClick: onClose }}
-        primaryButton={{
-          text: 'Agregar contacto',
-          disabled: !puedeGuardar,
-          onClick: () => onGuardar({ mismoCliente, nombre: nombre.trim(), codigoPais, telefono, email }),
-        }}
-      />
-    </Modal>
-  )
-}
-
 // Sección Contacto del paso 1 — máquina de estados de la selección (a pedido, la
 // oportunidad SIEMPRE queda con exactamente un Cliente y un Contacto marcado explícito):
 //
@@ -613,10 +496,19 @@ export function ContactoFields({
 
       {modalNuevo && (
         <ContactoNuevoModal
-          form={form}
           nombreCliente={nombreCliente}
+          mismoClienteInicial={form.contactoMismoCliente !== false}
+          inicial={{
+            nombre: form.contactoNombre ?? '',
+            codigoPais: form.codigoPais,
+            telefono: form.telefono ?? '',
+            email: form.email ?? '',
+          }}
           homonimo={homonimo}
-          onElegirContacto={onElegirContacto}
+          onElegirHomonimo={(h) => onElegirContacto?.(h.id)}
+          // Teléfono repetido detectado adentro del popup: "usar ese contacto" cae en el
+          // mismo camino que elegirlo desde "Vincular un contacto existente".
+          onUsarExistente={onVincularContacto ? (contacto) => onVincularContacto(contacto) : undefined}
           onClose={() => setModalNuevo(false)}
           onGuardar={(datos) => {
             handleChange('contactoMismoCliente', datos.mismoCliente)

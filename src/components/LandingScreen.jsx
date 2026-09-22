@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button } from '@vibe/core'
-import { MdExpandMore, MdLogout, MdNoteAdd, MdSearch } from 'react-icons/md'
+import { MdExpandMore, MdLogout, MdNoteAdd, MdPeopleAlt, MdSearch } from 'react-icons/md'
 import stagnariLogo from '../assets/stagnari-logo.png'
 import { fetchMe, fetchUsuariosHabilitados } from '../services/mondayApi'
 import { initialsOf } from '../services/personaFields'
@@ -16,6 +16,7 @@ import './LandingScreen.css'
 const ACCIONES = [
   { key: 'consultar', label: 'Consultar oportunidades', desc: 'Buscar y continuar una existente', Icono: MdSearch },
   { key: 'crear', label: 'Crear una oportunidad', desc: 'Cotizar un riesgo nuevo', Icono: MdNoteAdd },
+  { key: 'clientes', label: 'Gestionar clientes', desc: 'Contactos, relaciones y grupo económico', Icono: MdPeopleAlt },
 ]
 
 // La clave que CrearOportunidadForm lee (y borra) al montar para arrancar el Asignado
@@ -59,7 +60,7 @@ function Selector({ etiqueta, valor, placeholder, abierto, onToggle, children })
   )
 }
 
-export default function LandingScreen({ onCreateNew, onSearchExisting }) {
+export default function LandingScreen({ onCreateNew, onSearchExisting, onClientes }) {
   const [accion, setAccion] = useState(null)
   const [personaId, setPersonaId] = useState(null)
   const [usuarios, setUsuarios] = useState([])
@@ -147,6 +148,8 @@ export default function LandingScreen({ onCreateNew, onSearchExisting }) {
         /* sin sessionStorage, el alta arranca con quien crea, como siempre */
       }
       onCreateNew()
+    } else if (accion === 'clientes') {
+      onClientes()
     } else {
       onSearchExisting()
     }

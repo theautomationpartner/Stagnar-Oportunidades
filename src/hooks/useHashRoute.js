@@ -10,6 +10,11 @@ import { useCallback, useEffect, useState } from 'react'
 //   #/oportunidades/:id         detalle de una Oportunidad
 //   #/oportunidades/:id/:step   detalle en un paso puntual (cotizar|comparar|confirmar|emitir)
 //   #/crear                     wizard de creación
+//   #/clientes                  tabla de clientes
+//   #/clientes/:id              ficha de gestión de un cliente
+//   #/contactos                 tabla de contactos
+//   #/grupos                    lista de grupos económicos
+//   #/grupos/:id                administración de un grupo (miembros, roles)
 //
 // Hash (no pathname) a propósito: la app corre embebida en un iframe de monday y en
 // Vercel/Vite como SPA — el hash no requiere reglas de rewrite y no interfiere con la
@@ -18,6 +23,9 @@ const parse = () => {
   const h = (window.location.hash || '#/').replace(/^#\/?/, '')
   const [seg = '', id = '', step = ''] = h.split('/').map((s) => decodeURIComponent(s))
   if (seg === 'oportunidades') return { seg, id: id || null, step: step || null }
+  if (seg === 'clientes') return { seg, id: id || null, step: null }
+  if (seg === 'contactos') return { seg, id: null, step: null }
+  if (seg === 'grupos') return { seg, id: id || null, step: null }
   if (seg === 'crear') return { seg, id: null, step: null }
   return { seg: 'inicio', id: null, step: null }
 }

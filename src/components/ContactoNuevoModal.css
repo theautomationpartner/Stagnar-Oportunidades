@@ -1,0 +1,9 @@
+/* Advertencia de teléfono repetido dentro del popup de contacto nuevo — va bien visible
+   arriba de los campos, con su acción de salida ("Usar ese contacto") debajo del texto. */
+.contacto-nuevo__dup {
+  margin: 0 0 14px;
+}
+
+.contacto-nuevo__dup-accion {
+  margin-top: 10px;
+}

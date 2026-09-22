@@ -1,0 +1,403 @@
+.grupos {
+  margin: 20px auto 32px;
+  padding: 0 var(--page-gutter, 32px);
+  width: 100%;
+  max-width: 1320px;
+}
+
+.grupos__head h1 {
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin: 0 0 4px;
+}
+
+.grupos__head p {
+  font-size: 13px;
+  color: var(--text-gray);
+  margin: 0 0 16px;
+}
+
+/* Solapas Clientes/Grupos (pill-tabs compartido) + "Crear grupo" a la derecha. */
+.grupos__barra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 0 16px;
+}
+
+.grupos__tabs {
+  align-self: flex-start;
+}
+
+.grupos__tabs .pill-tabs__tab {
+  min-width: 190px;
+}
+
+.grupos__nuevo {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 10px 14px;
+  padding: 14px 16px;
+  margin: 0 0 16px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.grupos__nuevo-acciones {
+  grid-column: 1 / -1;
+  display: flex;
+  gap: 8px;
+}
+
+.grupos__error {
+  margin: 0 0 12px;
+  font-size: 13px;
+  color: var(--tint-danger-text);
+}
+
+.grupos__vacio {
+  font-size: 13px;
+  color: var(--text-muted);
+  margin: 8px 0;
+}
+
+/* Lista de grupos como tabla (a pedido: nada de tarjetas con todo a la vista — se entra
+   al grupo y se administra adentro, ver GrupoDetalle). */
+.grupos__tabla {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 4px 12px 10px;
+}
+
+.grupos__row {
+  cursor: pointer;
+}
+
+.grupos__celda {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  width: 100%;
+  height: 100%;
+  font-size: 13px;
+  color: var(--text-dark);
+}
+
+.grupos__celda--nombre {
+  font-weight: 600;
+}
+
+.grupos__celda--nombre svg {
+  color: var(--color-verde, #008581);
+  font-size: 17px;
+  flex-shrink: 0;
+}
+
+.grupos__celda-vacia {
+  color: var(--text-muted);
+}
+
+.grupos__celda-miembros {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+}
+
+/* --- Detalle de un grupo (GrupoDetalle) --- */
+.grupo-det {
+  margin: 20px auto 32px;
+  padding: 0 var(--page-gutter, 32px);
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  width: 100%;
+  max-width: 1320px;
+}
+
+/* A pedido: dos columnas para aprovechar el ancho — miembros a la izquierda, el alta
+   como sección propia a la derecha. En angosto se apila. */
+.grupo-det__grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.25fr) minmax(0, 1fr);
+  gap: 16px;
+  align-items: start;
+}
+
+@media (max-width: 980px) {
+  .grupo-det__grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.grupo-det__volver {
+  align-self: flex-start;
+}
+
+.grupo-det__cabecera {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 22px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: var(--shadow-sm);
+}
+
+.grupo-det__icono {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 44px;
+  height: 44px;
+  border-radius: 12px;
+  background: var(--tint-success, #e6f9f1);
+  color: var(--color-verde, #008581);
+  font-size: 24px;
+}
+
+.grupo-det__cabecera h1 {
+  font-size: 20px;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin: 0 0 2px;
+}
+
+.grupo-det__cabecera p {
+  font-size: 13px;
+  color: var(--text-gray);
+  margin: 0;
+}
+
+.grupos__card {
+  padding: 16px 20px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+}
+
+.grupos__card h2 {
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-dark);
+  margin: 0 0 10px;
+}
+
+.grupos__alias {
+  font-size: 13px;
+  font-weight: 400;
+  color: var(--text-gray);
+}
+
+.grupos__miembros {
+  list-style: none;
+  margin: 0 0 12px;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+/* Cada miembro con el color de su rol (borde izquierdo + insignia, mismos tonos del
+   tablero: Titular naranja, Miembro verde, Empresa vinculada azul, sin rol gris) — se
+   distinguen de un vistazo sin leer el selector. */
+.grupos__miembro {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 10px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-left-width: 4px;
+  border-radius: 8px;
+}
+
+.grupos__miembro--titular {
+  border-left-color: #fdab3d;
+}
+
+.grupos__miembro--miembro {
+  border-left-color: #00c875;
+}
+
+.grupos__miembro--empresa {
+  border-left-color: #579bfc;
+}
+
+.grupos__miembro--sinrol {
+  border-left-color: #c4c4c4;
+}
+
+/* El nombre reserva su propio ancho mínimo y, si no entra junto al selector de rol,
+   la fila envuelve limpio (antes el aviso "sin cliente vinculado" quedaba atrás del
+   dropdown). */
+.grupos__miembro-nombre {
+  flex: 1 1 200px;
+  min-width: 0;
+  font-size: 13px;
+  color: var(--text-dark);
+  overflow-wrap: anywhere;
+}
+
+.grupos__miembro .grupos__aviso-suave {
+  display: block;
+  margin-top: 2px;
+}
+
+/* A pedido: el nombre del cliente es lo que manda en la fila — más grande y en negrita
+   que todo lo demás. */
+.grupos__miembro-titulo,
+.grupos__link--principal {
+  display: block;
+  font-size: 15px;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+
+.grupos__link--principal {
+  color: var(--tint-info-text);
+}
+
+/* Insignia del rol, con el mismo tono que el borde de la fila. */
+.grupos__rol-chip {
+  display: inline-block;
+  margin-top: 4px;
+  padding: 2px 10px;
+  border: 1px solid;
+  border-radius: 12px;
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.grupos__rol-chip--titular {
+  color: #8a5300;
+  border-color: #e99729;
+  background: #fff3e0;
+}
+
+.grupos__rol-chip--miembro {
+  color: #036842;
+  border-color: #00b461;
+  background: #e6f9f1;
+}
+
+.grupos__rol-chip--empresa {
+  color: #1f4e9c;
+  border-color: #5a8fe0;
+  background: #eaf2ff;
+}
+
+.grupos__rol-chip--sinrol {
+  color: var(--text-gray);
+  border-color: #b0b0b0;
+  background: var(--bg-subtle);
+}
+
+.grupos__hint {
+  font-size: 12px;
+  color: var(--text-gray);
+  margin: 0 0 12px;
+}
+
+.grupos__rol-label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  max-width: 240px;
+}
+
+.grupos__rol-label > span {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.grupos__rol {
+  width: 200px;
+  flex: none;
+}
+
+.grupos__link {
+  border: none;
+  background: none;
+  padding: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--tint-info-text);
+  cursor: pointer;
+  text-align: left;
+}
+
+.grupos__link:hover {
+  text-decoration: underline;
+}
+
+.grupos__aviso-suave {
+  font-size: 12px;
+  color: var(--text-warning);
+}
+
+/* Alta de un miembro: búsqueda deliberada (campo + rol + botón Buscar) y resultados con
+   su "Agregar" — separado de la lista de miembros por línea fina. */
+.grupos__agregar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  border-top: 1px solid var(--border);
+  padding-top: 12px;
+}
+
+/* Como sección propia (tarjeta "Agregar un cliente") no lleva el divisor de arriba —
+   ese era para cuando el alta vivía pegada a la lista de miembros. */
+.grupos__agregar--seccion {
+  border-top: none;
+  padding-top: 0;
+}
+
+.grupos__buscar {
+  display: flex;
+  gap: 8px;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+
+.grupos__buscar > :first-child {
+  flex: 1 1 180px;
+}
+
+.grupos__resultados {
+  list-style: none;
+  margin: 0;
+  padding: 10px 12px;
+  border: 1px dashed var(--border-input);
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.grupos__resultado-meta {
+  display: block;
+  font-size: 12px;
+  color: var(--text-gray);
+}
+
+@media (max-width: 640px) {
+  .grupos__miembro {
+    flex-wrap: wrap;
+  }
+
+  .grupos__rol {
+    width: 100%;
+  }
+}

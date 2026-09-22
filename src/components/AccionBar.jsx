@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react'
-import { MdExpandMore, MdHome, MdNoteAdd, MdSearch } from 'react-icons/md'
+import { MdExpandMore, MdHome, MdNoteAdd, MdPeopleAlt, MdSearch } from 'react-icons/md'
 import stagnariLogoSimple from '../assets/stagnari-logo-simple.png'
 import AlertModal from './AlertModal'
 import { hayTrabajoEnCrear } from '../services/crearEnCurso'
@@ -21,6 +21,7 @@ const ACCIONES = [
   { key: 'inicio', label: 'Inicio', Icono: MdHome },
   { key: 'consultar', label: 'Consultar oportunidades', Icono: MdSearch },
   { key: 'crear', label: 'Crear una oportunidad', Icono: MdNoteAdd },
+  { key: 'clientes', label: 'Gestionar clientes', Icono: MdPeopleAlt },
 ]
 
 export default function AccionBar({ accionActual, enDetalle = false, onIrAInicio, onCambiar }) {
