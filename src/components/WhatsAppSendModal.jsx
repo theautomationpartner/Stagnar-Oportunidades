@@ -95,6 +95,11 @@ export default function WhatsAppSendModal({
   // Si ninguno tiene teléfono, un desplegable entero en gris no deja mandar nada: ahí se
   // vuelve al campo de texto.
   const hayContactos = opcionesContacto.some((o) => !o.disabled)
+  // Traer los contactos tarda cerca de dos segundos (es lo que tarda monday, no hay
+  // consulta más rápida: probada en una sola llamada anidada, da igual). Sin este estado
+  // aparecía el campo de texto con el número viejo y, dos segundos después, se
+  // transformaba en otra cosa — se leía como un dato raro puesto ahí.
+  const cargandoContactos = Boolean(opportunity.clienteId) && contactosCliente === null
   // Preseleccionado: el contacto de la oportunidad. Si no está entre los del cliente
   // —quedó desvinculado, o la oportunidad es vieja— se cae al que tenga el mismo número
   // que se venía proponiendo, para no cambiarle el destinatario a nadie sin avisar.
@@ -271,7 +276,19 @@ export default function WhatsAppSendModal({
             {/* A pedido: el input achicado y el aviso de origen al lado, no arriba —
                 ocupaban demasiado alto para un dato secundario. */}
             <div className="wa-modal__telefono-row">
-              {hayContactos ? (
+              {cargandoContactos ? (
+                <label className="wa-modal__field wa-modal__field--telefono">
+                  <span className="wa-modal__field-title">Enviar a</span>
+                  <Dropdown
+                    size="small"
+                    options={[]}
+                    value={null}
+                    loading
+                    disabled
+                    placeholder="Buscando los contactos..."
+                  />
+                </label>
+              ) : hayContactos ? (
                 <label className="wa-modal__field wa-modal__field--telefono">
                   <span className="wa-modal__field-title">Enviar a</span>
                   <Dropdown
