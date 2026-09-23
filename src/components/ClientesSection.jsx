@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
-import { MdChevronLeft, MdChevronRight, MdContactPhone, MdGroups, MdPeopleAlt, MdSearch } from 'react-icons/md'
-import { Table, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell, EmptyState, TextField } from '@vibe/core'
+import { MdChevronLeft, MdChevronRight, MdClear, MdContactPhone, MdGroups, MdPeopleAlt, MdSearch } from 'react-icons/md'
+import { Button, Table, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell, EmptyState, TextField } from '@vibe/core'
 import Avatar from './Avatar'
 import LoadingScreen from './LoadingScreen'
 import StatusBadge from './StatusBadge'
@@ -56,8 +56,17 @@ export default function ClientesSection({ onOpenCliente, onIrAGrupos, onIrAConta
   const [clientes, setClientes] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  // A pedido, igual que el resto de la app: la búsqueda NO es en vivo. `busqueda` es lo
+  // que se está tipeando y `termino` lo que de verdad filtra la tabla — se aplica recién
+  // con "Buscar" o Enter.
   const [busqueda, setBusqueda] = useState('')
+  const [termino, setTermino] = useState('')
   const [page, setPage] = useState(1)
+
+  const buscar = (valor = busqueda) => {
+    setTermino(valor)
+    setPage(1)
+  }
 
   useEffect(() => {
     let vivo = true
@@ -78,14 +87,14 @@ export default function ClientesSection({ onOpenCliente, onIrAGrupos, onIrAConta
 
   const filtrados = useMemo(() => {
     // Sin distinguir tildes (normalizarParaMatch): "logistica" encuentra "Logística".
-    const q = normalizarParaMatch(busqueda)
+    const q = normalizarParaMatch(termino)
     if (!q) return clientes
     return clientes.filter((c) =>
       [c.name, c.nombre, c.apellido, c.ci, c.rut, c.razonSocial, c.grupo?.name, c.empresa?.name]
         .filter(Boolean)
         .some((v) => normalizarParaMatch(v).includes(q))
     )
-  }, [clientes, busqueda])
+  }, [clientes, termino])
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / PAGE_SIZE))
   const paginaActual = Math.min(page, totalPaginas)
@@ -129,15 +138,23 @@ export default function ClientesSection({ onOpenCliente, onIrAGrupos, onIrAConta
           <TextField
             size="medium"
             placeholder="Buscar por nombre, CI, RUT, razón social, grupo..."
-            icon={MdSearch}
+            icon={MdClear}
             value={busqueda}
             onChange={(v) => {
               setBusqueda(v)
-              setPage(1)
+              // Borrar todo el texto vuelve a la lista completa sin apretar Buscar: es
+              // "salir de la búsqueda", no una búsqueda nueva.
+              if (!v.trim()) buscar('')
             }}
+            onKeyDown={(e) => e.key === 'Enter' && buscar()}
           />
+          <Button kind="secondary" size="medium" onClick={() => buscar()}>
+            <MdSearch /> Buscar
+          </Button>
           <span className="clientes__conteo">
-            {`${filtrados.length} de ${clientes.length} clientes`}
+            {termino.trim()
+              ? `${filtrados.length} de ${clientes.length} clientes`
+              : `${clientes.length} clientes`}
           </span>
         </div>
       </div>

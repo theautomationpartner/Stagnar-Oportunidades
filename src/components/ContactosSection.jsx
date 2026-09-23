@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useState } from 'react'
 import { MdChevronLeft, MdChevronRight, MdClear, MdContactPhone, MdGroups, MdPeopleAlt, MdSearch } from 'react-icons/md'
-import { AttentionBox, EmptyState, Modal, ModalContent, ModalFooter, Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, TextField } from '@vibe/core'
+import { AttentionBox, Button, EmptyState, Modal, ModalContent, ModalFooter, Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, TextField } from '@vibe/core'
 import Avatar from './Avatar'
 import LoadingScreen from './LoadingScreen'
 import {
@@ -395,8 +395,16 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos, onOpenCli
   const [contactos, setContactos] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
+  // Igual que en Clientes (a pedido): la búsqueda se aplica con "Buscar" o Enter, no
+  // mientras se tipea. `busqueda` es lo tipeado; `termino` lo que filtra la tabla.
   const [busqueda, setBusqueda] = useState('')
+  const [termino, setTermino] = useState('')
   const [page, setPage] = useState(1)
+
+  const buscar = (valor = busqueda) => {
+    setTermino(valor)
+    setPage(1)
+  }
 
   useEffect(() => {
     let vivo = true
@@ -417,14 +425,14 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos, onOpenCli
 
   const filtrados = useMemo(() => {
     // Sin distinguir tildes (normalizarParaMatch): "lucia" encuentra "Lucía".
-    const q = normalizarParaMatch(busqueda)
+    const q = normalizarParaMatch(termino)
     if (!q) return contactos
     return contactos.filter((c) =>
       [c.name, c.telefono, c.email, c.clienteNombre]
         .filter(Boolean)
         .some((v) => normalizarParaMatch(v).includes(q))
     )
-  }, [contactos, busqueda])
+  }, [contactos, termino])
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / PAGE_SIZE))
   const paginaActual = Math.min(page, totalPaginas)
@@ -466,15 +474,22 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos, onOpenCli
           <TextField
             size="medium"
             placeholder="Buscar por nombre, teléfono, email o cliente..."
-            icon={MdSearch}
+            icon={MdClear}
             value={busqueda}
             onChange={(v) => {
               setBusqueda(v)
-              setPage(1)
+              // Borrar todo el texto vuelve a la lista completa sin apretar Buscar.
+              if (!v.trim()) buscar('')
             }}
+            onKeyDown={(e) => e.key === 'Enter' && buscar()}
           />
+          <Button kind="secondary" size="medium" onClick={() => buscar()}>
+            <MdSearch /> Buscar
+          </Button>
           <span className="contactos__conteo">
-            {`${filtrados.length} de ${contactos.length} contactos`}
+            {termino.trim()
+              ? `${filtrados.length} de ${contactos.length} contactos`
+              : `${contactos.length} contactos`}
           </span>
         </div>
       </div>
