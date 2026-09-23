@@ -665,10 +665,22 @@ async function callMondayApi(query, variables) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ query, variables }),
   })
+  return leerRespuestaMonday(response)
+}
 
-  const payload = await response.json()
-  if (payload.errors?.length) {
+// Antes solo se miraba `errors`: si el proxy no llegaba a monday (502) o monday respondía
+// un error sin ese formato, `data` volvía undefined sin avisar. Una escritura que no usa
+// la respuesta (borrar, guardar columnas, subir un archivo) quedaba como exitosa sin
+// haberse hecho, y una lectura rompía más adelante con un TypeError sin explicación.
+async function leerRespuestaMonday(response) {
+  const payload = await response.json().catch(() => null)
+  if (payload?.errors?.length) {
     throw new Error(payload.errors[0].message)
+  }
+  if (!response.ok || !payload?.data) {
+    throw new Error(
+      payload?.error_message || payload?.error || `No se pudo hablar con monday (HTTP ${response.status})`
+    )
   }
   return payload.data
 }
@@ -878,11 +890,8 @@ export async function uploadFileToColumn(itemId, columnId, file) {
   formData.append('variables[file]', file, file.name)
 
   const response = await fetchProtegido('/api/monday-file', { method: 'POST', body: formData })
-  const payload = await response.json()
-  if (payload.errors?.length) {
-    throw new Error(payload.errors[0].message)
-  }
-  return payload.data?.add_file_to_column
+  const data = await leerRespuestaMonday(response)
+  return data.add_file_to_column
 }
 
 // Escenario de Make que lee la Carta Automóvil con IA y devuelve los datos que pudo
