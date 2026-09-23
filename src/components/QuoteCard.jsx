@@ -570,18 +570,22 @@ function QuoteCard({
           {opcionalesDeLaCompania.length > 0 && (
             <>
               <div className="quote-card__params-subtitle">Opcionales {raw.compania}</div>
-              <div className="quote-card__params-grid">
+              {/* Los tildes van juntos en una línea y Auto extra (que tiene etiqueta y
+                  selector, y por eso es más alto) en su propia fila: mezclados en la
+                  grilla, la fila de Auto extra quedaba más alta y los tildes desparejos. */}
+              <div className="quote-card__opcionales-checks">
                 {opcionalesDeLaCompania.map((opt) => (
                   <Checkbox
                     key={opt.field}
-                    className="quote-card__params-field--checkbox"
                     label={opt.label}
                     checked={!!raw[opt.field]}
                     disabled={savingOpcional === opt.field}
                     onChange={(e) => handleToggleOpcional(opt.field, e.target.checked)}
                   />
                 ))}
-                {autoExtraDias.length > 0 && (
+              </div>
+              {autoExtraDias.length > 0 && (
+                <div className="quote-card__opcionales-extra">
                   <label className="quote-card__params-field">
                     <span>Auto extra</span>
                     <Dropdown
@@ -594,8 +598,8 @@ function QuoteCard({
                       onChange={(option) => handleAutoExtraChange(option?.value ?? '')}
                     />
                   </label>
-                )}
-              </div>
+                </div>
+              )}
               {opcionalError && <p className="quote-card__warning">{opcionalError}</p>}
             </>
           )}

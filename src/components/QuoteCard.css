@@ -429,9 +429,36 @@
   margin-bottom: 12px;
 }
 
+/* Opcionales: los tildes en una línea, cada uno del ancho de su texto, y si no entran
+   pasan al renglón de abajo, siempre alineados. Antes iban en la grilla de 130px de los
+   parámetros: "Accidentes Personales" no entraba en su columna y se montaba sobre la de
+   al lado, y la celda de Auto extra (etiqueta + selector) dejaba las filas desparejas. */
+.quote-card__opcionales-checks {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8px 24px;
+  margin-bottom: 12px;
+}
+
+/* Auto extra en su propia fila, con el ancho de un selector y no el de toda la tarjeta. */
+.quote-card__opcionales-extra {
+  max-width: 220px;
+  margin-bottom: 12px;
+}
+
 /* A pedido: el RC a lo ancho de toda la fila — sus valores son los más largos. */
 .quote-card__params-field--ancho {
   grid-column: 1 / -1;
+  /* A pedido: sigue en su propia fila, pero el selector ocupa la mitad de la tarjeta. */
+  max-width: 50%;
+}
+
+/* En celular la mitad queda chica para los textos de RC: ahí vuelve a todo el ancho. */
+@media (max-width: 640px) {
+  .quote-card__params-field--ancho {
+    max-width: none;
+  }
 }
 
 .quote-card__params-field {
