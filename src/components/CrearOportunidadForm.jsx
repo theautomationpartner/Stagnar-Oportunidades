@@ -1847,11 +1847,11 @@ export default function CrearOportunidadForm({
                             que se reusa al confirmar. Por CI/RUT se busca directo en
                             Clientes (cada documento en su columna). */}
                         {{
-                          rut: 'Encontramos este RUT ya cargado en el tablero Clientes:',
-                          telefono: 'Encontramos este Teléfono ya cargado en un Contacto del tablero Contactos, vinculado a este cliente:',
-                          email: 'Encontramos este Email ya cargado en un Contacto del tablero Contactos, vinculado a este cliente:',
-                          nombre: 'Encontramos una persona con este Nombre y Apellido ya cargada en el tablero Clientes:',
-                        }[duplicadoCheck.motivo] ?? 'Encontramos esta Cédula de Identidad ya cargada en el tablero Clientes:'}
+                          rut: 'Este RUT ya corresponde a un cliente registrado:',
+                          telefono: 'Este Teléfono ya corresponde a un contacto de un cliente registrado:',
+                          email: 'Este Email ya corresponde a un contacto de un cliente registrado:',
+                          nombre: 'Este Nombre y Apellido ya corresponde a un cliente registrado:',
+                        }[duplicadoCheck.motivo] ?? 'Esta Cédula de Identidad ya corresponde a un cliente registrado:'}
                         <br />
                         <br />
                         Nombre: <strong>{duplicadoCheck.contacto.name}</strong>
@@ -1865,14 +1865,19 @@ export default function CrearOportunidadForm({
                         )}
                         <br />
                         <br />
-                        ¿Con cuál de los dos seguís?
+                        {/* Con CI/RUT/Teléfono no hay dos caminos: el registro es el
+                            mismo cargado dos veces y el único camino es reusarlo. La
+                            pregunta queda solo donde de verdad se puede elegir (Nombre y
+                            Email: dos personas pueden llamarse igual y un email
+                            compartido —el de la empresa, el de un familiar— es normal). */}
+                        {duplicadoBloqueante ? 'Para continuar, utilice el cliente existente.' : '¿Con cuál de los dos seguís?'}
                       </>
                     }
                     onClose={handleCancelDuplicadoModal}
                     {...(duplicadoBloqueante
                       ? {}
                       : { secondaryButton: { text: 'Seguir con el cliente nuevo', onClick: handleCancelDuplicadoModal } })}
-                    primaryButton={{ text: 'Usar el cliente existente', onClick: handleConfirmDuplicadoContacto }}
+                    primaryButton={{ text: 'Usar cliente existente', onClick: handleConfirmDuplicadoContacto }}
                   />
                 )}
 
