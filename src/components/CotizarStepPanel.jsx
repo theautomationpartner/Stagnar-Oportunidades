@@ -595,8 +595,12 @@ export default function CotizarStepPanel({
       )}
 
       {/* Sin ícono manual — AttentionBox ya pone el suyo propio según "type" (acá
-          duplicaba el de advertencia). */}
-      {!editingSection && !polling && !canCotizar && (
+          duplicaba el de advertencia).
+          A pedido, la ubicación a medio elegir NO se avisa acá: alcanza con el mensaje
+          del propio panel de ubicación (ver UbicacionParaCotizar), que está al lado de
+          donde se arregla. Por eso la condición mira los campos y no canCotizar — si no,
+          con la ubicación como único pendiente este recuadro salía vacío. */}
+      {!editingSection && !polling && (missingFields.length > 0 || invalidFields.length > 0) && (
         <AttentionBox type="negative">
           {missingFields.length > 0 && (
             <>
@@ -615,15 +619,6 @@ export default function CotizarStepPanel({
                 {invalidFields.map((f) => `${f.label} ("${opportunity[f.key]}")`).join(', ')}
               </strong>
               .
-            </>
-          )}
-          {/* La ubicación elegida más abajo todavía no es la que se usaría al cotizar:
-              sin esto se cotizaba con la anterior sin decir nada. */}
-          {ubicacionPendiente && (
-            <>
-              {ubicacionPendiente === 'incompleta'
-                ? 'Elegiste otra ubicación pero falta el departamento y la localidad: completalos abajo, en «¿Con qué ubicación se cotiza?».'
-                : 'Cambiaste la ubicación y todavía no la confirmaste: apretá «Usar esta ubicación» abajo, en «¿Con qué ubicación se cotiza?».'}
             </>
           )}
         </AttentionBox>
