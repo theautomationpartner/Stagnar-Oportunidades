@@ -185,6 +185,13 @@ const POLL_MAX_FAILS = 3
 // MON-10) — este corte es solo la red de seguridad del lado del cliente: a los 5
 // minutos sin resolverse, se da por muerto y se pasa a "Error" con "Reintentar".
 const POLL_COTIZANDO_TIMEOUT_MS = 5 * 60 * 1000
+// Mismo problema en la emisión: si el escenario de Make falla sin llegar a escribir
+// "Error" (la lectura de la póliza con IA, el parseo, un tipo de cliente inesperado), la
+// oportunidad queda en "Creando" y el modal giraba para siempre. A diferencia de la
+// cotización, acá NO se escribe "Error" en monday: el escenario podría seguir vivo, y
+// pisarle el estado o invitar a concretar de nuevo podría crear la póliza dos veces.
+// Solo se deja de esperar y se avisa.
+const POLL_CREANDO_TIMEOUT_MS = 5 * 60 * 1000
 // Prefijo que cada automatización debe agregar al principio del texto del Update que
 // postea sobre el ítem cuando falla (configurar así del lado del robot de cotización y
 // del escenario de Make.com de envío por WhatsApp) — ver fetchLatestUpdate en mondayApi.js.
@@ -280,6 +287,13 @@ export default function OpportunityDetail({
   // monday DESPUÉS de que la cotización ya salió.
   const [actividadError, setActividadError] = useState(null)
   const [polizaErrorDetail, setPolizaErrorDetail] = useState(null)
+  // Desde cuándo se espera la creación de la póliza (ver POLL_CREANDO_TIMEOUT_MS). Se
+  // arranca cada vez que se prende ese seguimiento: al concretar, al reentrar con la
+  // oportunidad en "Creando" o al apretar "Reintentar" tras un corte.
+  const polizaPollStartRef = useRef(null)
+  useEffect(() => {
+    polizaPollStartRef.current = polizaPolling ? Date.now() : null
+  }, [polizaPolling])
   const [lecturaErrorDetail, setLecturaErrorDetail] = useState(null)
 
   // El robot que genera la cotización (o el escenario de Make.com que la envía) postea
@@ -579,6 +593,18 @@ export default function OpportunityDetail({
           if (estadoCreacion === 'Error') {
             setPolizaErrorDetail(await loadErrorUpdate(ERROR_UPDATE_TAG_CREAR_POLIZA))
           }
+        } else if (
+          polizaPollStartRef.current &&
+          Date.now() - polizaPollStartRef.current > POLL_CREANDO_TIMEOUT_MS
+        ) {
+          // Ver POLL_CREANDO_TIMEOUT_MS: se deja de esperar, sin tocar monday.
+          polizaPollStartRef.current = null
+          setPolizaPolling(false)
+          setPolizaErrorDetail(
+            `La creación de la póliza lleva más de 5 minutos en "${estadoCreacion || 'Crear'}" sin terminar. ` +
+              'Es posible que la automatización se haya interrumpido. Antes de volver a apretar ' +
+              '"Concretar Oportunidad", revisá en monday si la póliza ya se creó, para no crearla dos veces.'
+          )
         }
       }
 
