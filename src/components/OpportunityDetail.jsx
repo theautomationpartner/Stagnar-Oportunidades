@@ -2221,9 +2221,6 @@ export default function OpportunityDetail({
                 {/* A pedido: se puede pasar a "Confirmar" sin haber enviado nada por
                     WhatsApp — útil cuando el cliente ya eligió la propuesta por otro
                     medio (llamada, presencial) y no hace falta mandarle nada más. */}
-                {/* LOG-19 ("Descargar detalle", la planilla CSV de todas las cotizaciones
-                    para cotejar contra los portales) se quitó a pedido — el código sigue
-                    en services/quotesExport.js por si vuelve. */}
                 <Button kind="secondary" onClick={() => setActiveStep('confirmar')}>
                   Continuar sin enviar
                 </Button>

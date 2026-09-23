@@ -82,7 +82,8 @@ export const config = {
   // Se enciende el día que exista un acceso directo real.
   passwordLogin: process.env.AUTH_PASSWORD_LOGIN === 'on',
   // El registro autoservicio está apagado y conviene que siga así: la lista blanca es la
-  // que define quién entra, y un registro abierto la contradice. Ver api/auth/registro.js.
+  // que define quién entra, y un registro abierto la contradice. Hoy no hay ningún
+  // endpoint de registro que lea esta bandera.
   registroAbierto: process.env.AUTH_REGISTRO_ABIERTO === 'on',
 
   // Nombre que ve el usuario en Google Authenticator al escanear el QR.

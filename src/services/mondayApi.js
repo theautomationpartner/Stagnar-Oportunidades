@@ -1316,8 +1316,9 @@ const CONTACTO_CI_COLUMN_ID = 'text_mm4vk9aq'
 const CONTACTO_FECHA_NACIMIENTO_COLUMN_ID = 'date_mm65sgmw'
 const CONTACTO_CI_FRENTE_COLUMN_ID = 'file_mm65486d'
 // A pedido: domicilio principal = Departamento + Localidad (las 2 conexiones de abajo,
-// ya existían) + Dirección exacta (calle y número, texto largo — nueva). Los 3 son
-// obligatorios en la app (ver isStepValid en CrearOportunidadForm.jsx).
+// ya existían) + Dirección exacta (calle y número, texto largo — nueva). Departamento y
+// Localidad son obligatorios al crear (ver isStepValid en CrearOportunidadForm.jsx); la
+// Dirección es opcional ahí y se exige en el paso Confirmar (ver requiredFields.js).
 const CONTACTO_DIRECCION_COLUMN_ID = 'long_text_mm6m7d8c'
 // A pedido: además del nombre del ítem ("Nombre Apellido"), Nombre y Apellido van en
 // columnas propias — se escriben al crear y se leen al buscar (antes se partía el

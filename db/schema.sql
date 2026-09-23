@@ -83,7 +83,7 @@ CREATE TABLE IF NOT EXISTS dispositivos_confiables (
   id           BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   usuario_id   BIGINT      NOT NULL REFERENCES usuarios_autorizados(id) ON DELETE CASCADE,
   hash_token   TEXT        NOT NULL UNIQUE, -- HMAC-SHA256 del token opaco que guarda el navegador
-  expira_en    TIMESTAMPTZ NOT NULL,        -- +30 días (AUTH_DEVICE_TTL_DIAS)
+  expira_en    TIMESTAMPTZ NOT NULL,        -- +AUTH_DEVICE_TTL_DIAS (1 día por defecto)
   user_agent   TEXT,
   ip           TEXT,
   ultimo_uso   TIMESTAMPTZ,
