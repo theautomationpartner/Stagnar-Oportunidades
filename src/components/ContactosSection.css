@@ -54,11 +54,26 @@
   border-radius: var(--radius-md);
 }
 
+/* La fila entera abre la ficha, así que la zona clickeable tiene que ser la celda
+   entera. Sin el alto y el ancho al 100%, este div medía solo lo que mide su contenido:
+   una franja de 20px de alto —medido— en una celda de 68. La fila mostraba el cursor de
+   mano en todos lados pero respondía casi en ninguno, y en la primera columna parecía
+   que "solo andaba el avatar" porque ahí el contenido es más alto. */
 .contactos__celda {
   display: flex;
   align-items: center;
   gap: 10px;
   min-width: 0;
+  /* El padding de la celda (9px 16px) también tiene que abrir la ficha: se lo come con
+     margen negativo y se devuelve como padding propio, así el div cubre la celda entera
+     sin mover nada de sitio.
+     El calc es necesario porque con box-sizing: border-box, un 100% pelado resuelve
+     contra la caja de CONTENIDO de la celda —medido: 49px de los 68— y dejaba muerta
+     justo la franja de arriba y la de abajo. */
+  width: calc(100% + 32px);
+  height: calc(100% + 18px);
+  margin: -9px -16px;
+  padding: 9px 16px;
 }
 
 .contactos__nombre {
