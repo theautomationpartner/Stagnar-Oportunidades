@@ -291,7 +291,7 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
         <h2>
           <MdCall aria-hidden="true" /> Contactos
         </h2>
-        <p className="gcli__hint">A quién se le manda la información de este cliente.</p>
+        <p className="gcli__hint">Información de contacto.</p>
 
         {contactosDetalle.length === 0 && <p className="gcli__vacio">Este cliente no tiene contactos vinculados.</p>}
         <ul className="gcli__lista">

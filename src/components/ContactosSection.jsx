@@ -240,9 +240,12 @@ function ContactoFichaModal({ contacto, onOpenCliente, onActualizado, onClose })
 
         {editando && chequeo === 'duplicado' && dupTelefono && (
           <AttentionBox type="danger" title="Ese teléfono ya está cargado" className="contactos__ficha-aviso">
-            Es de <strong>{dupTelefono.name}</strong>
-            {dupTelefono.clienteNombre ? ` (contacto de ${dupTelefono.clienteNombre})` : ''}. Dos contactos con el
-            mismo teléfono son la misma persona cargada dos veces — cambiá el número.
+            <strong>{dupTelefono.name}</strong>
+            {dupTelefono.clienteNombre ? ` (cliente: ${dupTelefono.clienteNombre})` : ''}.
+            <br />
+            {/* Acá no se ofrece "utilizar el existente": se está EDITANDO un contacto
+                que ya existe, no eligiendo cuál usar. */}
+            Si corresponde a la misma persona, ya está cargada. De lo contrario, ingrese otro número.
           </AttentionBox>
         )}
 

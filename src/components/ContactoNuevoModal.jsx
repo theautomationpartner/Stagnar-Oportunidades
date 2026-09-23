@@ -114,7 +114,7 @@ export default function ContactoNuevoModal({
     <Modal id="contacto-nuevo-modal" show onClose={onClose} size="medium">
       <ModalContent className="crear-op__editar-contacto-content">
         <h2 className="crear-op__editar-contacto-title">Contacto nuevo</h2>
-        <p className="crear-op__section-hint">A quién le mandás la información.</p>
+        <p className="crear-op__section-hint">Información de contacto.</p>
 
         {nombreCliente && (
           <label className="crear-op__checkbox">
@@ -135,7 +135,7 @@ export default function ContactoNuevoModal({
                   onClose()
                 }}
               >
-                Usar ese contacto
+                Utilizar contacto existente
               </Button>
             )}
           </p>
@@ -147,9 +147,11 @@ export default function ContactoNuevoModal({
             title="Ese teléfono ya está cargado"
             className="contacto-nuevo__dup"
           >
-            Es de <strong>{dupTelefono.name}</strong>
-            {dupTelefono.clienteNombre ? ` (contacto de ${dupTelefono.clienteNombre})` : ''}. Dos contactos con el
-            mismo teléfono son la misma persona cargada dos veces — usá el que ya está o cambiá el número.
+            <strong>{dupTelefono.name}</strong>
+            {dupTelefono.clienteNombre ? ` (cliente: ${dupTelefono.clienteNombre})` : ''}.
+            <br />
+            Si corresponde a la misma persona, puede utilizar el contacto existente. De lo contrario, ingrese otro
+            número.
             {onUsarExistente && (
               <div className="contacto-nuevo__dup-accion">
                 <Button
@@ -160,7 +162,7 @@ export default function ContactoNuevoModal({
                     onClose()
                   }}
                 >
-                  Usar ese contacto
+                  Utilizar contacto existente
                 </Button>
               </div>
             )}

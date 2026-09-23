@@ -303,7 +303,10 @@ export function ContactoFields({
   return (
     <div className="crear-op__section">
       <SectionTitle icon={MdCall}>Contacto</SectionTitle>
-      <p className="crear-op__section-hint">A quién le mandás la cotización.</p>
+      {/* A pedido, el mismo rótulo en todos lados donde se cargan o eligen datos de
+          contacto (popup de contacto nuevo, ficha del cliente, y este paso tanto con
+          un Lead nuevo como con un Cliente ya elegido). */}
+      <p className="crear-op__section-hint">Información de contacto.</p>
 
       {contactoNuevo ? (
         // A pedido: el contacto nuevo se muestra igual que los demás, con una etiqueta
