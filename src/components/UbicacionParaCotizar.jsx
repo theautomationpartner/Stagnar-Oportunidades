@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { Button, Dropdown } from '@vibe/core'
 import { MdPlace } from 'react-icons/md'
 import { matchOption } from '../services/format'
@@ -30,7 +30,7 @@ function idPorNombre(opciones, nombre) {
   return opciones.find((o) => o.name === real)?.id ?? ''
 }
 
-export default function UbicacionParaCotizar({ opportunity, dropdownOptions, onGuardar, guardando }) {
+export default function UbicacionParaCotizar({ opportunity, dropdownOptions, onGuardar, guardando, onPendienteChange }) {
   const departamentos = dropdownOptions?.departamentos ?? []
   const localidades = dropdownOptions?.localidades ?? []
 
@@ -96,6 +96,19 @@ export default function UbicacionParaCotizar({ opportunity, dropdownOptions, onG
   const elegida = eleccion === 'cliente' ? delCliente : eleccion === 'montevideo' ? montevideo : otra
   const completa = Boolean(elegida?.departamentoId && elegida?.localidadId)
   const sinCambios = completa && mismaQue(elegida)
+
+  // Bug reportado: se elegía "Otra", no se completaba departamento/localidad, y el botón
+  // "Cotizar" de abajo dejaba cotizar igual — con la ubicación ANTERIOR, en silencio. El
+  // panel ahora avisa hacia afuera qué le falta para que la elección sea real:
+  //   'incompleta'    → falta elegir departamento y/o localidad.
+  //   'sin-confirmar' → está completa pero es distinta a la guardada y nadie apretó
+  //                     "Usar esta ubicación", así que todavía no es la que se cotizaría.
+  const pendiente = !completa ? 'incompleta' : sinCambios ? null : 'sin-confirmar'
+  useEffect(() => {
+    onPendienteChange?.(pendiente)
+  }, [pendiente, onPendienteChange])
+  // Al desaparecer el panel (ya hay cotizaciones) no queda nada pendiente de él.
+  useEffect(() => () => onPendienteChange?.(null), [onPendienteChange])
 
   const opciones = [
     {
@@ -186,6 +199,13 @@ export default function UbicacionParaCotizar({ opportunity, dropdownOptions, onG
       )}
 
       <div className="ubicacion-cotizar__pie">
+        {pendiente && (
+          <p className="ubicacion-cotizar__pendiente" role="alert">
+            {pendiente === 'incompleta'
+              ? 'Elegí el departamento y la localidad para poder cotizar.'
+              : 'Confirmá la ubicación con «Usar esta ubicación» para poder cotizar.'}
+          </p>
+        )}
         <Button
           kind="primary"
           disabled={!completa || sinCambios || guardando}

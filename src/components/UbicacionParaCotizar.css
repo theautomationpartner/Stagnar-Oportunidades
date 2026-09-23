@@ -98,6 +98,18 @@
 
 .ubicacion-cotizar__pie {
   display: flex;
+  align-items: center;
   justify-content: flex-end;
+  gap: 12px;
+  flex-wrap: wrap;
   margin-top: 14px;
+}
+
+/* Qué falta para que la ubicación elegida sea la que se use al cotizar (ver
+   UbicacionParaCotizar#pendiente) — al lado del botón, que es donde se resuelve. */
+.ubicacion-cotizar__pendiente {
+  margin: 0;
+  flex: 1;
+  font-size: 13px;
+  color: var(--text-warning);
 }

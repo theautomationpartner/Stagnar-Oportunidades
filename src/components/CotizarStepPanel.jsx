@@ -203,7 +203,12 @@ export default function CotizarStepPanel({
   // columna (ej. una ficha de Autodata con Combustible "EREV"). Antes esto se descubría
   // del otro lado, con el robot ya corriendo — o el dato entraba vacío al portal.
   const invalidFields = getInvalidCotizarFields(opportunity, dropdownOptions)
-  const canCotizar = missingFields.length === 0 && invalidFields.length === 0
+  // Bug reportado: elegir "Otra" en el selector de ubicación de más abajo y no completar
+  // departamento/localidad dejaba cotizar igual — con la ubicación anterior. Los campos
+  // de la oportunidad seguían completos (missingFields no lo veía), así que el aviso lo
+  // da el propio panel de ubicación (ver UbicacionParaCotizar#pendiente).
+  const [ubicacionPendiente, setUbicacionPendiente] = useState(null)
+  const canCotizar = missingFields.length === 0 && invalidFields.length === 0 && !ubicacionPendiente
   // LOG-07: lo mismo pero sobre lo que se está editando AHORA (no sobre la oportunidad
   // guardada), para resaltar en vivo lo que falta dentro del popup y que el resaltado se
   // apague apenas se completa, sin esperar a "Guardar cambios".
@@ -470,6 +475,7 @@ export default function CotizarStepPanel({
           dropdownOptions={dropdownOptions}
           onGuardar={handleGuardarUbicacion}
           guardando={guardandoUbicacion}
+          onPendienteChange={setUbicacionPendiente}
         />
       )}
 
@@ -611,6 +617,15 @@ export default function CotizarStepPanel({
               .
             </>
           )}
+          {/* La ubicación elegida más abajo todavía no es la que se usaría al cotizar:
+              sin esto se cotizaba con la anterior sin decir nada. */}
+          {ubicacionPendiente && (
+            <>
+              {ubicacionPendiente === 'incompleta'
+                ? 'Elegiste otra ubicación pero falta el departamento y la localidad: completalos abajo, en «¿Con qué ubicación se cotiza?».'
+                : 'Cambiaste la ubicación y todavía no la confirmaste: apretá «Usar esta ubicación» abajo, en «¿Con qué ubicación se cotiza?».'}
+            </>
+          )}
         </AttentionBox>
       )}
 
@@ -739,12 +754,22 @@ export default function CotizarStepPanel({
             // LOG-09: los que están cargados pero con un valor fuera del catálogo se
             // listan igual acá, aclarando cuál es el valor que no se acepta.
             ...invalidFields.map((f) => `${f.label}: "${opportunity[f.key]}" no está en la lista`),
+            ...(ubicacionPendiente
+              ? [
+                  ubicacionPendiente === 'incompleta'
+                    ? 'Ubicación: falta elegir el departamento y la localidad'
+                    : 'Ubicación: falta confirmarla con «Usar esta ubicación»',
+                ]
+              : []),
           ]}
           onClose={() => setShowMissingFieldsModal(false)}
           primaryButton={{
-            text: 'Completar datos faltantes',
+            // Con la ubicación como único pendiente no hay campos que editar: se
+            // resuelve en el panel de arriba, que ya está a la vista.
+            text: missingFields.length + invalidFields.length === 0 ? 'Entendido' : 'Completar datos faltantes',
             onClick: () => {
               setShowMissingFieldsModal(false)
+              if (missingFields.length + invalidFields.length === 0) return
               // A pedido: "Editar" ahora son 2 popups separados — si lo que falta
               // incluye algún dato personal, se abre ese primero (si después sigue
               // faltando algo del vehículo, este mismo popup vuelve a aparecer al
