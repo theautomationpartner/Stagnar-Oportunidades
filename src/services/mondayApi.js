@@ -206,11 +206,10 @@ const SUBITEM_COLUMN_IDS = [
   'boolean_mm5fqazp', // Cristales (opcional PORTO)
   // Los opcionales que se sumaron después. La app ya los escribía (OPCIONAL_COLUMN_IDS
   // en OpportunityDetail.jsx) pero no los pedía acá, así que al recargar volvían
-  // destildados y el total cambiaba. El AP tiene además su propio límite: ver
-  // mapSubitemToRawQuote en quoteMapper.js.
+  // destildados y el total cambiaba.
   'boolean_mm6z3j9j', // Uso rural
   'boolean_mm6zhfhd', // SURA te lleva
-  'boolean_mm6zzwq5', // AP (SURA)
+  'boolean_mm7fbtb', // AP sacado (SURA) — el AP se guarda al revés, ver quoteMapper.js
   'color_mm6zpx3j', // Auto extra
 ]
 

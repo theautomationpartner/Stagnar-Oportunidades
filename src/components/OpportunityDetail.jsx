@@ -161,6 +161,11 @@ const OPCIONAL_COLUMN_IDS = {
   suraTeLleva: 'boolean_mm6zhfhd',
   ap: 'boolean_mm6zzwq5',
 }
+// El AP de SURA viene incluido, así que su dato real se guarda al revés, en "AP sacado":
+// monday no distingue una casilla que nunca se tocó de una destildada, y un AP sacado
+// volvía como incluido al recargar. La columna AP de arriba se sigue escribiendo por
+// compatibilidad, pero ya no se lee (ver mapSubitemToRawQuote en quoteMapper.js).
+const AP_SACADO_COLUMN_ID = 'boolean_mm7fbtb'
 const AUTO_EXTRA_COLUMN_ID = 'color_mm6zpx3j'
 // LOG-13: la Bonificación (columna "Bonif" del subitem) se puede guardar de verdad desde
 // el paso "Confirmar" — en "Comparar y enviar" sigue siendo un ajuste de prueba local.
@@ -895,7 +900,14 @@ export default function OpportunityDetail({
     // desincronizado en silencio (promesa rechazada sin capturar).
     setRawQuotes((prev) => prev.map((r) => (r.id === rawId ? { ...r, [field]: checked } : r)))
     try {
-      await setSubitemCheckboxValue(rawId, OPCIONAL_COLUMN_IDS[field], checked)
+      if (field === 'ap') {
+        await setSubitemCheckboxValue(rawId, AP_SACADO_COLUMN_ID, !checked)
+        setSubitemCheckboxValue(rawId, OPCIONAL_COLUMN_IDS.ap, checked).catch((err) =>
+          console.warn('[AP] no se pudo actualizar la columna AP de compatibilidad', err)
+        )
+      } else {
+        await setSubitemCheckboxValue(rawId, OPCIONAL_COLUMN_IDS[field], checked)
+      }
     } catch (err) {
       setRawQuotes((prev) => prev.map((r) => (r.id === rawId ? { ...r, [field]: !checked } : r)))
       setElegidaError(err.message)
