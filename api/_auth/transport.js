@@ -34,7 +34,14 @@
 
 import { config } from './env.js'
 
-export const COOKIE_SESION = '__Host_stg_sesion'
+// Con guion: "__Host-" es el prefijo que el navegador reconoce, y con él se niega a
+// aceptar la cookie si le falta Secure, si no es Path=/ o si trae Domain — así nadie
+// puede plantarla desde un subdominio. Antes se llamaba "__Host_stg_sesion", con guion
+// bajo, y el navegador la trataba como una cookie común. El nombre viejo se sigue
+// leyendo y borrando para que las sesiones abiertas no se corten en el cambio; se puede
+// sacar pasadas las 24 h que dura una sesión.
+export const COOKIE_SESION = '__Host-stg_sesion'
+const COOKIE_SESION_VIEJA = '__Host_stg_sesion'
 export const COOKIE_DISPOSITIVO = 'stg_dispositivo'
 export const HEADER_SESION = 'x-session-token'
 export const HEADER_DISPOSITIVO = 'x-device-token'
@@ -83,7 +90,7 @@ function parsearCookies(req) {
 // por header le gane a la sesión legítima.
 export function leerTokenSesion(req) {
   const cookies = parsearCookies(req)
-  return cookies[COOKIE_SESION] || req.headers?.[HEADER_SESION] || null
+  return cookies[COOKIE_SESION] || cookies[COOKIE_SESION_VIEJA] || req.headers?.[HEADER_SESION] || null
 }
 
 export function leerTokenDispositivo(req) {
@@ -158,6 +165,7 @@ function borrarCookie(res, nombre) {
 
 export function borrarSesion(res) {
   borrarCookie(res, COOKIE_SESION)
+  borrarCookie(res, COOKIE_SESION_VIEJA)
 }
 
 export function borrarDispositivo(res) {
