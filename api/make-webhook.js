@@ -16,10 +16,9 @@ async function handler(req, res) {
     return
   }
 
-  // MAKE_WHATSAPP_WEBHOOK_URL es el nombre nuevo, sin VITE_, para que la URL no pueda
-  // terminar en el bundle del navegador. VITE_MAKE_WEBHOOK_URL queda como respaldo
-  // mientras la variable nueva no esté cargada en Vercel; después se borra la vieja.
-  const targetUrl = process.env.MAKE_WHATSAPP_WEBHOOK_URL || process.env.VITE_MAKE_WEBHOOK_URL
+  // Sin prefijo VITE_ a propósito: así la URL nunca puede terminar en el bundle del
+  // navegador. Solo la conoce el servidor.
+  const targetUrl = process.env.MAKE_WHATSAPP_WEBHOOK_URL
   if (!targetUrl) {
     res.status(500).json({ error: 'Falta configurar MAKE_WHATSAPP_WEBHOOK_URL en el servidor' })
     return

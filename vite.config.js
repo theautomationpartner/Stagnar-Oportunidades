@@ -398,8 +398,8 @@ function makeWebhookProxy(env) {
           return
         }
 
-        // Mismo orden que api/make-webhook.js: el nombre nuevo, sin VITE_, y el viejo de respaldo.
-        const targetUrl = env.MAKE_WHATSAPP_WEBHOOK_URL || env.VITE_MAKE_WEBHOOK_URL
+        // Igual que api/make-webhook.js: sin VITE_, solo la conoce el servidor.
+        const targetUrl = env.MAKE_WHATSAPP_WEBHOOK_URL
         if (!targetUrl) {
           res.statusCode = 500
           res.end(JSON.stringify({ error: 'Falta configurar MAKE_WHATSAPP_WEBHOOK_URL en .env' }))

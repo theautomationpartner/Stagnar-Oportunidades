@@ -30,8 +30,7 @@ Dejarlo corriendo y abrir http://localhost:5173 en el navegador.
     caen al tablero real actual — se pueden pisar por entorno (ej. un Preview de
     Vercel apuntando a un tablero de prueba en vez del real).
   - `MAKE_WHATSAPP_WEBHOOK_URL`: URL del webhook de Make.com para el envío por WhatsApp.
-    Sin prefijo `VITE_`: solo la usa el servidor (`api/make-webhook.js`). Reemplaza a
-    `VITE_MAKE_WEBHOOK_URL`, que el proxy todavía lee de respaldo.
+    Sin prefijo `VITE_`: solo la usa el servidor (`api/make-webhook.js`).
   - `MAKE_CARTA_AUTOMOVIL_WEBHOOK_URL`: URL del escenario de Make.com que lee la Carta
     Automóvil con IA (ver `services/mondayApi.js#leerCartaAutomovil`). Sin prefijo
     `VITE_` a propósito — igual que `MAKE_WHATSAPP_WEBHOOK_URL`, esta URL nunca debe
