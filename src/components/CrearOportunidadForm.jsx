@@ -798,7 +798,8 @@ export default function CrearOportunidadForm({
       // (solo contactoCrm) — los dos casos se avisan.
       const lookup = (async () => {
         if (ciValida) {
-          const porDoc = await findClientePorDocumento(digits)
+          // El tipo declarado manda: Particular se chequea contra CI, Empresa contra RUT.
+          const porDoc = await findClientePorDocumento(digits, { tipoCliente: form.tipoCliente })
           if (porDoc) return { contacto: porDoc.cliente, motivo: porDoc.motivo }
         }
         // El contacto YA elegido para esta oportunidad no es un duplicado de sí mismo:
@@ -842,6 +843,9 @@ export default function CrearOportunidadForm({
     }
   }, [
     form.ci,
+    // El tipo decide contra qué columna se chequea el documento (CI o RUT): cambiarlo
+    // tiene que volver a consultar, si no queda el resultado del otro documento.
+    form.tipoCliente,
     form.nombre,
     form.apellido,
     form.telefono,
@@ -852,10 +856,18 @@ export default function CrearOportunidadForm({
     resultadoSeleccionado,
   ])
 
-  // "Cancelar" — cierra el popup sin tocar nada, el usuario sigue completando el form a
-  // mano como si el aviso no hubiera aparecido.
+  // Cerrar el aviso sin reusar el cliente encontrado. A pedido, con un documento
+  // repetido eso BORRA el CI/RUT tipeado: no se puede avanzar con un documento que ya es
+  // de otro cliente, así que dejarlo cargado solo esconde el problema hasta el próximo
+  // intento — se vuelve a pedir y de paso desaparece el aviso, que ya no aplica a un
+  // campo vacío. Por Nombre/Email (que no bloquean) no se toca nada: cerrar ahí es
+  // "seguí con el cliente nuevo", una decisión válida.
   const handleCancelDuplicadoModal = () => {
     setShowDuplicadoModal(false)
+    if (duplicadoCheck?.motivo === 'ci' || duplicadoCheck?.motivo === 'rut') {
+      handleChange('ci', '')
+      setDuplicadoCheck(null)
+    }
   }
 
   // "Usar el cliente existente" — aplica directo los datos de ese Contacto (mismo circuito que elegir un

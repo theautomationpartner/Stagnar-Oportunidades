@@ -1503,10 +1503,16 @@ export async function findContactoByCedula(ci) {
 // numérica: contains_text no aplica, se busca por igualdad con any_of (verificado contra
 // la API real: any_of sobre numbers con el valor como string no da error y matchea).
 // Devuelve { cliente, motivo: 'ci' | 'rut' } o null.
+//
+// `tipoCliente` (a pedido) manda sobre la pinta del número: un Particular se chequea
+// contra la columna CI y una Empresa contra R.U.T, que es el documento que cada uno
+// tiene. Sin tipo (los buscadores por término libre, que no saben a quién buscan) se
+// sigue decidiendo por el largo del número.
 export const CLIENTE_RUT_COLUMN_ID = 'numeric_mm51eyk2'
-export async function findClientePorDocumento(documento) {
+export async function findClientePorDocumento(documento, { tipoCliente } = {}) {
   const digits = (documento ?? '').replace(/\D/g, '')
-  const tipo = tipoDeTerminoNumerico(documento)
+  const tipo =
+    tipoCliente === 'Empresa' ? 'rut' : tipoCliente === 'Particular' ? 'ci' : tipoDeTerminoNumerico(documento)
   // Con pinta de teléfono (09..., +598...) no es un documento: que lo resuelva el
   // chequeo de Contactos, no un falso match contra CI/RUT.
   if (tipo !== 'ci' && tipo !== 'rut') return null
