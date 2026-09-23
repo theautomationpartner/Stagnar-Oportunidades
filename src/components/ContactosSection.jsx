@@ -169,13 +169,21 @@ function ContactoFichaModal({ contacto, onOpenCliente, onActualizado, onClose })
     setEditando(true)
   }
 
-  const puedeGuardar =
-    Boolean(nombre.trim()) &&
-    Boolean(telefono.trim()) &&
-    !telErr &&
-    !mailErr &&
-    (!telefonoCambio || chequeo === 'libre') &&
-    !guardando
+  // El teléfono solo condiciona el guardado si se TOCÓ. Sin esto el botón quedaba en
+  // gris para siempre en dos casos muy comunes, y no se podía corregir ni el nombre ni
+  // el email ni las notas:
+  //
+  //   · Contactos sin teléfono. Son la mayoría del tablero.
+  //   · Contactos cuyo número guardado no valida contra el formato que espera la app.
+  //     En el tablero conviven cuatro largos distintos después del 598 (8, 9, 12 y 13
+  //     dígitos) y solo el de 9 pasa: el resto abría la edición ya en rojo, bloqueada,
+  //     por un dato que venía así de antes y que nadie estaba editando.
+  //
+  // Un número que no se tocó tampoco se escribe (ver `guardar`), así que dejarlo pasar
+  // no guarda nada malo. Si se edita, se valida y se chequea duplicado como siempre.
+  const telefonoBloquea = telefonoCambio && (Boolean(telErr) || (Boolean(telefono.trim()) && chequeo !== 'libre'))
+
+  const puedeGuardar = Boolean(nombre.trim()) && !mailErr && !telefonoBloquea && !guardando
 
   const guardar = async () => {
     if (!puedeGuardar) return
