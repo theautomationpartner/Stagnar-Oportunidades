@@ -237,6 +237,27 @@ function authDevPlugin(env) {
           // mutation, y no puede hacerlo acá porque leer el cuerpo consumiría el stream
           // antes de que el proxy lo reenvíe.
           req.__auth = await autenticar(req)
+
+          // El mismo permiso por endpoint que declara cada api/*.js en Vercel
+          // (protegerEndpoint → requierePermiso). Sin esto, en local un Invitado podía
+          // subir archivos, leer documentos o mandar WhatsApp, y la diferencia recién
+          // aparecía en producción.
+          const [{ PERMISOS, puede }, { NoAutorizado }] = await Promise.all([
+            server.ssrLoadModule('/api/_auth/permisos.js'),
+            server.ssrLoadModule('/api/_auth/errors.js'),
+          ])
+          const PERMISO_POR_RUTA = {
+            '/monday': PERMISOS.VER,
+            '/monday-file': PERMISOS.SUBIR_ARCHIVOS,
+            '/monday-asset': PERMISOS.VER,
+            '/make-webhook': PERMISOS.ENVIAR_WHATSAPP,
+            '/leer-cedula': PERMISOS.LEER_DOCUMENTOS,
+            '/leer-carta-automovil': PERMISOS.LEER_DOCUMENTOS,
+          }
+          const permiso = PERMISO_POR_RUTA[(req.url || '').split('?')[0]]
+          if (permiso && !puede(req.__auth.usuario, permiso)) {
+            throw new NoAutorizado('sin_permiso', { permiso, rol: req.__auth.usuario?.rol })
+          }
           next()
         } catch (err) {
           if (modo() === 'shadow') {
