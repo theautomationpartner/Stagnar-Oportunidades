@@ -16,6 +16,11 @@
   background:
     radial-gradient(ellipse at 20% -10%, rgb(255 255 255 / 14%), transparent 55%),
     linear-gradient(155deg, #00615e 0%, #008581 55%, #009d97 100%);
+  /* Mismo ajuste que .loading-screen: con texto claro sobre el verde, el antialiasing
+     por defecto engorda los trazos y pares como "cl" se empastan (se leía "dientes"
+     por "clientes"). */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 
 .landing::after {

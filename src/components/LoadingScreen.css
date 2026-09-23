@@ -15,6 +15,14 @@
   background:
     radial-gradient(ellipse at 20% -10%, rgb(255 255 255 / 14%), transparent 55%),
     linear-gradient(155deg, #00615e 0%, #008581 55%, #009d97 100%);
+  /* Bug reportado: en esta pantalla "Cargando clientes" se leía "Cargando dientes" —
+     texto claro sobre fondo oscuro, el antialiasing por defecto engorda los trazos y la
+     "cl" se empasta hasta parecer una "d". Suavizado antialiased (adelgaza el texto
+     claro) + un pelín de tracking separan las dos letras. Verificado a tamaño real
+     contra el fondo verde; solo acá, que es donde se da la combinación. */
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  letter-spacing: 0.015em;
 }
 
 /* El spinner degradé (azul→verde) se fundía con el fondo verde: va sobre un disco
