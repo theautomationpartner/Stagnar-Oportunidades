@@ -48,6 +48,10 @@ export function mapSubitemToRawQuote(subitem) {
     suraTeLleva: boolOf(cv, 'boolean_mm6zhfhd'),
     // El AP de SURA viene incluido en el precio del portal: sin dato cargado se asume
     // tildado, y solo cuenta como "sacado" cuando está explícitamente destildado.
+    // Ojo: monday devuelve lo mismo (text vacío, value {"checked":false}, sin changed_at)
+    // para una casilla que nunca se tocó y para una destildada — probado contra la API —,
+    // así que un AP destildado vuelve como incluido al recargar. Arreglarlo requiere
+    // guardar el dato al revés ("AP sacado"), en una columna nueva.
     ap: textOf(cv, 'boolean_mm6zzwq5') === '' ? true : boolOf(cv, 'boolean_mm6zzwq5'),
     autoExtra: textOf(cv, 'color_mm6zpx3j'),
   }
