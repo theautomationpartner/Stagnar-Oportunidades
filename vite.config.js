@@ -398,10 +398,11 @@ function makeWebhookProxy(env) {
           return
         }
 
-        const targetUrl = env.VITE_MAKE_WEBHOOK_URL
+        // Mismo orden que api/make-webhook.js: el nombre nuevo, sin VITE_, y el viejo de respaldo.
+        const targetUrl = env.MAKE_WHATSAPP_WEBHOOK_URL || env.VITE_MAKE_WEBHOOK_URL
         if (!targetUrl) {
           res.statusCode = 500
-          res.end(JSON.stringify({ error: 'VITE_MAKE_WEBHOOK_URL no está configurada' }))
+          res.end(JSON.stringify({ error: 'Falta configurar MAKE_WHATSAPP_WEBHOOK_URL en .env' }))
           return
         }
 
@@ -429,7 +430,7 @@ function makeWebhookProxy(env) {
 
 // Lee la Carta Automóvil con IA (ver mondayApi.js#leerCartaAutomovil) — mismo motivo
 // que makeWebhookProxy (CORS de un Custom Webhook de Make pegado directo desde el
-// navegador) más ocultar la URL real: a diferencia de VITE_MAKE_WEBHOOK_URL, esta
+// navegador) más ocultar la URL real: igual que MAKE_WHATSAPP_WEBHOOK_URL, esta
 // variable NO lleva prefijo VITE_ a propósito, así que nunca se embebe en el bundle del
 // cliente — el navegador solo conoce /api/leer-carta-automovil, nunca la URL de Make.
 function leerCartaAutomovilProxy(env) {

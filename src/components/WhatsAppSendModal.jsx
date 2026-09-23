@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react'
 import { MdSend, MdCheckCircle, MdArrowForward, MdImage, MdNotes, MdLibraryAddCheck } from 'react-icons/md'
 import { Modal, ModalHeader, ModalContent, ModalFooter, AttentionBox, TextField, Dropdown } from '@vibe/core'
-import { sendQuotesToWhatsApp, getMakeWebhookUrl } from '../services/makeWebhook'
+import { sendQuotesToWhatsApp } from '../services/makeWebhook'
 import { fetchClienteContactos, fetchContactosCrm, fetchTelefonosEnvioHabilitados } from '../services/mondayApi'
 import { splitTelefono } from '../services/personaFields'
 import GradientSpinner from './GradientSpinner'
@@ -113,7 +113,6 @@ export default function WhatsAppSendModal({
   const [sending, setSending] = useState(false)
   const [error, setError] = useState(null)
   const [submitted, setSubmitted] = useState(false)
-  const webhookConfigured = Boolean(getMakeWebhookUrl())
 
   // A pedido: mostrar ANTES de mandar con qué línea (o líneas) de WhatsApp se puede enviar
   // y de quién es cada celular (ver fetchTelefonosEnvioHabilitados) — no depende de quién
@@ -207,14 +206,6 @@ export default function WhatsAppSendModal({
     <Modal id="whatsapp-send-modal" show onClose={onClose} size="medium">
       <ModalHeader title="Enviar por WhatsApp" className="wa-modal__header" />
       <ModalContent className="wa-modal__content">
-        {!webhookConfigured && (
-          <AttentionBox type="warning">
-            Falta configurar <code>VITE_MAKE_WEBHOOK_URL</code> en <code>app/.env</code> con la URL
-            del webhook de Make.com. Podés previsualizar las imágenes, pero todavía no se puede
-            enviar.
-          </AttentionBox>
-        )}
-
         {showStatus ? (
           <div className="wa-modal__status">
             {/* A pedido, estética tipo mockup: tarjeta con spinner degradé + barra de
@@ -403,7 +394,7 @@ export default function WhatsAppSendModal({
           primaryButton={{
             text: sending ? 'Enviando...' : 'Enviar',
             onClick: handleSend,
-            disabled: sending || !phone || !webhookConfigured,
+            disabled: sending || !phone,
             leftIcon: MdSend,
           }}
           secondaryButton={{ text: 'Cancelar', onClick: onClose }}

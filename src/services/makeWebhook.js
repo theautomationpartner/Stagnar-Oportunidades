@@ -1,8 +1,9 @@
-// Envío a Make.com: se llama directo desde el navegador (a diferencia de la API de
-// monday, un webhook de Make está pensado para recibir POSTs de cualquier origen, no
-// hace falta ocultarlo detrás del proxy del server). La URL se configura en
-// app/.env como VITE_MAKE_WEBHOOK_URL (prefijo VITE_ para que Vite la exponga al
-// bundle del cliente). Ver /logica-monday-vibe.md.
+// Envío a Make.com: el navegador postea a /api/make-webhook y el servidor lo reenvía a
+// la URL real del webhook (ver api/make-webhook.js). La URL vive solo del lado del
+// servidor (MAKE_WHATSAPP_WEBHOOK_URL): antes se leía acá como VITE_MAKE_WEBHOOK_URL y,
+// por el prefijo VITE_, Vite la metía entera en el bundle — cualquiera que abriera el
+// código del navegador podía pegarle al webhook sin pasar por la app. Si falta, el
+// servidor responde un error que se muestra como cualquier rechazo del envío.
 //
 // Se manda como multipart/form-data (archivos binarios reales), NO como base64 dentro
 // de un JSON — así el Custom Webhook de Make ya entrega cada imagen como un binario
@@ -29,10 +30,6 @@
 // Ver /logica-monday-vibe.md.
 import { fetchProtegido } from '../auth/fetchProtegido'
 import { coberturaGroupOf } from './coberturaGroups'
-
-export function getMakeWebhookUrl() {
-  return import.meta.env.VITE_MAKE_WEBHOOK_URL || ''
-}
 
 // Se decodifica a mano, y NO con fetch(dataUrl) como antes: en producción el CSP
 // (ver vercel.json) limita connect-src a 'self' y monday.com, y para el navegador un
@@ -66,13 +63,6 @@ function buildFilename(raw, opportunity, ext = 'png') {
 export const FORMATOS_ENVIO = ['imagen', 'texto', 'ambos']
 
 export async function sendQuotesToWhatsApp({ phone, opportunity, images, formato = 'imagen', telefonoEnvio }) {
-  const url = getMakeWebhookUrl()
-  if (!url) {
-    throw new Error(
-      'Falta configurar VITE_MAKE_WEBHOOK_URL en app/.env con la URL del webhook de Make.com'
-    )
-  }
-
   const formData = new FormData()
   formData.append('phone', phone)
   formData.append('opportunityId', opportunity.id)
@@ -111,7 +101,7 @@ export async function sendQuotesToWhatsApp({ phone, opportunity, images, formato
   // formado y Make no puede parsear los archivos.
   //
   // El POST va a nuestro propio proxy (/api/make-webhook, ver vite.config.js /
-  // api/make-webhook.js), NO directo a `url` — un Custom Webhook de Make normalmente no
+  // api/make-webhook.js), NO directo a Make — un Custom Webhook de Make normalmente no
   // responde con headers CORS, así que un fetch directo desde el navegador terminaba
   // recibiendo el WhatsApp igual (Make sí procesaba el POST) pero tirando "Failed to
   // fetch" del lado del cliente antes de poder confirmar el envío, y por eso nunca se

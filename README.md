@@ -29,10 +29,12 @@ Dejarlo corriendo y abrir http://localhost:5173 en el navegador.
     `VITE_` porque el navegador los necesita para armar las queries. Sin configurar,
     caen al tablero real actual — se pueden pisar por entorno (ej. un Preview de
     Vercel apuntando a un tablero de prueba en vez del real).
-  - `VITE_MAKE_WEBHOOK_URL`: URL del webhook de Make.com para el envío por WhatsApp.
+  - `MAKE_WHATSAPP_WEBHOOK_URL`: URL del webhook de Make.com para el envío por WhatsApp.
+    Sin prefijo `VITE_`: solo la usa el servidor (`api/make-webhook.js`). Reemplaza a
+    `VITE_MAKE_WEBHOOK_URL`, que el proxy todavía lee de respaldo.
   - `MAKE_CARTA_AUTOMOVIL_WEBHOOK_URL`: URL del escenario de Make.com que lee la Carta
     Automóvil con IA (ver `services/mondayApi.js#leerCartaAutomovil`). Sin prefijo
-    `VITE_` a propósito — a diferencia de `VITE_MAKE_WEBHOOK_URL`, esta URL nunca debe
+    `VITE_` a propósito — igual que `MAKE_WHATSAPP_WEBHOOK_URL`, esta URL nunca debe
     llegar al navegador, solo la usa el servidor (`api/leer-carta-automovil.js` en
     Vercel, o el proxy de `vite.config.js` en local).
 - En local (`npm run dev`), el proxy de `/api/monday`, `/api/monday-file` y
