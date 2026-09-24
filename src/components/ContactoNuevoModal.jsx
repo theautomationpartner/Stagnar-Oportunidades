@@ -3,6 +3,7 @@ import { AttentionBox, Button, Modal, ModalContent, ModalFooter, TextField } fro
 import { MdClear } from 'react-icons/md'
 import { Required, RequiredDropdown, codigoPaisDropdownProps } from './crear/FormPrimitives'
 import { CODIGO_PAIS_OPTIONS, emailError, telefonoError } from '../services/personaFields'
+import { normalizarParaMatch } from '../services/format'
 import { buscarContactosCrmLibre } from '../services/mondayApi'
 // Los estilos de campos/errores son los del wizard (crear-op__*) — el popup nació ahí y
 // se ve igual en todos lados.
@@ -31,6 +32,11 @@ import './ContactoNuevoModal.css'
 
 const colaTelefono = (s) => String(s ?? '').replace(/\D/g, '').slice(-8)
 export default function ContactoNuevoModal({
+  // Lista de clientes a elegir: { id, name, contactos: [{ id, name }] }. Solo la pasa la
+  // sección Contactos, donde el contacto se crea suelto y hay que decir a quién
+  // pertenece. En el wizard y en la ficha del cliente ya se sabe cuál es, así que no se
+  // pasa y el selector no aparece.
+  clientes = null,
   // Nombre del cliente, para el check "el contacto es el mismo cliente".
   nombreCliente = '',
   mismoClienteInicial = true,
@@ -48,7 +54,12 @@ export default function ContactoNuevoModal({
   guardando = false,
   onClose,
 }) {
-  const [mismoCliente, setMismoCliente] = useState(mismoClienteInicial)
+  const [mismoClienteTildado, setMismoCliente] = useState(mismoClienteInicial)
+  // "El contacto es el mismo cliente" solo existe cuando hay un cliente conocido: su
+  // checkbox se muestra únicamente con `nombreCliente`. Sin eso, el estado quedaba en
+  // true sin forma de apagarlo, el campo Nombre no se mostraba —se renderiza cuando es
+  // false— y el popup no dejaba crear nada porque el nombre salía vacío.
+  const mismoCliente = Boolean(nombreCliente) && mismoClienteTildado
   const [nombre, setNombre] = useState(inicial.nombre ?? '')
   const [codigoPais, setCodigoPais] = useState(inicial.codigoPais ?? '+598')
   const [telefono, setTelefono] = useState(inicial.telefono ?? '')
@@ -57,6 +68,7 @@ export default function ContactoNuevoModal({
   // 'buscando', 'libre' o 'duplicado' (con el contacto encontrado en dupTelefono).
   const [chequeo, setChequeo] = useState('sin')
   const [dupTelefono, setDupTelefono] = useState(null)
+  const [clienteId, setClienteId] = useState('')
 
   const telErr = telefonoError(telefono, codigoPais)
   const mailErr = emailError(email)
@@ -93,12 +105,30 @@ export default function ContactoNuevoModal({
     }
   }, [telefono, codigoPais, telErr])
 
-  const bloqueadoPorHomonimo = mismoCliente && Boolean(homonimo)
+  // Con el selector puesto, el cliente elegido trae sus contactos: si ya tiene uno con
+  // el mismo nombre, crear otro sería duplicarlo. Es el mismo criterio que el homónimo
+  // del wizard, resuelto acá porque el cliente recién se sabe al elegirlo.
+  const clienteElegido = clientes?.find((c) => String(c.id) === String(clienteId)) ?? null
+  const homonimoDelCliente =
+    nombre.trim() && clienteElegido
+      ? (clienteElegido.contactos ?? []).find(
+          (x) => normalizarParaMatch(x.name) === normalizarParaMatch(nombre)
+        ) ?? null
+      : null
+
+  // Dos homónimos distintos, cada uno con su aviso: el del wizard ("es el mismo
+  // cliente" tildado y ese cliente ya tiene su contacto) y el del selector de acá (el
+  // cliente elegido ya tiene a alguien con ese nombre). Los dos frenan, pero mezclar los
+  // textos dejaba el del wizard sin nombre de cliente que poner.
+  const homonimoDelMismoCliente = mismoCliente && Boolean(homonimo)
+  const bloqueadoPorHomonimo = homonimoDelMismoCliente || Boolean(homonimoDelCliente)
   // En gris hasta que el teléfono esté VERIFICADO como libre — ni mientras se busca ni
   // con un duplicado a la vista.
+  // Todo obligatorio menos el email. Con el selector puesto, el cliente también.
   const puedeGuardar =
     (mismoCliente ? Boolean(nombreCliente) : Boolean(nombre.trim())) &&
     Boolean(telefono.trim()) &&
+    (!clientes || Boolean(clienteId)) &&
     !telErr &&
     !mailErr &&
     !bloqueadoPorHomonimo &&
@@ -107,7 +137,17 @@ export default function ContactoNuevoModal({
 
   const confirmar = () => {
     if (!puedeGuardar) return
-    onGuardar({ mismoCliente, nombre: nombre.trim(), codigoPais, telefono, email })
+    onGuardar({
+      mismoCliente,
+      nombre: nombre.trim(),
+      codigoPais,
+      telefono,
+      email,
+      clienteId: clienteId || undefined,
+      // Los contactos que el cliente YA tiene: al vincular hay que remandarlos todos o
+      // monday los desvincula (ver createContactoCrm).
+      contactosDelCliente: clienteElegido?.contactos ?? [],
+    })
   }
 
   return (
@@ -123,7 +163,7 @@ export default function ContactoNuevoModal({
           </label>
         )}
 
-        {bloqueadoPorHomonimo && (
+        {homonimoDelMismoCliente && (
           <p className="crear-op__field-error" role="alert">
             {nombreCliente} ya tiene su propio contacto cargado — no hace falta crearlo de nuevo.{' '}
             {onElegirHomonimo && (
@@ -139,6 +179,17 @@ export default function ContactoNuevoModal({
               </Button>
             )}
           </p>
+        )}
+
+        {homonimoDelCliente && (
+          <AttentionBox
+            type="danger"
+            title="Ese cliente ya tiene un contacto con ese nombre"
+            className="contacto-nuevo__dup"
+          >
+            <strong>{clienteElegido.name}</strong> ya tiene cargado a <strong>{homonimoDelCliente.name}</strong>.
+            Si es la misma persona no hace falta crearla de nuevo; si es otra, conviene distinguirla en el nombre.
+          </AttentionBox>
         )}
 
         {chequeo === 'duplicado' && dupTelefono && (
@@ -170,6 +221,19 @@ export default function ContactoNuevoModal({
         )}
 
         <div className="crear-op__fields--grid">
+          {clientes && (
+            <label className="crear-op__field">
+              <span>Cliente <Required /></span>
+              <RequiredDropdown
+                size="medium"
+                options={clientes.map((c) => ({ value: String(c.id), label: c.name }))}
+                value={clienteElegido ? { value: String(clienteElegido.id), label: clienteElegido.name } : null}
+                placeholder="¿De qué cliente es este contacto?"
+                searchable
+                onChange={(opcion) => setClienteId(opcion?.value ?? '')}
+              />
+            </label>
+          )}
           {!mismoCliente && (
             <TextField
               size="medium"

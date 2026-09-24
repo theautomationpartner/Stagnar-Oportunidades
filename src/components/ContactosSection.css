@@ -313,3 +313,9 @@
   outline: none;
   border-color: var(--primary-blue);
 }
+
+/* El aviso de un alta que falló va entre la barra y la tabla, con el mismo aire que el
+   resto de la sección. */
+.contactos__aviso {
+  margin: 0 0 14px;
+}

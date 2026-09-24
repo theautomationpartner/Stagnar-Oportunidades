@@ -1,9 +1,12 @@
 import { useEffect, useMemo, useState } from 'react'
-import { MdChevronLeft, MdChevronRight, MdClear, MdContactPhone, MdGroups, MdPeopleAlt, MdSearch } from 'react-icons/md'
+import { MdChevronLeft, MdChevronRight, MdClear, MdContactPhone, MdGroups, MdPeopleAlt, MdPersonAdd, MdSearch } from 'react-icons/md'
 import { AttentionBox, Button, EmptyState, Modal, ModalContent, ModalFooter, Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, TextField } from '@vibe/core'
 import Avatar from './Avatar'
 import LoadingScreen from './LoadingScreen'
+import ContactoNuevoModal from './ContactoNuevoModal'
 import {
+  createContactoCrm,
+  fetchClientesGestion,
   fetchContactosCrmTodos,
   fetchContactoFicha,
   updateContactoCrmFicha,
@@ -408,6 +411,53 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos, onOpenCli
   const [busqueda, setBusqueda] = useState('')
   const [termino, setTermino] = useState('')
   const [page, setPage] = useState(1)
+  // Alta de un contacto desde acá. A diferencia del wizard, el contacto no nace colgado
+  // de una oportunidad: hay que decir a qué cliente pertenece, y por eso al popup se le
+  // pasa la lista de clientes (ver ContactoNuevoModal).
+  const [creando, setCreando] = useState(false)
+  const [clientes, setClientes] = useState(null)
+  const [errorCrear, setErrorCrear] = useState(null)
+  const [guardandoNuevo, setGuardandoNuevo] = useState(false)
+
+  // Los clientes se traen al abrir el popup, no al cargar la pantalla: la mayoría de las
+  // visitas a Contactos son de consulta y no necesitan esta consulta.
+  const abrirAlta = () => {
+    setErrorCrear(null)
+    setCreando(true)
+    if (clientes) return
+    fetchClientesGestion()
+      .then((lista) => setClientes(lista.map((c) => ({ id: c.id, name: c.name, contactos: c.contactos ?? [] }))))
+      .catch((err) => {
+        setErrorCrear(`No se pudo traer la lista de clientes: ${err.message}`)
+        setCreando(false)
+      })
+  }
+
+  const crearContacto = async (datos) => {
+    setGuardandoNuevo(true)
+    setErrorCrear(null)
+    try {
+      await createContactoCrm({
+        name: datos.nombre,
+        phone: buildMondayPhone(datos.codigoPais, datos.telefono),
+        email: datos.email?.trim() ? { email: datos.email.trim(), text: datos.email.trim() } : undefined,
+        clienteId: datos.clienteId,
+        existingContactIds: (datos.contactosDelCliente ?? []).map((c) => c.id),
+      })
+      // La lista se vuelve a traer entera: el contacto nuevo ya viene con su cliente
+      // vinculado, y así la fila se arma igual que las demás.
+      const lista = await fetchContactosCrmTodos()
+      setContactos(lista)
+      // El cliente elegido ahora tiene un contacto más: sin esto, crear un segundo
+      // contacto para el mismo cliente lo desvincularía (ver existingContactIds).
+      setClientes(null)
+      setCreando(false)
+    } catch (err) {
+      setErrorCrear(err.message)
+    } finally {
+      setGuardandoNuevo(false)
+    }
+  }
 
   const buscar = (valor = busqueda) => {
     setTermino(valor)
@@ -494,6 +544,9 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos, onOpenCli
           <Button kind="secondary" size="medium" onClick={() => buscar()}>
             <MdSearch /> Buscar
           </Button>
+          <Button kind="primary" size="medium" onClick={abrirAlta}>
+            <MdPersonAdd /> Crear contacto
+          </Button>
           <span className="contactos__conteo">
             {termino.trim()
               ? `${filtrados.length} de ${contactos.length} contactos`
@@ -501,6 +554,21 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos, onOpenCli
           </span>
         </div>
       </div>
+
+      {errorCrear && (
+        <AttentionBox type="danger" title="No se pudo crear el contacto" className="contactos__aviso">
+          {errorCrear}
+        </AttentionBox>
+      )}
+
+      {creando && (
+        <ContactoNuevoModal
+          clientes={clientes ?? []}
+          onGuardar={crearContacto}
+          guardando={guardandoNuevo}
+          onClose={() => setCreando(false)}
+        />
+      )}
 
       <div className="contactos__tabla">
         {/* isLoading en false siempre: mientras carga, el componente devuelve la
