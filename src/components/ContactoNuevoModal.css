@@ -7,3 +7,27 @@
 .contacto-nuevo__dup-accion {
   margin-top: 10px;
 }
+
+/* Buscador de cliente: campo + botón en una fila, igual que el de contactos del paso 1. */
+.contacto-nuevo__buscar-cliente {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.contacto-nuevo__buscar-cliente > :first-child {
+  flex: 1;
+}
+
+/* Ya elegido: el nombre y la salida para cambiarlo, sin dejar el buscador ocupando lugar. */
+.contacto-nuevo__cliente-elegido {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  background: var(--bg-subtle);
+}

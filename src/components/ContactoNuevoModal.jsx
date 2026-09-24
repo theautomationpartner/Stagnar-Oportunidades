@@ -4,7 +4,7 @@ import { MdClear } from 'react-icons/md'
 import { Required, RequiredDropdown, codigoPaisDropdownProps } from './crear/FormPrimitives'
 import { CODIGO_PAIS_OPTIONS, emailError, telefonoError } from '../services/personaFields'
 import { normalizarParaMatch } from '../services/format'
-import { buscarContactosCrmLibre } from '../services/mondayApi'
+import { buscarContactosCrmLibre, fetchClienteContactos, searchContactos } from '../services/mondayApi'
 // Los estilos de campos/errores son los del wizard (crear-op__*) — el popup nació ahí y
 // se ve igual en todos lados.
 import './CrearOportunidadForm.css'
@@ -32,11 +32,10 @@ import './ContactoNuevoModal.css'
 
 const colaTelefono = (s) => String(s ?? '').replace(/\D/g, '').slice(-8)
 export default function ContactoNuevoModal({
-  // Lista de clientes a elegir: { id, name, contactos: [{ id, name }] }. Solo la pasa la
-  // sección Contactos, donde el contacto se crea suelto y hay que decir a quién
-  // pertenece. En el wizard y en la ficha del cliente ya se sabe cuál es, así que no se
-  // pasa y el selector no aparece.
-  clientes = null,
+  // Pide elegir el cliente. Solo lo activa la sección Contactos, donde el contacto se
+  // crea suelto y hay que decir a quién pertenece; en el wizard y en la ficha del cliente
+  // ya se sabe cuál es y el buscador no aparece.
+  pedirCliente = false,
   // Nombre del cliente, para el check "el contacto es el mismo cliente".
   nombreCliente = '',
   mismoClienteInicial = true,
@@ -68,7 +67,40 @@ export default function ContactoNuevoModal({
   // 'buscando', 'libre' o 'duplicado' (con el contacto encontrado en dupTelefono).
   const [chequeo, setChequeo] = useState('sin')
   const [dupTelefono, setDupTelefono] = useState(null)
-  const [clienteId, setClienteId] = useState('')
+  // El cliente se BUSCA y se elige, no se filtra una lista entera cargada de antemano:
+  // se escribe y se aprieta Buscar (o Enter), igual que en las tablas de la app. Así no
+  // se traen los clientes que nadie va a mirar y la consulta sale una sola vez, con el
+  // término completo, en vez de una por tecla.
+  const [busquedaCliente, setBusquedaCliente] = useState('')
+  const [resultadosCliente, setResultadosCliente] = useState(null)
+  const [buscandoCliente, setBuscandoCliente] = useState(false)
+  const [clienteElegido, setClienteElegido] = useState(null)
+
+  const buscarCliente = async () => {
+    const termino = busquedaCliente.trim()
+    if (termino.length < 2) return
+    setBuscandoCliente(true)
+    try {
+      setResultadosCliente(await searchContactos(termino))
+    } catch {
+      setResultadosCliente([])
+    } finally {
+      setBuscandoCliente(false)
+    }
+  }
+
+  // Al elegirlo se traen sus contactos: hacen falta para avisar del homónimo y, sobre
+  // todo, para remandarlos al vincular — monday reemplaza la lista entera, así que sin
+  // ellos el cliente se quedaría solo con el contacto nuevo.
+  const elegirCliente = async (cliente) => {
+    setClienteElegido({ ...cliente, contactos: [] })
+    try {
+      setClienteElegido({ ...cliente, contactos: await fetchClienteContactos(cliente.id) })
+    } catch {
+      // Sin la lista no se puede vincular sin romper lo que ya había: se deshace.
+      setClienteElegido(null)
+    }
+  }
 
   const telErr = telefonoError(telefono, codigoPais)
   const mailErr = emailError(email)
@@ -108,7 +140,6 @@ export default function ContactoNuevoModal({
   // Con el selector puesto, el cliente elegido trae sus contactos: si ya tiene uno con
   // el mismo nombre, crear otro sería duplicarlo. Es el mismo criterio que el homónimo
   // del wizard, resuelto acá porque el cliente recién se sabe al elegirlo.
-  const clienteElegido = clientes?.find((c) => String(c.id) === String(clienteId)) ?? null
   const homonimoDelCliente =
     nombre.trim() && clienteElegido
       ? (clienteElegido.contactos ?? []).find(
@@ -128,7 +159,7 @@ export default function ContactoNuevoModal({
   const puedeGuardar =
     (mismoCliente ? Boolean(nombreCliente) : Boolean(nombre.trim())) &&
     Boolean(telefono.trim()) &&
-    (!clientes || Boolean(clienteId)) &&
+    (!pedirCliente || Boolean(clienteElegido)) &&
     !telErr &&
     !mailErr &&
     !bloqueadoPorHomonimo &&
@@ -143,7 +174,7 @@ export default function ContactoNuevoModal({
       codigoPais,
       telefono,
       email,
-      clienteId: clienteId || undefined,
+      clienteId: clienteElegido?.id,
       // Los contactos que el cliente YA tiene: al vincular hay que remandarlos todos o
       // monday los desvincula (ver createContactoCrm).
       contactosDelCliente: clienteElegido?.contactos ?? [],
@@ -221,17 +252,70 @@ export default function ContactoNuevoModal({
         )}
 
         <div className="crear-op__fields--grid">
-          {clientes && (
-            <label className="crear-op__field">
+          {pedirCliente && (
+            <label className="crear-op__field crear-op__field--full">
               <span>Cliente <Required /></span>
-              <RequiredDropdown
-                size="medium"
-                options={clientes.map((c) => ({ value: String(c.id), label: c.name }))}
-                value={clienteElegido ? { value: String(clienteElegido.id), label: clienteElegido.name } : null}
-                placeholder="¿De qué cliente es este contacto?"
-                searchable
-                onChange={(opcion) => setClienteId(opcion?.value ?? '')}
-              />
+              {clienteElegido ? (
+                <div className="contacto-nuevo__cliente-elegido">
+                  <strong>{clienteElegido.name}</strong>
+                  <Button
+                    kind="tertiary"
+                    size="small"
+                    onClick={() => {
+                      setClienteElegido(null)
+                      setResultadosCliente(null)
+                    }}
+                  >
+                    Cambiar
+                  </Button>
+                </div>
+              ) : (
+                <>
+                  <div className="contacto-nuevo__buscar-cliente">
+                    <TextField
+                      size="medium"
+                      placeholder="Nombre, CI o RUT del cliente"
+                      value={busquedaCliente}
+                      onChange={setBusquedaCliente}
+                      onKeyDown={(e) => e.key === 'Enter' && buscarCliente()}
+                      icon={MdClear}
+                      onIconClick={() => {
+                        setBusquedaCliente('')
+                        setResultadosCliente(null)
+                      }}
+                    />
+                    <Button
+                      kind="secondary"
+                      size="medium"
+                      loading={buscandoCliente}
+                      disabled={busquedaCliente.trim().length < 2}
+                      onClick={buscarCliente}
+                    >
+                      Buscar
+                    </Button>
+                  </div>
+                  {resultadosCliente !== null && !buscandoCliente && resultadosCliente.length === 0 && (
+                    <span className="crear-op__field-error" role="alert">
+                      Sin resultados para «{busquedaCliente.trim()}» en Clientes.
+                    </span>
+                  )}
+                  {(resultadosCliente ?? []).length > 0 && (
+                    <RequiredDropdown
+                      size="medium"
+                      options={resultadosCliente.map((c) => ({
+                        value: String(c.id),
+                        label: [c.name, c.ci && `CI ${c.ci}`].filter(Boolean).join(' — '),
+                      }))}
+                      value={null}
+                      placeholder={`${resultadosCliente.length} resultado(s): elegí el cliente`}
+                      onChange={(opcion) => {
+                        const c = resultadosCliente.find((x) => String(x.id) === opcion?.value)
+                        if (c) elegirCliente(c)
+                      }}
+                    />
+                  )}
+                </>
+              )}
             </label>
           )}
           {!mismoCliente && (

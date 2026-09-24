@@ -6,7 +6,6 @@ import LoadingScreen from './LoadingScreen'
 import ContactoNuevoModal from './ContactoNuevoModal'
 import {
   createContactoCrm,
-  fetchClientesGestion,
   fetchContactosCrmTodos,
   fetchContactoFicha,
   updateContactoCrmFicha,
@@ -415,22 +414,12 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos, onOpenCli
   // de una oportunidad: hay que decir a qué cliente pertenece, y por eso al popup se le
   // pasa la lista de clientes (ver ContactoNuevoModal).
   const [creando, setCreando] = useState(false)
-  const [clientes, setClientes] = useState(null)
   const [errorCrear, setErrorCrear] = useState(null)
   const [guardandoNuevo, setGuardandoNuevo] = useState(false)
 
-  // Los clientes se traen al abrir el popup, no al cargar la pantalla: la mayoría de las
-  // visitas a Contactos son de consulta y no necesitan esta consulta.
   const abrirAlta = () => {
     setErrorCrear(null)
     setCreando(true)
-    if (clientes) return
-    fetchClientesGestion()
-      .then((lista) => setClientes(lista.map((c) => ({ id: c.id, name: c.name, contactos: c.contactos ?? [] }))))
-      .catch((err) => {
-        setErrorCrear(`No se pudo traer la lista de clientes: ${err.message}`)
-        setCreando(false)
-      })
   }
 
   const crearContacto = async (datos) => {
@@ -448,9 +437,6 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos, onOpenCli
       // vinculado, y así la fila se arma igual que las demás.
       const lista = await fetchContactosCrmTodos()
       setContactos(lista)
-      // El cliente elegido ahora tiene un contacto más: sin esto, crear un segundo
-      // contacto para el mismo cliente lo desvincularía (ver existingContactIds).
-      setClientes(null)
       setCreando(false)
     } catch (err) {
       setErrorCrear(err.message)
@@ -563,7 +549,7 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos, onOpenCli
 
       {creando && (
         <ContactoNuevoModal
-          clientes={clientes ?? []}
+          pedirCliente
           onGuardar={crearContacto}
           guardando={guardandoNuevo}
           onClose={() => setCreando(false)}
