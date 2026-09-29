@@ -45,6 +45,10 @@ export default function ContactoNuevoModal({
   // otro sería duplicarlo — se bloquea y se ofrece usarlo.
   homonimo = null,
   onElegirHomonimo,
+  // Los contactos que el cliente YA tiene (el alta y la ficha del cliente los conocen de
+  // antemano; con el selector de cliente llegan al elegirlo). Sirven para frenar un
+  // contacto nuevo con el mismo nombre que uno existente.
+  contactosDelCliente = [],
   // Contacto encontrado por TELÉFONO repetido al confirmar: "Usar ese contacto".
   onUsarExistente,
   // Confirmación: recibe { mismoCliente, nombre, codigoPais, telefono, email }. Puede ser
@@ -137,14 +141,16 @@ export default function ContactoNuevoModal({
     }
   }, [telefono, codigoPais, telErr])
 
-  // Con el selector puesto, el cliente elegido trae sus contactos: si ya tiene uno con
-  // el mismo nombre, crear otro sería duplicarlo. Es el mismo criterio que el homónimo
-  // del wizard, resuelto acá porque el cliente recién se sabe al elegirlo.
+  // Si el cliente ya tiene un contacto con el nombre que se está escribiendo, crear otro
+  // sería duplicarlo. Con el selector puesto, los contactos llegan al elegir el cliente;
+  // en el alta y en la ficha vienen de afuera. Bug reportado: con "es el mismo cliente"
+  // tildado esto ya frenaba (ver homonimoDelMismoCliente), pero destildándolo y
+  // escribiendo el mismo nombre se creaba el duplicado igual.
+  const contactosConocidos = clienteElegido ? clienteElegido.contactos ?? [] : contactosDelCliente
+  const nombreDelCliente = clienteElegido?.name ?? nombreCliente
   const homonimoDelCliente =
-    nombre.trim() && clienteElegido
-      ? (clienteElegido.contactos ?? []).find(
-          (x) => normalizarParaMatch(x.name) === normalizarParaMatch(nombre)
-        ) ?? null
+    !mismoCliente && nombre.trim()
+      ? contactosConocidos.find((x) => normalizarParaMatch(x.name) === normalizarParaMatch(nombre)) ?? null
       : null
 
   // Dos homónimos distintos, cada uno con su aviso: el del wizard ("es el mismo
@@ -218,7 +224,7 @@ export default function ContactoNuevoModal({
             title="Ese cliente ya tiene un contacto con ese nombre"
             className="contacto-nuevo__dup"
           >
-            <strong>{clienteElegido.name}</strong> ya tiene cargado a <strong>{homonimoDelCliente.name}</strong>.
+            <strong>{nombreDelCliente}</strong> ya tiene cargado a <strong>{homonimoDelCliente.name}</strong>.
             Si es la misma persona no hace falta crearla de nuevo; si es otra, conviene distinguirla en el nombre.
           </AttentionBox>
         )}

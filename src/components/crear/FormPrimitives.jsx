@@ -511,6 +511,7 @@ export function ContactoFields({
                 }
           }
           homonimo={homonimo}
+          contactosDelCliente={contactosDelCliente}
           onElegirHomonimo={(h) => onElegirContacto?.(h.id)}
           // Teléfono repetido detectado adentro del popup: "usar ese contacto" cae en el
           // mismo camino que elegirlo desde el buscador.

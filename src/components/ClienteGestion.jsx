@@ -585,6 +585,7 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
           // ninguno, el caso común es el propio cliente (igual que en el alta).
           mismoClienteInicial={contactosDetalle.length === 0}
           homonimo={homonimoDelCliente}
+          contactosDelCliente={contactosDetalle}
           // El homónimo ya está vinculado a este cliente: "usarlo" es simplemente no
           // crear otro (el popup se cierra solo).
           onElegirHomonimo={() => {}}
