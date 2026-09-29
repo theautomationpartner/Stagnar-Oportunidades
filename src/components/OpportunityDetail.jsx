@@ -119,6 +119,8 @@ import {
   VALIDACION_POLIZA_COLUMN_ID,
   estaValidando,
 } from '../services/validacionPoliza'
+import { dispararEscenario } from '../services/makeEscenarios'
+import { EDAD_COLUMN_ID, edadDesde } from '../services/edad'
 import { useAuth } from '../auth/AuthContext'
 import './OpportunityDetail.css'
 
@@ -463,6 +465,23 @@ export default function OpportunityDetail({
   // arrancó un tick más nuevo para cuando esta respuesta vuelve, se descarta.
   const tickSeqRef = useRef(0)
   const [pollStalled, setPollStalled] = useState(false)
+  // El tick del polling en curso, para poder adelantarlo cuando un escenario de Make
+  // contesta que ya terminó (ver avisarAlEscenario) en vez de esperar al próximo
+  // intervalo. null cuando no hay polling.
+  const tickAhoraRef = useRef(null)
+  const opportunityIdRef = useRef(opportunityId)
+  opportunityIdRef.current = opportunityId
+
+  // Dispara un escenario de Make (ver services/makeEscenarios.js) sin frenar la pantalla:
+  // quien llama ya escribió la columna y prendió su polling, y esto solo sirve para
+  // enterarse antes de cómo le fue. Sin respuesta útil no se hace nada y el polling
+  // sigue; si la ficha ya es de otra oportunidad cuando contesta, tampoco.
+  const avisarAlEscenario = (escenario, alResponder) => {
+    const idPedido = opportunityId
+    dispararEscenario(escenario, idPedido).then((respuesta) => {
+      if (respuesta && opportunityIdRef.current === idPedido) alResponder(respuesta)
+    })
+  }
 
   useEffect(() => {
     if (!anyPolling) return undefined
@@ -634,9 +653,11 @@ export default function OpportunityDetail({
     document.addEventListener('visibilitychange', handleVisibility)
     window.addEventListener('focus', handleVisibility)
 
+    tickAhoraRef.current = tick
     const id = setInterval(tick, POLL_INTERVAL_MS)
     return () => {
       cancelled = true
+      if (tickAhoraRef.current === tick) tickAhoraRef.current = null
       clearInterval(id)
       document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('focus', handleVisibility)
@@ -1105,6 +1126,10 @@ export default function OpportunityDetail({
           `No se pudo dejar el año a cotizar en ${anioCotizacion} (quedó "${anioConfirmado}"). No se cotizó, para que el robot no use un año equivocado.`
         )
       }
+      // El robot también cotiza con la Edad (ver services/edad.js): se deja al día con la
+      // fecha de nacimiento. Sin fecha no se escribe nada y el escenario avisa qué falta.
+      const edad = edadDesde(opportunity?.fechaNacimiento)
+      if (edad) await setSimpleColumnValue(opportunityId, EDAD_COLUMN_ID, String(edad))
       await setSimpleColumnValue(opportunityId, ESTADO_COTIZACION_COLUMN_ID, 'Cotizar')
       setItem((prev) => ({
         ...prev,
@@ -1118,6 +1143,16 @@ export default function OpportunityDetail({
       cotizarPollStartRef.current = Date.now()
       cotizarProgresoVistoRef.current = 0
       setPolling(true)
+      // El escenario contesta apenas larga el robot ("cotizando") o apenas ve que faltan
+      // datos (con cuáles). Lo segundo se muestra ya, sin esperar a que el polling vea el
+      // "Error" y vaya a buscar el Update. El final de la cotización lo sigue trayendo el
+      // polling: lo escribe otro escenario, el que dispara Apify al terminar el robot.
+      avisarAlEscenario('cotizar', ({ error }) => {
+        if (!error) return
+        setPolling(false)
+        setMarkError('La cotización automática no se pudo iniciar.')
+        setCotizarErrorDetail(error)
+      })
       // Le llega el turno a Cotización: En Proceso mientras el robot corre (si venía
       // Completada de una vuelta anterior, vuelve acá) — recién se completa de nuevo si
       // ESTA corrida termina bien (ver el polling más abajo); si falla, queda en
@@ -1355,7 +1390,12 @@ export default function OpportunityDetail({
     await setSimpleColumnValue(opportunityId, VALIDACION_POLIZA_COLUMN_ID, estadoGeneral)
   }
 
-  const pedirValidacionPoliza = () => limpiarValidacionPoliza(ESTADO_GENERAL.validar)
+  // El escenario no contesta errores propios: cuando responde, ya dejó los veredictos
+  // escritos, así que alcanza con adelantar el tick para verlos.
+  const pedirValidacionPoliza = async () => {
+    await limpiarValidacionPoliza(ESTADO_GENERAL.validar)
+    avisarAlEscenario('validar-poliza', () => tickAhoraRef.current?.())
+  }
 
   // A pedido: eliminar la póliza también limpia la validación. Solo si el borrado salió
   // bien — si falló, la póliza sigue ahí y sus veredictos siguen valiendo. Un fallo de
@@ -1508,6 +1548,16 @@ export default function OpportunityDetail({
         ),
       }))
       setPolizaPolling(true)
+      // Un error (faltan datos del cliente o del vehículo) se muestra en el acto. Si sale
+      // bien, se adelanta el tick para que "Creada" aparezca sin esperar el intervalo.
+      avisarAlEscenario('crear-poliza', ({ error }) => {
+        if (!error) {
+          tickAhoraRef.current?.()
+          return
+        }
+        setPolizaPolling(false)
+        setPolizaErrorDetail(error)
+      })
     } catch (err) {
       setConfirmarEmisionError(err.message)
     } finally {

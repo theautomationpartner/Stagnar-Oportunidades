@@ -253,6 +253,7 @@ function authDevPlugin(env) {
             '/make-webhook': PERMISOS.ENVIAR_WHATSAPP,
             '/leer-cedula': PERMISOS.LEER_DOCUMENTOS,
             '/leer-carta-automovil': PERMISOS.LEER_DOCUMENTOS,
+            '/disparar-escenario': PERMISOS.ESCRIBIR,
           }
           const permiso = PERMISO_POR_RUTA[(req.url || '').split('?')[0]]
           if (permiso && !puede(req.__auth.usuario, permiso)) {
@@ -517,6 +518,43 @@ function leerCedulaProxy(env) {
   }
 }
 
+// Dispara Cotizar / Validar póliza / Crear póliza en Make (ver api/disparar-escenario.js)
+// — mismo motivo que los proxies de arriba: CORS y que la URL real no llegue al
+// navegador. La lista de escenarios y la forma del pedido son las mismas que en Vercel
+// (api/_make/escenarios.js), cargadas por el grafo de Vite como hace authDevPlugin.
+function dispararEscenarioProxy(env) {
+  return {
+    name: 'disparar-escenario-proxy',
+    configureServer(server) {
+      server.middlewares.use('/api/disparar-escenario', async (req, res) => {
+        if (req.method !== 'POST') {
+          res.statusCode = 405
+          res.end('Method not allowed')
+          return
+        }
+
+        const chunks = []
+        req.on('data', (chunk) => chunks.push(chunk))
+        req.on('end', async () => {
+          let pedido
+          try {
+            pedido = JSON.parse(Buffer.concat(chunks).toString() || '{}')
+          } catch {
+            res.statusCode = 400
+            res.end(JSON.stringify({ error: 'JSON inválido' }))
+            return
+          }
+          const { dispararEscenario } = await server.ssrLoadModule('/api/_make/escenarios.js')
+          const { status, body } = await dispararEscenario(pedido, env)
+          res.statusCode = status
+          res.setHeader('Content-Type', 'application/json')
+          res.end(body)
+        })
+      })
+    },
+  }
+}
+
 // Descarga el archivo real de una columna "file" ya subida (a pedido: reusar la Cédula
 // Identidad de una Oportunidad anterior al elegirla en el buscador, ver
 // mondayApi.js#fetchFileColumnAsFile). El asset guarda el binario en S3, no en
@@ -592,6 +630,7 @@ export default defineConfig(({ mode }) => {
       makeWebhookProxy(env),
       leerCartaAutomovilProxy(env),
       leerCedulaProxy(env),
+      dispararEscenarioProxy(env),
       mondayAssetProxy(env),
     ],
     server: {

@@ -130,7 +130,7 @@ export async function sendQuotesToWhatsApp({ phone, opportunity, images, formato
 // Devuelve el mensaje de error que mandó el escenario, o null si la respuesta no es uno.
 // Solo se mira la clave "error": un cuerpo con otra forma (el "Accepted" de siempre, un
 // JSON de datos) no es un rechazo y no tiene que frenar nada.
-function leerErrorDeMake(cuerpo) {
+export function leerErrorDeMake(cuerpo) {
   const texto = (cuerpo ?? '').trim()
   if (!texto.startsWith('{')) return null
   try {

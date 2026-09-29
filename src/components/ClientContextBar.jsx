@@ -4,6 +4,7 @@ import { Button } from '@vibe/core'
 import ClienteArchivos from './ClienteArchivos'
 import { formatShortDate, modeloSinMarca, sinCodigoPostal } from '../services/format'
 import { initialsOf } from '../services/personaFields'
+import { edadDesde } from '../services/edad'
 import './ClientContextBar.css'
 
 // Barra de contexto del Cliente/Lead para los pasos 2, 3 y 4 de una Oportunidad
@@ -13,15 +14,6 @@ import './ClientContextBar.css'
 // nacimiento/edad, domicilio, zona, tipo, documentos) — nada se repite — como panel
 // flotante por ENCIMA del contenido de abajo (no lo empuja); se cierra con click afuera,
 // Escape o el mismo botón. Las acciones (Editar/Recotizar) van en la barra.
-function edadDesde(fechaIso) {
-  if (!fechaIso) return null
-  const [y, m, d] = String(fechaIso).slice(0, 10).split('-').map(Number)
-  if (!y || !m || !d) return null
-  const hoy = new Date()
-  let edad = hoy.getFullYear() - y
-  if (hoy.getMonth() + 1 < m || (hoy.getMonth() + 1 === m && hoy.getDate() < d)) edad -= 1
-  return edad > 0 && edad < 130 ? edad : null
-}
 
 export default function ClientContextBar({ opportunity, onEdit, actions, tag }) {
   const [open, setOpen] = useState(false)
