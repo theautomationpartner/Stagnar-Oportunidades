@@ -26,7 +26,7 @@ import {
   fetchDepartamentos,
   fetchLocalidades,
   fetchCurrentMondayUser,
-  fetchMondayUsers,
+  fetchPersonasAsignables,
 } from './services/mondayApi'
 import {
   FILTROS_VACIOS,
@@ -133,11 +133,12 @@ export default function App() {
     }
   }, [])
 
-  // Personas del filtro "Asignado": las mismas que ofrece el selector de Asignado.
+  // Personas del filtro "Asignado": las mismas que ofrece el selector de Asignado —
+  // solo las habilitadas en la lista blanca (ver fetchPersonasAsignables).
   const [usuarios, setUsuarios] = useState([])
   useEffect(() => {
     let cancelled = false
-    fetchMondayUsers()
+    fetchPersonasAsignables()
       .then((lista) => !cancelled && setUsuarios(lista))
       .catch(() => {}) // sin la lista, el filtro de Asignado queda vacío
     return () => {
