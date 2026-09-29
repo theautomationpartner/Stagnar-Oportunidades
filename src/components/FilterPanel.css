@@ -1,76 +1,190 @@
+/* Buscador + filtros de la tabla de Oportunidades (ver FilterPanel.jsx): una sola fila
+   —buscador, botón Filtros, filtros activos como etiquetas, Limpiar— y los filtros en un
+   panel flotante que se superpone a la tabla (no la empuja hacia abajo). */
 .filter-panel {
-  margin: 20px var(--page-gutter) 0;
-  padding: 14px 20px;
+  position: relative;
+  margin: 16px var(--page-gutter) 0;
+  padding: 10px 14px;
   border: 1px solid var(--border);
   border-radius: 10px;
   background: #fff;
 }
 
-@media (max-width: 640px) {
-  .filter-panel {
-    padding: 12px 16px;
-  }
+.filter-panel__fila {
+  display: flex;
+  align-items: center;
+  gap: 8px 10px;
+  flex-wrap: wrap;
 }
 
-/* Search (@vibe/core) ya trae su propio padding/borde/radio — acá solo el layout. */
-.filter-panel__search {
-  width: 100%;
-}
-
-/* El botón "Buscar" al lado de la barra, y debajo de ella cuando no entran los dos. */
+/* A pedido, más angosto: el texto que se busca es corto (un nombre, una CI, una
+   matrícula) y a todo el ancho empujaba el resto a otra fila. */
 .filter-panel__search-row {
   display: flex;
   gap: 8px;
   align-items: center;
+  flex: 0 1 460px;
+  min-width: 260px;
+}
+
+.filter-panel__search {
+  flex: 1;
+  min-width: 0;
 }
 
 .filter-panel__search-btn {
   flex: 0 0 auto;
 }
 
-@media (max-width: 640px) {
-  .filter-panel__search-row {
-    flex-wrap: wrap;
-  }
-
-  .filter-panel__search-btn {
-    width: 100%;
-  }
+.filter-panel__toggle {
+  flex: 0 0 auto;
+  gap: 6px;
 }
 
-/* A pedido, estética tipo mockup: link chico en vez del Button "Ocultar/Mostrar
-   filtros" de siempre — los filtros básicos (Estado cotización/Tipo sujeto/Estado
-   envío) son secundarios ahora que la búsqueda hace la mayor parte del trabajo. */
-.filter-panel__advanced-toggle {
+.filter-panel__toggle--abierto {
+  border-color: var(--primary-blue);
+  color: var(--primary-blue);
+}
+
+/* Contador de filtros activos en el botón (auditoría, ver FilterPanel.jsx). */
+.filter-panel__active-count {
   display: inline-flex;
   align-items: center;
-  gap: 2px;
-  margin-top: 10px;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  padding: 0 5px;
+  margin-left: 2px;
+  border-radius: 9px;
+  background: var(--primary-blue);
+  color: #fff;
+  font-size: 11px;
+  font-weight: 700;
+  line-height: 1;
+}
+
+/* Filtros aplicados, visibles con el panel cerrado: cada uno se saca con su cruz. */
+.filter-panel__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.filter-panel__chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 3px 4px 3px 10px;
+  font-size: 12px;
+  color: var(--text-dark);
+  background: var(--tint-info);
+  border: 1px solid var(--tint-info-bd);
+  border-radius: 999px;
+}
+
+.filter-panel__chip span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.filter-panel__chip button {
+  display: inline-flex;
+  padding: 2px;
   border: none;
   background: none;
-  padding: 0;
-  font: inherit;
-  font-size: 13px;
-  font-weight: 600;
-  color: var(--primary-blue);
+  color: var(--text-gray);
+  border-radius: 50%;
   cursor: pointer;
 }
 
-.filter-panel__advanced-toggle:hover {
-  text-decoration: underline;
+.filter-panel__chip button:hover {
+  color: var(--text-dark);
+  background: rgb(0 0 0 / 6%);
 }
 
-.filter-panel__fields {
+.filter-panel__limpiar {
+  margin-left: auto;
+}
+
+/* Panel flotante: cuelga del buscador y se superpone a la tabla. */
+.filter-panel__popover {
+  position: absolute;
+  top: calc(100% + 6px);
+  left: 0;
+  z-index: var(--z-dropdown, 20);
+  width: min(820px, calc(100vw - 2 * var(--page-gutter, 16px)));
+  padding: 14px 16px 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  box-shadow: 0 14px 36px rgb(0 0 0 / 16%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.filter-panel__grupo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.filter-panel__grupo + .filter-panel__grupo {
+  padding-top: 12px;
+  border-top: 1px solid var(--border);
+}
+
+.filter-panel__grupo-titulo {
+  margin: 0;
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--text-muted);
+}
+
+.filter-panel__grupo-campos {
   display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 10px 16px;
-  margin-top: 14px;
+  gap: 10px 14px;
 }
 
-@media (max-width: 640px) {
-  .filter-panel__fields {
+.filter-panel__grupo-campos--3 {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.filter-panel__grupo-campos--2 {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+}
+
+.filter-panel__grupo-campos--fechas {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+@media (max-width: 720px) {
+  .filter-panel__grupo-campos--3,
+  .filter-panel__grupo-campos--2,
+  .filter-panel__grupo-campos--fechas {
     grid-template-columns: 1fr;
   }
+
+  .filter-panel__search-row {
+    flex: 1 1 100%;
+  }
+}
+
+.filter-panel__popover-pie {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+  padding-top: 10px;
+  border-top: 1px solid var(--border);
 }
 
 .filter-field {
@@ -80,42 +194,6 @@
   font-size: 11px;
   color: var(--text-gray);
   font-weight: 600;
-}
-
-.filter-panel__footer {
-  display: flex;
-  align-items: center;
-  justify-content: flex-end;
-  margin-top: 12px;
-}
-
-/* Contador de filtros activos en el toggle (auditoría, ver FilterPanel.jsx). */
-.filter-panel__active-count {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-width: 18px;
-  height: 18px;
-  padding: 0 5px;
-  margin: 0 4px;
-  border-radius: 9px;
-  background: var(--primary-blue);
-  color: #fff;
-  font-size: 11px;
-  font-weight: 700;
-  line-height: 1;
-}
-
-/* Reunión del 24/09: más filtros — estados, Tipo de sujeto y Asignado en una grilla de 5
-   que baja a 3 y a 1; los tres rangos de fecha en su propia fila. */
-@media (min-width: 1100px) {
-  .filter-panel__fields {
-    grid-template-columns: repeat(5, minmax(0, 1fr));
-  }
-
-  .filter-panel__fields--fechas {
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-  }
 }
 
 .filter-field--rango {
