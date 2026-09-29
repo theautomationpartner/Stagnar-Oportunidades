@@ -1,6 +1,8 @@
 import { useEffect, useState } from 'react'
 import { MdAutorenew, MdChevronRight, MdDescription, MdLogout, MdNoteAdd, MdPeopleAlt, MdSearch } from 'react-icons/md'
+import { Search } from '@vibe/core'
 import stagnariLogo from '../assets/stagnari-logo.png'
+import { normalizarParaMatch } from '../services/format'
 import { fetchMe } from '../services/mondayApi'
 import { initialsOf } from '../services/personaFields'
 import { useMondayUser } from '../context/AppContext'
@@ -60,6 +62,13 @@ export default function LandingScreen({ onCreateNew, onSearchExisting, onCliente
     : (ctxUser?.name ?? usuarioSesion?.nombre ?? me?.name)
   const fotoSesion = ctxUser?.photo ?? me?.photo ?? null
   const [saliendo, setSaliendo] = useState(false)
+  // A pedido: buscador de lo que se puede hacer, solo por el título del botón y el texto
+  // que muestra (la descripción, o "Próximamente"). Sin distinguir acentos ni mayúsculas.
+  const [busqueda, setBusqueda] = useState('')
+  const buscado = normalizarParaMatch(busqueda)
+  const visibles = acciones({ onCreateNew, onSearchExisting, onClientes })
+    .map((a) => ({ ...a, texto: a.onClick ? a.desc : 'Próximamente' }))
+    .filter((a) => !buscado || normalizarParaMatch(`${a.label} ${a.texto}`).includes(buscado))
   const puedeSalir = !deshabilitada && Boolean(usuarioSesion)
 
   return (
@@ -100,8 +109,21 @@ export default function LandingScreen({ onCreateNew, onSearchExisting, onCliente
 
         <h1 className="landing__titulo">¿Qué querés hacer?</h1>
 
+        <Search
+          className="landing__buscador"
+          placeholder="Buscar qué hacer…"
+          value={busqueda}
+          onChange={setBusqueda}
+          debounceRate={0}
+          showClearIcon
+        />
+
+        {visibles.length === 0 && (
+          <p className="landing__sin-resultados">No hay nada que coincida con «{busqueda.trim()}».</p>
+        )}
+
         <div className="landing__botones">
-          {acciones({ onCreateNew, onSearchExisting, onClientes }).map(({ key, label, desc, Icono, onClick }) => {
+          {visibles.map(({ key, label, texto, Icono, onClick }) => {
             const disponible = Boolean(onClick)
             return (
               <button
@@ -116,7 +138,7 @@ export default function LandingScreen({ onCreateNew, onSearchExisting, onCliente
                 </span>
                 <span className="landing__boton-cuerpo">
                   <span className="landing__boton-label">{label}</span>
-                  <span className="landing__boton-desc">{disponible ? desc : 'Próximamente'}</span>
+                  <span className="landing__boton-desc">{texto}</span>
                 </span>
                 {disponible && <MdChevronRight className="landing__boton-flecha" aria-hidden="true" />}
               </button>

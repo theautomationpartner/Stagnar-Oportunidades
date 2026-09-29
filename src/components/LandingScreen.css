@@ -115,6 +115,18 @@
   color: var(--text-dark);
 }
 
+/* Buscador de lo que se puede hacer (filtra los botones de abajo). */
+.landing__buscador {
+  width: 100%;
+  margin-bottom: 14px;
+}
+
+.landing__sin-resultados {
+  margin: 4px 0 0;
+  font-size: 14px;
+  color: var(--text-gray);
+}
+
 /* Un botón por funcionalidad (reunión del 24/09; referencia: Ejemplo_btn_home/): ícono en
    su recuadro, nombre y una línea que dice para qué es. Las que todavía no existen van en
    gris con "Próximamente". */
