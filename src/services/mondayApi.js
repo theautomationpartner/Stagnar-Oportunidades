@@ -1185,6 +1185,17 @@ export function fetchUsuariosHabilitados() {
   }
   return usuariosHabilitadosPromesa
 }
+// A quién se le puede asignar una oportunidad (columna people "Asignado"): los miembros de
+// la cuenta de monday que están HABILITADOS en la lista blanca — fila con "Estado Usuario" =
+// Activo y un "ID Usuario" válido (ver fetchUsuariosHabilitados). Antes eran todos los
+// miembros de la cuenta, y aparecía gente dada de baja. En un asiento compartido varias
+// filas tienen el mismo usuario de monday: la persona aparece una sola vez.
+export async function fetchPersonasAsignables() {
+  const [cuenta, habilitados] = await Promise.all([fetchMondayUsers(), fetchUsuariosHabilitados()])
+  const ids = new Set(habilitados.map((u) => u.mondayUserId).filter(Boolean))
+  return cuenta.filter((u) => ids.has(u.id))
+}
+
 const USUARIO_TELEFONO_ENVIO_COLUMN_ID = 'phone_mm6sbe95' // "Whatsapp Envio"
 const USUARIO_CELULAR_HABILITADO_COLUMN_ID = 'color_mm71pdy7' // "Celular habilitado"
 const USUARIO_CELULAR_HABILITADO_LABEL = 'Habilitada'

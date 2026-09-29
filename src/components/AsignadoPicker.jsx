@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react'
 import { createPortal } from 'react-dom'
 import { MdCheck, MdUnfoldMore } from 'react-icons/md'
-import { fetchMondayUsers } from '../services/mondayApi'
+import { fetchPersonasAsignables } from '../services/mondayApi'
 import { initialsOf } from '../services/personaFields'
 import './AsignadoPicker.css'
 
@@ -46,9 +46,10 @@ export default function AsignadoPicker({ value, creadorId, onChange, disabled = 
   function cargar() {
     setCargando(true)
     setError(null)
-    // fetchMondayUsers memoiza la promesa y la descarta si falló, así que reintentar
-    // realmente vuelve a preguntar (ver mondayApi.js).
-    fetchMondayUsers()
+    // Solo personas habilitadas en la lista blanca (ver fetchPersonasAsignables). Las dos
+    // lecturas de las que sale memoizan su promesa y la descartan si fallan, así que
+    // reintentar realmente vuelve a preguntar (ver mondayApi.js).
+    fetchPersonasAsignables()
       .then(setUsuarios)
       .catch((err) => setError(err.message || 'No se pudo cargar la lista.'))
       .finally(() => setCargando(false))

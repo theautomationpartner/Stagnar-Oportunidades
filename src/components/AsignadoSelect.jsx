@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Dropdown } from '@vibe/core'
-import { fetchMondayUsers } from '../services/mondayApi'
+import { fetchMondayUsers, fetchPersonasAsignables } from '../services/mondayApi'
 
 // Selector de "Asignado" (columna people deal_owner de la Oportunidad). Lo comparten el
 // alta —donde arranca en quien la está creando— y el detalle, donde se puede reasignar.
@@ -11,16 +11,23 @@ import { fetchMondayUsers } from '../services/mondayApi'
 //
 // Mientras la lista no llegó, un `value` ya puesto no encuentra su opción y el campo se ve
 // vacío un instante: se completa solo apenas llegan los usuarios.
+//
+// Solo se ofrecen personas habilitadas en la lista blanca (ver fetchPersonasAsignables).
+// Si la oportunidad ya estaba asignada a alguien que se dio de baja, se sigue viendo quién
+// es —con "(no habilitado)"— pero no se puede volver a elegir.
 export default function AsignadoSelect({ value, onChange, disabled = false, size = 'small', className }) {
   const [usuarios, setUsuarios] = useState([])
+  const [cuenta, setCuenta] = useState([])
   const [cargando, setCargando] = useState(true)
   const [error, setError] = useState(null)
 
   useEffect(() => {
     let cancelado = false
-    fetchMondayUsers()
-      .then((lista) => {
-        if (!cancelado) setUsuarios(lista)
+    Promise.all([fetchPersonasAsignables(), fetchMondayUsers()])
+      .then(([asignables, todos]) => {
+        if (cancelado) return
+        setUsuarios(asignables)
+        setCuenta(todos)
       })
       .catch((err) => {
         if (!cancelado) setError(err.message)
@@ -34,6 +41,11 @@ export default function AsignadoSelect({ value, onChange, disabled = false, size
   }, [])
 
   const opciones = usuarios.map((u) => ({ value: u.id, label: u.name }))
+  const actual = value != null ? String(value) : ''
+  const actualNoHabilitado = actual && !opciones.some((o) => o.value === actual) && cuenta.find((u) => u.id === actual)
+  if (actualNoHabilitado) {
+    opciones.push({ value: actual, label: `${actualNoHabilitado.name} (no habilitado)`, disabled: true })
+  }
   const seleccionada = opciones.find((o) => o.value === String(value ?? '')) ?? null
 
   return (
