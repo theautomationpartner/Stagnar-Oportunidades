@@ -62,7 +62,12 @@ export default function ContactoNuevoModal({
   // checkbox se muestra únicamente con `nombreCliente`. Sin eso, el estado quedaba en
   // true sin forma de apagarlo, el campo Nombre no se mostraba —se renderiza cuando es
   // false— y el popup no dejaba crear nada porque el nombre salía vacío.
-  const mismoCliente = Boolean(nombreCliente) && mismoClienteTildado
+  //
+  // Si el cliente YA tiene su propio contacto (uno con su mismo nombre, `homonimo`), el
+  // nuevo no puede ser él: el tilde queda apagado y deshabilitado, y hay que poner el
+  // nombre de la otra persona (a pedido — antes se abría tildado y quedaba bloqueado).
+  const yaTieneContactoPropio = Boolean(homonimo)
+  const mismoCliente = Boolean(nombreCliente) && !yaTieneContactoPropio && mismoClienteTildado
   const [nombre, setNombre] = useState(inicial.nombre ?? '')
   const [codigoPais, setCodigoPais] = useState(inicial.codigoPais ?? '+598')
   const [telefono, setTelefono] = useState(inicial.telefono ?? '')
@@ -144,7 +149,7 @@ export default function ContactoNuevoModal({
   // Si el cliente ya tiene un contacto con el nombre que se está escribiendo, crear otro
   // sería duplicarlo. Con el selector puesto, los contactos llegan al elegir el cliente;
   // en el alta y en la ficha vienen de afuera. Bug reportado: con "es el mismo cliente"
-  // tildado esto ya frenaba (ver homonimoDelMismoCliente), pero destildándolo y
+  // tildado esto ya frenaba, pero destildándolo y
   // escribiendo el mismo nombre se creaba el duplicado igual.
   const contactosConocidos = clienteElegido ? clienteElegido.contactos ?? [] : contactosDelCliente
   const nombreDelCliente = clienteElegido?.name ?? nombreCliente
@@ -153,12 +158,9 @@ export default function ContactoNuevoModal({
       ? contactosConocidos.find((x) => normalizarParaMatch(x.name) === normalizarParaMatch(nombre)) ?? null
       : null
 
-  // Dos homónimos distintos, cada uno con su aviso: el del wizard ("es el mismo
-  // cliente" tildado y ese cliente ya tiene su contacto) y el del selector de acá (el
-  // cliente elegido ya tiene a alguien con ese nombre). Los dos frenan, pero mezclar los
-  // textos dejaba el del wizard sin nombre de cliente que poner.
-  const homonimoDelMismoCliente = mismoCliente && Boolean(homonimo)
-  const bloqueadoPorHomonimo = homonimoDelMismoCliente || Boolean(homonimoDelCliente)
+  // Frena un nombre repetido entre los contactos del cliente. El caso "es el mismo
+  // cliente" ya no puede darse con contacto propio existente: el tilde queda apagado.
+  const bloqueadoPorHomonimo = Boolean(homonimoDelCliente)
   // En gris hasta que el teléfono esté VERIFICADO como libre — ni mientras se busca ni
   // con un duplicado a la vista.
   // Todo obligatorio menos el email. Con el selector puesto, el cliente también.
@@ -195,14 +197,20 @@ export default function ContactoNuevoModal({
 
         {nombreCliente && (
           <label className="crear-op__checkbox">
-            <input type="checkbox" checked={mismoCliente} onChange={(e) => setMismoCliente(e.target.checked)} />
+            <input
+              type="checkbox"
+              checked={mismoCliente}
+              disabled={yaTieneContactoPropio}
+              onChange={(e) => setMismoCliente(e.target.checked)}
+            />
             <span>El contacto es el mismo cliente ({nombreCliente})</span>
           </label>
         )}
 
-        {homonimoDelMismoCliente && (
-          <p className="crear-op__field-error" role="alert">
-            {nombreCliente} ya tiene su propio contacto cargado — no hace falta crearlo de nuevo.{' '}
+        {yaTieneContactoPropio && nombreCliente && (
+          <p className="crear-op__section-hint" role="note">
+            {nombreCliente} ya tiene su propio contacto
+            {homonimo.telefono ? ` (${homonimo.telefono})` : ''}: este tiene que ser otra persona, con su nombre.{' '}
             {onElegirHomonimo && (
               <Button
                 kind="tertiary"
