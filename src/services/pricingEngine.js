@@ -623,6 +623,17 @@ export function deducibleSancorPorDefecto({ compania, cobertura, deducibleSancor
   return num(deducibleSancorUsd) > 0 ? deducibleSancorUsd : String(SANCOR_DEDUCIBLE_PARCIAL_USD)
 }
 
+// Deducible que fija la cobertura misma, sin nada que elegir: en SANCOR las Total lo
+// llevan en el nombre ("TOTAL 600" son U$S 600) y las parciales son U$S 400 (ver
+// SANCOR_DEDUCIBLE_PARCIAL_USD). null en el resto: ahí el monto depende del vehículo y lo
+// da la compañía. Lo usa la carga a mano para no pedir un dato que ya se sabe.
+export function deducibleFijoDeCobertura({ compania, cobertura }) {
+  if (compania !== 'SANCOR') return null
+  if (coberturaGroupOf(cobertura) === 'TRIPLE') return SANCOR_DEDUCIBLE_PARCIAL_USD
+  const enElNombre = /^TOTAL (\d+)$/.exec(String(cobertura ?? '').trim().toUpperCase())
+  return enElNombre ? Number(enElNombre[1]) : null
+}
+
 // Reunión del 24/09: el deducible siempre lleva su moneda — SANCOR cotiza en dólares y el
 // resto en pesos. En SANCOR el deducible base llega en dólares aunque venga por la columna
 // general (TOTAL 1500 trae 1500 en las dos), así que mostrarlo con "$" era decir otra

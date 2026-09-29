@@ -41,6 +41,8 @@ export function mapSubitemToRawQuote(subitem) {
     recargo10: textOf(cv, 'numeric_mm52bnpa'),
     incluirPropuesta: boolOf(cv, 'boolean_mm4wjdnw'),
     propuestaElegida: boolOf(cv, 'boolean_mm5bn41n'),
+    // El costo y el deducible los cargó el vendedor a mano (ver CotizacionManualModal).
+    costoManual: boolOf(cv, 'boolean_mm7n3mvm'),
     // Opcionales de la cotización — ver pricingEngine.js#OPCIONALES. Granizo lo comparten
     // PORTO y SURA (el precio lo pone la compañía de la cotización, ver PANEL); el resto
     // es de una sola. "Auto extra" no es un tilde sino la duración elegida ("7 días" /

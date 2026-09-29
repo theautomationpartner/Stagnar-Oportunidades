@@ -5,6 +5,7 @@ import {
   MdRadioButtonUnchecked,
   MdRemove,
   MdAdd,
+  MdEdit,
   MdListAlt,
   MdPayments,
   MdTune,
@@ -559,15 +560,27 @@ function QuoteCard({
       {/* Renglón SIEMPRE reservado (min-height en CSS) para que todas las tarjetas del
           renglón midan lo mismo: acá va la advertencia corta o, si la cotización no es
           seleccionable, el aviso de "sin costo total" — nunca una línea extra. */}
-      <div className="quote-card__meta-warning">
-        {!selectable ? (
+      <div
+        className={
+          sinCostoDeWink && onCargarCostoManual
+            ? 'quote-card__meta-warning quote-card__meta-warning--manual'
+            : 'quote-card__meta-warning'
+        }
+      >
+        {sinCostoDeWink && onCargarCostoManual ? (
+          // A pedido ("no se entiende el botón"): un botón de verdad, sin atenuar como el
+          // resto de la tarjeta, que dice qué pasó y qué hace.
+          <>
+            <span className="quote-card__sin-costo">
+              <MdWarningAmber /> Sin costo de WINK
+            </span>
+            <button type="button" className="quote-card__completar" onClick={() => setCargandoCosto(true)}>
+              <MdEdit aria-hidden="true" /> Completar manualmente
+            </button>
+          </>
+        ) : !selectable ? (
           <>
             <MdWarningAmber /> Sin costo total — no se puede seleccionar
-            {sinCostoDeWink && onCargarCostoManual && (
-              <button type="button" className="quote-card__cargar-costo" onClick={() => setCargandoCosto(true)}>
-                Cargar costo a mano
-              </button>
-            )}
           </>
         ) : (
           quote.warning && (
@@ -597,6 +610,19 @@ function QuoteCard({
           gris mientras no tengan valor, coloreadas con el valor puesto apenas lo tienen
           (override de "Parámetros ajustables", o el dato real del subitem). */}
       <div className="quote-card__override-tags">
+        {/* Cotización con costo y deducible cargados a mano: se marca, y un clic la
+            vuelve a abrir para corregirla. */}
+        {raw.costoManual && (
+          <button
+            type="button"
+            className="quote-card__manual"
+            title={onCargarCostoManual ? 'Completada manualmente — clic para editarla' : 'Completada manualmente'}
+            disabled={!onCargarCostoManual}
+            onClick={() => setCargandoCosto(true)}
+          >
+            <MdEdit aria-hidden="true" /> Manual
+          </button>
+        )}
         {fields.map((field) => {
           const active = hasTagValue(field, raw, overrides)
           const label = field.label.replace(/\s*\(%\)$/, '')

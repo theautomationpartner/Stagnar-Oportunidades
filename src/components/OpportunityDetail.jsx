@@ -1046,6 +1046,7 @@ export default function OpportunityDetail({
           ? r
           : {
               ...r,
+              costoManual: true,
               contado: String(datos.contado),
               deducibleBase: String(datos.deducible),
               ...(r.compania === 'SANCOR' ? { deducibleSancorUsd: String(datos.deducible) } : {}),

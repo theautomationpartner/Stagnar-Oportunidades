@@ -193,6 +193,7 @@ const SUBITEM_COLUMN_IDS = [
   'numeric_mm52bnpa', // Recargo 10 Cuotas
   'boolean_mm4wjdnw', // Incluir Propuesta
   'boolean_mm5bn41n', // Propuesta elegida
+  'boolean_mm7n3mvm', // Costo cargado a mano (ver scripts/mon-costo-manual.mjs)
   'boolean_mm5fsr46', // Granizo (opcional PORTO)
   'boolean_mm5fqazp', // Cristales (opcional PORTO)
   // Los opcionales que se sumaron después. La app ya los escribía (OPCIONAL_COLUMN_IDS
@@ -2654,10 +2655,14 @@ export async function fetchContactoFicha(contactoId) {
 // "Deducible BSE/SURA" en 1 para que se muestre tal cual se cargó (sin el descuento por
 // nivel de deducible, ver pricingEngine.js#deducibleDisplay): el costo del portal ya es
 // el de ese deducible.
+//
+// Además se tilda "Costo cargado a mano", para que la tarjeta lo muestre y se pueda
+// volver a editar.
 export function columnasDeCostoManual(compania, { contado, deducible }) {
   const columnas = {
     numeric_mm4pc2y1: String(contado),
     numeric_mm519my9: String(deducible),
+    boolean_mm7n3mvm: { checked: 'true' },
   }
   if (compania === 'SANCOR') columnas.numeric_mm59qzvf = String(deducible)
   if (compania === 'BSE') columnas.dropdown_mm52dm1j = { labels: ['1'] }

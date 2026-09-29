@@ -490,10 +490,21 @@
 
 /* Cotización no seleccionable (sin fórmula o COSTO TOTAL en 0, ver isQuoteSelectable):
    atenuada y sin interacción — no se puede marcar para enviar. */
+/* Se atenúa cada parte y no la tarjeta entera: así el botón "Cargar a mano" (ver
+   .quote-card__meta-warning--manual) queda a pleno color y se entiende que se puede tocar. */
 .quote-card--unavailable {
+  background: var(--bg-subtle);
+  border-left-color: var(--border) !important;
+}
+
+.quote-card--unavailable > * {
   opacity: 0.55;
   filter: grayscale(0.6);
-  background: var(--bg-subtle);
+}
+
+.quote-card--unavailable > .quote-card__meta-warning--manual {
+  opacity: 1;
+  filter: none;
 }
 
 .quote-card--unavailable .quote-card__radio,
@@ -695,15 +706,69 @@
 /* Reunión del 24/09: en una tarjeta que vino en 0, la acción para cargar el costo a mano.
    La tarjeta está atenuada y sin clics (ver .quote-card--unavailable); esto sí se puede
    tocar. */
-.quote-card__cargar-costo {
-  margin-left: 8px;
-  padding: 0;
-  border: none;
-  background: none;
+.quote-card__meta-warning--manual {
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.quote-card__sin-costo {
+  display: inline-flex;
+  white-space: nowrap;
+  align-items: center;
+  gap: 4px;
+}
+
+/* Botón principal de la tarjeta sin costo de WINK: abre el popup para completarla. */
+.quote-card__completar {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  height: 30px;
+  padding: 0 14px;
   font: inherit;
-  font-weight: 700;
-  color: var(--primary-blue);
-  text-decoration: underline;
+  font-size: 13px;
+  font-weight: 600;
+  color: #fff;
+  background: var(--primary-blue);
+  border: none;
+  border-radius: 6px;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.12);
   cursor: pointer;
   pointer-events: auto;
+  transition: background 0.15s;
+}
+
+.quote-card__completar svg {
+  font-size: 15px;
+}
+
+.quote-card__completar:hover {
+  background: var(--primary-blue-hover);
+}
+
+.quote-card__completar:focus-visible {
+  outline: 2px solid var(--primary-blue);
+  outline-offset: 2px;
+}
+
+/* Marca de "Completada manualmente" junto al deducible; un clic la vuelve a editar. */
+.quote-card__manual {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 3px;
+  padding: 1px 7px;
+  font: inherit;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--primary-blue);
+  background: var(--tint-info, #eef4ff);
+  border: 1px solid currentColor;
+  border-radius: 10px;
+  cursor: pointer;
+}
+
+.quote-card__manual:disabled {
+  cursor: default;
 }

@@ -29,3 +29,12 @@
 .cotizacion-manual__aviso {
   margin-top: 14px;
 }
+
+/* Deducible que fija la cobertura (SANCOR): se muestra, no se pide. */
+.cotizacion-manual__fijo {
+  display: flex;
+  align-items: center;
+  min-height: 40px;
+  font-size: 14px;
+  color: var(--text-gray);
+}
