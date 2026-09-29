@@ -587,20 +587,100 @@
   color: #a05a00;
 }
 
-/* Reunión del 24/09: la Bonificación a la vista, debajo del costo total. */
+/* Reunión del 24/09: la Bonificación a la vista, debajo del costo total — una pastilla
+   con el porcentaje y botones para bajarlo o subirlo. En gris cuando no aplica (SANCOR
+   con el titular fuera de edad). */
 .quote-card__bonif {
-  display: flex;
+  display: inline-flex;
   align-items: center;
-  justify-content: flex-end;
-  gap: 6px;
-  margin-top: 4px;
-  font-size: 11px;
-  font-weight: 600;
-  color: var(--text-gray);
+  gap: 2px;
+  margin-top: 2px;
+  padding: 2px 3px 2px 8px;
+  font-size: 12px;
+  white-space: nowrap;
+  color: var(--color-verde-cta, #0a7a74);
+  background: #e9f5f4;
+  border: 1px solid #b9e0dc;
+  border-radius: 999px;
 }
 
-.quote-card__bonif > div {
-  width: 76px;
+.quote-card__bonif-label {
+  margin-right: 4px;
+  font-weight: 600;
+}
+
+.quote-card__bonif-input {
+  width: 28px;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-align: right;
+  color: inherit;
+  background: transparent;
+  border: none;
+  -moz-appearance: textfield;
+}
+
+.quote-card__bonif-input::-webkit-outer-spin-button,
+.quote-card__bonif-input::-webkit-inner-spin-button {
+  margin: 0;
+  -webkit-appearance: none;
+}
+
+.quote-card__bonif-input:focus {
+  outline: none;
+  text-decoration: underline;
+}
+
+.quote-card__bonif-pct {
+  font-weight: 700;
+}
+
+/* Botones redondos a los costados del porcentaje, con aire respecto del número. */
+.quote-card__bonif-paso {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex: none;
+  width: 20px;
+  height: 20px;
+  margin: 0 3px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  color: inherit;
+  background: #fff;
+  border: 1px solid #b9e0dc;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.quote-card__bonif-paso:hover:not(:disabled) {
+  background: #d4ecea;
+}
+
+.quote-card__bonif-paso:disabled {
+  opacity: 0.4;
+  cursor: default;
+}
+
+.quote-card__bonif--no-aplica {
+  color: var(--text-gray);
+  background: var(--bg-subtle);
+  border-color: var(--border);
+}
+
+.quote-card__bonif--no-aplica .quote-card__bonif-input {
+  text-decoration: line-through;
+}
+
+/* Precio sin la bonificación, tachado, arriba del costo total. */
+.quote-card__total-antes {
+  font-size: 12px;
+  color: var(--text-muted);
+  text-decoration: line-through;
+  line-height: 1;
 }
 
 .quote-card__bonif-especial {

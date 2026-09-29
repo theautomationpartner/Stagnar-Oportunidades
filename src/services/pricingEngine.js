@@ -572,9 +572,15 @@ function factorBonificacionesEspeciales(eff) {
 // PARCIAL PLUS no la tomaban), y un "descuento" suelto que sí se aplicaba a todas. Al
 // unirse en una sola, la Bonificación ocupa el lugar del descuento: se aplica siempre.
 // La única excepción es la de SANCOR por edad del titular (LOG-15).
+// Tope de la bonificación comercial: 100 % dejaría el total en 0 (tarjeta gris, no
+// seleccionable — reportado como bug).
+export const BONIF_MAX = 99
+
 function bonificacionAplicable(eff) {
   if (sancorSinDescuento(eff)) return 0
-  return num(eff.bonif) / 100
+  // Siempre entre 0 y BONIF_MAX %: una negativa se colaba como recargo (reportado: "-5"
+  // subía el precio) y con 100 % el total queda en 0 y la tarjeta pasa a "sin costo".
+  return Math.min(BONIF_MAX, Math.max(0, num(eff.bonif))) / 100
 }
 
 function computeWarning(eff) {

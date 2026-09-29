@@ -1,8 +1,10 @@
-import { useEffect, useState, useMemo, memo } from 'react'
+import { useEffect, useRef, useState, useMemo, memo } from 'react'
 import {
   MdWarningAmber,
   MdRadioButtonChecked,
   MdRadioButtonUnchecked,
+  MdRemove,
+  MdAdd,
   MdListAlt,
   MdPayments,
   MdTune,
@@ -10,7 +12,7 @@ import {
 import { FaWhatsapp } from 'react-icons/fa'
 import { Button, IconButton, Dropdown, Checkbox, NumberField } from '@vibe/core'
 import { formatMoney, CUOTA_COUNTS, toPercentString } from '../services/format'
-import { autoExtraOpciones, formatDeducible, isQuoteSelectable, opcionalesDeCompania } from '../services/pricingEngine'
+import { autoExtraOpciones, BONIF_MAX, formatDeducible, isQuoteSelectable, opcionalesDeCompania } from '../services/pricingEngine'
 import { accentForCompania, selectionForCompania } from '../services/companyColors'
 import CompanyMark from './CompanyMark'
 import CotizacionManualModal from './CotizacionManualModal'
@@ -334,15 +336,43 @@ function QuoteCard({
     const siguiente = openPanel === 'params' ? null : 'params'
     if (siguiente === 'params') setForm(buildInitialForm(raw, overrides, ajustables))
     setOpenPanel(siguiente)
-    onPanelChange?.(siguiente)
+    avisarCongelado(siguiente, editandoBonif)
   }
 
   // Coberturas y Cuotas no tienen form que refrescar: solo abren o cierran su panel.
   const handleTogglePanel = (panel) => {
     const siguiente = openPanel === panel ? null : panel
     setOpenPanel(siguiente)
-    onPanelChange?.(siguiente)
+    avisarCongelado(siguiente, editandoBonif)
   }
+
+  // Bug reportado: al tocar la bonificación la tarjeta cambia de precio y se reordena
+  // mientras la estás editando. Editarla congela el orden igual que un panel abierto
+  // (ver handlePanelChange en OpportunityDetail); se descongela recién con un clic
+  // fuera de la tarjeta. El padre lleva un solo "abierto sí/no" por tarjeta, así que
+  // se le avisa combinando panel abierto + bonificación en edición.
+  const tarjetaRef = useRef(null)
+  const [editandoBonif, setEditandoBonif] = useState(false)
+  const avisarCongelado = (panel, editando) => onPanelChange?.(panel ?? (editando ? 'bonif' : null))
+  const empezarEdicionBonif = () => {
+    if (editandoBonif) return
+    setEditandoBonif(true)
+    avisarCongelado(openPanel, true)
+  }
+  useEffect(() => {
+    if (!editandoBonif) return undefined
+    const alTocarAfuera = (e) => {
+      if (tarjetaRef.current?.contains(e.target)) return
+      setEditandoBonif(false)
+      avisarCongelado(openPanel, false)
+    }
+    document.addEventListener('pointerdown', alTocarAfuera)
+    document.addEventListener('focusin', alTocarAfuera)
+    return () => {
+      document.removeEventListener('pointerdown', alTocarAfuera)
+      document.removeEventListener('focusin', alTocarAfuera)
+    }
+  })
 
   const handleReset = () => {
     // A pedido: el Deducible (BSE/SURA) vuelve a "Sin definir" al restablecer, no al
@@ -378,6 +408,17 @@ function QuoteCard({
 
   // A pedido: COSTO TOTAL en 0 → tarjeta atenuada, no se puede seleccionar para enviar.
   const selectable = isQuoteSelectable(quote)
+  // Bonificación a la vista (debajo del costo): el valor puesto, el precio que tendría sin
+  // ella (para mostrarlo tachado) y si de verdad se está aplicando — SANCOR la ignora con
+  // el titular fuera de edad (ver pricingEngine.js#bonificacionAplicable).
+  const bonifActual = Number(displayValue(BONIF_FIELD, raw, overrides)) || 0
+  const efectivo = quote.efectivo ?? {}
+  const precioSinBonif = Math.round(
+    (Number(efectivo.contadoCalculado) || 0) * (efectivo.factorBonificacionesEspeciales ?? 1) +
+      (Number(efectivo.adicionales) || 0)
+  )
+  const bonifNoAplica = bonifActual > 0 && !(efectivo.bonifAplicada > 0)
+  const cambiarBonif = (valor) => handleFieldChange('bonif', String(Math.min(BONIF_MAX, Math.max(0, valor))))
   // Reunión del 24/09: si vino en 0 es que WINK no supo el valor — solo esas se pueden
   // completar a mano (ver CotizacionManualModal).
   const sinCostoDeWink = !selectable && !(Number(raw.contado) > 0)
@@ -393,6 +434,7 @@ function QuoteCard({
       /* Para la animación FLIP de la grilla (ver useFlipDeTarjetas en OpportunityDetail):
          identifica esta tarjeta entre un render y el siguiente para animar su traslado. */
       data-quote-id={raw.id}
+      ref={tarjetaRef}
       /* A pedido, la selección se pinta con el tono de la compañía (ver
          selectionForCompania): las variables las consume .quote-card--selected. */
       style={{
@@ -450,21 +492,62 @@ function QuoteCard({
 
         <div className="quote-card__total">
           <span className="quote-card__total-label">COSTO TOTAL</span>
+          {/* El precio sin la bonificación comercial, tachado: que se vea de un vistazo
+              cuánto está descontando. Solo cuando de verdad descuenta algo. */}
+          {precioSinBonif > quote.total && (
+            <span className="quote-card__total-antes">{formatMoney(precioSinBonif)}</span>
+          )}
           <span className="quote-card__total-value">{formatMoney(quote.total)}</span>
           {/* Reunión del 24/09: la Bonificación a la vista y editable, sin abrir
               Parámetros. Arranca en la de PANEL para la compañía (ver
               recargoPanel.js#applyBonificacionPorDefecto). */}
-          <label className="quote-card__bonif">
-            <span>Bonif. %</span>
-            <NumberField
+          <div
+            className={bonifNoAplica ? 'quote-card__bonif quote-card__bonif--no-aplica' : 'quote-card__bonif'}
+            title={bonifNoAplica ? quote.warning?.full : 'Bonificación comercial sobre el contado'}
+            onPointerDownCapture={empezarEdicionBonif}
+            onFocusCapture={empezarEdicionBonif}
+          >
+            <span className="quote-card__bonif-label">{bonifNoAplica ? 'No aplica' : 'Bonif.'}</span>
+            {/* A pedido: los botones a los costados — bajar a la izquierda, subir a la
+                derecha —, redondos y separados del número para que el de bajar no se lea
+                como un signo menos. */}
+            <button
+              type="button"
+              className="quote-card__bonif-paso"
+              aria-label="Bajar bonificación"
+              disabled={bonifActual <= 0}
+              onClick={() => cambiarBonif(bonifActual - 1)}
+            >
+              <MdRemove aria-hidden="true" />
+            </button>
+            <input
               key={`bonif-${paramsResetKey}`}
-              size="small"
-              min={0}
-              max={100}
-              value={displayValue(BONIF_FIELD, raw, overrides) === '' ? null : Number(displayValue(BONIF_FIELD, raw, overrides))}
-              onChange={(value) => handleFieldChange('bonif', value == null ? '' : String(value))}
+              className="quote-card__bonif-input"
+              type="number"
+              inputMode="decimal"
+              min="0"
+              max={BONIF_MAX}
+              aria-label="Bonificación (%)"
+              value={displayValue(BONIF_FIELD, raw, overrides)}
+              // Sin signo menos ni más del tope: una bonificación negativa es un recargo y
+              // una de 100 % deja la tarjeta sin costo.
+              onKeyDown={(e) => (e.key === '-' || e.key === 'e') && e.preventDefault()}
+              onChange={(e) => {
+                const valor = e.target.value.replace('-', '')
+                handleFieldChange('bonif', valor === '' ? '' : String(Math.min(BONIF_MAX, Number(valor))))
+              }}
             />
-          </label>
+            <span className="quote-card__bonif-pct">%</span>
+            <button
+              type="button"
+              className="quote-card__bonif-paso"
+              aria-label="Subir bonificación"
+              disabled={bonifActual >= BONIF_MAX}
+              onClick={() => cambiarBonif(bonifActual + 1)}
+            >
+              <MdAdd aria-hidden="true" />
+            </button>
+          </div>
         </div>
       </div>
 
