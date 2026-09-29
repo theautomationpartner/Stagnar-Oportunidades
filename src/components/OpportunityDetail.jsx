@@ -202,10 +202,15 @@ const POLL_CREANDO_TIMEOUT_MS = 5 * 60 * 1000
 // Prefijo que cada automatización debe agregar al principio del texto del Update que
 // postea sobre el ítem cuando falla (configurar así del lado del robot de cotización y
 // del escenario de Make.com de envío por WhatsApp) — ver fetchLatestUpdate en mondayApi.js.
+//
+// El Update es el RESPALDO: Cotizar y Crear póliza contestan su error en la respuesta del
+// webhook (ver avisarAlEscenario), y si la hubo se usa esa. El Update queda para lo que no
+// vuelve en ninguna respuesta: el robot de WINK que falla después de arrancar, entrar a
+// una oportunidad que ya estaba en "Error", un timeout del proxy, y los errores del envío
+// de WhatsApp en sí (los postea el escenario de envío sin responderlos).
 const ERROR_UPDATE_TAG_COTIZAR = '[COTIZAR]'
 const ERROR_UPDATE_TAG_ENVIO = '[ENVIO]'
 const ERROR_UPDATE_TAG_CREAR_POLIZA = '[CREAR_POLIZA]'
-const ERROR_UPDATE_TAG_LEER = '[LEER]'
 
 export default function OpportunityDetail({
   opportunityId,
@@ -301,7 +306,6 @@ export default function OpportunityDetail({
   useEffect(() => {
     polizaPollStartRef.current = polizaPolling ? Date.now() : null
   }, [polizaPolling])
-  const [lecturaErrorDetail, setLecturaErrorDetail] = useState(null)
 
   // El robot que genera la cotización (o el escenario de Make.com que la envía) postea
   // el detalle del error como un Update nativo de monday sobre el ítem cuando algo falla
@@ -323,8 +327,22 @@ export default function OpportunityDetail({
     }
   }
 
+  // El error que contestó cada escenario en esta corrida, por nombre de escenario. Si el
+  // polling ve "Error" y ya hay uno, se muestra ese y no se va a buscar el Update (ver
+  // ERROR_UPDATE_TAG_*). Se limpia al disparar de nuevo y al cambiar de oportunidad.
+  const errorRespondidoRef = useRef({})
+  // Detalle de un "Error" que vio el polling: el que contestó el escenario si lo hubo, y
+  // si no el último Update. Se vuelve a mirar después de ir a buscar el Update porque la
+  // respuesta puede llegar justo mientras tanto, y en ese caso gana ella.
+  const detalleDeError = async (escenario, tag) => {
+    if (errorRespondidoRef.current[escenario]) return errorRespondidoRef.current[escenario]
+    const delUpdate = await loadErrorUpdate(tag)
+    return errorRespondidoRef.current[escenario] ?? delUpdate
+  }
+
   useEffect(() => {
     let cancelled = false
+    errorRespondidoRef.current = {}
     setLoading(true)
     setError(null)
     setPolling(false)
@@ -332,7 +350,6 @@ export default function OpportunityDetail({
     setCotizarErrorDetail(null)
     setEnvioErrorDetail(null)
     setPolizaErrorDetail(null)
-    setLecturaErrorDetail(null)
 
     fetchOpportunityDetail(opportunityId)
       .then(async (data) => {
@@ -416,10 +433,6 @@ export default function OpportunityDetail({
           const detail = await loadErrorUpdate(ERROR_UPDATE_TAG_CREAR_POLIZA)
           if (!cancelled) setPolizaErrorDetail(detail)
         }
-        if (poseeVehiculo === 'Si' && estadoLectura === 'Error') {
-          const detail = await loadErrorUpdate(ERROR_UPDATE_TAG_LEER)
-          if (!cancelled) setLecturaErrorDetail(detail)
-        }
       })
       .catch((err) => {
         if (!cancelled) setError(err.message)
@@ -478,8 +491,11 @@ export default function OpportunityDetail({
   // sigue; si la ficha ya es de otra oportunidad cuando contesta, tampoco.
   const avisarAlEscenario = (escenario, alResponder) => {
     const idPedido = opportunityId
+    errorRespondidoRef.current[escenario] = null
     dispararEscenario(escenario, idPedido).then((respuesta) => {
-      if (respuesta && opportunityIdRef.current === idPedido) alResponder(respuesta)
+      if (!respuesta || opportunityIdRef.current !== idPedido) return
+      if (respuesta.error) errorRespondidoRef.current[escenario] = respuesta.error
+      alResponder(respuesta)
     })
   }
 
@@ -565,7 +581,7 @@ export default function OpportunityDetail({
           setMarkError(
             'La cotización automática terminó en estado "Error". Revisá la oportunidad en monday e intentá nuevamente.'
           )
-          setCotizarErrorDetail(await loadErrorUpdate(ERROR_UPDATE_TAG_COTIZAR))
+          setCotizarErrorDetail(await detalleDeError('cotizar', ERROR_UPDATE_TAG_COTIZAR))
         } else if (
           estadoCotizacion === 'Cotizando' &&
           cotizarPollStartRef.current &&
@@ -615,7 +631,7 @@ export default function OpportunityDetail({
         if (estadoCreacion === 'Creada' || estadoCreacion === 'Error') {
           setPolizaPolling(false)
           if (estadoCreacion === 'Error') {
-            setPolizaErrorDetail(await loadErrorUpdate(ERROR_UPDATE_TAG_CREAR_POLIZA))
+            setPolizaErrorDetail(await detalleDeError('crear-poliza', ERROR_UPDATE_TAG_CREAR_POLIZA))
           }
         } else if (
           polizaPollStartRef.current &&
@@ -638,9 +654,6 @@ export default function OpportunityDetail({
         const estadoLectura = textOf(data.column_values, ESTADO_LECTURA_COLUMN_ID)
         if (estadoLectura === 'Leidos' || estadoLectura === 'Error') {
           setLecturaPolling(false)
-          if (estadoLectura === 'Error') {
-            setLecturaErrorDetail(await loadErrorUpdate(ERROR_UPDATE_TAG_LEER))
-          }
         }
       }
     }
@@ -2206,9 +2219,6 @@ export default function OpportunityDetail({
                     </Button>
                   </div>
                 </AttentionBox>
-              )}
-              {opportunity.estadoLectura === 'Error' && (
-                <ErrorDetailBox detail={lecturaErrorDetail} className="opp-detail__error-detail-spacing" />
               )}
             </div>
           ) : (
