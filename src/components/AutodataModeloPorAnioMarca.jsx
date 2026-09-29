@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { Dropdown } from '@vibe/core'
 import { fetchAutodataModelosByAnioMarca } from '../services/mondayApi'
 import { matchesSearchQuery, modeloSinMarca } from '../services/format'
+import { filtroParaModeloLeido } from '../services/modeloLeido'
 
 // Modelo (Autodata) filtrado por Año + Marca ya elegidos — a diferencia de una búsqueda
 // libre por texto (que trae resultados de CUALQUIER año/marca), acá solo se pide la
@@ -28,9 +29,17 @@ export default function AutodataModeloPorAnioMarca({
   // Modelo que la oportunidad YA tiene guardado (texto). Solo para mostrarlo mientras no
   // se elija otro — ver `selected` más abajo.
   currentName,
+  // Modelo tal como lo leyó la IA de la Carta del vehículo: deja el buscador ya filtrado
+  // (ver modeloLeido.js#filtroParaModeloLeido). No elige nada solo.
+  modeloLeido = '',
 }) {
   const [options, setOptions] = useState([])
   const [loading, setLoading] = useState(false)
+  const [query, setQuery] = useState('')
+  // Texto con el que se filtra la lista a partir del modelo leído de la Carta (vacío = sin
+  // filtro). Apenas se escribe algo en el buscador se deja de aplicar: la búsqueda vuelve a
+  // ser sobre todos los modelos, como siempre.
+  const [prefiltro, setPrefiltro] = useState('')
 
   useEffect(() => {
     if (!anio || !marca) {
@@ -49,7 +58,9 @@ export default function AutodataModeloPorAnioMarca({
           (!tipo || (o.tipo && o.tipo.toLowerCase() === tipo.toLowerCase())) &&
           (!combustible || (o.combustible && o.combustible.toLowerCase() === combustible.toLowerCase()))
         const strict = tipo || combustible ? mapped.filter(matchesLeido) : mapped
-        setOptions(strict.length > 0 ? strict : mapped)
+        const lista = strict.length > 0 ? strict : mapped
+        setOptions(lista)
+        setPrefiltro(modeloLeido && !value ? filtroParaModeloLeido(modeloLeido, lista, marca) : '')
       })
       .finally(() => {
         if (!cancelled) setLoading(false)
@@ -57,7 +68,10 @@ export default function AutodataModeloPorAnioMarca({
     return () => {
       cancelled = true
     }
-  }, [anio, marca, tipo, combustible])
+    // value queda afuera a propósito: el filtro se calcula al llegar las opciones, no
+    // cada vez que se elige un modelo.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [anio, marca, tipo, combustible, modeloLeido])
 
   // Bug reportado: al abrir "Editar vehículo" de una oportunidad que YA tenía modelo, el
   // campo aparecía vacío ("Selecciona un modelo"), como si se hubiera perdido.
@@ -74,12 +88,34 @@ export default function AutodataModeloPorAnioMarca({
       : null
   const disabled = forceDisabled || !anio || !marca
 
+  const elegir = (option) =>
+    onChange(option ? { id: option.value, name: option.label, combustible: option.combustible, tipo: option.tipo } : null)
+
+  // Reunión del 24/09 (completar el alta sin mouse): Enter con algo tipeado elige la
+  // primera opción que coincide, igual que RequiredDropdown. El Dropdown filtra pero no
+  // resalta ninguna, así que Enter no hacía nada aunque quedara un solo modelo.
+  const handleKeyDown = (e) => {
+    const texto = query.trim() || prefiltro
+    if (e.key !== 'Enter' || !texto) return
+    const match = options.find((o) => matchesSearchQuery(o.label, texto))
+    if (match) {
+      e.preventDefault()
+      setQuery('')
+      elegir(match)
+    }
+  }
+
   return (
+    <div onKeyDown={handleKeyDown}>
     <Dropdown
       clearable={false}
       searchable
       filterOption={(option, inputValue) => matchesSearchQuery(option.label, inputValue)}
-      options={options}
+      onInputChange={(input) => {
+        setQuery(input ?? '')
+        if ((input ?? '').trim()) setPrefiltro('')
+      }}
+      options={prefiltro ? options.filter((o) => matchesSearchQuery(o.label, prefiltro)) : options}
       // Solo presentación: la marca ya está elegida arriba, en la lista y en el valor se
       // muestra el modelo sin ella ("206 1.6 Presence Full…"). El label/valor real que se
       // guarda sigue siendo el nombre completo de Autodata.
@@ -88,11 +124,21 @@ export default function AutodataModeloPorAnioMarca({
       value={selected}
       loading={loading || forceDisabled}
       disabled={disabled}
-      placeholder={forceDisabled ? 'Buscando el modelo...' : disabled ? 'Elegí primero Año y Marca' : placeholder || 'Selecciona un modelo'}
-      noOptionsMessage={loading ? 'Buscando...' : 'Sin modelos para esa combinación'}
-      onChange={(option) =>
-        onChange(option ? { id: option.value, name: option.label, combustible: option.combustible, tipo: option.tipo } : null)
+      placeholder={
+        forceDisabled
+          ? 'Buscando el modelo...'
+          : disabled
+            ? 'Elegí primero Año y Marca'
+            : prefiltro
+              ? `Leído de la carta: «${prefiltro}» — escribí para buscar otro`
+              : placeholder || 'Selecciona un modelo'
       }
+      noOptionsMessage={loading ? 'Buscando...' : 'Sin modelos para esa combinación'}
+      onChange={(option) => {
+        setQuery('')
+        elegir(option)
+      }}
     />
+    </div>
   )
 }

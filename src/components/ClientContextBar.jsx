@@ -2,7 +2,7 @@ import { useEffect, useRef, useState } from 'react'
 import { MdEmail, MdExpandLess, MdExpandMore, MdPerson, MdSmartphone } from 'react-icons/md'
 import { Button } from '@vibe/core'
 import ClienteArchivos from './ClienteArchivos'
-import { formatShortDate, modeloSinMarca } from '../services/format'
+import { formatShortDate, modeloSinMarca, sinCodigoPostal } from '../services/format'
 import { initialsOf } from '../services/personaFields'
 import './ClientContextBar.css'
 
@@ -142,7 +142,7 @@ export default function ClientContextBar({ opportunity, onEdit, actions, tag }) 
             </div>
             <div className="client-bar__detail">
               <dt>Localidad</dt>
-              <dd>{(opportunity.clienteId ? opportunity.clienteLocalidad : opportunity.zonaCirculacion) || '—'}</dd>
+              <dd>{sinCodigoPostal(opportunity.clienteId ? opportunity.clienteLocalidad : opportunity.zonaCirculacion) || '—'}</dd>
             </div>
             <div className="client-bar__detail">
               <dt>Dirección</dt>

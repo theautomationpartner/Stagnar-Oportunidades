@@ -1,13 +1,17 @@
 import { useEffect, useState } from 'react'
 import { MdExpandLess, MdExpandMore } from 'react-icons/md'
 import { Button, Dropdown, Search } from '@vibe/core'
+import { matchesSearchQuery } from '../services/format'
+import { RANGOS_DE_FECHA, cantidadDeFiltrosActivos } from '../services/filtrosOportunidades'
 import './FilterPanel.css'
 
 // Dropdown (@vibe/core) maneja {value, label} y el objeto entero como valor
 // seleccionado, no un string plano como filters/onFilterChange (que no
 // cambiaron, siguen siendo strings) — el adaptador de ida y vuelta pasa acá.
+// `options` puede ser una lista de textos o de {value, label} (Asignado: el valor es el
+// id de la persona y se muestra su nombre).
 function FilterSelect({ label, field, value, options, onChange, placeholder }) {
-  const dropdownOptions = options.map((opt) => ({ value: opt, label: opt }))
+  const dropdownOptions = options.map((opt) => (typeof opt === 'string' ? { value: opt, label: opt } : opt))
   const selected = dropdownOptions.find((o) => o.value === value) ?? null
 
   return (
@@ -18,6 +22,8 @@ function FilterSelect({ label, field, value, options, onChange, placeholder }) {
         options={dropdownOptions}
         value={selected}
         placeholder={placeholder}
+        searchable
+        filterOption={(option, inputValue) => matchesSearchQuery(option.label, inputValue)}
         clearable
         onClear={() => onChange(field, '')}
         onChange={(option) => onChange(field, option?.value ?? '')}
@@ -26,13 +32,42 @@ function FilterSelect({ label, field, value, options, onChange, placeholder }) {
   )
 }
 
+// Reunión del 24/09: un rango de fechas es un par de campos "desde" y "hasta"; cualquiera
+// de los dos puede quedar vacío (sin límite de ese lado).
+function FilterDateRange({ label, clave, filters, onChange }) {
+  const desde = `${clave}Desde`
+  const hasta = `${clave}Hasta`
+  return (
+    <fieldset className="filter-field filter-field--rango">
+      <legend>{label}</legend>
+      <div className="filter-field__rango">
+        <input
+          type="date"
+          aria-label={`${label} desde`}
+          value={filters[desde]}
+          max={filters[hasta] || undefined}
+          onChange={(e) => onChange(desde, e.target.value)}
+        />
+        <span aria-hidden="true">a</span>
+        <input
+          type="date"
+          aria-label={`${label} hasta`}
+          value={filters[hasta]}
+          min={filters[desde] || undefined}
+          onChange={(e) => onChange(hasta, e.target.value)}
+        />
+      </div>
+    </fieldset>
+  )
+}
+
 // A pedido, estética tipo mockup: una sola barra de búsqueda para todos los campos
 // posibles (nombre, apellido, CI, teléfono, vehículo, aseguradora — ver el haystack en
 // App.jsx) en vez del bloque de 8 campos sueltos de antes. Marca/Año/Nombre/CI/Teléfono
 // ya no tienen su propio filtro — quedan cubiertos por el buscador; los únicos filtros
 // que se mantienen aparte ("filtros básicos") son los 3 que el buscador de texto libre
-// no puede resolver (son estados/categorías, no texto): Estado de la cotización, Tipo
-// de sujeto y Estado de envío, escondidos detrás de "Filtros avanzados" para no ocupar
+// no puede resolver (son estados/categorías o fechas, no texto) — ver
+// filtrosOportunidades.js —, escondidos detrás de "Filtros avanzados" para no ocupar
 // espacio de entrada.
 export default function FilterPanel({
   searchTerm,
@@ -64,7 +99,7 @@ export default function FilterPanel({
   }
   // Auditoría (Nielsen N1, visibilidad del estado): con el panel cerrado no había forma
   // de saber que había filtros aplicados. El contador va en el propio toggle.
-  const activeCount = Object.values(filters).filter(Boolean).length
+  const activeCount = cantidadDeFiltrosActivos(filters)
 
   return (
     <section className="filter-panel">
@@ -113,6 +148,16 @@ export default function FilterPanel({
         <>
           <div className="filter-panel__fields">
             <FilterSelect
+              label="Estado de la oportunidad"
+              field="estadoOportunidad"
+              value={filters.estadoOportunidad}
+              options={filterOptions.estadosOportunidad}
+              onChange={onFilterChange}
+              placeholder="Todos los estados"
+            />
+            {/* Reunión del 24/09: los estados de transición (Cotizar/Cotizando,
+                Enviar/Enviando) van juntos como "Otros" — ver filtrosOportunidades.js. */}
+            <FilterSelect
               label="Estado de la cotización"
               field="estadoCotizacion"
               value={filters.estadoCotizacion}
@@ -136,6 +181,19 @@ export default function FilterPanel({
               onChange={onFilterChange}
               placeholder="Todos los estados"
             />
+            <FilterSelect
+              label="Asignado"
+              field="asignado"
+              value={filters.asignado}
+              options={filterOptions.asignados}
+              onChange={onFilterChange}
+              placeholder="Todos"
+            />
+          </div>
+          <div className="filter-panel__fields filter-panel__fields--fechas">
+            {RANGOS_DE_FECHA.map((r) => (
+              <FilterDateRange key={r.clave} label={r.label} clave={r.clave} filters={filters} onChange={onFilterChange} />
+            ))}
           </div>
           <div className="filter-panel__footer">
             <Button kind="tertiary" onClick={onClear}>

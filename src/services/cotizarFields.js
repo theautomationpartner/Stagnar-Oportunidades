@@ -54,7 +54,7 @@ export const COTIZAR_FIELDS = [
   },
   {
     key: 'zonaCirculacion',
-    label: 'Localidad',
+    label: 'Zona principal de circulación',
     kind: 'connected',
     columnId: 'board_relation_mm5sqf8t',
     idKey: 'localidadId',

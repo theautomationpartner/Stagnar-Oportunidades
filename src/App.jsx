@@ -26,7 +26,14 @@ import {
   fetchDepartamentos,
   fetchLocalidades,
   fetchCurrentMondayUser,
+  fetchMondayUsers,
 } from './services/mondayApi'
+import {
+  FILTROS_VACIOS,
+  cumpleFiltros,
+  opcionesDeEstado,
+  reglasDeFiltros,
+} from './services/filtrosOportunidades'
 import { mapOpportunities } from './services/opportunityMapper'
 import { fetchFilterAndStatusSchema } from './services/boardSchema'
 import { fetchPanelData } from './services/recargoPanel'
@@ -43,14 +50,10 @@ const PAGE_SIZE_OPTIONS = [10, 25, 50, 100]
 const DEFAULT_PAGE_SIZE = 10
 
 // A pedido: Marca/Año/Nombre/CI/Teléfono ya no tienen filtro propio (ver
-// FilterPanel.jsx) — quedan cubiertos por la única barra de búsqueda de texto libre
-// (ver el haystack en filteredOpportunities más abajo). Solo quedan acá los 3 "filtros
-// básicos" que un texto libre no puede resolver por ser estados/categorías.
-const EMPTY_FILTERS = {
-  estadoCotizacion: '',
-  tipoSujeto: '',
-  estadoEnvio: '',
-}
+// FilterPanel.jsx) — quedan cubiertos por la única barra de búsqueda de texto libre.
+// Acá quedan los filtros que un texto libre no puede resolver: estados, Asignado y
+// rangos de fechas (ver filtrosOportunidades.js).
+const EMPTY_FILTERS = FILTROS_VACIOS
 
 export default function App() {
   const [opportunities, setOpportunities] = useState([])
@@ -130,14 +133,29 @@ export default function App() {
     }
   }, [])
 
+  // Personas del filtro "Asignado": las mismas que ofrece el selector de Asignado.
+  const [usuarios, setUsuarios] = useState([])
+  useEffect(() => {
+    let cancelled = false
+    fetchMondayUsers()
+      .then((lista) => !cancelled && setUsuarios(lista))
+      .catch(() => {}) // sin la lista, el filtro de Asignado queda vacío
+    return () => {
+      cancelled = true
+    }
+  }, [])
+
   const filterOptions = useMemo(
     () => ({
-      estadosCotizacion: schema?.estadoCotizacion.options ?? [],
+      estadosOportunidad: schema?.estadoOportunidad.options ?? [],
+      estadosCotizacion: opcionesDeEstado('estadoCotizacion', schema?.estadoCotizacion.options ?? []),
       tiposSujeto: schema?.tipoSujeto.options ?? [],
-      estadosEnvio: schema?.estadoEnvio.options ?? [],
+      estadosEnvio: opcionesDeEstado('estadoEnvio', schema?.estadoEnvio.options ?? []),
+      asignados: usuarios.map((u) => ({ value: u.id, label: u.name })),
     }),
-    [schema]
+    [schema, usuarios]
   )
+  const nombreAsignado = usuarios.find((u) => u.id === filters.asignado)?.name
 
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({ ...prev, [field]: value }))
@@ -152,13 +170,10 @@ export default function App() {
     () =>
       opportunities.filter((opp) => {
         if (filters.tipoSujeto && opp.tipoSujeto !== filters.tipoSujeto) return false
-        if (hayBusqueda) {
-          if (filters.estadoCotizacion && opp.estadoCotizacion !== filters.estadoCotizacion) return false
-          if (filters.estadoEnvio && opp.estadoEnvio !== filters.estadoEnvio) return false
-        }
+        if (hayBusqueda) return cumpleFiltros(opp, filters, { nombreAsignado })
         return true
       }),
-    [opportunities, filters, hayBusqueda]
+    [opportunities, filters, hayBusqueda, nombreAsignado]
   )
 
   // Trae la lista de cero con la búsqueda y los filtros actuales. Se usa al buscar, al
@@ -169,7 +184,11 @@ export default function App() {
     trayendoMasRef.current = false
     setLoadingMore(true)
     try {
-      const pagina = await fetchOpportunitiesPage({ limit: pageSize, search: searchTerm, filtros: filters })
+      const pagina = await fetchOpportunitiesPage({
+        limit: pageSize,
+        search: searchTerm,
+        reglas: reglasDeFiltros(filters, schema),
+      })
       setBoardTotalCount(pagina.totalCount)
       setCursor(pagina.cursor)
       setOpportunities(

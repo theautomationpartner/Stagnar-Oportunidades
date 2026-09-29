@@ -105,3 +105,47 @@
   font-weight: 700;
   line-height: 1;
 }
+
+/* Reunión del 24/09: más filtros — estados, Tipo de sujeto y Asignado en una grilla de 5
+   que baja a 3 y a 1; los tres rangos de fecha en su propia fila. */
+@media (min-width: 1100px) {
+  .filter-panel__fields {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .filter-panel__fields--fechas {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.filter-field--rango {
+  margin: 0;
+  padding: 0;
+  border: none;
+  min-width: 0;
+}
+
+.filter-field--rango legend {
+  padding: 0;
+  margin-bottom: 4px;
+}
+
+.filter-field__rango {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-weight: 400;
+}
+
+.filter-field__rango input {
+  flex: 1 1 0;
+  min-width: 0;
+  height: 32px;
+  padding: 0 8px;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-dark);
+  border: 1px solid var(--border-input);
+  border-radius: 6px;
+  background: #fff;
+}

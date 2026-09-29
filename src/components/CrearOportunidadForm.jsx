@@ -6,8 +6,6 @@ import {
   MdEventNote,
   MdKeyboardArrowDown,
   MdKeyboardArrowUp,
-  MdEdit,
-  MdCheck,
   MdLocationOn,
   MdPerson,
 } from 'react-icons/md'
@@ -78,10 +76,11 @@ import { revisarIdentificacion } from '../services/vehiculoIdentificacion'
 import { ciError, documentoDelTipoCliente, fechaError, fieldStateClass, maxFechaNacimiento, NACIONALIDAD_URUGUAY, normalizeFechaIA, splitNombreApellido, splitTelefono, stripCi, telefonoError, buildMondayPhone, emailError, buildMondayEmail } from '../services/personaFields'
 import { clearPersistedSearch, loadPersistedSearch, savePersistedSearch } from '../services/persistedSearch'
 import { publicarTrabajoEnCrear } from '../services/crearEnCurso'
-import { ContactoFields, DocumentChoiceToggle, ExtranjeroFields, Required, RequiredDropdown, SectionTitle, StepHeading } from './crear/FormPrimitives'
+import { ContactoFields, ExtranjeroFields, Required, RequiredDropdown, SectionTitle, StepHeading } from './crear/FormPrimitives'
 import { ExistingRecordSearch } from './crear/ExistingRecordSearch'
 import { VehiculoManualFields } from './crear/VehiculoManualFields'
-import { EditarContactoModal, EditarLeadModal } from './crear/EditarPersonaModals'
+import { EditarContactoModal } from './crear/EditarPersonaModals'
+import { opcionesDeLocalidad } from '../services/localidades'
 import './CrearOportunidadForm.css'
 
 // `label` es el texto corto del Stepper de arriba (círculos numerados); `navLabel` es
@@ -157,18 +156,14 @@ function buildInitialForm() {
     // suben al Cliente recién creado al guardar (ver handleGuardar / ClienteArchivos).
     archivosCliente: [],
     tipoRiesgo: '',
-    poseeVehiculo: '',
-    // Modelo (Autodata) — se pide siempre que sea Automóvil, sin importar la respuesta
-    // de Posee Vehículo.
+    // Modelo (Autodata) — se pide siempre que sea Automóvil, haya Carta o no.
     modeloSeleccion: null,
-    // Posee Vehículo === "Si": Carta Automóvil obligatoria (dispara la lectura
-    // automática que completa marca/anio/tipo más abajo). Cédula Identidad es opcional
-    // en los dos casos (Sí y No).
+    // Reunión del 24/09: la Carta Automóvil es opcional y ya no se pregunta si la tienen.
+    // Si la cargan, se lee y completa marca/anio/tipo/combustible/uso más abajo (ver
+    // handleCartaAutomovilChange); si no, esos campos se tipean. Con Carta, "Posee
+    // Vehiculo?" se guarda en "Si" (ver buildColumnValues). Cédula Identidad es opcional.
     cartaAutomovil: null,
     cedulaIdentidad: null,
-    // Posee Vehículo === "No": no hay archivo que leer, se tipean estos 5 campos a mano.
-    // Posee Vehículo === "Si": marca/anio/tipo los completa la lectura automática de la
-    // Carta Automóvil en vez de tipearlos (ver handleCartaAutomovilChange); uso no aplica.
     marca: '',
     anio: '',
     combustible: '',
@@ -210,25 +205,9 @@ export default function CrearOportunidadForm({
   // inicializado una vez porque el respaldo (el contexto de monday) llega tarde: con un
   // useState(creadorId) quedaría fijo en null.
   //
-  // La pantalla principal deja elegir "con qué usuario" trabajar (ver LandingScreen y su
-  // ASIGNADO_PREFILL_KEY): si vino de ahí, esa persona arranca como Asignado. El
-  // initializer SOLO lee (StrictMode lo invoca dos veces: leer-y-borrar ahí dejaba la
-  // segunda pasada sin el dato); el borrado va en el efecto de abajo — es un dato de ese
-  // viaje, no una preferencia que deba sobrevivir.
-  const [asignadoElegido, setAsignadoElegido] = useState(() => {
-    try {
-      return sessionStorage.getItem('stg_asignado_prefill') || null
-    } catch {
-      return null
-    }
-  })
-  useEffect(() => {
-    try {
-      sessionStorage.removeItem('stg_asignado_prefill')
-    } catch {
-      /* nada para borrar */
-    }
-  }, [])
+  // Reunión del 24/09: la pantalla principal ya no pregunta "con qué usuario" — el
+  // Asignado se elige solo acá (y adentro de la oportunidad).
+  const [asignadoElegido, setAsignadoElegido] = useState(null)
   const asignadoId = asignadoElegido ?? creadorId
   // Calculado una sola vez, al montar (ver loadPersistedSearch) — de acá salen los
   // valores iniciales de stepIndex/form/resultadoSeleccionado/searchPreview/
@@ -262,19 +241,14 @@ export default function CrearOportunidadForm({
   const [createdItemId, setCreatedItemId] = useState(null)
   const [lecturaEstado, setLecturaEstado] = useState('')
   const [lecturaError, setLecturaError] = useState(null)
-  // A pedido, estética tipo mockup: tras una lectura exitosa (Leidos + Modelo ya
-  // elegido) se muestra un resumen compacto en vez de los campos sueltos — "Editar
-  // datos" lo cambia por VehiculoManualFields (mismos campos, ahora editables) para
-  // corregir algo puntual sin perder lo demás. Se resetea a false cada vez que se sube
-  // un archivo nuevo (ver handleCartaAutomovilChange) para no arrancar la lectura
-  // siguiente ya en modo edición.
-  const [editingLeidos, setEditingLeidos] = useState(false)
   // Combustible/Tipo que de verdad vinieron de la lectura de la Carta Automóvil (LOG-03)
   // — captado UNA sola vez cuando termina la lectura, no derivado de `form` (que cambia
   // con cada Modelo elegido). handleModeloChangeConOcr lo usa en vez de `prev.combustible`
   // porque `prev` ya viene "contaminado" por el modelo anterior: si se usara `prev`, el
   // primer modelo fija el valor y ningún modelo siguiente (misma marca) puede corregirlo.
-  const [ocrVehiculo, setOcrVehiculo] = useState({ combustible: '', tipo: '' })
+  // `modelo` es el texto que leyó la IA (reunión del 24/09): no se elige solo, filtra el
+  // desplegable de Modelo (ver modeloLeido.js).
+  const [ocrVehiculo, setOcrVehiculo] = useState({ combustible: '', tipo: '', modelo: '' })
   // A pedido: marca si el archivo actual de Cédula Identidad vino del autocompletado
   // (ver handleAutofillCedula) en vez de elegido a mano — gatea el recubrimiento verde
   // de FileField (highlighted). Se apaga solo si el usuario cambia o quita el archivo
@@ -355,18 +329,11 @@ export default function CrearOportunidadForm({
   // (pantalla en blanco). Igual que con el Dropdown de ExistingRecordSearch, forzarlos
   // a remontar de cero (key) evita el problema.
   const [textFieldsResetKey, setTextFieldsResetKey] = useState(0)
-  // A pedido: al crear un Lead desde cero, antes de mostrar el formulario a mano se
-  // pregunta si tienen la Cédula de Identidad — "Sí" pide el archivo y lo manda a leer
-  // con IA (ver handleCedulaLeadChange); "No" cae al formulario de siempre. '' (sin
-  // responder) no muestra ninguno de los 2 todavía.
-  const [tieneCedulaLead, setTieneCedulaLead] = useState('')
+  // Cédula de un Lead creado desde cero (opcional): si la suben se lee con IA y completa
+  // los Datos personales (ver handleCedulaLeadChange).
   const [cedulaLeadFile, setCedulaLeadFile] = useState(null)
   const [leyendoCedulaLead, setLeyendoCedulaLead] = useState(false)
   const [cedulaLeadError, setCedulaLeadError] = useState(null)
-  // true una vez que la IA devolvió algo y ya se aplicó al `form` — gatea si se
-  // muestra el perfil de solo lectura (ver JSX) en vez de solo el campo de archivo.
-  const [leadPerfilListo, setLeadPerfilListo] = useState(false)
-  const [editingLeadPerfil, setEditingLeadPerfil] = useState(false)
 
   const handleChange = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
 
@@ -651,7 +618,6 @@ export default function CrearOportunidadForm({
       // JSON, se pierden en el viaje (hay que volver a elegirlos).
       riesgo: {
         tipoRiesgo: form.tipoRiesgo,
-        poseeVehiculo: form.poseeVehiculo,
         modeloSeleccion: form.modeloSeleccion,
         marca: form.marca,
         anio: form.anio,
@@ -671,7 +637,6 @@ export default function CrearOportunidadForm({
     resultadoSeleccionado,
     stepIndex,
     form.tipoRiesgo,
-    form.poseeVehiculo,
     form.modeloSeleccion,
     form.marca,
     form.anio,
@@ -680,16 +645,14 @@ export default function CrearOportunidadForm({
     form.tipo,
   ])
 
-  // Limpia el gate de "¿Tenés la Cédula de Identidad?" (ver JSX del paso 1) y todo lo
-  // que haya quedado de un intento anterior de leerla con IA — se llama tanto al
+  // Limpia lo que haya quedado de un intento anterior de leer la Cédula del Lead con IA —
+  // se llama tanto al
   // arrancar "Crear Lead" de cero como al volver a buscar, para no arrastrar el
   // archivo/perfil de una persona distinta.
   const resetCedulaLead = () => {
-    setTieneCedulaLead('')
     setCedulaLeadFile(null)
     setLeyendoCedulaLead(false)
     setCedulaLeadError(null)
-    setLeadPerfilListo(false)
   }
 
   // "No lo encuentro" — abre el resto del formulario para completarlo a mano, sin ningún
@@ -988,9 +951,11 @@ export default function CrearOportunidadForm({
   // elegido, solo las de ese departamento (texto plano de la propia Localidad,
   // text_mm5wbef5 — no hace falta ir a buscar el board_relation).
   const localidades = schema?.localidades ?? []
-  const localidadOptions = localidades
-    .filter((l) => !selectedDepartamento || l.departamento === selectedDepartamento.label)
-    .map((l) => ({ value: l.id, label: l.name }))
+  // Reunión del 24/09: sin código postal y sin nombres repetidos (ver localidades.js).
+  const localidadOptions = opcionesDeLocalidad(localidades, {
+    departamento: selectedDepartamento?.label,
+    seleccionadaId: form.localidadId,
+  })
   const selectedLocalidad = localidadOptions.find((o) => o.value === form.localidadId) ?? null
 
   const tipoRiesgoOptions = (schema?.tipoRiesgo?.options ?? []).map((opt) => ({ value: opt, label: opt }))
@@ -1100,7 +1065,9 @@ export default function CrearOportunidadForm({
           // Un duplicado que frena no deja salir del paso: si no, se llega hasta "Crear
           // Oportunidad" con el cliente repetido ya cargado.
           !duplicadoBloqueante &&
-          !duplicadoPendiente
+          !duplicadoPendiente &&
+          // Mientras se lee la Cédula del Lead, lo que se ve todavía no es lo definitivo.
+          !leyendoCedulaLead
         // A pedido: la Dirección ya no es obligatoria acá — se pide en el paso 3
         // (Confirmar) de la oportunidad, junto con los documentos.
       )
@@ -1114,28 +1081,12 @@ export default function CrearOportunidadForm({
       // que no sea Automóvil (ver el mensaje "Todavía no hay campos definidos..." en el
       // JSX), así que no hay nada que bloquee avanzar en ese caso.
       if (!esAutomovil) return true
-      if (!form.poseeVehiculo) return false
-      if (form.poseeVehiculo === 'Si') {
-        // Cédula Identidad se pide junto con Carta Automóvil pero es opcional (no
-        // bloquea), en los dos casos (Sí y No).
-        if (!form.cartaAutomovil) return false
-        // Camino feliz: la lectura automática terminó bien ("Leidos") — pero puede haber
-        // terminado sin completar TODOS los campos (ver vehiculoLeidoCompleto), no solo
-        // el Modelo. Mientras está "Leer"/"Leyendo"/"subido"/"subiendo" todavía no hay
-        // Marca/Año confiables con qué filtrar Autodata, así que no se puede avanzar.
-        if (lecturaEstado === 'Leidos') return vehiculoLeidoCompleto
-        // A pedido: si la lectura terminó en "Error", en vez de trabar el formulario se
-        // muestra lo que se haya alcanzado a extraer (puede venir vacío) y se completa a
-        // mano el resto — mismos campos y misma validación que el caso "No".
-        if (lecturaEstado === 'Error') {
-          return Boolean(
-            form.marca && form.anio && form.modeloSeleccion && form.combustible && form.uso && form.tipo
-          )
-        }
-        return false
-      }
-      if (!form.modeloSeleccion) return false
-      return Boolean(form.marca && form.anio && form.combustible && form.uso && form.tipo)
+      // Reunión del 24/09: ya no se pregunta si tienen la Carta. La Carta es opcional; si
+      // la suben, hay que esperar a que termine de leerse (mientras tanto Marca/Año no son
+      // confiables para filtrar Autodata). Termine bien o con Error, se exigen los mismos
+      // campos que cargando a mano.
+      if (form.cartaAutomovil && lecturaEstado !== 'Leidos' && lecturaEstado !== 'Error') return false
+      return vehiculoLeidoCompleto
     }
     return false
   }
@@ -1161,7 +1112,7 @@ export default function CrearOportunidadForm({
     // El email es opcional: solo molesta si está escrito y mal.
     if (form.email && emailError(form.email)) revisar.push('email')
     pedir(!form.departamentoId, false, 'departamento')
-    pedir(!form.localidadId, false, 'localidad')
+    pedir(!form.localidadId, false, 'zona principal de circulación')
     pedir(!form.nacionalidad, false, 'nacionalidad')
     const contactoDefinido =
       form.contactoId ||
@@ -1182,6 +1133,7 @@ export default function CrearOportunidadForm({
         : `Ese documento ya es de ${quien}. Usá ese cliente o corregí el documento: no se puede cargar dos veces el mismo.`
     }
     if (duplicadoPendiente) return 'Buscando si esta persona ya está cargada...'
+    if (leyendoCedulaLead) return 'Leyendo la Cédula de Identidad...'
     const { faltan, revisar } = datosPendientesDelCliente()
     const partes = []
     if (faltan.length) partes.push(`Falta cargar ${enumerar(faltan)}.`)
@@ -1231,7 +1183,9 @@ export default function CrearOportunidadForm({
       board_relation_mm5sqf8t: { item_ids: [Number(form.localidadId)] },
       board_relation_mm54tq30: { item_ids: [Number(form.departamentoId)] },
     }
-    if (esAutomovil) columnValues.color_mm51n4j = form.poseeVehiculo
+    // "Posee Vehiculo?" ya no se pregunta (reunión del 24/09): es "Si" cuando cargaron la
+    // Carta del vehículo y "No" cuando no.
+    if (esAutomovil) columnValues.color_mm51n4j = form.cartaAutomovil ? 'Si' : 'No'
     if (asignadoId) columnValues.deal_owner = { personsAndTeams: [{ id: Number(asignadoId), kind: 'person' }] }
     return columnValues
   }
@@ -1268,8 +1222,7 @@ export default function CrearOportunidadForm({
   // paso intermedio de "Confirmar lectura" — el archivo elegido ya es la confirmación.
   const handleCartaAutomovilChange = async (file) => {
     handleChange('cartaAutomovil', file)
-    setEditingLeidos(false)
-    setOcrVehiculo({ combustible: '', tipo: '' })
+    setOcrVehiculo({ combustible: '', tipo: '', modelo: '' })
     if (!file) {
       setLecturaEstado('')
       setLecturaError(null)
@@ -1328,19 +1281,12 @@ export default function CrearOportunidadForm({
         chasis: pick('chasis', 'Chasis'),
         motor: pick('motor', 'Motor'),
       }))
-      setOcrVehiculo({ combustible: combustibleLeido, tipo: tipoLeido })
+      setOcrVehiculo({ combustible: combustibleLeido, tipo: tipoLeido, modelo: pick('modelo', 'Modelo') })
       setLecturaEstado('Leidos')
     } catch (err) {
       setLecturaEstado('Error')
       setLecturaError(err.message)
     }
-  }
-
-  // Caso "No": acá no hay lectura automática que disparar (ver handleCartaAutomovilChange
-  // para el caso "Sí") — el archivo queda en memoria nomás, handleGuardar lo sube recién
-  // al final junto con el resto (ítem de la Oportunidad todavía no existe a esta altura).
-  const handleCartaAutomovilManualChange = (file) => {
-    handleChange('cartaAutomovil', file)
   }
 
   // Cédula Identidad es opcional en los dos casos (Sí y No) — no bloquea el guardado. El
@@ -1363,8 +1309,12 @@ export default function CrearOportunidadForm({
   const handleCedulaLeadChange = async (file) => {
     setCedulaLeadFile(file)
     setCedulaLeadError(null)
-    setLeadPerfilListo(false)
-    if (!file) return
+    if (!file) {
+      // Sacar la Cédula del recuadro la saca también de la Documentación, si había
+      // entrado sola desde acá. Lo ya completado queda: son campos editables.
+      if (cedulaAutofilled) handleCedulaIdentidadChange(null)
+      return
+    }
     setLeyendoCedulaLead(true)
     try {
       const data = await leerCedula(file)
@@ -1375,7 +1325,7 @@ export default function CrearOportunidadForm({
       )
       if (!nombre && !data.ci) {
         // La IA no pudo leer nada útil — se avisa y se deja el archivo puesto para
-        // reintentar (o pasar a "No" y cargar a mano), en vez de mostrar un perfil vacío.
+        // reintentar; mientras tanto los campos se pueden completar a mano.
         setCedulaLeadError('No pudimos leer los datos del documento.')
         return
       }
@@ -1401,17 +1351,11 @@ export default function CrearOportunidadForm({
         extranjero: departamentoMatch ? 'No' : prev.extranjero,
       }))
       handleCedulaIdentidadChange(file, true)
-      setLeadPerfilListo(true)
     } catch (err) {
       setCedulaLeadError(err.message)
     } finally {
       setLeyendoCedulaLead(false)
     }
-  }
-
-  const handleSaveLeadPerfil = (values) => {
-    setForm((prev) => ({ ...prev, ...values }))
-    setEditingLeadPerfil(false)
   }
 
   // A pedido: toda Oportunidad nueva queda con el campo Cliente completo, nunca vacío —
@@ -2027,42 +1971,29 @@ export default function CrearOportunidadForm({
                   </>
                 ) : (
                   <div className="crear-op__form-card">
-                    {/* A pedido: antes de mostrar el formulario a mano para "Crear Lead",
-                        se pregunta si tienen la Cédula de Identidad — mismo criterio que
-                        "¿Tenés la Cédula o Carta del vehículo?" del paso 3 (mismo toggle,
-                        ver DocumentChoiceToggle). "Sí" manda el archivo a leer con IA
-                        (ver handleCedulaLeadChange) y muestra el resultado como perfil de
-                        solo lectura (mismo lenguaje que la ficha de un Cliente/Lead ya
-                        elegido, ver más arriba) en vez de un formulario — "Editar" abre un
-                        popup para corregir lo que la IA haya leído mal (ver
-                        EditarLeadModal). "No" cae al formulario de siempre. A pedido: la
-                        pregunta y lo que aparece según la respuesta (subir Cédula, o los
-                        campos Nombre/Apellido/CI/Fecha) van en la MISMA sección — antes
-                        eran 2 .crear-op__section separadas, con un salto/gap en el medio
-                        de lo que es conceptualmente un solo bloque ("Datos personales"). */}
+                    {/* Reunión del 24/09: "Crear Lead" ya no pregunta si tienen la Cédula.
+                        La Cédula va en su recuadro, a un costado de los Datos personales, y
+                        los campos siempre a la vista: si la suben, se lee con IA (ver
+                        handleCedulaLeadChange) y se completan solos, editables; si no, se
+                        tipean. Continuar exige lo mismo en los dos casos. */}
                     <div className="crear-op__section">
-                      {/* A pedido: "Datos personales" (título + ícono) ya no va acá arriba de
-                          la pregunta — solo aparece más abajo, adentro de la respuesta "No"
-                          (los campos Nombre/Apellido/CI/Fecha son los "datos personales"
-                          en sí; la pregunta de la Cédula es un paso previo, no forma parte
-                          de esa sección). */}
-                      <p className="crear-op__risk-subtitle">¿Tenés el frente de la Cédula de Identidad de la persona?</p>
-                      <DocumentChoiceToggle value={tieneCedulaLead} onChange={setTieneCedulaLead} />
-
-                      {tieneCedulaLead === 'Si' && (
-                        <div className="crear-op__section-subblock">
+                      <SectionTitle icon={MdPerson}>Datos personales</SectionTitle>
+                      <div className="crear-op__doc-y-campos">
+                        <div className="crear-op__doc-lado">
                           {!cedulaLeadFile ? (
                             <FileUploadField
                               label="Cédula de Identidad (frente)"
+                              required={false}
                               file={cedulaLeadFile}
                               onUpload={handleCedulaLeadChange}
                               prominent
-                              helperText="Subí una foto o PDF del FRENTE de la Cédula de Identidad para completar los datos automáticamente."
+                              helperText="Opcional: si la subís, completamos los datos solos."
                               buttonLabel="Adjuntar frente de la Cédula"
                             />
                           ) : (
                             <FileUploadField
                               label="Cédula de Identidad (frente)"
+                              required={false}
                               file={cedulaLeadFile}
                               uploading={leyendoCedulaLead}
                               onDelete={() => handleCedulaLeadChange(null)}
@@ -2072,17 +2003,13 @@ export default function CrearOportunidadForm({
                           )}
                           {cedulaLeadError && (
                             <AttentionBox type="warning" className="crear-op__lead-error">
-                              No pudimos leer los datos automáticamente. Completá lo que falta con
-                              "Editar", o eliminá el archivo de arriba para probar con otro documento.
+                              No pudimos leer los datos automáticamente. Completá los datos a mano,
+                              o eliminá el archivo para probar con otro documento.
                             </AttentionBox>
                           )}
                         </div>
-                      )}
-
-                      {tieneCedulaLead === 'No' && (
-                        <div className="crear-op__section-subblock">
-                          <SectionTitle icon={MdPerson}>Datos personales</SectionTitle>
-                          <div className="crear-op__fields--grid crear-op__fields--grid-3">
+                        <div className="crear-op__campos-lado">
+  <div className="crear-op__fields--grid crear-op__fields--grid-3">
                           {/* A pedido: el alta declara si es una Empresa o un Particular
                               (Tipo Cliente del tablero Clientes). Siempre tiene valor
                               (arranca en Particular, el caso típico), así que no lleva
@@ -2092,7 +2019,6 @@ export default function CrearOportunidadForm({
                             <RequiredDropdown
                               size="medium"
                               clearable={false}
-                              searchable={false}
                               options={[
                                 { value: 'Particular', label: 'Particular' },
                                 { value: 'Empresa', label: 'Empresa' },
@@ -2193,58 +2119,9 @@ export default function CrearOportunidadForm({
                           )}
                           </div>
                         </div>
-                      )}
-
+                      </div>
                     </div>
 
-                    {tieneCedulaLead === 'Si' && leadPerfilListo && (
-                      <>
-                        {/* Misma ficha compartida que la de un Cliente/Lead existente
-                            (crear/PersonaFicha.jsx) — solo datos del Cliente; el teléfono
-                            y el email del Contacto se piden justo debajo
-                            (ContactoFields), que además es lo que la IA no devuelve. */}
-                        <PersonaFicha
-                          form={form}
-                          selectedLocalidad={selectedLocalidad}
-                          selectedDepartamento={selectedDepartamento}
-                          source="lead"
-                          onEdit={() => setEditingLeadPerfil(true)}
-                          cedula={{ file: form.cedulaIdentidad, onChange: handleCedulaIdentidadChange }}
-                        />
-
-                        {/* A pedido: primero todo lo del Lead junto (perfil + documentos)
-                            y el Contacto al final, sin intercalar. */}
-                        <ClienteArchivos
-                          pendingFiles={form.archivosCliente}
-                          onPendingChange={(files) => handleChange('archivosCliente', files)}
-                        />
-
-                        <ContactoFields
-                          form={form}
-                          handleChange={handleChange}
-                          resetKey={textFieldsResetKey}
-                          contactosDelCliente={contactosDelCliente}
-                          onElegirContacto={handleElegirContacto}
-                          onContactoModo={handleContactoModo}
-                          homonimo={contactoHomonimo}
-                          permitirVincular
-                          onBuscarContacto={buscarContactosCrmLibre}
-                          onVincularContacto={aplicarContacto}
-                        />
-
-                        {/* A pedido: mismo aviso que la ficha de un Cliente/Lead ya
-                            existente de más arriba — acá la lectura con IA puede haber
-                            dejado algún dato obligatorio sin completar (ej. no
-                            reconoció la Ubicación), y sin esto no había ninguna pista
-                            de por qué "Continuar" seguía gris. */}
-                        {!isStepValid(0) && (
-                          <AttentionBox type="warning">{avisoDatosDelCliente()}</AttentionBox>
-                        )}
-                      </>
-                    )}
-
-                    {tieneCedulaLead === 'No' && (
-                      <>
                         <div className="crear-op__section">
                           <SectionTitle icon={MdLocationOn}>Ubicación</SectionTitle>
                           <div className="crear-op__fields--grid crear-op__fields--grid-3">
@@ -2275,7 +2152,7 @@ export default function CrearOportunidadForm({
                               />
                             </label>
                             <label className="crear-op__field">
-                              <span>Localidad <Required /></span>
+                              <span>Zona principal de circulación <Required /></span>
                               <RequiredDropdown
                                 options={localidadOptions}
                                 value={selectedLocalidad}
@@ -2302,6 +2179,9 @@ export default function CrearOportunidadForm({
                           </div>
                         </div>
 
+                        {/* Reunión del 24/09 (menos scroll): en pantalla ancha Documentos y
+                            Contacto van lado a lado; en angosta se apilan como antes. */}
+                        <div className="crear-op__lead-pie">
                         <ClienteArchivos
                           pendingFiles={form.archivosCliente}
                           onPendingChange={(files) => handleChange('archivosCliente', files)}
@@ -2322,19 +2202,15 @@ export default function CrearOportunidadForm({
                           onBuscarContacto={buscarContactosCrmLibre}
                           onVincularContacto={aplicarContacto}
                         />
-                      </>
+                        </div>
+
+                    {/* Con la Cédula leída, la IA puede haber dejado algún dato obligatorio
+                        sin completar (ej. no reconoció el departamento): sin este aviso no
+                        había ninguna pista de por qué "Continuar" seguía gris. */}
+                    {cedulaLeadFile && !leyendoCedulaLead && !isStepValid(0) && (
+                      <AttentionBox type="warning">{avisoDatosDelCliente()}</AttentionBox>
                     )}
 
-                    {editingLeadPerfil && (
-                      <EditarLeadModal
-                        form={form}
-                        departamentoOptions={departamentoOptions}
-                        localidades={localidades}
-                        nacionalidadOptions={nacionalidadOptions}
-                        onClose={() => setEditingLeadPerfil(false)}
-                        onSave={handleSaveLeadPerfil}
-                      />
-                    )}
                   </div>
                 )}
 
@@ -2472,21 +2348,6 @@ export default function CrearOportunidadForm({
         {stepIndex === 2 && (
           <div className="crear-op__fields">
             <StepHeading number={3} title="Ingresar datos del bien" />
-            {esAutomovil && (
-              <>
-                {/* A pedido, estética tipo mockup: subtítulo propio del paso, y el
-                    toggle de 2 botones en vez del dropdown "Si"/"No" — mismos valores
-                    reales que color_mm51n4j, solo cambia el control. A pedido: se sacó
-                    la selección de "¿es alguno de estos vehículos?" (ver git history)
-                    — este paso deja solo la pregunta de abajo, ahora más destacada
-                    (ver .crear-op__risk-subtitle). */}
-                <p className="crear-op__risk-subtitle">¿Tenés la Cédula o Carta del vehículo a cotizar?</p>
-                <DocumentChoiceToggle
-                  value={form.poseeVehiculo}
-                  onChange={(value) => handleChange('poseeVehiculo', value)}
-                />
-              </>
-            )}
 
             {!esAutomovil && (
               <p className="crear-op__empty">
@@ -2494,187 +2355,112 @@ export default function CrearOportunidadForm({
               </p>
             )}
 
-            {esAutomovil && form.poseeVehiculo === 'Si' && (
-              <>
-                {/* Cédula Identidad se movió al paso 1 (a pedido) — acá solo queda Carta
-                    Automóvil, la que dispara la lectura automática. Caja grande
-                    centrada (prominent) SOLO mientras no hay archivo — apenas se elige
-                    uno, se reemplaza por una fila compacta (mismo lenguaje que el resto
-                    de la app: Cédula Identidad, Póliza, etc.) que se queda FIJA ahí pase
-                    lo que pase con la lectura (analizando/leído/incompleto/error, ver
-                    más abajo). A pedido: antes "eliminar" era un link de texto suelto,
-                    distinto y en un lugar distinto en cada uno de esos estados — ahora
-                    es un único botón, siempre pegado al archivo al que se refiere (más
-                    fácil de encontrar, ni hay que ir a buscarlo según en qué estado esté
-                    la lectura). El archivo no se sube a monday en este paso (ver
-                    handleCartaAutomovilChange) — solo se le manda al escenario de Make
-                    que lo lee, así que acá no hay "uploading" que mostrar. */}
-                {!form.cartaAutomovil ? (
-                  <FileUploadField
-                    label="Cédula/Carta Automóvil"
-                    file={form.cartaAutomovil}
-                    onUpload={handleCartaAutomovilChange}
-                    prominent
-                    helperText="Subí una foto o PDF de la Cédula o Carta Automóvil del vehículo para autocompletar sus datos."
-                    buttonLabel="Adjuntar Cédula/Carta Automóvil"
-                  />
-                ) : (
-                  <FileUploadField
-                    label="Cédula/Carta Automóvil"
-                    file={form.cartaAutomovil}
-                    onDelete={() => handleCartaAutomovilChange(null)}
-                    deleteLabel="Eliminar archivo y reintentar"
-                    showReplaceButton={false}
-                  />
-                )}
+            {/* Reunión del 24/09: sin la pregunta "¿Tenés la Cédula o Carta del vehículo?".
+                La Carta va en su recuadro, a un costado, y los campos del vehículo siempre
+                a la vista del otro lado: si la suben se lee y los completa; si no, se
+                tipean. Continuar exige los mismos campos en los dos casos. */}
+            {esAutomovil && (
+              <div className="crear-op__doc-y-campos">
+                <div className="crear-op__doc-lado">
+                  {/* Caja grande (prominent) SOLO mientras no hay archivo — apenas se elige
+                      uno, se reemplaza por una fila compacta que se queda FIJA pase lo que
+                      pase con la lectura, con su único botón para eliminarlo. El archivo no
+                      se sube a monday en este paso (ver handleCartaAutomovilChange): solo
+                      se le manda al escenario de Make que lo lee. */}
+                  {!form.cartaAutomovil ? (
+                    <FileUploadField
+                      label="Cédula/Carta Automóvil"
+                      required={false}
+                      file={form.cartaAutomovil}
+                      onUpload={handleCartaAutomovilChange}
+                      prominent
+                      helperText="Opcional: si la subís, completamos los datos del vehículo solos."
+                      buttonLabel="Adjuntar Cédula/Carta Automóvil"
+                    />
+                  ) : (
+                    <FileUploadField
+                      label="Cédula/Carta Automóvil"
+                      required={false}
+                      file={form.cartaAutomovil}
+                      onDelete={() => handleCartaAutomovilChange(null)}
+                      deleteLabel="Eliminar archivo y reintentar"
+                      showReplaceButton={false}
+                    />
+                  )}
 
-                {lecturaEstado === 'Leyendo' && (
-                  <div className="crear-op__lectura-analyzing">
-                    <Loader size={20} className="crear-op__lectura-analyzing-spinner" />
-                    <div>
-                      <strong>Analizando cédula del vehículo...</strong>
-                      <span>Extrayendo Marca, Año, Combustible, Tipo y Uso con Inteligencia Artificial.</span>
+                  {lecturaEstado === 'Leyendo' && (
+                    <div className="crear-op__lectura-analyzing">
+                      <Loader size={20} className="crear-op__lectura-analyzing-spinner" />
+                      <div>
+                        <strong>Analizando cédula del vehículo...</strong>
+                        <span>Extrayendo Marca, Año, Combustible, Tipo y Uso con Inteligencia Artificial.</span>
+                      </div>
                     </div>
-                  </div>
-                )}
+                  )}
 
-                {/* A pedido: si la lectura falla, en vez de trabar el formulario se avisa
-                    en amarillo (mismo color que los campos resaltados de abajo, ver
-                    VehiculoManualFields#highlightEmpty) y se completa/corrige lo que
-                    haga falta a mano — mismos campos que el caso "No". Eliminar el
-                    archivo y probar con otro es la fila de arriba (ver más arriba). */}
-                {lecturaEstado === 'Error' && (
-                  <>
-                    <AttentionBox type="warning">
-                      No pudimos leer todos los datos del documento. Por favor, completá
-                      manualmente los campos resaltados en amarillo.
+                  {/* A pedido: si la lectura falla, en vez de trabar el formulario se avisa en
+                      amarillo (mismo color que los campos resaltados, ver
+                      VehiculoManualFields#highlightEmpty) y se completa a mano. */}
+                  {lecturaEstado === 'Error' && (
+                    <>
+                      <AttentionBox type="warning">
+                        No pudimos leer todos los datos del documento. Por favor, completá
+                        manualmente los campos resaltados en amarillo.
+                      </AttentionBox>
+                      <ErrorDetailBox detail={lecturaError} title="Detalle del error:" className="crear-op__error-detail-spacing" />
+                    </>
+                  )}
+
+                  {lecturaEstado === 'Leidos' && !vehiculoLeidoCompleto && (
+                    <p className="crear-op__lectura-incompleto-hint">
+                      No pudimos leer todos los datos automáticamente — completá lo que falta
+                      (resaltado en amarillo), o eliminá el archivo para volver a intentar con
+                      otro documento.
+                    </p>
+                  )}
+
+                  {/* Red temprana (LOG-21): la matrícula y el chasis que leyó la Carta se
+                      revisan contra reglas de formato apenas se leen — es el único momento
+                      en que un error de lectura se puede corregir ANTES de cotizar y emitir.
+                      Avisa, no bloquea: el parque uruguayo tiene autos viejos e importados.
+                      Los valores no se muestran en el formulario, así que este aviso es lo
+                      único que los delata. */}
+                  {lecturaEstado === 'Leidos' && reparosIdentificacion.length > 0 && (
+                    <AttentionBox type="warning" className="crear-op__lectura-reparos">
+                      <strong>Revisá el documento:</strong>
+                      <ul>
+                        {reparosIdentificacion.map((r, i) => (
+                          <li key={i}>{r.campo} «{r.valor}» {r.motivo}.</li>
+                        ))}
+                      </ul>
+                      Se guarda igual, pero conviene corregirlo en el documento o a mano en
+                      monday — es el dato con el que después se controla que la póliza se
+                      haya emitido sobre este auto.
                     </AttentionBox>
-                    <ErrorDetailBox detail={lecturaError} title="Detalle del error:" className="crear-op__error-detail-spacing" />
-                    <VehiculoManualFields
-                      form={form}
-                      setForm={setForm}
-                      handleChange={handleChange}
-                      anioOptions={anioOptions}
-                      marcaOptions={marcaOptions}
-                      combustibleOptions={combustibleOptions}
-                      tipoOptions={tipoOptions}
-                      usoOptions={usoOptions}
-                      onModeloChange={handleModeloChangeConOcr}
-                      highlightEmpty
-                    />
-                  </>
-                )}
+                  )}
+                </div>
 
-                {/* A pedido, estética tipo mockup: tras leer TODO (Marca/Año/Tipo/
-                    Combustible/Uso/Modelo, ver vehiculoLeidoCompleto), un resumen
-                    compacto en vez de los campos sueltos — "Editar datos" lo cambia por
-                    VehiculoManualFields (mismos campos, ahora editables). */}
-                {lecturaEstado === 'Leidos' && vehiculoLeidoCompleto && !editingLeidos && (
-                  <div className="crear-op__lectura-summary">
-                    <div className="crear-op__lectura-summary-info">
-                      <strong>
-                        {form.marca} {form.modeloSeleccion.name} ({form.anio})
-                      </strong>
-                      <span>
-                        {[form.combustible, form.tipo, form.uso && `Uso ${form.uso}`]
-                          .filter(Boolean)
-                          .join(' · ')}
-                      </span>
-                    </div>
-                    <button
-                      type="button"
-                      className="crear-op__lectura-summary-edit"
-                      onClick={() => setEditingLeidos(true)}
-                    >
-                      Editar datos <MdEdit />
-                    </button>
-                  </div>
-                )}
-
-                {/* Red temprana (LOG-21): la matrícula y el chasis que leyó la Carta se
-                    revisan contra reglas de formato acá mismo, apenas se leen — es el
-                    único momento en que un error de lectura se puede corregir ANTES de
-                    cotizar y emitir. Un chasis de 5 caracteres no es un chasis, y eso se
-                    sabe sin comparar contra nada. Avisa, no bloquea: el parque uruguayo
-                    tiene autos viejos e importados y una regla que corte el paso frenaría
-                    datos buenos. Los valores no se muestran en el formulario (no hacen
-                    falta para cotizar), así que este aviso es lo único que los delata. */}
-                {lecturaEstado === 'Leidos' && reparosIdentificacion.length > 0 && (
-                  <AttentionBox type="warning" className="crear-op__lectura-reparos">
-                    <strong>Revisá el documento:</strong>
-                    <ul>
-                      {reparosIdentificacion.map((r, i) => (
-                        <li key={i}>{r.campo} «{r.valor}» {r.motivo}.</li>
-                      ))}
-                    </ul>
-                    Se guarda igual, pero conviene corregirlo en el documento o a mano en
-                    monday — es el dato con el que después se controla que la póliza se
-                    haya emitido sobre este auto.
-                  </AttentionBox>
-                )}
-
-                {/* A pedido: si la lectura ("Leidos") no completó TODOS los campos —
-                    puede pasar aunque haya terminado "bien", no solo en "Error" — se
-                    muestran los mismos campos editables con lo que falte resaltado en
-                    amarillo, en vez de texto muerto ("—") sin forma de completarlo.
-                    También se usa para "Editar datos" del resumen de arriba. Eliminar el
-                    archivo y probar con otro es la fila de arriba (ver más arriba). */}
-                {lecturaEstado === 'Leidos' && (!vehiculoLeidoCompleto || editingLeidos) && (
-                  <>
-                    {!vehiculoLeidoCompleto && (
-                      <p className="crear-op__lectura-incompleto-hint">
-                        No pudimos leer todos los datos automáticamente — completá lo que
-                        falta abajo, o eliminá el archivo arriba para volver a intentar
-                        con otro documento.
-                      </p>
-                    )}
-                    <VehiculoManualFields
-                      form={form}
-                      setForm={setForm}
-                      handleChange={handleChange}
-                      anioOptions={anioOptions}
-                      marcaOptions={marcaOptions}
-                      combustibleOptions={combustibleOptions}
-                      tipoOptions={tipoOptions}
-                      usoOptions={usoOptions}
-                      onModeloChange={handleModeloChangeConOcr}
-                      highlightEmpty={!vehiculoLeidoCompleto}
-                    />
-                    {/* A pedido: volver al resumen compacto de arriba — solo tiene
-                        sentido si ya está todo completo (si no, no hay resumen al que
-                        volver, se sigue viendo esto hasta que lo esté). Mismo estilo
-                        (link chico en verde) que "Editar datos" del resumen — es la
-                        acción inversa de esa, tiene que leerse como el mismo lenguaje
-                        visual, no como un botón de página (footer) ni un texto
-                        genérico. El texto deja explícito qué confirma (los datos del
-                        vehículo), no un "Listo" ambiguo que podía referirse a cualquier
-                        cosa. */}
-                    {editingLeidos && vehiculoLeidoCompleto && (
-                      <button
-                        type="button"
-                        className="crear-op__lectura-summary-edit"
-                        onClick={() => setEditingLeidos(false)}
-                      >
-                        Confirmar datos del vehículo <MdCheck />
-                      </button>
-                    )}
-                  </>
-                )}
-              </>
-            )}
-
-            {esAutomovil && form.poseeVehiculo === 'No' && (
-              <VehiculoManualFields
-                form={form}
-                setForm={setForm}
-                handleChange={handleChange}
-                anioOptions={anioOptions}
-                marcaOptions={marcaOptions}
-                combustibleOptions={combustibleOptions}
-                tipoOptions={tipoOptions}
-                usoOptions={usoOptions}
-                onModeloChange={handleModeloChange}
-              />
+                <div className="crear-op__campos-lado">
+                  {/* Con Carta leída, lo que leyó la IA tiene prioridad sobre lo que traiga el
+                      modelo elegido (handleModeloChangeConOcr); a mano, el modelo completa
+                      Combustible/Tipo (handleModeloChange). Mientras se lee, los campos
+                      quedan bloqueados: la lectura los va a pisar. */}
+                  <VehiculoManualFields
+                    form={form}
+                    setForm={setForm}
+                    handleChange={handleChange}
+                    anioOptions={anioOptions}
+                    marcaOptions={marcaOptions}
+                    combustibleOptions={combustibleOptions}
+                    tipoOptions={tipoOptions}
+                    usoOptions={usoOptions}
+                    onModeloChange={form.cartaAutomovil ? handleModeloChangeConOcr : handleModeloChange}
+                    highlightEmpty={Boolean(form.cartaAutomovil) && (lecturaEstado === 'Error' || lecturaEstado === 'Leidos')}
+                    disabled={lecturaEstado === 'Leyendo'}
+                    modeloLeido={form.cartaAutomovil ? ocrVehiculo.modelo : ''}
+                  />
+                </div>
+              </div>
             )}
           </div>
         )}

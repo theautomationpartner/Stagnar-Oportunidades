@@ -1466,3 +1466,96 @@ button.crear-op__clientes-chip:hover {
   padding: 4px 0 0 16px;
   border-left: 2px solid var(--tint-info-bd);
 }
+
+/* ============================================================================
+   Reunión del 24/09 — usar más el ancho de la pantalla para scrollear menos. Con
+   1100px de techo, en una notebook (1366×768) el alta de un Lead a mano medía ~1040px
+   de alto y en un monitor de 1920 quedaban ~400px vacíos a cada costado. Ningún campo,
+   validación ni orden cambia: solo cuántos entran por fila.
+   ============================================================================ */
+.crear-op__card {
+  max-width: 1440px;
+}
+
+/* Documentos y Contacto: una columna (como siempre) hasta que haya ancho para dos. */
+.crear-op__lead-pie {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  column-gap: 32px;
+  align-items: start;
+}
+
+@media (min-width: 1200px) {
+  /* Datos personales y Ubicación tienen 5 campos cada una: en una fila de 5 entran
+     enteras, en vez de 3 + 2. */
+  .crear-op__fields--grid-3 {
+    grid-template-columns: repeat(5, minmax(0, 1fr));
+  }
+
+  .crear-op__lead-pie {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+/* Reunión del 24/09: sin la pregunta "¿Tenés el documento?". El documento (Cédula del
+   Lead en el paso 1, Carta del vehículo en el paso 3) va en su recuadro a un costado y
+   los campos del otro lado, siempre a la vista. En angosto, el documento queda arriba. */
+.crear-op__doc-y-campos {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 16px 28px;
+  align-items: start;
+}
+
+.crear-op__doc-lado {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-width: 0;
+}
+
+.crear-op__campos-lado {
+  min-width: 0;
+}
+
+@media (min-width: 900px) {
+  .crear-op__doc-y-campos {
+    grid-template-columns: minmax(260px, 340px) minmax(0, 1fr);
+  }
+
+  /* Al lado del documento no entran 5 campos por fila: vuelven a ser 3. */
+  .crear-op__campos-lado .crear-op__fields--grid-3 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+/* La caja de arrastrar y soltar, al costado de los campos, no tiene que ser más alta que
+   ellos: si no, vuelve el scroll que se sacó arriba. */
+.crear-op__doc-lado .file-field--prominent {
+  padding: 10px 16px;
+}
+
+/* Con el documento al costado, un poco menos de aire entre secciones. */
+.crear-op__form-card:has(.crear-op__doc-y-campos) {
+  gap: 14px;
+}
+
+.crear-op__doc-lado .file-field__dropzone-icon {
+  width: 36px;
+  height: 36px;
+  font-size: 19px;
+}
+
+/* Búsqueda de contacto sin resultados: el aviso y, al lado, el botón para crearlo con lo
+   buscado (reunión del 24/09). */
+.crear-op__sin-resultados {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-top: 8px;
+}
+
+.crear-op__sin-resultados .crear-op__section-hint {
+  margin: 0;
+}

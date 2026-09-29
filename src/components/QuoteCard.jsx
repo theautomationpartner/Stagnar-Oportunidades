@@ -1,17 +1,19 @@
-import { useState, useMemo, memo } from 'react'
+import { useEffect, useState, useMemo, memo } from 'react'
 import {
   MdWarningAmber,
   MdRadioButtonChecked,
   MdRadioButtonUnchecked,
   MdListAlt,
+  MdPayments,
   MdTune,
 } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
 import { Button, IconButton, Dropdown, Checkbox, NumberField } from '@vibe/core'
 import { formatMoney, CUOTA_COUNTS, toPercentString } from '../services/format'
-import { autoExtraOpciones, isQuoteSelectable, opcionalesDeCompania } from '../services/pricingEngine'
+import { autoExtraOpciones, formatDeducible, isQuoteSelectable, opcionalesDeCompania } from '../services/pricingEngine'
 import { accentForCompania, selectionForCompania } from '../services/companyColors'
 import CompanyMark from './CompanyMark'
+import CotizacionManualModal from './CotizacionManualModal'
 import { coberturaGroupOf, coberturaParaMostrar, FAMILIA_LABEL } from '../services/coberturaGroups'
 import { opcionesRc, rcEsEditable } from '../services/rcPorCompania'
 import './QuoteCard.css'
@@ -33,7 +35,7 @@ const SURA_DEDUCIBLE_OPTIONS = ['1', '1.3', '2']
 // y Edad se sacó directamente, ya no se muestra.
 const FIXED_FIELDS = [
   { key: 'contado', label: 'Contado/Costo', kind: 'money' },
-  { key: 'deducibleBase', label: 'Deducible', kind: 'text' },
+  { key: 'deducibleBase', label: 'Deducible', kind: 'deducible' },
   { key: 'uso', label: 'Uso', kind: 'text' },
 ]
 
@@ -43,8 +45,20 @@ const FIXED_FIELDS = [
 // no impacta el cálculo de precio, es solo el nivel de RC que se le muestra al
 // cliente), y el deducible/edad específico de cada compañía es otra selección de nivel
 // de cobertura. Ver /logica-monday-vibe.md.
+// Reunión del 24/09: la Bonificación sale de "Parámetros" y queda a la vista en la
+// tarjeta, debajo del costo (ver BONIF_FIELD). Sigue siendo un ajuste de pantalla: se
+// guarda recién en "Confirmar".
+const BONIF_FIELD = { key: 'bonif', label: 'Bonificación (%)', kind: 'number' }
+
+// Solo BSE: bonificación por no siniestro y por flota (%). A diferencia de la comercial,
+// son datos de la póliza que da el Banco de Seguros y se guardan en la cotización.
+const BONIFICACIONES_ESPECIALES_BSE = [
+  { key: 'bns', label: 'BNS — no siniestro (%)' },
+  { key: 'flota', label: 'Flota (%)' },
+]
+
 function fieldsForRaw(raw, rcOptions) {
-  const common = [{ key: 'bonif', label: 'Bonificación (%)', kind: 'number' }]
+  const common = []
 
   // SURA no elige RC: se lo fija el plan (Total = US$ 1.000.000, Total Plus = US$
   // 1.500.000), así que ofrecerlo como desplegable invitaría a cambiar algo que la
@@ -77,6 +91,8 @@ function fromPercentString(value) {
 function fixedFieldValue(field, raw) {
   if (field.kind === 'money') return formatMoney(Number(raw[field.key]) || 0)
   if (field.kind === 'percent') return `${toPercentString(raw[field.key])}%`
+  // Con su moneda, como en el resto de la app (dólares en SANCOR, pesos en las demás).
+  if (field.kind === 'deducible') return Number(raw[field.key]) > 0 ? formatDeducible(raw.compania, Number(raw[field.key])) : '—'
   return raw[field.key] || '—'
 }
 
@@ -155,6 +171,57 @@ function FieldSelect({ value, options, onChange }) {
   )
 }
 
+// Un porcentaje que se guarda en monday al salir del campo o con Enter — no en cada
+// tecla, que serían tantas escrituras como dígitos. Si falla, vuelve al valor anterior
+// y lo dice.
+function BonificacionEspecial({ label, valor, onGuardar }) {
+  const [borrador, setBorrador] = useState(String(valor ?? ''))
+  const [guardando, setGuardando] = useState(false)
+  const [error, setError] = useState(null)
+  // Si el valor guardado cambia por fuera (recarga del detalle), el campo lo acompaña.
+  useEffect(() => {
+    setBorrador(String(valor ?? ''))
+  }, [valor])
+  const guardar = async () => {
+    const limpio = borrador.trim()
+    if (limpio === String(valor ?? '').trim()) return
+    const n = Number(limpio)
+    if (limpio !== '' && (!Number.isFinite(n) || n < 0 || n >= 100)) {
+      setError('Tiene que ser un porcentaje entre 0 y 99.')
+      return
+    }
+    setGuardando(true)
+    setError(null)
+    try {
+      await onGuardar(limpio)
+    } catch (err) {
+      setBorrador(String(valor ?? ''))
+      setError(err.message)
+    } finally {
+      setGuardando(false)
+    }
+  }
+  return (
+    <label className="quote-card__params-field">
+      <span>{label}</span>
+      <input
+        className="quote-card__bonif-especial"
+        type="number"
+        min="0"
+        max="99"
+        step="0.1"
+        value={borrador}
+        disabled={guardando}
+        placeholder="0"
+        onChange={(e) => setBorrador(e.target.value)}
+        onBlur={guardar}
+        onKeyDown={(e) => e.key === 'Enter' && e.currentTarget.blur()}
+      />
+      {error && <span className="quote-card__warning">{error}</span>}
+    </label>
+  )
+}
+
 function QuoteCard({
   raw,
   quote,
@@ -165,6 +232,8 @@ function QuoteCard({
   onResetOverrides,
   onToggleOpcional,
   onAutoExtraChange,
+  onBonificacionEspecialChange,
+  onCargarCostoManual,
   onPanelChange,
   rcOptions,
 }) {
@@ -174,7 +243,10 @@ function QuoteCard({
   // (nunca hay que acordarse de apagar el otro a mano).
   const [openPanel, setOpenPanel] = useState(null)
   const fields = fieldsForRaw(raw, rcOptions)
-  const [form, setForm] = useState(() => buildInitialForm(raw, overrides, fields))
+  // La Bonificación va aparte en pantalla (debajo del costo) pero se aplica con los mismos
+  // overrides que el resto de los parámetros ajustables.
+  const ajustables = [BONIF_FIELD, ...fields]
+  const [form, setForm] = useState(() => buildInitialForm(raw, overrides, ajustables))
   const [savingOpcional, setSavingOpcional] = useState(null)
   const [opcionalError, setOpcionalError] = useState(null)
   // A pedido: bug reportado — "Restablecer" no volvía a mostrar el Deducible (BSE/SURA,
@@ -185,6 +257,7 @@ function QuoteCard({
   // (CrearOportunidadForm.jsx#textFieldsResetKey), mismo arreglo: forzar un remount
   // real del control cambiándole el `key` cuando se resetea.
   const [paramsResetKey, setParamsResetKey] = useState(0)
+  const [cargandoCosto, setCargandoCosto] = useState(false)
 
   const hasCustomOverrides = Object.keys(overrides).length > 0
   const accent = accentForCompania(raw.compania)
@@ -230,7 +303,7 @@ function QuoteCard({
   // `next` explícito y se lo pasa: el form de la closure todavía tiene el valor viejo).
   const applyFromForm = (formValues) => {
     const nextOverrides = {}
-    for (const field of fields) {
+    for (const field of ajustables) {
       const formValue = formValues[field.key]
       if (field.kind === 'percent') {
         if (formValue !== toPercentString(raw[field.key])) nextOverrides[field.key] = fromPercentString(formValue)
@@ -259,13 +332,14 @@ function QuoteCard({
   // termina siendo un setState del padre mientras se renderiza este componente).
   const handleToggleParams = () => {
     const siguiente = openPanel === 'params' ? null : 'params'
-    if (siguiente === 'params') setForm(buildInitialForm(raw, overrides, fields))
+    if (siguiente === 'params') setForm(buildInitialForm(raw, overrides, ajustables))
     setOpenPanel(siguiente)
     onPanelChange?.(siguiente)
   }
 
-  const handleToggleCoberturas = () => {
-    const siguiente = openPanel === 'coberturas' ? null : 'coberturas'
+  // Coberturas y Cuotas no tienen form que refrescar: solo abren o cierran su panel.
+  const handleTogglePanel = (panel) => {
+    const siguiente = openPanel === panel ? null : panel
     setOpenPanel(siguiente)
     onPanelChange?.(siguiente)
   }
@@ -283,7 +357,7 @@ function QuoteCard({
     for (const field of fields) {
       if (field.key.startsWith('deducible')) blankedOverrides[field.key] = ''
     }
-    setForm(buildInitialForm(raw, blankedOverrides, fields))
+    setForm(buildInitialForm(raw, blankedOverrides, ajustables))
     setParamsResetKey((k) => k + 1)
     onApplyOverrides(blankedOverrides)
   }
@@ -304,6 +378,9 @@ function QuoteCard({
 
   // A pedido: COSTO TOTAL en 0 → tarjeta atenuada, no se puede seleccionar para enviar.
   const selectable = isQuoteSelectable(quote)
+  // Reunión del 24/09: si vino en 0 es que WINK no supo el valor — solo esas se pueden
+  // completar a mano (ver CotizacionManualModal).
+  const sinCostoDeWink = !selectable && !(Number(raw.contado) > 0)
   return (
     <div
       className={[
@@ -324,7 +401,9 @@ function QuoteCard({
         '--seleccion-bd': seleccion.border,
         '--seleccion-fg': seleccion.fg,
       }}
-      aria-disabled={!selectable || undefined}
+      // Con "Cargar costo a mano" adentro no se marca entera como deshabilitada: esa acción
+      // sí está disponible (el radio sigue deshabilitado por su cuenta).
+      aria-disabled={(!selectable && !(sinCostoDeWink && onCargarCostoManual)) || undefined}
     >
       {/* A pedido, estética tipo mockup: layout vertical (título+deducible a la
           izquierda, COSTO TOTAL a la derecha, arriba de todo) en vez de las 3 columnas
@@ -372,6 +451,20 @@ function QuoteCard({
         <div className="quote-card__total">
           <span className="quote-card__total-label">COSTO TOTAL</span>
           <span className="quote-card__total-value">{formatMoney(quote.total)}</span>
+          {/* Reunión del 24/09: la Bonificación a la vista y editable, sin abrir
+              Parámetros. Arranca en la de PANEL para la compañía (ver
+              recargoPanel.js#applyBonificacionPorDefecto). */}
+          <label className="quote-card__bonif">
+            <span>Bonif. %</span>
+            <NumberField
+              key={`bonif-${paramsResetKey}`}
+              size="small"
+              min={0}
+              max={100}
+              value={displayValue(BONIF_FIELD, raw, overrides) === '' ? null : Number(displayValue(BONIF_FIELD, raw, overrides))}
+              onChange={(value) => handleFieldChange('bonif', value == null ? '' : String(value))}
+            />
+          </label>
         </div>
       </div>
 
@@ -387,6 +480,11 @@ function QuoteCard({
         {!selectable ? (
           <>
             <MdWarningAmber /> Sin costo total — no se puede seleccionar
+            {sinCostoDeWink && onCargarCostoManual && (
+              <button type="button" className="quote-card__cargar-costo" onClick={() => setCargandoCosto(true)}>
+                Cargar costo a mano
+              </button>
+            )}
           </>
         ) : (
           quote.warning && (
@@ -441,11 +539,12 @@ function QuoteCard({
           })}
       </div>
 
-      {/* A pedido, estética tipo mockup: 2 botones separados en vez de un solo "Ver
+      {/* A pedido, estética tipo mockup: botones separados en vez de un solo "Ver
           más" — Parámetros abre datos fijos + ajustables (+ opcionales PORTO si es
-          PORTO), Coberturas abre el detalle del vehículo + "Incluye". Mutuamente
-          excluyentes por construcción (ver openPanel/handleToggleParams/
-          handleToggleCoberturas más arriba: un solo estado, no 2 booleans). */}
+          PORTO), Coberturas abre el detalle del vehículo + "Incluye", y Cuotas (reunión
+          del 24/09) la tabla de cuotas y recargos, que antes vivía adentro de
+          Parámetros y la recargaba. Mutuamente excluyentes por construcción (ver
+          openPanel/handleToggleParams/handleTogglePanel más arriba: un solo estado). */}
       <div className="quote-card__actions">
         <Button
           kind="secondary"
@@ -463,9 +562,18 @@ function QuoteCard({
               ? 'quote-card__action-btn quote-card__action-btn--active'
               : 'quote-card__action-btn'
           }
-          onClick={handleToggleCoberturas}
+          onClick={() => handleTogglePanel('coberturas')}
         >
           <MdListAlt /> Coberturas
+        </Button>
+        <Button
+          kind="secondary"
+          className={
+            openPanel === 'cuotas' ? 'quote-card__action-btn quote-card__action-btn--active' : 'quote-card__action-btn'
+          }
+          onClick={() => handleTogglePanel('cuotas')}
+        >
+          <MdPayments /> Cuotas
         </Button>
       </div>
 
@@ -494,29 +602,6 @@ function QuoteCard({
               </div>
             ))}
           </div>
-
-          {/* El desglose que antes vivía a la vista en la tarjeta (a pedido salió de
-              ahí): al cliente le llega entero en la imagen de WhatsApp, y acá queda
-              para consultarlo sin ensuciar la tarjeta. */}
-          <div className="quote-card__params-subtitle">Cuotas y recargos</div>
-          <table className="quote-card__cuotas-table">
-            <thead>
-              <tr>
-                <th>Cuotas</th>
-                <th>Valor cuota</th>
-                <th>Recargo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {CUOTA_COUNTS.map((n) => (
-                <tr key={n}>
-                  <td>{n}x</td>
-                  <td>{formatMoney(quote.cuotas[n].valor)}</td>
-                  <td>{toPercentString(raw[`recargo${n}`])}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
 
           <div className="quote-card__params-subtitle">Parámetros ajustables</div>
           {/* A pedido: "Restablecer" (más chico, azul) va al lado de la grilla de campos
@@ -567,6 +652,22 @@ function QuoteCard({
             </Button>
           </div>
 
+          {raw.compania === 'BSE' && onBonificacionEspecialChange && (
+            <>
+              <div className="quote-card__params-subtitle">Bonificaciones especiales BSE</div>
+              <div className="quote-card__params-grid">
+                {BONIFICACIONES_ESPECIALES_BSE.map((b) => (
+                  <BonificacionEspecial
+                    key={b.key}
+                    label={b.label}
+                    valor={raw[b.key] ?? ''}
+                    onGuardar={(valor) => onBonificacionEspecialChange(b.key, valor)}
+                  />
+                ))}
+              </div>
+            </>
+          )}
+
           {opcionalesDeLaCompania.length > 0 && (
             <>
               <div className="quote-card__params-subtitle">Opcionales {raw.compania}</div>
@@ -604,6 +705,44 @@ function QuoteCard({
             </>
           )}
         </div>
+      )}
+
+      {/* El desglose que antes vivía a la vista en la tarjeta (a pedido salió de ahí): al
+          cliente le llega entero en la imagen de WhatsApp, y acá queda para consultarlo
+          sin ensuciar la tarjeta ni los Parámetros. */}
+      {openPanel === 'cuotas' && (
+        <div className="quote-card__params">
+          <div className="quote-card__params-subtitle">Cuotas y recargos</div>
+          <table className="quote-card__cuotas-table">
+            <thead>
+              <tr>
+                <th>Cuotas</th>
+                <th>Valor cuota</th>
+                <th>Recargo</th>
+              </tr>
+            </thead>
+            <tbody>
+              {CUOTA_COUNTS.map((n) => (
+                <tr key={n}>
+                  <td>{n}x</td>
+                  <td>{formatMoney(quote.cuotas[n].valor)}</td>
+                  <td>{toPercentString(raw[`recargo${n}`])}%</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+
+      {cargandoCosto && (
+        <CotizacionManualModal
+          raw={raw}
+          onGuardar={async (datos) => {
+            await onCargarCostoManual(datos)
+            setCargandoCosto(false)
+          }}
+          onClose={() => setCargandoCosto(false)}
+        />
       )}
 
       {openPanel === 'coberturas' && (

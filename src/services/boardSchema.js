@@ -39,7 +39,7 @@ const SUBITEM_DROPDOWN_COLUMNS = {
 }
 
 function parseStatusColumn(column) {
-  if (!column) return { options: [], colorsByLabel: {} }
+  if (!column) return { options: [], colorsByLabel: {}, indexByLabel: {} }
   const settings = JSON.parse(column.settings_str || '{}')
   const labels = settings.labels || {}
   const positions = settings.labels_positions_v2 || {}
@@ -50,6 +50,7 @@ function parseStatusColumn(column) {
     .filter((idx) => labels[idx] && !deactivated.has(idx))
     .sort((a, b) => (positions[a] ?? 0) - (positions[b] ?? 0))
     .map((idx) => ({
+      idx,
       label: labels[idx],
       color: {
         bg: colors[idx]?.color ?? DEFAULT_COLOR.bg,
@@ -60,6 +61,9 @@ function parseStatusColumn(column) {
   return {
     options: entries.map((e) => e.label),
     colorsByLabel: Object.fromEntries(entries.map((e) => [e.label, e.color])),
+    // El índice de cada etiqueta: la API filtra estados por índice (any_of), ver
+    // filtrosOportunidades.js#reglasDeFiltros.
+    indexByLabel: Object.fromEntries(entries.map((e) => [e.label, e.idx])),
   }
 }
 

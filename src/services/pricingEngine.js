@@ -559,6 +559,13 @@ function sancorSinDescuento(eff) {
   return edad > 0 && (edad < 25 || edad > 70)
 }
 
+// Solo BSE: BNS y Flota (%), que da el Banco de Seguros para cada póliza. Devuelve el
+// factor a multiplicar (1 = sin bonificación especial).
+function factorBonificacionesEspeciales(eff) {
+  if (eff.compania !== 'BSE') return 1
+  return (1 - num(eff.bns) / 100) * (1 - num(eff.flota) / 100)
+}
+
 // LOG-11: cuánta bonificación entra en el cálculo, como fracción.
 // Aplica en TODAS las coberturas. Antes había dos ideas separadas: la "bonificación", que
 // la fórmula de cada compañía aplicaba o no (BSE GLOBAL - 3x2, SURA 4 EN 1 y SANCOR
@@ -610,13 +617,22 @@ export function deducibleSancorPorDefecto({ compania, cobertura, deducibleSancor
   return num(deducibleSancorUsd) > 0 ? deducibleSancorUsd : String(SANCOR_DEDUCIBLE_PARCIAL_USD)
 }
 
+// Reunión del 24/09: el deducible siempre lleva su moneda — SANCOR cotiza en dólares y el
+// resto en pesos. En SANCOR el deducible base llega en dólares aunque venga por la columna
+// general (TOTAL 1500 trae 1500 en las dos), así que mostrarlo con "$" era decir otra
+// moneda.
+export function formatDeducible(compania, valor) {
+  return compania === 'SANCOR' ? formatUsd(valor) : formatMoney(valor)
+}
+
 function deducibleDisplay(eff) {
   const base = num(eff.deducibleBase)
   if (eff.compania === 'BSE') {
+    // Reunión del 24/09: el deducible de BSE es "más IVA" (antes decía "sin IVA").
     if (['GLOBAL - anual', 'GLOBAL - 3x2'].includes(eff.cobertura) && eff.deducibleBSE) {
-      return `${formatMoney(Math.ceil(base * num(eff.deducibleBSE)))} sin IVA`
+      return `${formatMoney(Math.ceil(base * num(eff.deducibleBSE)))} más IVA`
     }
-    if (BSE_TRIPLE_COBERTURAS.includes(eff.cobertura)) return `${formatMoney(Math.ceil(base))} sin IVA`
+    if (BSE_TRIPLE_COBERTURAS.includes(eff.cobertura)) return `${formatMoney(Math.ceil(base))} más IVA`
     return '—'
   }
   if (eff.compania === 'SURA') {
@@ -630,7 +646,7 @@ function deducibleDisplay(eff) {
     // Ojo con el 0: monday lo manda como el texto "0", que en JS es verdadero. Sin este
     // `> 0` se mostraba "USD 0", que no es un deducible sino el dato que no vino.
     const usd = num(eff.deducibleSancorUsd)
-    return usd > 0 ? formatUsd(usd) : base ? formatMoney(base) : '—'
+    return usd > 0 ? formatUsd(usd) : base ? formatDeducible('SANCOR', base) : '—'
   }
   if (eff.compania === 'PORTO') {
     return base ? formatMoney(base) : '—'
@@ -664,8 +680,12 @@ export function computeQuote(raw, overrides = {}, panelContext = {}) {
   // de SURA es al revés: ya viene incluido en el contado del portal, así que solo mueve el
   // precio cuando se destilda, restando.
   const bonif = bonificacionAplicable(eff)
+  // Reunión del 24/09: en BSE, primero la bonificación por no siniestro (BNS) y la de
+  // flota, después la comercial — cada una sobre el resultado de la anterior (el orden no
+  // cambia el número). Ninguna toca los opcionales.
+  const especiales = factorBonificacionesEspeciales(eff)
   const adicionales = computeAdicionales(eff, panelContext.preciosOpcionales)
-  const total = round(contadoResult * (1 - bonif) + adicionales)
+  const total = round(contadoResult * especiales * (1 - bonif) + adicionales)
 
   const cuotas = {}
   for (const n of CUOTA_COUNTS) {
@@ -706,6 +726,7 @@ export function computeQuote(raw, overrides = {}, panelContext = {}) {
       ...eff,
       contadoCalculado: contadoResult,
       bonifAplicada: bonif,
+      factorBonificacionesEspeciales: especiales,
       adicionales,
     },
     rc: eff.rc || '',

@@ -27,6 +27,9 @@ export function mapSubitemToRawQuote(subitem) {
     deducibleBSE: textOf(cv, 'dropdown_mm52dm1j'),
     deducibleSURA: textOf(cv, 'dropdown_mm5fb4y0'),
     bonif: textOf(cv, 'numeric_mm52ey7f'),
+    // Solo BSE: bonificación por no siniestro y por flota (%), datos de la póliza.
+    bns: textOf(cv, 'numeric_mm7nrezs'),
+    flota: textOf(cv, 'numeric_mm7nmnk0'),
     edadBSE: textOf(cv, 'dropdown_mm52p7yx'),
     rc: textOf(cv, 'dropdown_mm5954ma'),
     // Uso y Año Vehículo ya no viven en el subitem (se sacaron por duplicar datos que

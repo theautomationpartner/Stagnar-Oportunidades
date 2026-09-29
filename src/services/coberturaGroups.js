@@ -50,9 +50,24 @@ export function coberturaGroupOf(cobertura) {
 // Descripción en una línea de cada familia — la usan la imagen de WhatsApp y la versión
 // en texto (LOG-17), que tienen que decir lo mismo del mismo plan. Si la cobertura no
 // cae en ninguna familia, quien la muestre arma un texto genérico con su nombre.
+//
+// Reunión del 24/09 (resumen de cambios, punto D): en mayúsculas y con el texto exacto
+// que definió Stagnari. "PARCIAL PLUS" (SANCOR) tiene el suyo propio, ver
+// subtituloDeCobertura.
 export const SUBTITULO_POR_FAMILIA = {
-  GLOBAL: 'Cobertura completa del vehículo y responsabilidad civil.',
-  TRIPLE: 'Responsabilidad civil, hurto e incendio.',
+  GLOBAL: 'RESPONSABILIDAD CIVIL, HURTO, INCENDIO Y DAÑO PROPIO',
+  TRIPLE: 'RESPONSABILIDAD CIVIL, HURTO E INCENDIO',
+}
+
+const SUBTITULO_POR_COBERTURA = {
+  'PARCIAL PLUS': 'RESPONSABILIDAD CIVIL, HURTO, INCENDIO Y PÉRDIDA TOTAL',
+}
+
+// El detalle de una cobertura puntual: el propio si lo tiene, si no el de su familia, y
+// null si no cae en ninguna (quien lo muestre arma un texto genérico con su nombre).
+export function subtituloDeCobertura(cobertura) {
+  const normalized = (cobertura ?? '').trim().toUpperCase()
+  return SUBTITULO_POR_COBERTURA[normalized] ?? SUBTITULO_POR_FAMILIA[coberturaGroupOf(cobertura)] ?? null
 }
 
 // A pedido: "Global" y "Triple" son como llaman las compañías a esas coberturas puertas

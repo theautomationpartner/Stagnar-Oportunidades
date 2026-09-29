@@ -8,9 +8,9 @@
 // Los NÚMEROS salen tal cual de `quote` (pricingEngine.computeQuote) — acá no se
 // calcula nada: total, cuotas[n].valor, promo.{count,valor}, deducibleDisplay, rc,
 // incluye, warning. Devuelve un data URL PNG listo para previsualizar o mandar a Make.
-import { formatMoney, modeloSinMarca } from './format'
+import { formatMoney, modeloSinMarca, zonaParaMostrar } from './format'
 import { BRAND_COLORS } from './companyColors'
-import { coberturaGroupOf, coberturaParaMostrar, FAMILIA_LABEL, SUBTITULO_POR_FAMILIA } from './coberturaGroups'
+import { coberturaGroupOf, coberturaParaMostrar, FAMILIA_LABEL, subtituloDeCobertura } from './coberturaGroups'
 import { iconoUrlParaBeneficio } from './beneficiosIconos'
 // A pedido: logo del header desde logo-blanco-.png con el fondo blanco recortado.
 import stagnariLogo from '../assets/stagnari-logo-header.png'
@@ -53,12 +53,6 @@ const INSURER_LOGOS = {
   SANCOR: logoSancor,
   SURA: logoSura,
 }
-
-// Subtítulo corto por familia de cobertura (ver coberturaGroups.js). Es texto
-// descriptivo genérico, no una condición contractual — el detalle real va en
-// "Beneficios incluidos" (quote.incluye) y en la advertencia (quote.warning).
-// Compartido con la versión en texto (ver coberturaGroups.js).
-const SUBTITLE_BY_GROUP = SUBTITULO_POR_FAMILIA
 
 const imageCache = new Map()
 function loadImage(src) {
@@ -178,6 +172,14 @@ function iconCircleCheck(ctx, cx, cy, r, color = C.verde) {
   ctx.stroke()
 }
 
+function iconCircleEmpty(ctx, cx, cy, r, color = C.gris) {
+  ctx.strokeStyle = color
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.arc(cx, cy, r, 0, Math.PI * 2)
+  ctx.stroke()
+}
+
 function iconShield(ctx, cx, cy, size, { fill = C.verde, check = true } = {}) {
   const w = size
   const h = size * 1.15
@@ -255,16 +257,6 @@ function iconCar(ctx, cx, cy, s, color = C.verde, lineWidth = 2) {
   }
 }
 
-function iconWallet(ctx, cx, cy, s) {
-  ctx.strokeStyle = C.verde
-  ctx.lineWidth = 2
-  roundedRectPath(ctx, cx - s * 0.5, cy - s * 0.32, s, s * 0.64, 4)
-  ctx.stroke()
-  ctx.beginPath()
-  ctx.arc(cx + s * 0.28, cy, s * 0.08, 0, Math.PI * 2)
-  ctx.stroke()
-}
-
 function iconCard(ctx, cx, cy, s) {
   ctx.strokeStyle = C.verde
   ctx.lineWidth = 2
@@ -325,7 +317,10 @@ function drawCoverTitle(ctx, raw, y) {
   // no tiene familia (hoy "TOTAL c/ Mov" de SURA) queda su nombre, para no mandar una
   // imagen sin título.
   const title = (FAMILIA_LABEL[group] || coberturaParaMostrar(raw) || 'COTIZACIÓN').toUpperCase()
-  const subtitle = SUBTITLE_BY_GROUP[group] ?? `Cobertura ${coberturaParaMostrar(raw)}`.trim() + '.'
+  // Detalle de lo que cubre, en mayúsculas (texto definido por Stagnari, compartido con la
+  // versión en texto — ver coberturaGroups.js#subtituloDeCobertura). Es descriptivo, no
+  // una condición contractual: el detalle real va en "Beneficios incluidos".
+  const subtitle = subtituloDeCobertura(raw.cobertura) ?? `Cobertura ${coberturaParaMostrar(raw)}`.trim() + '.'
 
   // Escudo + título + subtítulo a la izquierda
   iconShield(ctx, PAD + 34, y + 44, 56)
@@ -336,10 +331,12 @@ function drawCoverTitle(ctx, raw, y) {
     text(ctx, line, PAD + 84, ty, { size: 30, weight: 'bold', color: C.verdeOscuro })
     ty += 34
   }
-  const subLines = wrapLines(ctx, subtitle, INNER - 330, `18px ${FONT}`)
-  ty -= 6
+  // Reunión del 24/09: el detalle va pegado al título (antes quedaba un renglón vacío
+  // entre los dos y se leían como cosas separadas).
+  const subLines = wrapLines(ctx, subtitle, INNER - 330, `19px ${FONT}`)
+  ty -= 8
   for (const line of subLines) {
-    text(ctx, line, PAD + 84, ty + 22, { size: 18, color: C.texto })
+    text(ctx, line, PAD + 84, ty, { size: 19, color: C.texto })
     ty += 24
   }
 
@@ -370,7 +367,11 @@ function drawVehicleCard(ctx, opportunity, raw, quote, y) {
   // síntoma: el mismo texto se veía de otro tamaño según el modelo cotizado. Con el alto
   // de este bloque fijo (headH), el resto de la imagen ya no depende del largo del nombre.
   const nameFit = fitOneLine(ctx, vehTitle || '—', w - 260, { sizes: [24, 22, 20, 18], weight: 'bold' })
-  const detailFit = vehDetail ? fitOneLine(ctx, vehDetail, w - 260, { sizes: [17, 15] }) : null
+  // Reunión del 24/09: el combustible va en el renglón del modelo — en el segundo, solo si
+  // el modelo entra en uno; compartiéndolo con el resto del modelo si ya se extiende ahí.
+  const combustible = raw.combustibleVehiculo || opportunity.combustible || ''
+  const segundaLinea = [vehDetail, combustible].filter(Boolean).join('  |  ')
+  const detailFit = segundaLinea ? fitOneLine(ctx, segundaLinea, w - 260, { sizes: [17, 15] }) : null
   // Fijo: el renglón de la descripción se reserva aunque el modelo no tenga (los nombres
   // de Autodata sin coma), así todas las cotizaciones tienen la misma geometría acá.
   const headH = 28 + 30 + 22 + 4
@@ -387,9 +388,9 @@ function drawVehicleCard(ctx, opportunity, raw, quote, y) {
   )
   const rcH = rcLineas.length ? 24 + rcLineas.length * 17 + 8 : 0
 
-  // Tantas filas como tenga la columna más larga: 2 con los límites de RC abajo, 3 cuando
-  // el RC no está cargado y vuelve a la grilla.
-  const gridH = (rcLineas.length ? 2 : 3) * 44 + 16
+  // Una sola fila: el deducible pasó a la banda del precio y el combustible al renglón del
+  // modelo, así que quedan la zona, el uso y (si no hay límites cargados) el RC.
+  const gridH = 44 + 16
   const h = headH + 16 + gridH + 8 + rcH
   card(ctx, x, y, w, h, { radius: 16 })
 
@@ -415,44 +416,37 @@ function drawVehicleCard(ctx, opportunity, raw, quote, y) {
   ctx.moveTo(x + 16, gy)
   ctx.lineTo(x + w - 16, gy)
   ctx.stroke()
-  const colMid = x + w / 2
-  ctx.beginPath()
-  ctx.moveTo(colMid, gy + 14)
-  ctx.lineTo(colMid, gy + gridH - 6)
-  ctx.stroke()
-
-  const localidad = [opportunity.zonaCirculacion, opportunity.departamento].filter(Boolean).join(' · ') || '—'
-  // A pedido: 2 y 2 en vez de 3 y 1. Con el RC abajo, la columna derecha quedaba con un
-  // solo dato y la tarjeta se veía volcada para la izquierda.
-  const left = [
-    { icon: iconPin, label: 'LOCALIDAD', value: localidad },
+  // Reunión del 24/09: "Localidad" pasa a "Zona principal de circulación" y muestra el
+  // departamento (en Canelones, también la localidad), sin el código postal.
+  const datos = [
+    { icon: iconPin, label: 'ZONA PRINCIPAL DE CIRCULACIÓN', value: zonaParaMostrar(opportunity) || '—' },
     { icon: iconCar, label: 'USO', value: raw.uso || opportunity.uso || '—' },
   ]
-  const right = [
-    { icon: iconWallet, label: 'DEDUCIBLE', value: quote.deducibleDisplay || '—' },
-    { icon: iconCard, label: 'COMBUSTIBLE', value: raw.combustibleVehiculo || opportunity.combustible || '—' },
-  ]
-  // Sin límites cargados el RC vuelve a la grilla como tercera fila: el nivel a secas es
-  // mejor que nada.
+  // Sin límites cargados el RC vuelve a la grilla: el nivel a secas es mejor que nada.
   if (!rcLineas.length) {
-    right.push({
+    datos.push({
       icon: (c, cx, cy, s) => strokeShield(c, cx, cy, s * 0.8),
       label: 'RC',
       value: quote.rc ? `Hasta ${quote.rc}` : '—',
     })
   }
-  const drawCol = (items, cx) => {
-    let iy = gy + 26
-    for (const it of items) {
-      it.icon(ctx, cx + 16, iy + 6, 24)
-      text(ctx, it.label, cx + 48, iy, { size: 13, color: C.gris })
-      const valueLines = wrapLines(ctx, it.value, w / 2 - 80, `bold 18px ${FONT}`)
-      text(ctx, valueLines[0], cx + 48, iy + 21, { size: 18, weight: 'bold' })
-      iy += 44
+  // La zona se lleva la mitad: su rótulo es el más largo y en Canelones también su valor.
+  const anchos = datos.map((_, i) => (i === 0 ? w * 0.5 : (w * 0.5) / (datos.length - 1)))
+  datos.forEach((it, i) => {
+    const colX = x + anchos.slice(0, i).reduce((acc, n) => acc + n, 0)
+    const colW = anchos[i]
+    const cx = colX + 16
+    if (i > 0) {
+      ctx.beginPath()
+      ctx.moveTo(colX, gy + 14)
+      ctx.lineTo(colX, gy + gridH - 6)
+      ctx.stroke()
     }
-  }
-  drawCol(left, x + 16)
-  drawCol(right, colMid + 16)
+    const iy = gy + 26
+    it.icon(ctx, cx + 16, iy + 6, 24)
+    text(ctx, ellipsize(ctx, it.label, colW - 64, `13px ${FONT}`), cx + 48, iy, { size: 13, color: C.gris })
+    text(ctx, ellipsize(ctx, it.value, colW - 64, `bold 18px ${FONT}`), cx + 48, iy + 21, { size: 18, weight: 'bold' })
+  })
 
   if (rcLineas.length) {
     const ry = gy + gridH + 2
@@ -509,13 +503,23 @@ function drawPriceBand(ctx, quote, y) {
   // en el alto de dos — así la condición entra a un tamaño que se lee (14px, en crema
   // sobre el verde) y no como letra chica pegada al borde de la caja.
   const conCondicion = Boolean(quote.promo?.condicion)
-  const h = conCondicion ? 142 : 120
+  // Reunión del 24/09: el deducible va en la banda, debajo del precio y más chico — es lo
+  // segundo que mira el cliente. La banda crece lo justo para que entre.
+  const deducible = quote.deducibleDisplay && quote.deducibleDisplay !== '—' ? quote.deducibleDisplay : null
+  const h = Math.max(conCondicion ? 142 : 120, deducible ? 148 : 0)
   // Con la banda más alta, el precio de la izquierda se baja otro tanto para no quedar
   // pegado arriba con un hueco debajo.
-  const shift = conCondicion ? 10 : 0
+  const shift = conCondicion && !deducible ? 10 : 0
   card(ctx, PAD, y, INNER, h, { fill: C.verdeOscuro, stroke: null, radius: 16 })
   text(ctx, 'PRECIO ANUAL', PAD + 28, y + 36 + shift, { size: 16, weight: 'bold', color: '#cfe6e4' })
   text(ctx, formatMoney(quote.total), PAD + 26, y + 92 + shift, { size: 52, weight: 'bold', color: C.blanco })
+  if (deducible) {
+    text(ctx, ellipsize(ctx, `Deducible: ${deducible}`, 370, `bold 20px ${FONT}`), PAD + 28, y + 128, {
+      size: 20,
+      weight: 'bold',
+      color: C.blanco,
+    })
+  }
 
   // Separador vertical
   ctx.strokeStyle = 'rgba(255,255,255,0.35)'
@@ -665,8 +669,11 @@ function drawOpcionales(ctx, opcionales, y, { fontSize = 15 } = {}) {
     // El precio se ancla a la derecha; la etiqueta se recorta a lo que sobra para que
     // nunca se pisen (los nombres de PORTO son largos).
     const [linea] = wrapLines(ctx, opc.label, INNER - 60 - precioW - 20, itemFont)
+    // Reunión del 24/09: círculo con tilde lo contratado, círculo vacío lo que no, para
+    // que se vea de un vistazo qué tiene y qué no.
     if (opc.contratado) iconCircleCheck(ctx, PAD + 33, ry - 5, 9)
-    text(ctx, linea, PAD + (opc.contratado ? 50 : 24), ry, { size: fontSize })
+    else iconCircleEmpty(ctx, PAD + 33, ry - 5, 9)
+    text(ctx, linea, PAD + 50, ry, { size: fontSize })
     text(ctx, precio, PAD + INNER - 24, ry, {
       size: fontSize,
       weight: 'bold',

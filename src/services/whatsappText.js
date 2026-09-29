@@ -7,8 +7,8 @@
 //
 // El formato usa los marcadores de WhatsApp: *negrita* y viñetas con "•". A propósito no
 // se arma con emojis ni cajas ASCII — en un chat real se ven distinto en cada teléfono.
-import { formatMoney, CUOTA_COUNTS, modeloSinMarca } from './format'
-import { coberturaGroupOf, coberturaParaMostrar, FAMILIA_LABEL, SUBTITULO_POR_FAMILIA } from './coberturaGroups'
+import { formatMoney, CUOTA_COUNTS, modeloSinMarca, zonaParaMostrar } from './format'
+import { coberturaGroupOf, coberturaParaMostrar, FAMILIA_LABEL, subtituloDeCobertura } from './coberturaGroups'
 
 // Mismo criterio que splitVehicleName en whatsappImage.js: el modelo de Autodata ya trae
 // la marca adelante, no se repite.
@@ -43,12 +43,12 @@ export function renderQuoteText(opportunity, raw, quote) {
   const coberturaReal = raw.cobertura || raw.name || ''
   const familia = coberturaGroupOf(coberturaReal)
   const cobertura = FAMILIA_LABEL[familia]?.toUpperCase() || coberturaParaMostrar(raw)
-  const subtitulo =
-    SUBTITULO_POR_FAMILIA[familia] ?? (cobertura ? `Cobertura ${cobertura}.` : '')
+  const subtitulo = subtituloDeCobertura(coberturaReal) ?? (cobertura ? `Cobertura ${cobertura}.` : '')
   const anio = raw.anioVehiculo || opportunity.anio || ''
   const combustible = raw.combustibleVehiculo || opportunity.combustible || ''
   const uso = raw.uso || opportunity.uso || ''
-  const ubicacion = [opportunity.zonaCirculacion, opportunity.departamento].filter(Boolean).join(', ')
+  // Mismo criterio que la imagen: departamento (y en Canelones la localidad), sin CP.
+  const ubicacion = zonaParaMostrar(opportunity)
 
   const bloques = []
 

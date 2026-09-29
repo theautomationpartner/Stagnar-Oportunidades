@@ -129,6 +129,21 @@ function buildConfiguracion(items) {
   return { globales, porCompania }
 }
 
+// Reunión del 24/09: bonificación comercial con la que arranca cada compañía (Grupo =
+// "Bonificacion", una fila por compañía, el % en "Valor" — ver
+// scripts/mon-bonificaciones.mjs). { SANCOR: 15, PORTO: 10, BSE: 10, SURA: 0 }
+function buildBonificaciones(items) {
+  const porCompania = {}
+  for (const item of items) {
+    const cv = item.column_values
+    if (grupoOf(cv) !== 'Bonificacion') continue
+    const compania = (textOf(cv, 'dropdown_mm52feqr') ?? '').trim()
+    const valor = Number(textOf(cv, 'numeric_mm5fmjh0'))
+    if (compania && Number.isFinite(valor)) porCompania[compania] = valor
+  }
+  return porCompania
+}
+
 // Un solo fetch a PANEL para las cuatro cosas — se pide una vez al cargar la app
 // (App.jsx), no por cada oportunidad.
 export async function fetchPanelData() {
@@ -155,7 +170,20 @@ export async function fetchPanelData() {
     // ({ PORTO: { Granizo: 1279, ... }, SURA: { ... } }). pricingEngine los usa tanto para
     // la viñeta "OPCIONAL: ... + $N" como para sumarlos al total cuando están tildados.
     preciosOpcionales: configuracion.porCompania,
+    bonificacionesPorCompania: buildBonificaciones(items),
   }
+}
+
+// La bonificación precargada de PANEL es el punto de partida de una cotización que
+// todavía no tiene una guardada (la columna "Bonif" vacía). Una guardada —aunque sea 0—
+// manda. `bonifPorDefecto` marca que el valor NO está en monday todavía (ver
+// OpportunityDetail#handleSetElegida, que lo guarda al elegir la propuesta).
+export function applyBonificacionPorDefecto(rawQuotes, bonificacionesPorCompania) {
+  return rawQuotes.map((raw) => {
+    const porDefecto = bonificacionesPorCompania?.[raw.compania]
+    if (String(raw.bonif ?? '').trim() !== '' || porDefecto == null) return raw
+    return { ...raw, bonif: String(porDefecto), bonifPorDefecto: true }
+  })
 }
 
 // Reemplaza recargo3/6/8/10 de cada cotización cruda con el valor real del tarifario

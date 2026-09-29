@@ -85,3 +85,23 @@ export function modeloSinMarca(marca, modelo) {
   if (!m || !texto.toUpperCase().startsWith(m.toUpperCase())) return texto
   return texto.slice(m.length).replace(/^[\s\-–·]+/, '').trim()
 }
+
+// Reunión del 24/09: el nombre de cada Localidad trae su código postal ("Montevideo -
+// CP11500") porque así la elige el robot en WINK — el dato guardado no se toca. De cara
+// al cliente el CP no dice nada y se saca solo de lo que se muestra.
+export function sinCodigoPostal(nombre) {
+  return String(nombre ?? '')
+    .replace(/\s*-?\s*CP\s*\d+\s*$/i, '')
+    .trim()
+}
+
+// La "Zona principal de circulación" tal como la ve el cliente en la cotización: solo el
+// departamento, salvo en Canelones, donde hay zonas muy distintas y va también la
+// localidad (sin su código postal).
+export function zonaParaMostrar(opportunity) {
+  const departamento = (opportunity?.departamento ?? '').trim()
+  const localidad = sinCodigoPostal(opportunity?.zonaCirculacion)
+  if (!departamento) return localidad
+  if (departamento.toLowerCase() === 'canelones' && localidad) return `${localidad}, ${departamento}`
+  return departamento
+}

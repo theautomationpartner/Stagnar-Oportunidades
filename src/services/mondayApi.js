@@ -40,6 +40,9 @@ const OPPORTUNITY_COLUMN_IDS = [
   'deal_owner', // Asignado
   'date_mm52w0h8', // Fecha Cot.
   'date__1', // Ultima Interaccion
+  // Para los filtros por fecha de la tabla (ver filtrosOportunidades.js).
+  'deal_expected_close_date', // Fecha Cierre
+  'pulse_log_mm4pzxca', // Registro de creación
   'numeric_mm658a9j', // Recotizaciones
   'color_mm51n7aa', // Estado Cotizacion
   // Tipo de Sujeto (Cliente/Lead): columna Mirror de la "Situación" del Cliente vinculado
@@ -136,22 +139,15 @@ const NEXT_ITEMS_PAGE_QUERY = `
 // vehículo, año y matrícula.
 const COLUMNAS_BUSQUEDA = ['name', 'numeric_mm51mb0s', 'phone_mm519m27']
 
-// Filtros que la API puede resolver. "Tipo de Sujeto" NO está: es una columna mirror y la
-// API la rechaza con "This column type is not supported yet in the API", así que ese
-// filtro se sigue aplicando en el navegador sobre lo ya traído (ver App.jsx).
-const COLUMNA_POR_FILTRO = {
-  estadoCotizacion: 'color_mm51n7aa',
-  estadoEnvio: 'color_mm4wr1t4',
-}
-
 // Las más nuevas primero, que es como se mira la tabla.
 const ORDEN_MAS_NUEVAS = [{ column_id: '__creation_log__', direction: 'desc' }]
 
 // La API acepta UN operador para todas las reglas, no grupos anidados: no hay forma de
 // pedir "(nombre o CI o teléfono) Y estado = X". Con término de búsqueda manda la
 // búsqueda (or) y los estados se terminan de filtrar en el navegador; sin término, los
-// estados van como filtro del servidor (and).
-export function buildOpportunitiesQueryParams({ search = '', filtros = {} } = {}) {
+// estados van como filtro del servidor (and). Las reglas de los filtros las arma
+// filtrosOportunidades.js#reglasDeFiltros, que es quien sabe traducir cada filtro.
+export function buildOpportunitiesQueryParams({ search = '', reglas = [] } = {}) {
   const termino = search.trim()
 
   if (termino) {
@@ -165,14 +161,6 @@ export function buildOpportunitiesQueryParams({ search = '', filtros = {} } = {}
       order_by: ORDEN_MAS_NUEVAS,
     }
   }
-
-  const reglas = Object.entries(COLUMNA_POR_FILTRO)
-    .filter(([clave]) => filtros[clave])
-    .map(([clave, columnId]) => ({
-      column_id: columnId,
-      compare_value: [filtros[clave]],
-      operator: 'contains_text',
-    }))
 
   return reglas.length
     ? { operator: 'and', rules: reglas, order_by: ORDEN_MAS_NUEVAS }
@@ -194,6 +182,9 @@ const SUBITEM_COLUMN_IDS = [
   'dropdown_mm52dm1j', // Deducible BSE
   'dropdown_mm5fb4y0', // Deducible SURA (recreada — la original dropdown_mm58af0r se borró)
   'numeric_mm52ey7f', // Bonif
+  // Reunión del 24/09: bonificaciones especiales de BSE (ver scripts/mon-bonificaciones.mjs).
+  'numeric_mm7nrezs', // BNS (%)
+  'numeric_mm7nmnk0', // Flota (%)
   'dropdown_mm52p7yx', // Edad BSE
   'dropdown_mm5954ma', // RC
   'numeric_mm52qx0e', // Recargo 3 Cuotas
@@ -596,7 +587,9 @@ const PANEL_BOARD_ID = 18421072511
 const PANEL_ITEMS_QUERY = `
   query GetPanelItems($boardId: ID!) {
     boards(ids: [$boardId]) {
-      items_page(limit: 100) {
+      # 500 es el máximo de items_page. Con 100, PANEL (119 filas ya el 24/09) perdía las
+      # últimas creadas sin avisar.
+      items_page(limit: 500) {
         items {
           id
           name
@@ -692,7 +685,7 @@ async function leerRespuestaMonday(response) {
 // Con `cursor` pide la página siguiente de esa misma búsqueda; sin él, arranca de cero
 // aplicando búsqueda y filtros. totalCount solo viene en la primera (la API no lo trae en
 // next_items_page).
-export async function fetchOpportunitiesPage({ limit = 10, cursor = null, search = '', filtros = {} } = {}) {
+export async function fetchOpportunitiesPage({ limit = 10, cursor = null, search = '', reglas = [] } = {}) {
   // A pedido: nombre/CI/RUT buscan por el CLIENTE y un teléfono por el CONTACTO. Nombre,
   // CI y teléfono ya los cubren las reglas del servidor (COLUMNAS_BUSQUEDA — el teléfono
   // del contacto queda copiado en phone_mm519m27 al crear la oportunidad). El RUT no vive
@@ -719,7 +712,7 @@ export async function fetchOpportunitiesPage({ limit = 10, cursor = null, search
     boardId: OPPORTUNITIES_BOARD_ID,
     limit,
     columnIds: OPPORTUNITY_COLUMN_IDS,
-    queryParams: buildOpportunitiesQueryParams({ search: terminoBusqueda, filtros }),
+    queryParams: buildOpportunitiesQueryParams({ search: terminoBusqueda, reglas }),
   })
   const board = data.boards?.[0]
   return {
@@ -2637,4 +2630,35 @@ export async function fetchContactoFicha(contactoId) {
     revision: byId[CONTACTO_REVISION_COLUMN_ID]?.text?.trim() || '',
     motivoRevision: byId[CONTACTO_MOTIVO_REVISION_COLUMN_ID]?.text?.trim() || '',
   }
+}
+
+// Reunión del 24/09 — costo cargado a mano: a veces WINK trae la cobertura de una compañía
+// en 0 porque no supo el valor, aunque la aseguradora sí la cotiza (el vendedor la saca del
+// portal de la compañía). Solo esas cotizaciones —las que se ven en gris— se completan a
+// mano, y solo con el costo (contado) y el deducible: todo lo demás (opcionales, RC,
+// bonificación) se ajusta después en la tarjeta, igual que en las que vinieron bien.
+//
+// El deducible va a la misma columna que usa Make para cada compañía: SANCOR en dólares
+// (y también en la columna general, como la trae el portal); el resto en pesos, con el
+// "Deducible BSE/SURA" en 1 para que se muestre tal cual se cargó (sin el descuento por
+// nivel de deducible, ver pricingEngine.js#deducibleDisplay): el costo del portal ya es
+// el de ese deducible.
+export function columnasDeCostoManual(compania, { contado, deducible }) {
+  const columnas = {
+    numeric_mm4pc2y1: String(contado),
+    numeric_mm519my9: String(deducible),
+  }
+  if (compania === 'SANCOR') columnas.numeric_mm59qzvf = String(deducible)
+  if (compania === 'BSE') columnas.dropdown_mm52dm1j = { labels: ['1'] }
+  if (compania === 'SURA') columnas.dropdown_mm5fb4y0 = { labels: ['1'] }
+  return columnas
+}
+
+export async function setCostoManual(subitemId, compania, datos) {
+  const data = await callMondayApi(CHANGE_MULTIPLE_COLUMN_VALUES_MUTATION, {
+    boardId: SUBITEMS_BOARD_ID,
+    itemId: subitemId,
+    columnValues: JSON.stringify(columnasDeCostoManual(compania, datos)),
+  })
+  return data.change_multiple_column_values
 }

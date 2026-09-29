@@ -2,7 +2,7 @@
 // CrearOportunidadForm.jsx (auditoría). Los estilos siguen en CrearOportunidadForm.css.
 import { useState } from 'react'
 import { Button, Dropdown, TextField } from '@vibe/core'
-import { MdCall, MdClear, MdDescription, MdEdit, MdInfoOutline, MdPersonAdd, MdPersonSearch } from 'react-icons/md'
+import { MdCall, MdClear, MdEdit, MdInfoOutline, MdPersonAdd, MdPersonSearch } from 'react-icons/md'
 import { CODIGO_PAIS_OPTIONS, emailError, telefonoError } from '../../services/personaFields'
 import FlagIcon from './FlagIcon'
 import { matchesSearchQuery } from '../../services/format'
@@ -56,7 +56,12 @@ export function Required() {
 // opción (no solo desde el principio, igual que Modelo — ver matchesSearchQuery) y 2) al
 // apretar Enter, si hay algo tipeado, elige directo la primera opción que matchea (antes
 // había que bajar con la flecha para resaltarla).
-export function RequiredDropdown({ onChange, onClear, searchable, options, ...props }) {
+//
+// `searchable` arranca en true (reunión del 24/09): todo desplegable tiene que sugerir
+// apenas se escribe, sin abrirlo antes, para completar el alta solo con teclado y Tab. El
+// Dropdown de @vibe/core viene sin búsqueda por defecto, y cada campo que se olvidaba de
+// pedirla quedaba mudo al tipear — así estaba Combustible ("N" no traía "Nafta").
+export function RequiredDropdown({ onChange, onClear, searchable = true, options, ...props }) {
   const [query, setQuery] = useState('')
 
   const handleKeyDown = (e) => {
@@ -127,43 +132,6 @@ const EXTRANJERO_OPTIONS = [
   { value: 'Si', label: 'Sí' },
 ]
 
-// A pedido, estética tipo mockup: 2 tarjetas sueltas con ícono (documento/lápiz) en vez
-// del control segmentado unido de antes — mismo componente para las 2 preguntas
-// "¿Tenés la Cédula o Carta del vehículo?" (paso 3) y "¿Tenés la Cédula de Identidad de
-// la persona?" (paso 1, Crear Lead) para que las 2 se vean iguales. Mismos valores reales
-// ("Si"/"No") que ya usaba el toggle viejo, solo cambia el control visual.
-export function DocumentChoiceToggle({
-  value,
-  onChange,
-  yesLabel = 'Sí, tengo el documento',
-  noLabel = 'No, ingresar manualmente',
-}) {
-  return (
-    <div className="crear-op__risk-toggle">
-      <button
-        type="button"
-        className={
-          value === 'Si' ? 'crear-op__risk-option crear-op__risk-option--active' : 'crear-op__risk-option'
-        }
-        onClick={() => onChange('Si')}
-      >
-        <MdDescription className="crear-op__risk-option-icon" />
-        {yesLabel}
-      </button>
-      <button
-        type="button"
-        className={
-          value === 'No' ? 'crear-op__risk-option crear-op__risk-option--active' : 'crear-op__risk-option'
-        }
-        onClick={() => onChange('No')}
-      >
-        <MdEdit className="crear-op__risk-option-icon" />
-        {noLabel}
-      </button>
-    </div>
-  )
-}
-
 // A pedido: título de sección con ícono en círculo de color al lado (mockup) en vez del
 // texto solo — reusado por las 3 secciones tituladas del paso 1 (Datos personales/
 // Contacto/Ubicación, ver más abajo).
@@ -193,15 +161,34 @@ export function SectionTitle({ icon: Icon, children }) {
 //   contactoId cargado          -> resumen "se reusa X" + botón Cambiar. Resuelto.
 //   sin contactoId              -> radios, UNO por camino posible:
 //     · un radio por cada contacto ya vinculado al Cliente (elegirlo = contactoId)
-//     · "Vincular un contacto existente" (solo `permitirVincular`, ruta Cliente nuevo):
-//       buscador contra el tablero Contactos por nombre/teléfono/email (onBuscarContacto)
-//       y un radio por resultado (elegirlo = onVincularContacto -> contactoId)
-//     · "Crear un contacto nuevo": el formulario de siempre (mismo cliente / nombre)
+//     · buscador (solo `permitirVincular`, siempre a la vista): contra el tablero
+//       Contactos por celular/nombre/email (onBuscarContacto); elegir un resultado =
+//       onVincularContacto -> contactoId. Sin resultados, ofrece crearlo con lo buscado.
+//     · "Crear un contacto nuevo": el popup de siempre (mismo cliente / nombre)
 //   Nada marcado (contactoModo null y sin contactoId) bloquea Continuar — la selección
 //   es explícita incluso cuando el Cliente tiene UN solo contacto (antes se auto-elegía).
 //
 // El teléfono/email quedan visibles también con contacto elegido: solo completan lo que
 // al contacto le falte (ensureContactoCrmId nunca pisa lo que ya tenía cargado).
+// Reunión del 24/09: si la búsqueda de contacto no encuentra nada, se ofrece crearlo con
+// lo que se buscó. Un término que es un número se toma como celular (con su código de
+// país si lo trae, "+54 11..."); cualquier otra cosa, como el nombre del contacto.
+const pareceTelefono = (termino) => /^\+?[\d\s().-]{6,}$/.test(termino.trim())
+
+function contactoDesdeBusqueda(termino, codigoPaisPorDefecto) {
+  const limpio = termino.trim()
+  if (!pareceTelefono(limpio)) return { nombre: limpio }
+  if (limpio.startsWith('+')) {
+    const digitos = limpio.replace(/\D/g, '')
+    // El código más largo primero: "+595" no tiene que leerse como "+59" + "5...".
+    const codigo = [...CODIGO_PAIS_OPTIONS]
+      .sort((a, b) => b.value.length - a.value.length)
+      .find((o) => digitos.startsWith(o.value.slice(1)))
+    if (codigo) return { codigoPais: codigo.value, telefono: digitos.slice(codigo.value.length - 1) }
+  }
+  return { codigoPais: codigoPaisPorDefecto || '+598', telefono: limpio }
+}
+
 export function ContactoFields({
   form,
   handleChange,
@@ -248,7 +235,7 @@ export function ContactoFields({
   const mostrarTelefono = Boolean(contactoElegido) && !contactoElegido.telefono
   const mostrarEmail = Boolean(contactoElegido) && !contactoElegido.email
 
-  // Buscador de "Vincular un contacto existente" — a pedido, NO es live search: se busca
+  // Buscador de contactos — a pedido, NO es live search: se busca
   // recién al apretar "Buscar" (o Enter). Buscar es una acción deliberada acá — el
   // usuario tipea un dato completo (nombre, teléfono, email) y pide resultados una vez,
   // no espera sugerencias a medio tipear. `resultados === null` = todavía no buscó nada
@@ -259,6 +246,13 @@ export function ContactoFields({
   // abrir varias a la vez empuja el resto de la pantalla sin que nadie lo haya pedido.
   const [detalleClientes, setDetalleClientes] = useState(null)
   const [modalNuevo, setModalNuevo] = useState(false)
+  // Con qué abre el popup de contacto nuevo cuando viene de una búsqueda sin resultados
+  // (ver contactoDesdeBusqueda). null = abre con lo que el form ya tenía, como siempre.
+  const [nuevoDesdeBusqueda, setNuevoDesdeBusqueda] = useState(null)
+  const abrirNuevo = (desdeBusqueda = null) => {
+    setNuevoDesdeBusqueda(desdeBusqueda)
+    setModalNuevo(true)
+  }
   // Qué término produjo los resultados de abajo — se muestra en el label para que nunca
   // queden resultados de "juan" bajo un input que ya dice "pedro".
   const [terminoBuscado, setTerminoBuscado] = useState('')
@@ -321,7 +315,7 @@ export function ContactoFields({
             )}
           </span>
           <span className="crear-op__contacto-acciones">
-            <Button kind="tertiary" size="small" onClick={() => setModalNuevo(true)}>
+            <Button kind="tertiary" size="small" onClick={() => abrirNuevo()}>
               <MdEdit /> Editar
             </Button>
             <Button kind="tertiary" size="small" onClick={() => onContactoModo?.(null)}>
@@ -398,25 +392,82 @@ export function ContactoFields({
                   )
                 })}
               </div>
-              {/* A pedido: los dos caminos son CAJAS que se seleccionan — el mismo
-                  control que el "¿Tenés la Cédula?" de más arriba (DocumentChoiceToggle,
-                  .crear-op__risk-option), así el paso 1 usa un solo lenguaje para
-                  "elegí uno de estos". */}
+              {/* Reunión del 24/09: el buscador de contactos (por celular o nombre) ya no
+                  está detrás de "Vincular un contacto existente": va siempre a la vista, y
+                  si no encuentra nada ofrece crear el contacto con lo buscado. */}
+              {permitirVincular && (
+                <div className="crear-op__subopcion">
+                  <div className="crear-op__buscar-contacto">
+                    <TextField
+                      size="medium"
+                      title="Buscar contacto"
+                      placeholder="Celular, nombre o email"
+                      value={busqueda}
+                      onChange={setBusqueda}
+                      onKeyDown={(e) => e.key === 'Enter' && ejecutarBusqueda()}
+                      icon={MdClear}
+                      onIconClick={() => {
+                        setBusqueda('')
+                        setResultados(null)
+                      }}
+                    />
+                    <Button
+                      kind="secondary"
+                      size="medium"
+                      loading={buscando}
+                      disabled={busqueda.trim().length < 2}
+                      onClick={ejecutarBusqueda}
+                    >
+                      <MdPersonSearch /> Buscar
+                    </Button>
+                  </div>
+                  {resultados !== null && !buscando && resultados.length === 0 && (
+                    <div className="crear-op__sin-resultados">
+                      <p className="crear-op__section-hint">Sin resultados para «{terminoBuscado}» en Contactos.</p>
+                      <Button
+                        kind="primary"
+                        size="small"
+                        onClick={() => abrirNuevo(contactoDesdeBusqueda(terminoBuscado, form.codigoPais))}
+                      >
+                        <MdPersonAdd />{' '}
+                        {pareceTelefono(terminoBuscado)
+                          ? `Crear contacto con el celular ${terminoBuscado}`
+                          : `Crear el contacto «${terminoBuscado}»`}
+                      </Button>
+                    </div>
+                  )}
+                  {/* A pedido: los resultados se eligen con el mismo Dropdown que usa el
+                      resto de la página, no con radios. */}
+                  {(resultados ?? []).length > 0 && (
+                    <label className="crear-op__field crear-op__field--full">
+                      <span>Resultados de «{terminoBuscado}» ({resultados.length})</span>
+                      <Dropdown
+                        size="medium"
+                        options={resultados.map((c) => {
+                          const clientes = clientesDeContacto(c)
+                          return {
+                            value: c.id,
+                            label: [etiquetaContacto(c), clientes?.resumen].filter(Boolean).join(' — '),
+                            detalleClientes: clientes?.detalle ?? '',
+                          }
+                        })}
+                        // En una opción de Dropdown no entra un botón, así que el detalle va
+                        // en el title: se ve al pasar el mouse por encima.
+                        optionRenderer={(option) => (
+                          <span title={option.detalleClientes || undefined}>{option.label}</span>
+                        )}
+                        value={null}
+                        placeholder="Elegí el contacto a vincular"
+                        onChange={(option) => {
+                          const contacto = resultados.find((c) => c.id === option?.value)
+                          if (contacto) onVincularContacto?.(contacto)
+                        }}
+                      />
+                    </label>
+                  )}
+                </div>
+              )}
               <div className="crear-op__risk-toggle crear-op__contacto-caminos">
-                {permitirVincular && (
-                  <button
-                    type="button"
-                    className={
-                      form.contactoModo === 'vincular'
-                        ? 'crear-op__risk-option crear-op__risk-option--active'
-                        : 'crear-op__risk-option'
-                    }
-                    onClick={() => onContactoModo?.('vincular')}
-                  >
-                    <MdPersonSearch className="crear-op__risk-option-icon" />
-                    Vincular un contacto existente
-                  </button>
-                )}
                 <button
                   type="button"
                   className={
@@ -424,7 +475,7 @@ export function ContactoFields({
                       ? 'crear-op__risk-option crear-op__risk-option--active'
                       : 'crear-op__risk-option'
                   }
-                  onClick={() => setModalNuevo(true)}
+                  onClick={() => abrirNuevo()}
                 >
                   <MdPersonAdd className="crear-op__risk-option-icon" />
                   Crear un contacto nuevo
@@ -433,84 +484,36 @@ export function ContactoFields({
             </>
           )}
 
-          {form.contactoModo === 'vincular' && (
-            <div className="crear-op__subopcion">
-              <div className="crear-op__buscar-contacto">
-                <TextField
-                  size="medium"
-                  title="Buscar contacto"
-                  placeholder="Nombre, teléfono o email"
-                  value={busqueda}
-                  onChange={setBusqueda}
-                  onKeyDown={(e) => e.key === 'Enter' && ejecutarBusqueda()}
-                  icon={MdClear}
-                  onIconClick={() => {
-                    setBusqueda('')
-                    setResultados(null)
-                  }}
-                />
-                <Button
-                  kind="secondary"
-                  size="medium"
-                  loading={buscando}
-                  disabled={busqueda.trim().length < 2}
-                  onClick={ejecutarBusqueda}
-                >
-                  Buscar
-                </Button>
-              </div>
-              {resultados !== null && !buscando && resultados.length === 0 && (
-                <p className="crear-op__section-hint">Sin resultados para «{terminoBuscado}» en Contactos.</p>
-              )}
-              {/* A pedido: los resultados se eligen con el mismo Dropdown que usa el
-                  resto de la página, no con radios. */}
-              {(resultados ?? []).length > 0 && (
-                <label className="crear-op__field crear-op__field--full">
-                  <span>Resultados de «{terminoBuscado}» ({resultados.length})</span>
-                  <Dropdown
-                    size="medium"
-                    options={resultados.map((c) => {
-                      const clientes = clientesDeContacto(c)
-                      return {
-                        value: c.id,
-                        label: [etiquetaContacto(c), clientes?.resumen].filter(Boolean).join(' — '),
-                        detalleClientes: clientes?.detalle ?? '',
-                      }
-                    })}
-                    // En una opción de Dropdown no entra un botón, así que el detalle va
-                    // en el title: se ve al pasar el mouse por encima.
-                    optionRenderer={(option) => (
-                      <span title={option.detalleClientes || undefined}>{option.label}</span>
-                    )}
-                    value={null}
-                    placeholder="Elegí el contacto a vincular"
-                    onChange={(option) => {
-                      const contacto = resultados.find((c) => c.id === option?.value)
-                      if (contacto) onVincularContacto?.(contacto)
-                    }}
-                  />
-                </label>
-              )}
-            </div>
-          )}
-
         </>
       )}
 
       {modalNuevo && (
         <ContactoNuevoModal
           nombreCliente={nombreCliente}
-          mismoClienteInicial={form.contactoMismoCliente !== false}
-          inicial={{
-            nombre: form.contactoNombre ?? '',
-            codigoPais: form.codigoPais,
-            telefono: form.telefono ?? '',
-            email: form.email ?? '',
-          }}
+          // Desde una búsqueda por nombre, el nombre buscado es el del contacto (no el
+          // del cliente); por celular, arranca como el propio cliente, editable.
+          mismoClienteInicial={
+            nuevoDesdeBusqueda ? !nuevoDesdeBusqueda.nombre : form.contactoMismoCliente !== false
+          }
+          inicial={
+            nuevoDesdeBusqueda
+              ? {
+                  nombre: nuevoDesdeBusqueda.nombre ?? '',
+                  codigoPais: nuevoDesdeBusqueda.codigoPais ?? form.codigoPais,
+                  telefono: nuevoDesdeBusqueda.telefono ?? '',
+                  email: '',
+                }
+              : {
+                  nombre: form.contactoNombre ?? '',
+                  codigoPais: form.codigoPais,
+                  telefono: form.telefono ?? '',
+                  email: form.email ?? '',
+                }
+          }
           homonimo={homonimo}
           onElegirHomonimo={(h) => onElegirContacto?.(h.id)}
           // Teléfono repetido detectado adentro del popup: "usar ese contacto" cae en el
-          // mismo camino que elegirlo desde "Vincular un contacto existente".
+          // mismo camino que elegirlo desde el buscador.
           onUsarExistente={onVincularContacto ? (contacto) => onVincularContacto(contacto) : undefined}
           onClose={() => setModalNuevo(false)}
           onGuardar={(datos) => {

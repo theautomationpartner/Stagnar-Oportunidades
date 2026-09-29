@@ -25,6 +25,10 @@ export function VehiculoManualFields({
   onModeloChange,
   highlightEmpty = false,
   modeloDisabled = false,
+  // Mientras se lee la Carta: la lectura va a pisar estos campos, tipear ahí se perdería.
+  disabled = false,
+  // Modelo leído de la Carta: el desplegable de Modelo arranca filtrado con él.
+  modeloLeido = '',
 }) {
   const missingClass = (value) => (highlightEmpty && !value ? ' crear-op__field--missing' : '')
 
@@ -33,6 +37,7 @@ export function VehiculoManualFields({
       <label className={`crear-op__field${missingClass(form.anio)}`}>
         <span>Año <Required /></span>
         <RequiredDropdown
+          disabled={disabled}
           options={anioOptions}
           value={anioOptions.find((o) => o.value === form.anio) ?? null}
           placeholder={highlightEmpty && !form.anio ? 'Seleccioná el año faltante...' : 'Escribe para buscar resultados'}
@@ -53,6 +58,7 @@ export function VehiculoManualFields({
       <label className={`crear-op__field${missingClass(form.marca)}`}>
         <span>Marca <Required /></span>
         <RequiredDropdown
+          disabled={disabled}
           options={marcaOptions}
           value={marcaOptions.find((o) => o.value === form.marca) ?? null}
           placeholder={highlightEmpty && !form.marca ? 'Seleccioná la marca faltante...' : 'Escribe para buscar resultados'}
@@ -78,12 +84,14 @@ export function VehiculoManualFields({
           value={form.modeloSeleccion}
           onChange={onModeloChange}
           placeholder={highlightEmpty && !form.modeloSeleccion ? 'Seleccioná el modelo faltante...' : undefined}
-          disabled={modeloDisabled}
+          disabled={modeloDisabled || disabled}
+          modeloLeido={modeloLeido}
         />
       </label>
       <label className={`crear-op__field crear-op__field--full${missingClass(form.combustible)}`}>
         <span>Combustible <Required /></span>
         <RequiredDropdown
+          disabled={disabled}
           options={combustibleOptions}
           value={combustibleOptions.find((o) => o.value === form.combustible) ?? null}
           placeholder={highlightEmpty && !form.combustible ? 'Seleccioná el combustible faltante...' : 'Selecciona una opción'}
@@ -104,6 +112,7 @@ export function VehiculoManualFields({
       <label className={`crear-op__field${missingClass(form.tipo)}`}>
         <span>Tipo <Required /></span>
         <RequiredDropdown
+          disabled={disabled}
           options={tipoOptions}
           value={tipoOptions.find((o) => o.value === form.tipo) ?? null}
           placeholder={highlightEmpty && !form.tipo ? 'Seleccioná el tipo...' : 'Escribe para buscar resultados'}
@@ -122,6 +131,7 @@ export function VehiculoManualFields({
       <label className={`crear-op__field${missingClass(form.uso)}`}>
         <span>Uso <Required /></span>
         <RequiredDropdown
+          disabled={disabled}
           options={usoOptions}
           value={usoOptions.find((o) => o.value === form.uso) ?? null}
           placeholder={highlightEmpty && !form.uso ? 'Seleccioná el uso faltante...' : 'Escribe para buscar resultados'}

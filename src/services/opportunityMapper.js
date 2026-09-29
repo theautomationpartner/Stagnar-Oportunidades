@@ -8,7 +8,7 @@ import {
   VALIDACION_POLIZA_COLUMN_ID,
   normalizarEstadoValidacion,
 } from './validacionPoliza'
-import { formatShortDate } from './format'
+import { formatShortDate, sinCodigoPostal } from './format'
 import { textOf, boardRelationDisplayOf } from './mondayColumns'
 
 const DEFAULT_COLOR = { bg: '#c4c4c4', border: '#b0b0b0' }
@@ -142,7 +142,9 @@ export function mapOpportunityItem(item, statusColors = {}) {
     clienteDireccion,
     clienteLocalidad,
     clienteDepartamento,
-    clienteDomicilio: [clienteDireccion, clienteLocalidad, clienteDepartamento].filter(Boolean).join(', '),
+    // Para mostrar: sin el código postal de la localidad (clienteLocalidad, el nombre
+    // completo, se sigue usando para buscar el ítem real — ver UbicacionParaCotizar).
+    clienteDomicilio: [clienteDireccion, sinCodigoPostal(clienteLocalidad), clienteDepartamento].filter(Boolean).join(', '),
     ci: textOf(cv, 'numeric_mm51mb0s'),
     telefono: textOf(cv, 'phone_mm519m27'),
     marca,
@@ -197,6 +199,13 @@ export function mapOpportunityItem(item, statusColors = {}) {
     estadoLectura,
     estadoLecturaColor,
     ultimaCotizacion,
+    // Filtros de la tabla (ver filtrosOportunidades.js): el estado tal cual está en la
+    // columna (estadoLabel dice "Sin estado" cuando está vacía) y las fechas como
+    // AAAA-MM-DD, para comparar desde/hasta como texto.
+    estadoOportunidad: textOf(cv, 'deal_stage'),
+    fechaCotizacionIso: textOf(cv, 'date_mm52w0h8').slice(0, 10),
+    fechaCierreIso: textOf(cv, 'deal_expected_close_date').slice(0, 10),
+    creacionIso: textOf(cv, 'pulse_log_mm4pzxca').slice(0, 10),
     recotizaciones,
     asignado,
     asignadoIniciales: initialsOf(asignado),

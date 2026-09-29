@@ -12,14 +12,17 @@ import { useState } from 'react'
 import { Modal, ModalContent, ModalFooter } from '@vibe/core'
 import { documentoDelTipoCliente, fechaError, fieldStateClass, maxFechaNacimiento, NACIONALIDAD_URUGUAY, stripCi } from '../../services/personaFields'
 import { ExtranjeroFields, Required, RequiredDropdown } from './FormPrimitives'
+import { opcionesDeLocalidad } from '../../services/localidades'
 
 // Localidades filtradas por el departamento elegido (antes copiado en los 2 popups y en
 // otros 2 lugares del formulario) — mismo criterio: sin departamento, todas.
 export function useLocalidadOptions(departamentoOptions, localidades, departamentoId, localidadId) {
   const selectedDepartamento = departamentoOptions.find((o) => o.value === departamentoId) ?? null
-  const localidadOptions = localidades
-    .filter((l) => !selectedDepartamento || l.departamento === selectedDepartamento.label)
-    .map((l) => ({ value: l.id, label: l.name }))
+  // Reunión del 24/09: sin código postal y sin nombres repetidos (ver localidades.js).
+  const localidadOptions = opcionesDeLocalidad(localidades, {
+    departamento: selectedDepartamento?.label,
+    seleccionadaId: localidadId,
+  })
   const selectedLocalidad = localidadOptions.find((o) => o.value === localidadId) ?? null
   return { selectedDepartamento, localidadOptions, selectedLocalidad }
 }
@@ -92,7 +95,7 @@ function UbicacionFields({
         />
       </label>
       <label className="crear-op__field">
-        <span>Localidad <Required /></span>
+        <span>Zona principal de circulación <Required /></span>
         <RequiredDropdown
           options={localidadOptions}
           value={selectedLocalidad}

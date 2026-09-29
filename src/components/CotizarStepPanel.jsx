@@ -3,13 +3,14 @@ import { MdAutorenew, MdArrowForward, MdCheckCircle, MdWarningAmber } from 'reac
 import { Button, Dropdown, AttentionBox, TextField, NumberField, Modal, ModalContent, ModalFooter } from '@vibe/core'
 import { COTIZAR_FIELDS, getInvalidCotizarFields, getMissingCotizarFields } from '../services/cotizarFields'
 import { fetchAutodataModelosByAnioMarca } from '../services/mondayApi'
-import { matchesSearchQuery, matchOption } from '../services/format'
+import { matchesSearchQuery, matchOption, sinCodigoPostal } from '../services/format'
 import AutodataModeloPorAnioMarca from './AutodataModeloPorAnioMarca'
 import AlertModal from './AlertModal'
 import ErrorDetailBox from './ErrorDetailBox'
 import ClientFicha from './ClientFicha'
 import { anioParaCotizar, esAnioAdelantado } from '../services/anioCotizacion'
 import UbicacionParaCotizar from './UbicacionParaCotizar'
+import { opcionesDeLocalidad } from '../services/localidades'
 import StepFooter from './StepFooter'
 import './CotizarStepPanel.css'
 
@@ -174,16 +175,39 @@ export default function CotizarStepPanel({
   // sabe escribir columnas conectadas, refresca la oportunidad y renombra el ítem. Mandar
   // solo los dos campos vaciaría todo lo demás, porque el guardado compara campo por
   // campo contra el formulario que recibe.
+  //
+  // Devuelve si se pudo: si no, no se cotiza (se cotizaría con la ubicación vieja).
   const handleGuardarUbicacion = async ({ departamentoId, localidadId }) => {
     setGuardandoUbicacion(true)
     setSaveError(null)
     try {
       await onSave({ ...buildInitialForm(opportunity, dropdownOptions), departamentoId, localidadId })
+      return true
     } catch (err) {
       setSaveError(err.message)
+      return false
     } finally {
       setGuardandoUbicacion(false)
     }
+  }
+
+  // Reunión del 24/09: la ubicación elegida en el panel (ver UbicacionParaCotizar) ya no
+  // se confirma con un botón aparte — es la que muestra el checklist y la que se guarda
+  // al apretar "Cotizar", justo antes de mandar a cotizar.
+  const [ubicacionElegida, setUbicacionElegida] = useState(null)
+  // Si la ubicación se cambió con "Editar", el panel arranca en esa y no en "Por defecto".
+  const [respetarUbicacionGuardada, setRespetarUbicacionGuardada] = useState(false)
+  const usarUbicacionElegida = !hasQuotes && Boolean(ubicacionElegida)
+  const oportunidadParaCotizar = usarUbicacionElegida
+    ? { ...opportunity, departamento: ubicacionElegida.departamento, zonaCirculacion: ubicacionElegida.localidad }
+    : opportunity
+  const cotizarConUbicacion = async () => {
+    const cambia =
+      usarUbicacionElegida &&
+      (ubicacionElegida.departamento !== opportunity.departamento ||
+        ubicacionElegida.localidad !== opportunity.zonaCirculacion)
+    if (cambia && !(await handleGuardarUbicacion(ubicacionElegida))) return
+    onMarcarParaCotizar()
   }
 
   // A pedido, estética tipo mockup: popup compartido (AlertModal) para "Error al
@@ -198,11 +222,11 @@ export default function CotizarStepPanel({
 
   // Ningún campo base puede quedar vacío: si falta alguno, no dejamos cotizar/recotizar
   // (la automatización de monday que genera los subitems necesita todos estos datos).
-  const missingFields = getMissingCotizarFields(opportunity)
+  const missingFields = getMissingCotizarFields(oportunidadParaCotizar)
   // LOG-09: además de los vacíos, los valores que NO existen en el catálogo de su
   // columna (ej. una ficha de Autodata con Combustible "EREV"). Antes esto se descubría
   // del otro lado, con el robot ya corriendo — o el dato entraba vacío al portal.
-  const invalidFields = getInvalidCotizarFields(opportunity, dropdownOptions)
+  const invalidFields = getInvalidCotizarFields(oportunidadParaCotizar, dropdownOptions)
   // Bug reportado: elegir "Otra" en el selector de ubicación de más abajo y no completar
   // departamento/localidad dejaba cotizar igual — con la ubicación anterior. Los campos
   // de la oportunidad seguían completos (missingFields no lo veía), así que el aviso lo
@@ -341,6 +365,10 @@ export default function CotizarStepPanel({
     setSaving(true)
     try {
       await onSave(form)
+      const inicial = buildInitialForm(opportunity, dropdownOptions)
+      if (form.departamentoId !== inicial.departamentoId || form.localidadId !== inicial.localidadId) {
+        setRespetarUbicacionGuardada(true)
+      }
       setEditingSection(null)
     } catch (err) {
       setSaveError(err.message)
@@ -353,7 +381,9 @@ export default function CotizarStepPanel({
   // campos reales, ver cotizarFields.js) — el modo "Editar información" no cambia:
   // sigue en una grilla plana con un control por campo (COTIZAR_FIELDS ya en el orden
   // real de columnas de monday, no hace falta agruparlo igual que la vista).
-  const ubicacion = [opportunity.departamento, opportunity.zonaCirculacion].filter(Boolean).join(' — ')
+  const ubicacion = [oportunidadParaCotizar.departamento, sinCodigoPostal(oportunidadParaCotizar.zonaCirculacion)]
+    .filter(Boolean)
+    .join(' — ')
 
   // A pedido: Localidad filtrada por el Departamento elegido EN ESTA EDICIÓN (form,
   // no opportunity) — se busca el nombre real por id contra la lista completa, ya que
@@ -473,9 +503,9 @@ export default function CotizarStepPanel({
         <UbicacionParaCotizar
           opportunity={opportunity}
           dropdownOptions={dropdownOptions}
-          onGuardar={handleGuardarUbicacion}
-          guardando={guardandoUbicacion}
+          onElegidaChange={setUbicacionElegida}
           onPendienteChange={setUbicacionPendiente}
+          respetarGuardada={respetarUbicacionGuardada}
         />
       )}
 
@@ -568,8 +598,13 @@ export default function CotizarStepPanel({
                         // Localidades; una vez elegido, solo las de ese departamento
                         // (texto plano de la propia Localidad, igual que
                         // CrearOportunidadForm.jsx).
-                        f.key === 'zonaCirculacion' && selectedDepartamentoName
-                          ? (dropdownOptions.localidades ?? []).filter((l) => l.departamento === selectedDepartamentoName)
+                        // Reunión del 24/09: la zona sin código postal y sin nombres repetidos
+                        // (ver localidades.js#opcionesDeLocalidad).
+                        f.key === 'zonaCirculacion'
+                          ? opcionesDeLocalidad(dropdownOptions.localidades ?? [], {
+                              departamento: selectedDepartamentoName,
+                              seleccionadaId: form.localidadId,
+                            }).map((o) => ({ id: o.value, name: o.label }))
                           : dropdownOptions[f.optionsKey] ?? []
                       }
                       anio={form.anio}
@@ -712,10 +747,16 @@ export default function CotizarStepPanel({
           ) : (
             <Button
               kind="primary"
-              onClick={() => runCotizarChecks(onMarcarParaCotizar)}
-              disabled={marking || polling || checkingConsistencia}
+              onClick={() => runCotizarChecks(cotizarConUbicacion)}
+              disabled={marking || polling || checkingConsistencia || guardandoUbicacion}
             >
-              {checkingConsistencia ? 'Verificando...' : marking ? 'Marcando...' : 'Cotizar'}
+              {checkingConsistencia
+                ? 'Verificando...'
+                : guardandoUbicacion
+                  ? 'Guardando ubicación...'
+                  : marking
+                    ? 'Marcando...'
+                    : 'Cotizar'}
             </Button>
           )}
         </StepFooter>
@@ -750,11 +791,7 @@ export default function CotizarStepPanel({
             // listan igual acá, aclarando cuál es el valor que no se acepta.
             ...invalidFields.map((f) => `${f.label}: "${opportunity[f.key]}" no está en la lista`),
             ...(ubicacionPendiente
-              ? [
-                  ubicacionPendiente === 'incompleta'
-                    ? 'Ubicación: falta elegir el departamento y la localidad'
-                    : 'Ubicación: falta confirmarla con «Usar esta ubicación»',
-                ]
+              ? ['Ubicación: falta elegir el departamento y la zona principal de circulación']
               : []),
           ]}
           onClose={() => setShowMissingFieldsModal(false)}

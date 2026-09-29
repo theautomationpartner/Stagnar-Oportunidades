@@ -26,6 +26,7 @@ import {
   setConnectedColumnValue,
   setSubitemCheckboxValue,
   setSubitemColumnValue,
+  setCostoManual,
   uploadFileToColumn,
   clearFileColumn,
   fetchLatestUpdate,
@@ -49,7 +50,7 @@ import { useSchema } from '../context/AppContext'
 import { mapSubitemToRawQuote, groupQuotesByCompania } from '../services/quoteMapper'
 import { renderQuoteText } from '../services/whatsappText'
 import { computeQuote, isQuoteSelectable } from '../services/pricingEngine'
-import { applyRecargoLookup } from '../services/recargoPanel'
+import { applyBonificacionPorDefecto, applyRecargoLookup } from '../services/recargoPanel'
 import { COTIZAR_FIELDS, getInvalidCotizarFields, getMissingCotizarFields } from '../services/cotizarFields'
 import { COBERTURA_TABS, coberturaGroupOf } from '../services/coberturaGroups'
 
@@ -170,6 +171,8 @@ const AUTO_EXTRA_COLUMN_ID = 'color_mm6zpx3j'
 // LOG-13: la Bonificación (columna "Bonif" del subitem) se puede guardar de verdad desde
 // el paso "Confirmar" — en "Comparar y enviar" sigue siendo un ajuste de prueba local.
 const BONIF_COLUMN_ID = 'numeric_mm52ey7f'
+// Reunión del 24/09: bonificaciones especiales de BSE, guardadas en la cotización.
+const BONIFICACION_ESPECIAL_COLUMN_IDS = { bns: 'numeric_mm7nrezs', flota: 'numeric_mm7nmnk0' }
 // LOG-13: forma de pago elegida. Vive en la Oportunidad, no en el subitem — es una
 // decisión de la venta, y así se puede filtrar por ella en el tablero.
 const CUOTAS_ELEGIDAS_COLUMN_ID = 'color_mm71kfpr'
@@ -729,7 +732,10 @@ export default function OpportunityDetail({
     // el schema son cinco en paralelo) las cuotas se recalculan solas. Antes el recargo
     // se horneaba en el fetch con el schema todavía vacío y quedaba en 0 para siempre:
     // las cuotas se mostraban SIN recargo, más baratas que el precio real.
-    const conRecargos = applyRecargoLookup(rawQuotes, schema?.recargoLookup ?? {})
+    const conRecargos = applyBonificacionPorDefecto(
+      applyRecargoLookup(rawQuotes, schema?.recargoLookup ?? {}),
+      schema?.bonificacionesPorCompania ?? {}
+    )
     const withQuotes = conRecargos.map((raw) => {
       const effectiveRaw = { ...raw, uso: opportunity?.uso ?? '', anioVehiculo: opportunity?.anio ?? '' }
       return {
@@ -988,6 +994,43 @@ export default function OpportunityDetail({
     }
   }
 
+  // Reunión del 24/09: costo cargado a mano en una cotización que WINK trajo en 0 (ver
+  // mondayApi.js#setCostoManual). Se escribe y se refleja en la tarjeta sin recargar.
+  const handleCargarCostoManual = async (rawId, datos) => {
+    onOpportunityAction?.()
+    const raw = rawQuotes.find((r) => r.id === rawId)
+    if (!raw) return
+    await setCostoManual(rawId, raw.compania, datos)
+    setRawQuotes((prev) =>
+      prev.map((r) =>
+        r.id !== rawId
+          ? r
+          : {
+              ...r,
+              contado: String(datos.contado),
+              deducibleBase: String(datos.deducible),
+              ...(r.compania === 'SANCOR' ? { deducibleSancorUsd: String(datos.deducible) } : {}),
+              ...(r.compania === 'BSE' ? { deducibleBSE: '1' } : {}),
+              ...(r.compania === 'SURA' ? { deducibleSURA: '1' } : {}),
+            }
+      )
+    )
+  }
+
+  // BNS / Flota de BSE: datos de la póliza que da el Banco de Seguros — se guardan en la
+  // cotización apenas se cargan (como los opcionales), no quedan solo en pantalla.
+  const handleBonificacionEspecialChange = async (rawId, field, valor) => {
+    onOpportunityAction?.()
+    const anterior = rawQuotes.find((r) => r.id === rawId)?.[field] ?? ''
+    setRawQuotes((prev) => prev.map((r) => (r.id === rawId ? { ...r, [field]: valor } : r)))
+    try {
+      await setSubitemColumnValue(rawId, BONIFICACION_ESPECIAL_COLUMN_IDS[field], valor)
+    } catch (err) {
+      setRawQuotes((prev) => prev.map((r) => (r.id === rawId ? { ...r, [field]: anterior } : r)))
+      throw err
+    }
+  }
+
   // "Auto extra" es la única opción con duración (7/15/30 días) en vez de un tilde: se
   // guarda como estado en el subitem. `dias` vacío = sin auto extra.
   const handleAutoExtraChange = async (rawId, dias) => {
@@ -1103,6 +1146,14 @@ export default function OpportunityDetail({
         }
         await setSubitemCheckboxValue(rawId, PROPUESTA_ELEGIDA_COLUMN_ID, true)
         setRawQuotes((prev) => prev.map((r) => ({ ...r, propuestaElegida: r.id === rawId })))
+        // La bonificación precargada de PANEL solo vivía en pantalla: al elegir la
+        // propuesta se guarda, porque con ella se emite y se valida la póliza (Make lee la
+        // columna "Bonif" de la cotización elegida).
+        const porDefecto = schema?.bonificacionesPorCompania?.[current?.compania]
+        if (current && String(current.bonif ?? '').trim() === '' && porDefecto != null) {
+          await setSubitemColumnValue(rawId, BONIF_COLUMN_ID, String(porDefecto))
+          setRawQuotes((prev) => prev.map((r) => (r.id === rawId ? { ...r, bonif: String(porDefecto) } : r)))
+        }
       }
     } catch (err) {
       setElegidaError(err.message)
@@ -2212,6 +2263,8 @@ export default function OpportunityDetail({
                         onApplyOverrides={(values) => handleApplyQuoteOverrides(raw.id, values)}
                         onResetOverrides={() => handleResetQuoteOverrides(raw.id)}
                         onToggleOpcional={(field, checked) => handleToggleOpcional(raw.id, field, checked)}
+                        onBonificacionEspecialChange={(field, valor) => handleBonificacionEspecialChange(raw.id, field, valor)}
+                        onCargarCostoManual={(datos) => handleCargarCostoManual(raw.id, datos)}
                         onAutoExtraChange={(dias) => handleAutoExtraChange(raw.id, dias)}
                         onPanelChange={(panel) => handlePanelChange(raw.id, panel)}
                         rcOptions={rcOptions}
