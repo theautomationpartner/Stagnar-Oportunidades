@@ -3,7 +3,7 @@
 import { useState } from 'react'
 import { Button, Dropdown, TextField } from '@vibe/core'
 import { MdCall, MdClear, MdEdit, MdInfoOutline, MdPersonAdd, MdPersonSearch } from 'react-icons/md'
-import { CODIGO_PAIS_OPTIONS, emailError, telefonoError } from '../../services/personaFields'
+import { CODIGO_PAIS_OPTIONS, emailError, telefonoError, telefonoParaMostrar } from '../../services/personaFields'
 import FlagIcon from './FlagIcon'
 import { matchesSearchQuery } from '../../services/format'
 // El popup de contacto nuevo es COMPARTIDO (también lo usa la ficha de gestión del
@@ -270,7 +270,7 @@ export function ContactoFields({
     }
   }
 
-  const etiquetaContacto = (c) => [c.name, c.telefono, c.email].filter(Boolean).join(' — ')
+  const etiquetaContacto = (c) => [c.name, c.telefono && telefonoParaMostrar(c.telefono), c.email].filter(Boolean).join(' — ')
 
   // Un contacto puede estar vinculado a varios Clientes, y la lista entera no entra en
   // una línea: se veía "(cliente: Valentina TAP, santiago tap, VALERIA DAIANA GRAJALES
@@ -330,7 +330,7 @@ export function ContactoFields({
           <span>
             <strong>{contactoElegido.name}</strong>
             {[contactoElegido.telefono, contactoElegido.email].filter(Boolean).length > 0 && (
-              <> — {[contactoElegido.telefono, contactoElegido.email].filter(Boolean).join(' — ')}</>
+              <> — {[contactoElegido.telefono && telefonoParaMostrar(contactoElegido.telefono), contactoElegido.email].filter(Boolean).join(' — ')}</>
             )}
           </span>
           <Button kind="tertiary" size="small" onClick={() => onElegirContacto?.(null)}>
@@ -436,34 +436,34 @@ export function ContactoFields({
                       </Button>
                     </div>
                   )}
-                  {/* A pedido: los resultados se eligen con el mismo Dropdown que usa el
-                      resto de la página, no con radios. */}
+                  {/* A pedido: los resultados a la vista, en una lista con scroll — antes era
+                      un desplegable que había que abrir para ver qué había. Un clic en la
+                      fila vincula ese contacto. */}
                   {(resultados ?? []).length > 0 && (
-                    <label className="crear-op__field crear-op__field--full">
-                      <span>Resultados de «{terminoBuscado}» ({resultados.length})</span>
-                      <Dropdown
-                        size="medium"
-                        options={resultados.map((c) => {
+                    <div className="crear-op__resultados-contacto">
+                      <span className="crear-op__resultados-titulo">
+                        Resultados de «{terminoBuscado}» ({resultados.length})
+                      </span>
+                      <ul role="list">
+                        {resultados.map((c) => {
                           const clientes = clientesDeContacto(c)
-                          return {
-                            value: c.id,
-                            label: [etiquetaContacto(c), clientes?.resumen].filter(Boolean).join(' — '),
-                            detalleClientes: clientes?.detalle ?? '',
-                          }
+                          return (
+                            <li key={c.id}>
+                              <button
+                                type="button"
+                                className="crear-op__resultado-contacto"
+                                title={clientes?.detalle || undefined}
+                                onClick={() => onVincularContacto?.(c)}
+                              >
+                                <strong>{c.name}</strong>
+                                <span>{[c.telefono && telefonoParaMostrar(c.telefono), c.email].filter(Boolean).join(' · ')}</span>
+                                {clientes && <span className="crear-op__resultado-clientes">{clientes.resumen}</span>}
+                              </button>
+                            </li>
+                          )
                         })}
-                        // En una opción de Dropdown no entra un botón, así que el detalle va
-                        // en el title: se ve al pasar el mouse por encima.
-                        optionRenderer={(option) => (
-                          <span title={option.detalleClientes || undefined}>{option.label}</span>
-                        )}
-                        value={null}
-                        placeholder="Elegí el contacto a vincular"
-                        onChange={(option) => {
-                          const contacto = resultados.find((c) => c.id === option?.value)
-                          if (contacto) onVincularContacto?.(contacto)
-                        }}
-                      />
-                    </label>
+                      </ul>
+                    </div>
                   )}
                 </div>
               )}

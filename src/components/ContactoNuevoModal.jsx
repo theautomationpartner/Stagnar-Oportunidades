@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { AttentionBox, Button, Modal, ModalContent, ModalFooter, TextField } from '@vibe/core'
 import { MdClear } from 'react-icons/md'
 import { Required, RequiredDropdown, codigoPaisDropdownProps } from './crear/FormPrimitives'
-import { CODIGO_PAIS_OPTIONS, emailError, telefonoError } from '../services/personaFields'
+import { CODIGO_PAIS_OPTIONS, emailError, telefonoError, telefonoParaMostrar } from '../services/personaFields'
 import { normalizarParaMatch } from '../services/format'
 import { buscarContactosCrmLibre, fetchClienteContactos, searchContactos } from '../services/mondayApi'
 // Los estilos de campos/errores son los del wizard (crear-op__*) — el popup nació ahí y
@@ -208,22 +208,25 @@ export default function ContactoNuevoModal({
         )}
 
         {yaTieneContactoPropio && nombreCliente && (
-          <p className="crear-op__section-hint" role="note">
-            {nombreCliente} ya tiene su propio contacto
-            {homonimo.telefono ? ` (${homonimo.telefono})` : ''}: este tiene que ser otra persona, con su nombre.{' '}
+          <AttentionBox type="primary" className="contacto-nuevo__propio">
+            <strong>{nombreCliente}</strong> ya tiene su propio contacto
+            {homonimo.telefono ? <> ({telefonoParaMostrar(homonimo.telefono)})</> : null}. Este tiene que ser otra
+            persona, con su nombre.
             {onElegirHomonimo && (
-              <Button
-                kind="tertiary"
-                size="small"
-                onClick={() => {
-                  onElegirHomonimo(homonimo)
-                  onClose()
-                }}
-              >
-                Utilizar contacto existente
-              </Button>
+              <div className="contacto-nuevo__dup-accion">
+                <Button
+                  kind="secondary"
+                  size="small"
+                  onClick={() => {
+                    onElegirHomonimo(homonimo)
+                    onClose()
+                  }}
+                >
+                  Usar el contacto de {nombreCliente}
+                </Button>
+              </div>
             )}
-          </p>
+          </AttentionBox>
         )}
 
         {homonimoDelCliente && (
@@ -265,7 +268,9 @@ export default function ContactoNuevoModal({
           </AttentionBox>
         )}
 
-        <div className="crear-op__fields--grid">
+        {/* A pedido, un campo por renglón: en 2 columnas el teléfono (código + número)
+            quedaba cortado y el orden de lectura saltaba de un lado al otro. */}
+        <div className="contacto-nuevo__campos">
           {pedirCliente && (
             <label className="crear-op__field crear-op__field--full">
               <span>Cliente <Required /></span>
@@ -335,7 +340,7 @@ export default function ContactoNuevoModal({
           {!mismoCliente && (
             <TextField
               size="medium"
-              wrapperClassName="crear-op__field"
+              wrapperClassName="crear-op__field crear-op__field--full"
               title="Nombre del contacto"
               required
               placeholder="Ej: María Pérez (hija)"
@@ -346,7 +351,7 @@ export default function ContactoNuevoModal({
               validation={nombre.trim() ? { status: 'success' } : undefined}
             />
           )}
-          <label className="crear-op__field">
+          <label className="crear-op__field crear-op__field--full">
             <span>Teléfono <Required /></span>
             <div className="crear-op__phone">
               <div className="crear-op__phone-code">
@@ -377,7 +382,7 @@ export default function ContactoNuevoModal({
             </div>
             {telErr && <span className="crear-op__field-error" role="alert">{telErr}</span>}
           </label>
-          <label className="crear-op__field">
+          <label className="crear-op__field crear-op__field--full">
             <span>Email</span>
             <TextField
               size="medium"

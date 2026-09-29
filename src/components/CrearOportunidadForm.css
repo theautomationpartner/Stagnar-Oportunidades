@@ -1574,3 +1574,62 @@ button.crear-op__clientes-chip:hover {
   width: 240px;
   max-width: 100%;
 }
+
+/* Resultados de la búsqueda de contactos: a la vista, con scroll si son muchos (ver
+   FormPrimitives.jsx#ContactoFields). Cada fila se elige con un clic. */
+.crear-op__resultados-contacto {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 10px;
+}
+
+.crear-op__resultados-titulo {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-gray);
+}
+
+.crear-op__resultados-contacto ul {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  max-height: 188px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.crear-op__resultados-contacto li + li {
+  border-top: 1px solid var(--border);
+}
+
+.crear-op__resultado-contacto {
+  display: flex;
+  align-items: baseline;
+  gap: 4px 12px;
+  flex-wrap: wrap;
+  width: 100%;
+  padding: 9px 12px;
+  text-align: left;
+  font: inherit;
+  font-size: 13px;
+  color: var(--text-dark);
+  background: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+.crear-op__resultado-contacto:hover,
+.crear-op__resultado-contacto:focus-visible {
+  background: var(--tint-info);
+}
+
+.crear-op__resultado-contacto span {
+  color: var(--text-gray);
+}
+
+.crear-op__resultado-clientes {
+  margin-left: auto;
+  font-size: 12px;
+}

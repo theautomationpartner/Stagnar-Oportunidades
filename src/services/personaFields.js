@@ -223,3 +223,12 @@ export function countryShortNameFromDigits(digits) {
   const hit = codes.find((c) => d.startsWith(c))
   return hit ? COUNTRY_SHORT_NAMES[`+${hit}`] : 'UY'
 }
+
+// Para MOSTRAR un teléfono guardado como dígitos con el código de país pegado
+// ("542281580112" → "+54 2281580112"): se lee mejor y deja claro de qué país es.
+export function telefonoParaMostrar(digits) {
+  const d = String(digits ?? '').replace(/\D/g, '')
+  if (!d) return ''
+  const { codigoPais, telefono } = splitTelefono(d, countryShortNameFromDigits(d))
+  return codigoPais && telefono !== d ? `${codigoPais} ${telefono}` : d
+}

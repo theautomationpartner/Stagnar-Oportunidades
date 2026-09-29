@@ -31,3 +31,14 @@
   border-radius: 8px;
   background: var(--bg-subtle);
 }
+
+/* Un campo por renglón (ver ContactoNuevoModal.jsx). */
+.contacto-nuevo__campos {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.contacto-nuevo__propio {
+  margin: 4px 0 14px;
+}
