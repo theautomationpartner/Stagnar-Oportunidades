@@ -51,15 +51,17 @@ import { mapSubitemToRawQuote, groupQuotesByCompania } from '../services/quoteMa
 import { renderQuoteText } from '../services/whatsappText'
 import { computeQuote, isQuoteSelectable } from '../services/pricingEngine'
 import { applyBonificacionPorDefecto, applyRecargoLookup } from '../services/recargoPanel'
+import { ordenarRecomendado } from '../services/ordenRecomendado'
 import { COTIZAR_FIELDS, getInvalidCotizarFields, getMissingCotizarFields } from '../services/cotizarFields'
 import { COBERTURA_TABS, coberturaGroupOf } from '../services/coberturaGroups'
 
 // A pedido: órdenes disponibles para las tarjetas de "Comparar y enviar" (ver
 // ordenElegido y el selector arriba de la grilla). Las claves son las del mapa de
 // comparadores en visibleQuoteEntries. "Enviadas" solo existe cuando hay cotizaciones ya
-// enviadas por WhatsApp (incluirPropuesta) — y en ese caso es el orden por defecto: lo
-// primero que se quiere ver al volver a una oportunidad con envíos es qué se le mandó.
+// enviadas por WhatsApp (incluirPropuesta).
+// Reunión del 24/09: el orden por defecto es el "Recomendado" (ver ordenRecomendado.js).
 const ORDEN_OPCIONES = [
+  { key: 'recomendado', label: 'Recomendado' },
   { key: 'enviadas', label: 'Enviadas' },
   { key: 'precio-asc', label: 'Menor precio' },
   { key: 'precio-desc', label: 'Mayor precio' },
@@ -775,10 +777,10 @@ export default function OpportunityDetail({
     () => groups.some((g) => g.entries.some((e) => e.raw.incluirPropuesta)),
     [groups]
   )
-  const ordenPedido = ordenElegido ?? (hayEnviadas ? 'enviadas' : 'precio-asc')
+  const ordenPedido = ordenElegido ?? 'recomendado'
   // Si el orden pedido es "enviadas" pero ya no hay ninguna (recotizar borra subitems),
   // se cae al default clásico — la opción tampoco se muestra en ese caso.
-  const ordenActivo = ordenPedido === 'enviadas' && !hayEnviadas ? 'precio-asc' : ordenPedido
+  const ordenActivo = ordenPedido === 'enviadas' && !hayEnviadas ? 'recomendado' : ordenPedido
   // Foto del orden de las tarjetas en el momento en que se abrió el primer panel (ver
   // visibleQuoteEntries).
   const [ordenCongelado, setOrdenCongelado] = useState(null)
@@ -812,10 +814,11 @@ export default function OpportunityDetail({
         ? flat
         : flat.filter((e) => coberturaGroupOf(e.raw.cobertura) === activeCoberturaTab)
     // LOG-12: antes salían en el orden en que la automatización creó los subitems (que no
-    // significa nada para quien compara). El orden por defecto es de la más barata a la
-    // más cara; a pedido también se puede invertir o agrupar por compañía (alfabética, y
-    // por precio adentro de cada una) — ver ordenElegido. Las que no se pueden elegir
-    // (sin fórmula o COSTO TOTAL en 0, ver isQuoteSelectable) van al final en cualquier
+    // significa nada para quien compara). El orden por defecto es el Recomendado (reunión
+    // del 24/09, ver ordenRecomendado.js); también se puede por precio, al revés o agrupar
+    // por compañía (alfabética, y por precio adentro de cada una) — ver ordenElegido. En
+    // esos, las que no se pueden elegir (sin fórmula o COSTO TOTAL en 0, ver
+    // isQuoteSelectable) van al final en cualquier
     // orden: si no, un total 0 encabezaría la lista.
     const total = (e) => Number(e.quote.total) || 0
     const comparar = {
@@ -825,8 +828,10 @@ export default function OpportunityDetail({
       'precio-asc': (a, b) => total(a) - total(b),
       'precio-desc': (a, b) => total(b) - total(a),
       compania: (a, b) => a.compania.localeCompare(b.compania, 'es') || total(a) - total(b),
-    }[ordenActivo]
-    const ordenadas = [...deLaSolapa].sort((a, b) => {
+    }[ordenActivo] ?? (() => 0)
+    // El recomendado maneja por su cuenta las que no tienen costo: una principal sin
+    // costo queda entre las primeras, no al final.
+    const ordenadas = ordenActivo === 'recomendado' ? ordenarRecomendado(deLaSolapa) : [...deLaSolapa].sort((a, b) => {
       const aSel = isQuoteSelectable(a.quote)
       const bSel = isQuoteSelectable(b.quote)
       if (aSel !== bSel) return aSel ? -1 : 1

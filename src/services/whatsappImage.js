@@ -12,8 +12,10 @@ import { formatMoney, modeloSinMarca, zonaParaMostrar } from './format'
 import { BRAND_COLORS } from './companyColors'
 import { coberturaGroupOf, coberturaParaMostrar, FAMILIA_LABEL, subtituloDeCobertura } from './coberturaGroups'
 import { iconoUrlParaBeneficio } from './beneficiosIconos'
-// A pedido: logo del header desde logo-blanco-.png con el fondo blanco recortado.
-import stagnariLogo from '../assets/stagnari-logo-header.png'
+// Reunión del 24/09: el logo del header es el archivo original de marca
+// (logo_stagnari/logo-blanco-.png) tal cual, sin retoques — la versión anterior tenía el
+// fondo recortado a mano y no era la que dio Stagnari.
+import stagnariLogo from '../assets/stagnari-logo-original.png'
 import stagnariLogoSimple from '../assets/stagnari-logo-simple.png'
 // A pedido: isotipo y logo completo en BLANCO sobre transparente para la barra verde del
 // pie (generados a partir de los archivos de marca: mini-logo-blanco-fondo-verde.png con

@@ -86,9 +86,10 @@ import './CrearOportunidadForm.css'
 // `label` es el texto corto del Stepper de arriba (círculos numerados); `navLabel` es
 // el texto que usan los botones "Volver a.../Continuar a..." del footer (ver más abajo)
 // — separado de `label` por si algún paso necesita decir algo distinto en cada lugar.
+// Reunión del 24/09: ya no hay un paso aparte para el Tipo de Riesgo — es un desplegable
+// arriba a la derecha del paso 1 (Automóvil por defecto).
 const STEPS = [
   { key: 'personales', label: 'Seleccionar Cliente', navLabel: 'Seleccionar Cliente' },
-  { key: 'tipo-riesgo', label: 'Seleccionar Riesgo', navLabel: 'Seleccionar Riesgo' },
   { key: 'riesgo', label: 'Ingresar datos del bien', navLabel: 'Ingresar datos del bien' },
 ]
 
@@ -219,7 +220,7 @@ export default function CrearOportunidadForm({
   // savePersistedSearch más abajo), arranca directo ahí en vez de en 0 — típicamente
   // pasa al volver de "Ir a esta oportunidad" (historial de acá abajo) a medio cargar
   // el paso 2/3 de esta.
-  const [stepIndex, setStepIndex] = useState(() => initialPersistedSearch?.stepIndex ?? 0)
+  const [stepIndex, setStepIndex] = useState(() => Math.min(initialPersistedSearch?.stepIndex ?? 0, STEPS.length - 1))
   const [form, setForm] = useState(() => ({
     ...buildInitialForm(),
     ...(initialPersistedSearch?.personales ?? {}),
@@ -1067,16 +1068,14 @@ export default function CrearOportunidadForm({
           !duplicadoBloqueante &&
           !duplicadoPendiente &&
           // Mientras se lee la Cédula del Lead, lo que se ve todavía no es lo definitivo.
-          !leyendoCedulaLead
+          !leyendoCedulaLead &&
+          // El Tipo de Riesgo vive ahora en este paso (arriba a la derecha).
+          Boolean(form.tipoRiesgo)
         // A pedido: la Dirección ya no es obligatoria acá — se pide en el paso 3
         // (Confirmar) de la oportunidad, junto con los documentos.
       )
     }
     if (index === 1) {
-      // Paso "Tipo de Riesgo" — un solo campo, nada más que validar.
-      return Boolean(form.tipoRiesgo)
-    }
-    if (index === 2) {
       // Paso "Datos del riesgo" — sin campos definidos todavía para otro Tipo de Riesgo
       // que no sea Automóvil (ver el mensaje "Todavía no hay campos definidos..." en el
       // JSX), así que no hay nada que bloquee avanzar en ese caso.
@@ -1114,6 +1113,7 @@ export default function CrearOportunidadForm({
     pedir(!form.departamentoId, false, 'departamento')
     pedir(!form.localidadId, false, 'zona principal de circulación')
     pedir(!form.nacionalidad, false, 'nacionalidad')
+    pedir(!form.tipoRiesgo, false, 'tipo de riesgo')
     const contactoDefinido =
       form.contactoId ||
       (form.contactoModo === 'nuevo' &&
@@ -1142,7 +1142,7 @@ export default function CrearOportunidadForm({
     // ahí queda el aviso de siempre en vez de un cartel vacío.
     return partes.length
       ? partes.join(' ')
-      : 'Completá los datos del cliente para continuar con la selección del riesgo.'
+      : 'Completá los datos del cliente para continuar con los datos del bien.'
   }
 
   // Para saltar directo a `target` (clickeando el Stepper) hacen falta TODOS los pasos
@@ -1750,6 +1750,24 @@ export default function CrearOportunidadForm({
 
         {stepIndex === 0 && (
           <div className="crear-op__fields">
+            {/* Reunión del 24/09: el Tipo de Riesgo dejó de ser un paso propio — va acá,
+                arriba a la derecha, a la altura del título (Automóvil por defecto, ver el
+                useEffect que arranca con TIPO_RIESGO_AUTOMOVIL). */}
+            <div className="crear-op__paso1-cabecera">
+              <StepHeading number={1} title="Seleccionar Cliente" />
+              <label className="crear-op__field crear-op__tipo-riesgo">
+                <span>
+                  Tipo de Riesgo <Required />
+                </span>
+                <RequiredDropdown
+                  size="small"
+                  options={tipoRiesgoOptions}
+                  value={selectedTipoRiesgo}
+                  placeholder="Selecciona una opción"
+                  onChange={(option) => handleChange('tipoRiesgo', option?.value ?? '')}
+                />
+              </label>
+            </div>
             {/* A pedido: la búsqueda y los datos ya autocompletados viven en 2
                 "pantallas" separadas (nunca las 2 juntas) — antes el campo "Buscar
                 Persona" se quedaba visible arriba con el resultado ya elegido mientras
@@ -1763,7 +1781,6 @@ export default function CrearOportunidadForm({
             {!busquedaResuelta ? (
               <div className="crear-op__search-screen" key="search-screen">
                 <label className="crear-op__field crear-op__field--full">
-                  <StepHeading number={1} title="Seleccionar Cliente" />
                   <ExistingRecordSearch value={searchPreview} onChange={handleSearchPreview} />
                   <Button kind="tertiary" className="crear-op__skip-btn" onClick={handleSaltearBusqueda}>
                     Crear Lead
@@ -2319,35 +2336,7 @@ export default function CrearOportunidadForm({
 
         {stepIndex === 1 && (
           <div className="crear-op__fields">
-            {/* A pedido: paso propio para Tipo de Riesgo (antes vivía junto con "Datos
-                del riesgo" en un mismo paso) — el Stepper de arriba ahora muestra los 3
-                pasos reales del flujo. Llega completado con el default de Vehículo (ver
-                el useEffect que arranca con TIPO_RIESGO_AUTOMOVIL), pero se puede
-                cambiar libremente acá. */}
-            <StepHeading
-              number={2}
-              title="Seleccionar riesgo"
-              subtitle="Seleccioná el tipo de riesgo que querés cotizar."
-            />
-            <div className="crear-op__section">
-              <div className="crear-op__fields--grid">
-                <label className="crear-op__field crear-op__field--full">
-                  <span>Tipo de Riesgo <Required /></span>
-                  <RequiredDropdown
-                    options={tipoRiesgoOptions}
-                    value={selectedTipoRiesgo}
-                    placeholder="Selecciona una opción"
-                    onChange={(option) => handleChange('tipoRiesgo', option?.value ?? '')}
-                  />
-                </label>
-              </div>
-            </div>
-          </div>
-        )}
-
-        {stepIndex === 2 && (
-          <div className="crear-op__fields">
-            <StepHeading number={3} title="Ingresar datos del bien" />
+            <StepHeading number={2} title="Ingresar datos del bien" />
 
             {!esAutomovil && (
               <p className="crear-op__empty">

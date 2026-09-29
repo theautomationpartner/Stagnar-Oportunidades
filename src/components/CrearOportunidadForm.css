@@ -1559,3 +1559,18 @@ button.crear-op__clientes-chip:hover {
 .crear-op__sin-resultados .crear-op__section-hint {
   margin: 0;
 }
+
+/* Reunión del 24/09: título del paso 1 a la izquierda y Tipo de Riesgo a la derecha, en la
+   misma fila (antes el riesgo era un paso aparte). En angosto, el riesgo baja. */
+.crear-op__paso1-cabecera {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px 24px;
+  flex-wrap: wrap;
+}
+
+.crear-op__tipo-riesgo {
+  width: 240px;
+  max-width: 100%;
+}
