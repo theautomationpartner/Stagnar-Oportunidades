@@ -12,10 +12,11 @@ import { formatMoney, modeloSinMarca, zonaParaMostrar } from './format'
 import { BRAND_COLORS } from './companyColors'
 import { coberturaGroupOf, coberturaParaMostrar, FAMILIA_LABEL, subtituloDeCobertura } from './coberturaGroups'
 import { iconoUrlParaBeneficio } from './beneficiosIconos'
-// Reunión del 24/09: el logo del header es el archivo original de marca
-// (logo_stagnari/logo-blanco-.png) tal cual, sin retoques — la versión anterior tenía el
-// fondo recortado a mano y no era la que dio Stagnari.
-import stagnariLogo from '../assets/stagnari-logo-original.png'
+// El logo del header de la imagen de la cotización: a pedido, el logo con el círculo verde
+// relleno (el mismo de la pantalla de inicio de la app, src/assets/stagnari-logo.png). Antes
+// era logo_stagnari/logo-blanco-.png (la S en contorno, stagnari-logo-original.png).
+// drawImageFit respeta sus proporciones dentro de la caja del header.
+import stagnariLogo from '../assets/stagnari-logo.png'
 import stagnariLogoSimple from '../assets/stagnari-logo-simple.png'
 // A pedido: isotipo y logo completo en BLANCO sobre transparente para la barra verde del
 // pie (generados a partir de los archivos de marca: mini-logo-blanco-fondo-verde.png con
