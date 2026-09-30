@@ -1,12 +1,21 @@
 import { useEffect, useState } from 'react'
-import { MdAutorenew, MdChevronRight, MdDescription, MdLogout, MdNoteAdd, MdPeopleAlt, MdSearch } from 'react-icons/md'
+import {
+  MdAdminPanelSettings,
+  MdAutorenew,
+  MdChevronRight,
+  MdDescription,
+  MdLogout,
+  MdNoteAdd,
+  MdPeopleAlt,
+  MdSearch,
+} from 'react-icons/md'
 import { Search } from '@vibe/core'
 import stagnariLogo from '../assets/stagnari-logo.png'
 import { normalizarParaMatch } from '../services/format'
 import { fetchMe } from '../services/mondayApi'
 import { initialsOf } from '../services/personaFields'
 import { useMondayUser } from '../context/AppContext'
-import { useAuth } from '../auth/AuthContext'
+import { useAuth, usePuedeAdministrarUsuarios } from '../auth/AuthContext'
 import './LandingScreen.css'
 
 // Pantalla principal (reunión del 24/09): un botón por funcionalidad, sin desplegable ni
@@ -19,13 +28,18 @@ import './LandingScreen.css'
 //
 // Renovaciones y Consultar pólizas todavía no existen: se ven en gris, como
 // "Próximamente", para que la pantalla ya tenga su forma final.
-function acciones({ onCreateNew, onSearchExisting, onClientes }) {
+//
+// "Usuarios y accesos" solo aparece para Admin (ver usePuedeAdministrarUsuarios).
+function acciones({ onCreateNew, onSearchExisting, onClientes, onUsuarios }) {
   return [
     { key: 'consultar', label: 'Consultar oportunidades', desc: 'Buscar y continuar una existente', Icono: MdSearch, onClick: onSearchExisting },
     { key: 'crear', label: 'Crear una oportunidad', desc: 'Cotizar un riesgo nuevo', Icono: MdNoteAdd, onClick: onCreateNew },
     { key: 'clientes', label: 'Gestionar clientes', desc: 'Contactos, relaciones y grupo económico', Icono: MdPeopleAlt, onClick: onClientes },
     { key: 'renovaciones', label: 'Renovaciones', desc: 'Seguimiento de las pólizas por vencer', Icono: MdAutorenew },
     { key: 'polizas', label: 'Consultar pólizas', desc: 'Buscar una póliza emitida', Icono: MdDescription },
+    ...(onUsuarios
+      ? [{ key: 'usuarios', label: 'Usuarios y accesos', desc: 'Altas, bajas y roles de la lista blanca', Icono: MdAdminPanelSettings, onClick: onUsuarios }]
+      : []),
   ]
 }
 
@@ -39,7 +53,8 @@ function AvatarPersona({ persona }) {
   )
 }
 
-export default function LandingScreen({ onCreateNew, onSearchExisting, onClientes }) {
+export default function LandingScreen({ onCreateNew, onSearchExisting, onClientes, onUsuarios }) {
+  const puedeAdministrar = usePuedeAdministrarUsuarios()
   // Quién está en el sistema, en orden de certeza: la sesión de autenticación, el
   // contexto de monday (embebido), y de respaldo el dueño del token con el que la app
   // habla con monday — que es lo que hay en local/preview: The Automation Partner.
@@ -66,7 +81,7 @@ export default function LandingScreen({ onCreateNew, onSearchExisting, onCliente
   // que muestra (la descripción, o "Próximamente"). Sin distinguir acentos ni mayúsculas.
   const [busqueda, setBusqueda] = useState('')
   const buscado = normalizarParaMatch(busqueda)
-  const visibles = acciones({ onCreateNew, onSearchExisting, onClientes })
+  const visibles = acciones({ onCreateNew, onSearchExisting, onClientes, onUsuarios: puedeAdministrar ? onUsuarios : null })
     .map((a) => ({ ...a, texto: a.onClick ? a.desc : 'Próximamente' }))
     .filter((a) => !buscado || normalizarParaMatch(`${a.label} ${a.texto}`).includes(buscado))
   const puedeSalir = !deshabilitada && Boolean(usuarioSesion)

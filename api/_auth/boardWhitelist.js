@@ -83,3 +83,14 @@ export async function obtenerEntradas() {
 export function olvidarMemoria() {
   memoria = null
 }
+
+// Relee el tablero en el acto y actualiza las dos copias. Lo usa el apartado de
+// administración después de escribir en el tablero: así un alta, una baja o un cambio de
+// rol hecho desde la app rige desde el pedido siguiente, sin esperar el TTL.
+export async function refrescarAhora() {
+  const entradas = await leerTableroSinCache()
+  await db.guardarListaBlancaCache(entradas).catch((err) => {
+    console.error('[auth] no se pudo cachear la lista blanca:', err.message)
+  })
+  return recordar(entradas, Date.now() + config.listaBlancaTtlSegundos * 1000)
+}

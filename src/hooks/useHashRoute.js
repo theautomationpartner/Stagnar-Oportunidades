@@ -15,6 +15,7 @@ import { useCallback, useEffect, useState } from 'react'
 //   #/contactos                 tabla de contactos
 //   #/grupos                    lista de grupos económicos
 //   #/grupos/:id                administración de un grupo (miembros, roles)
+//   #/usuarios                  usuarios y accesos (lista blanca, solo Admin)
 //
 // Hash (no pathname) a propósito: la app corre embebida en un iframe de monday y en
 // Vercel/Vite como SPA — el hash no requiere reglas de rewrite y no interfiere con la
@@ -27,6 +28,7 @@ const parse = () => {
   if (seg === 'contactos') return { seg, id: null, step: null }
   if (seg === 'grupos') return { seg, id: id || null, step: null }
   if (seg === 'crear') return { seg, id: null, step: null }
+  if (seg === 'usuarios') return { seg, id: null, step: null }
   return { seg: 'inicio', id: null, step: null }
 }
 

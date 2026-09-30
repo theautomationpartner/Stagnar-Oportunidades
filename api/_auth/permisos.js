@@ -2,7 +2,8 @@
 // "Usuario Habilitados - Lista Blanca".
 //
 // Las etiquetas de acá abajo NO son inventadas: son las que el tablero tiene hoy.
-//   Rol  (color_mm72cf90)    -> "Admin" | "Resto del equipo" | "Invitado"
+//   Rol  (color_mm72cf90)    -> "Admin" | "Vendedor" | "Invitado" ("Vendedor" antes se
+//                               llamaba "Resto del equipo"; se aceptan las dos)
 //   Team (dropdown_mm72rsy7) -> "Administracion"
 //
 // Cada permiso de esta lista corresponde a un punto de control REAL en un endpoint. No hay
@@ -41,7 +42,8 @@ export const ROLES = {
   // que no reconocemos. Solo lectura. Que el default sea el más restrictivo es lo que hace
   // que un dato mal cargado nunca termine dando de más.
   invitado: [PERMISOS.VER],
-  // "Resto del equipo": opera la aplicación completa, no administra personas.
+  // "Vendedor" (antes "Resto del equipo"): opera la aplicación completa, no administra
+  // personas.
   usuario: OPERACION,
   // "Admin": lo anterior más administrar la lista y resetear el segundo factor ajeno.
   admin: [...OPERACION, PERMISOS.ADMINISTRAR_USUARIOS, PERMISOS.RESETEAR_MFA],
@@ -58,7 +60,9 @@ export const ROL_BASE = 'invitado'
 export function rolDesdeEtiqueta(etiqueta) {
   const limpia = String(etiqueta ?? '').trim().toLowerCase()
   if (limpia === 'admin') return 'admin'
-  if (limpia === 'resto del equipo') return 'usuario'
+  // La etiqueta se renombró en el tablero de "Resto del equipo" a "Vendedor". Sin esta
+  // línea los vendedores caían en el rol base (solo lectura) y no podían operar.
+  if (limpia === 'vendedor' || limpia === 'resto del equipo') return 'usuario'
   if (limpia === 'invitado') return 'invitado'
   return ROL_BASE
 }

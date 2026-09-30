@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
-import { MdExpandMore, MdHome, MdNoteAdd, MdPeopleAlt, MdSearch } from 'react-icons/md'
+import { MdAdminPanelSettings, MdExpandMore, MdHome, MdNoteAdd, MdPeopleAlt, MdSearch } from 'react-icons/md'
+import { usePuedeAdministrarUsuarios } from '../auth/AuthContext'
 import stagnariLogoSimple from '../assets/stagnari-logo-simple.png'
 import AlertModal from './AlertModal'
 import { hayTrabajoEnCrear } from '../services/crearEnCurso'
@@ -23,6 +24,8 @@ const ACCIONES = [
   { key: 'crear', label: 'Crear una oportunidad', Icono: MdNoteAdd },
   { key: 'clientes', label: 'Gestionar clientes', Icono: MdPeopleAlt },
 ]
+// Solo para Admin (ver usePuedeAdministrarUsuarios).
+const ACCION_USUARIOS = { key: 'usuarios', label: 'Usuarios y accesos', Icono: MdAdminPanelSettings }
 
 export default function AccionBar({ accionActual, enDetalle = false, onIrAInicio, onCambiar }) {
   const [abierto, setAbierto] = useState(false)
@@ -30,6 +33,8 @@ export default function AccionBar({ accionActual, enDetalle = false, onIrAInicio
   // selector de labatea): null = no hay modal.
   const [pendiente, setPendiente] = useState(null)
   const raizRef = useRef(null)
+  const puedeAdministrar = usePuedeAdministrarUsuarios()
+  const acciones = puedeAdministrar ? [...ACCIONES, ACCION_USUARIOS] : ACCIONES
 
   useEffect(() => {
     if (!abierto) return
@@ -46,7 +51,7 @@ export default function AccionBar({ accionActual, enDetalle = false, onIrAInicio
     }
   }, [abierto])
 
-  const actual = ACCIONES.find((a) => a.key === accionActual)
+  const actual = acciones.find((a) => a.key === accionActual)
 
   // Un destino puede ser una acción o 'inicio' (el logo — a pedido, la casita de las
   // pantallas se fue y volver al inicio ES el logo de la marca).
@@ -109,7 +114,7 @@ export default function AccionBar({ accionActual, enDetalle = false, onIrAInicio
         </button>
         {abierto && (
           <ul className="accion-bar__lista" role="listbox" aria-labelledby="accion-bar-lbl">
-            {ACCIONES.map((a) => (
+            {acciones.map((a) => (
               <li key={a.key}>
                 <button
                   type="button"

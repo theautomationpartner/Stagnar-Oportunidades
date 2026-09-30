@@ -121,7 +121,7 @@ export const config = {
     mondayUserId: process.env.AUTH_COL_ID_USUARIO || 'text_mm6sdhy6',
     // "Correo electrónico" — respaldo para una fila cargada sin ID Usuario.
     email: process.env.AUTH_COL_EMAIL || 'email_mm6s3dc5',
-    // "Rol" — etiquetas reales del tablero: "Admin" y "Resto del equipo".
+    // "Rol" — etiquetas reales del tablero: "Admin", "Vendedor" e "Invitado".
     rol: process.env.AUTH_COL_ROL || 'color_mm72cf90',
     // "Team" — etiquetas: "Administracion", "Vehiculos". No restringe nada, ver permisos.js.
     team: process.env.AUTH_COL_TEAM || 'dropdown_mm72rsy7',
@@ -141,6 +141,19 @@ export const config = {
   // refresca al vencer. La comparación honesta no es contra cero segundos, es contra las
   // 24 horas que tardaría en caducar un token si el estado viviera dentro del JWT.
   listaBlancaTtlSegundos: Number(process.env.AUTH_LISTA_BLANCA_TTL || 60),
+
+  // Teams de monday que reflejan el Rol de la lista (ver listaBlancaEscritura.js): Admin
+  // va a Admin_App y Vendedor a Ventas_App. Los mueve el apartado de administración de la
+  // app al dar de alta, cambiar el rol o activar/desactivar. No deciden el acceso a la app:
+  // eso lo sigue decidiendo la columna Rol.
+  // Tablero de Oportunidades: al dar de baja a alguien en monday se reasignan (o se dejan
+  // sin asignar) las oportunidades que tenía (ver asignaciones.js).
+  oportunidadesBoardId: process.env.VITE_MONDAY_BOARD_ID || '18420863013',
+
+  teams: {
+    admin: process.env.AUTH_TEAM_ADMIN_ID || '1509544',
+    ventas: process.env.AUTH_TEAM_VENTAS_ID || '1509546',
+  },
 }
 
 // Se llama al arrancar cualquier endpoint protegido. Prefiere explotar con un mensaje

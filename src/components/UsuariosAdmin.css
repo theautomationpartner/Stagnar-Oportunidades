@@ -1,0 +1,523 @@
+/* Apartado "Usuarios y accesos" (ver UsuariosAdmin.jsx). Mismo esqueleto que Clientes. */
+.usuarios-admin {
+  margin: 20px var(--page-gutter, 32px) 32px;
+}
+
+.usuarios-admin__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.usuarios-admin__head h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+
+.usuarios-admin__head p {
+  max-width: 720px;
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-gray);
+}
+
+.usuarios-admin__acciones {
+  display: flex;
+  gap: 8px;
+}
+
+.usuarios-admin__aviso {
+  margin-bottom: 14px;
+}
+
+/* Sin overflow: el desplegable de "+ Agregar" (teams) tiene que poder salir de la tabla. */
+.usuarios-admin__tabla-caja {
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.usuarios-admin__tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+}
+
+.usuarios-admin__tabla th {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--text-gray);
+  border-bottom: 1px solid var(--border);
+}
+
+.usuarios-admin__tabla td {
+  padding: 10px 14px;
+  vertical-align: middle;
+  border-bottom: 1px solid var(--border);
+}
+
+.usuarios-admin__tabla tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.usuarios-admin__fila--ajena td {
+  background: var(--bg-subtle);
+}
+
+.usuarios-admin__muted {
+  color: var(--text-gray);
+}
+
+.usuarios-admin__marca {
+  display: inline-block;
+  margin-left: 8px;
+  padding: 1px 8px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-gray);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.usuarios-admin__select,
+.usuarios-admin__input {
+  height: 34px;
+  padding: 0 10px;
+  font: inherit;
+  font-size: 14px;
+  color: var(--text-dark);
+  background: #fff;
+  border: 1px solid var(--border-input);
+  border-radius: 6px;
+}
+
+.usuarios-admin__select:disabled {
+  color: var(--text-gray);
+  background: var(--bg-subtle);
+}
+
+.usuarios-admin__estado {
+  display: inline-block;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 10px;
+}
+
+.usuarios-admin__estado--activo {
+  color: #007a4d;
+  background: #e1f6ec;
+}
+
+.usuarios-admin__estado--inactivo {
+  color: #b3263a;
+  background: #fde7ea;
+}
+
+.usuarios-admin__estado--sin_estado {
+  color: var(--text-gray);
+  background: var(--bg-subtle);
+}
+
+.usuarios-admin__accion-celda {
+  text-align: right;
+}
+
+.usuarios-admin__boton {
+  height: 30px;
+  padding: 0 14px;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary-blue);
+  background: #fff;
+  border: 1px solid var(--primary-blue);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.usuarios-admin__boton:hover:not(:disabled) {
+  color: #fff;
+  background: var(--primary-blue);
+}
+
+.usuarios-admin__boton--peligro {
+  color: var(--negative-color, #d83a52);
+  border-color: var(--negative-color, #d83a52);
+}
+
+.usuarios-admin__boton--peligro:hover:not(:disabled) {
+  color: #fff;
+  background: var(--negative-color, #d83a52);
+}
+
+.usuarios-admin__boton:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+/* Popup de alta */
+.usuarios-admin__ayuda {
+  margin: 0 0 14px;
+  font-size: 13px;
+  color: var(--text-gray);
+}
+
+.usuarios-admin__campo {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dark);
+}
+
+.usuarios-admin__cuenta {
+  max-height: 220px;
+  margin: 8px 0 14px;
+  padding: 0;
+  overflow-y: auto;
+  list-style: none;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.usuarios-admin__cuenta li + li {
+  border-top: 1px solid var(--border);
+}
+
+.usuarios-admin__cuenta-fila {
+  display: flex;
+  align-items: baseline;
+  flex-wrap: wrap;
+  gap: 4px 12px;
+  width: 100%;
+  padding: 9px 12px;
+  font: inherit;
+  font-size: 13px;
+  text-align: left;
+  color: var(--text-dark);
+  background: #fff;
+  border: none;
+  cursor: pointer;
+}
+
+.usuarios-admin__cuenta-fila span {
+  color: var(--text-gray);
+}
+
+.usuarios-admin__cuenta-fila:hover,
+.usuarios-admin__cuenta-fila--elegida {
+  background: var(--tint-info);
+}
+
+.usuarios-admin__vacio {
+  padding: 12px;
+  font-size: 13px;
+  color: var(--text-gray);
+}
+
+.usuarios-admin__alta-datos {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 220px;
+  gap: 12px;
+}
+
+/* Usuario de monday que ya está en la lista o está desactivado: se ve, no se elige. */
+.usuarios-admin__cuenta-fila:disabled {
+  cursor: default;
+  background: var(--bg-subtle);
+}
+
+.usuarios-admin__cuenta-fila:disabled strong {
+  color: var(--text-gray);
+}
+
+/* Casillas de teams (Admin_App / Ventas_App) en la fila y en el alta. */
+.usuarios-admin__teams {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 14px;
+  min-height: 34px;
+  align-items: center;
+}
+
+.usuarios-admin__team {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dark);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.usuarios-admin__team input {
+  width: 16px;
+  height: 16px;
+  margin: 0;
+  accent-color: var(--primary-blue);
+  cursor: pointer;
+}
+
+.usuarios-admin__team input:disabled {
+  cursor: default;
+}
+
+.usuarios-admin__desalineado {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  margin-top: 4px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-warning);
+  cursor: help;
+}
+
+.usuarios-admin__modos {
+  margin-bottom: 14px;
+}
+
+.usuarios-admin__modos .pill-tabs__tab {
+  flex: 1;
+  padding: 8px 12px;
+}
+
+.usuarios-admin__input--ancho {
+  width: 100%;
+  box-sizing: border-box;
+}
+
+.usuarios-admin__link {
+  padding: 0;
+  font: inherit;
+  font-weight: 600;
+  color: var(--primary-blue);
+  background: none;
+  border: none;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.usuarios-admin__alta-datos + .usuarios-admin__alta-datos {
+  margin-top: 14px;
+}
+
+/* Cada baja en su celda: el estado y, al lado, su botón. */
+.usuarios-admin__baja {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+/* Desplegables de acceso: el color dice el estado de un vistazo. */
+.usuarios-admin__select--activo {
+  color: #007a4d;
+  border-color: #9fd9bf;
+  background: #f1faf6;
+}
+
+.usuarios-admin__select--inactivo,
+.usuarios-admin__select--sin_estado {
+  color: #b3263a;
+  border-color: #f2b8c1;
+  background: #fdf3f5;
+}
+
+.usuarios-admin__guardando {
+  margin-left: 8px;
+  font-size: 12px;
+  color: var(--text-gray);
+}
+
+/* Reasignación de oportunidades al dar de baja en monday. */
+.usuarios-admin__reasignar {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.usuarios-admin__reasignar-titulo {
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-dark);
+}
+
+.usuarios-admin__reasignar-lista {
+  margin: 0;
+  padding: 8px 12px 8px 28px;
+  font-size: 12px;
+  color: var(--text-gray);
+  background: var(--bg-subtle);
+  border-radius: 8px;
+}
+
+.usuarios-admin__opcion {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text-dark);
+  cursor: pointer;
+}
+
+.usuarios-admin__opcion input[type='radio'] {
+  margin: 0;
+  accent-color: var(--primary-blue);
+}
+
+/* Sin coincidencias en el alta: qué pasa y el botón para invitar. */
+.usuarios-admin__vacio {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.usuarios-admin__vacio strong {
+  color: var(--text-dark);
+}
+
+/* Teams como etiquetas + desplegable para agregar (ver TagsTeams). */
+.usuarios-admin__tags {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  min-height: 34px;
+}
+
+.usuarios-admin__tag {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+  padding: 0 4px 0 10px;
+  font-size: 12px;
+  font-weight: 600;
+  border-radius: 12px;
+  white-space: nowrap;
+}
+
+.usuarios-admin__tag:not(:has(.usuarios-admin__tag-quitar)) {
+  padding-right: 10px;
+}
+
+.usuarios-admin__tag--admin {
+  color: #5a2ea6;
+  background: #efe7fb;
+}
+
+.usuarios-admin__tag--ventas {
+  color: #0a6a8a;
+  background: #e2f3f9;
+}
+
+.usuarios-admin__tag-quitar {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  padding: 0;
+  font-size: 13px;
+  color: inherit;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.usuarios-admin__tag-quitar:hover:not(:disabled) {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.usuarios-admin__tag-agregar-caja {
+  position: relative;
+}
+
+.usuarios-admin__tag-agregar {
+  display: inline-flex;
+  align-items: center;
+  gap: 2px;
+  height: 24px;
+  padding: 0 10px 0 6px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-gray);
+  background: #fff;
+  border: 1px dashed var(--border-input);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.usuarios-admin__tag-agregar:hover:not(:disabled) {
+  color: var(--primary-blue);
+  border-color: var(--primary-blue);
+}
+
+.usuarios-admin__tag-agregar:disabled,
+.usuarios-admin__tag-quitar:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+
+.usuarios-admin__tag-menu {
+  position: absolute;
+  top: calc(100% + 4px);
+  left: 0;
+  z-index: 20;
+  min-width: 150px;
+  margin: 0;
+  padding: 6px;
+  list-style: none;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  box-shadow: 0 6px 20px rgba(0, 0, 0, 0.12);
+}
+
+.usuarios-admin__tag-menu button {
+  display: flex;
+  width: 100%;
+  padding: 5px 6px;
+  background: none;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.usuarios-admin__tag-menu button:hover {
+  background: var(--bg-subtle);
+}
+
+.usuarios-admin__sin-team {
+  font-size: 12px;
+}
+
+/* Etiquetas de la columna Team que no son teams de monday (Administracion, Vehiculos…). */
+.usuarios-admin__tag--otra {
+  color: var(--text-gray);
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+}
+
+.usuarios-admin__tag-menu-titulo {
+  padding: 6px 6px 2px;
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-gray);
+  white-space: nowrap;
+}

@@ -21,6 +21,7 @@ const ContactosSection = lazy(() => import('./components/ContactosSection'))
 const ClienteGestion = lazy(() => import('./components/ClienteGestion'))
 const GruposSection = lazy(() => import('./components/GruposSection'))
 const GrupoDetalle = lazy(() => import('./components/GrupoDetalle'))
+const UsuariosAdmin = lazy(() => import('./components/UsuariosAdmin'))
 import {
   fetchOpportunitiesPage,
   fetchDepartamentos,
@@ -378,8 +379,23 @@ export default function App() {
         />
       </Suspense>
     )
+  } else if (route.seg === 'usuarios') {
+    // La pantalla la protege el backend (el endpoint exige usuarios.administrar); acá solo
+    // se esconde el acceso para quien no es Admin (ver LandingScreen y AccionBar).
+    main = (
+      <Suspense fallback={<LoadingScreen title="Cargando usuarios" message="Estamos trayendo la lista blanca desde monday." />}>
+        <UsuariosAdmin />
+      </Suspense>
+    )
   } else if (route.seg === 'inicio') {
-    main = <LandingScreen onCreateNew={nav.goCreate} onSearchExisting={nav.goTable} onClientes={() => go('clientes')} />
+    main = (
+      <LandingScreen
+        onCreateNew={nav.goCreate}
+        onSearchExisting={nav.goTable}
+        onClientes={() => go('clientes')}
+        onUsuarios={() => go('usuarios')}
+      />
+    )
   } else if (route.seg === 'crear') {
     main = (
       <Suspense fallback={<LoadingScreen title="Preparando el formulario" message="Un momento, estamos cargando el asistente para crear la oportunidad." />}>
@@ -468,7 +484,9 @@ export default function App() {
                   // dropdown no tiene entrada propia, la tarea sigue siendo esa.
                   route.seg === 'clientes' || route.seg === 'grupos' || route.seg === 'contactos'
                   ? 'clientes'
-                  : 'consultar'
+                  : route.seg === 'usuarios'
+                    ? 'usuarios'
+                    : 'consultar'
             }
             enDetalle={enDetalle}
             onIrAInicio={nav.goHome}
@@ -476,6 +494,7 @@ export default function App() {
               setOpenedFromCrearFlow(false)
               if (accion === 'crear') nav.goCreate()
               else if (accion === 'clientes') go('clientes')
+              else if (accion === 'usuarios') go('usuarios')
               else nav.goTable()
             }}
           />

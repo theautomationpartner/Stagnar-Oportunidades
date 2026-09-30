@@ -286,4 +286,12 @@ export function usePermiso(permiso) {
   return useAuth().puede(permiso)
 }
 
+// ¿Ve el apartado "Usuarios y accesos"? Admin (permiso usuarios.administrar). Con la
+// autenticación apagada (local) no hay roles y el backend tampoco protege nada, así que
+// se muestra para poder trabajarlo.
+export function usePuedeAdministrarUsuarios() {
+  const { puede, deshabilitada } = useAuth()
+  return deshabilitada || puede(PERMISOS.ADMINISTRAR_USUARIOS)
+}
+
 export { PERMISOS }

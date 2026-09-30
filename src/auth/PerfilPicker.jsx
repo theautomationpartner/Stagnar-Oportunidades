@@ -14,7 +14,7 @@ import { useAuth } from './AuthContext'
 
 const TEXTO_ROL = {
   admin: 'Administrador',
-  usuario: 'Equipo',
+  usuario: 'Vendedor',
   invitado: 'Solo lectura',
 }
 
