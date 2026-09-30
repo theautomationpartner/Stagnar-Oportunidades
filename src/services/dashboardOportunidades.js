@@ -132,3 +132,17 @@ export function resumir(oportunidades, { periodo, fecha }, hoy = new Date(), est
   }))
   return { rango, totales, vendedores, sinFecha, grupos }
 }
+
+// Pólizas que vencen de hoy a `dias` días (inclusive), por su Vencimiento (o el fin de la
+// vigencia si falta).
+export function polizasPorVencer(polizas, dias = 30, hoy = new Date()) {
+  const desde = aDia(new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate()))
+  const hastaFecha = new Date(hoy.getFullYear(), hoy.getMonth(), hoy.getDate() + dias)
+  const hasta = aDia(hastaFecha)
+  const cantidad = polizas.filter((p) => {
+    const d = (p.vencimiento || p.hasta || '').slice(0, 10)
+    return d && d >= desde && d <= hasta
+  }).length
+  // El filtro de la lista de pólizas es por mes: del actual al del día límite.
+  return { cantidad, mesDesde: desde.slice(0, 7), mesHasta: hasta.slice(0, 7) }
+}

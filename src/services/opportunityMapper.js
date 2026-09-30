@@ -169,6 +169,8 @@ export function mapOpportunityItem(item, statusColors = {}) {
     // lo dejó el escenario (ver validacionPoliza.js). Agrupado acá y no suelto en nueve
     // campos, porque siempre se usan juntos.
     validacionPolizaEstado: textOf(cv, VALIDACION_POLIZA_COLUMN_ID),
+    // Mismo dato con el nombre del filtro (ver filtrosOportunidades.js#cumpleFiltros).
+    validacionPoliza: textOf(cv, VALIDACION_POLIZA_COLUMN_ID),
     validacionesPoliza: Object.fromEntries(
       VALIDACIONES_POLIZA.map((v) => [
         v.key,

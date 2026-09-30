@@ -233,3 +233,27 @@
     min-height: 44px;
   }
 }
+
+/* "Buscando…" en el encabezado mientras se trae la lista de un filtro nuevo. */
+.opps-table-wrap__buscando {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: var(--primary-blue);
+}
+
+.opps-table-wrap__buscando::before {
+  content: '';
+  width: 12px;
+  height: 12px;
+  border: 2px solid currentColor;
+  border-right-color: transparent;
+  border-radius: 50%;
+  animation: opps-table-girar 0.8s linear infinite;
+}
+
+@keyframes opps-table-girar {
+  to {
+    transform: rotate(360deg);
+  }
+}

@@ -11,17 +11,30 @@
 // traído (cumpleFiltros, con texto de búsqueda — la API no deja mezclar el "o" de la
 // búsqueda con el "y" de los filtros, ver buildOpportunitiesQueryParams).
 
+import { RESULTADO, resultadoDe } from './dashboardOportunidades'
+
 export const OTROS = 'Otros'
+
+// "Concretada" y las tres "Ganada" juntas (el mismo criterio que el dashboard, ver
+// dashboardOportunidades.js#resultadoDe). Es la opción a la que lleva la tarjeta
+// "Concretadas" del dashboard.
+export const CONCRETADAS_TODAS = 'Concretadas (todas)'
 
 const ESTADOS_DE_TRANSICION = {
   estadoCotizacion: ['Cotizar', 'Cotizando'],
   estadoEnvio: ['Enviar', 'Enviando'],
+  estadoCreacion: ['Crear', 'Creando'],
+  validacionPoliza: ['Validar', 'Validando'],
 }
 
+// Crear póliza y Validación póliza se sumaron para que las tarjetas de "Requiere
+// atención hoy" del dashboard lleven a la tabla ya filtrada.
 const COLUMNA_DE_ESTADO = {
   estadoOportunidad: 'deal_stage',
   estadoCotizacion: 'color_mm51n7aa',
   estadoEnvio: 'color_mm4wr1t4',
+  estadoCreacion: 'color_mm5ejysv',
+  validacionPoliza: 'color_mm7ash2k',
 }
 
 // `campo` es la fecha ya normalizada a AAAA-MM-DD en la oportunidad (ver
@@ -37,6 +50,8 @@ export const FILTROS_VACIOS = {
   estadoOportunidad: '',
   estadoCotizacion: '',
   estadoEnvio: '',
+  estadoCreacion: '',
+  validacionPoliza: '',
   tipoSujeto: '',
   // id de monday de la persona (columna people "Asignado").
   asignado: '',
@@ -52,13 +67,25 @@ export function opcionesDeEstado(clave, opciones) {
   return opciones.some((o) => transicion.includes(o)) ? [...quedan, OTROS] : quedan
 }
 
-function etiquetasDelFiltro(clave, valor) {
+// `todas`: las etiquetas de la columna (para expandir "Concretadas (todas)").
+function etiquetasDelFiltro(clave, valor, todas = []) {
+  if (clave === 'estadoOportunidad' && valor === CONCRETADAS_TODAS) {
+    return todas.filter((e) => resultadoDe(e) === RESULTADO.CONCRETADA)
+  }
   return valor === OTROS ? ESTADOS_DE_TRANSICION[clave] ?? [] : [valor]
 }
 
 // Cuántos filtros hay puestos: un rango cuenta una vez, tenga desde, hasta o los dos.
 export function cantidadDeFiltrosActivos(filtros) {
-  const sueltos = ['estadoOportunidad', 'estadoCotizacion', 'estadoEnvio', 'tipoSujeto', 'asignado'].filter(
+  const sueltos = [
+    'estadoOportunidad',
+    'estadoCotizacion',
+    'estadoEnvio',
+    'estadoCreacion',
+    'validacionPoliza',
+    'tipoSujeto',
+    'asignado',
+  ].filter(
     (k) => filtros[k]
   ).length
   const rangos = RANGOS_DE_FECHA.filter((r) => filtros[`${r.clave}Desde`] || filtros[`${r.clave}Hasta`]).length
@@ -72,7 +99,7 @@ export function reglasDeFiltros(filtros, schema) {
   const reglas = []
   for (const [clave, columnId] of Object.entries(COLUMNA_DE_ESTADO)) {
     if (!filtros[clave]) continue
-    const indices = etiquetasDelFiltro(clave, filtros[clave])
+    const indices = etiquetasDelFiltro(clave, filtros[clave], Object.keys(schema?.[clave]?.indexByLabel ?? {}))
       .map((etiqueta) => schema?.[clave]?.indexByLabel?.[etiqueta])
       .filter((i) => i != null)
       .map(Number)
@@ -99,7 +126,12 @@ export function reglasDeFiltros(filtros, schema) {
 // es el nombre de la persona elegida: en el listado la columna people llega como texto.
 export function cumpleFiltros(opp, filtros, { nombreAsignado } = {}) {
   for (const clave of Object.keys(COLUMNA_DE_ESTADO)) {
-    if (filtros[clave] && !etiquetasDelFiltro(clave, filtros[clave]).includes(opp[clave])) return false
+    if (!filtros[clave]) continue
+    if (clave === 'estadoOportunidad' && filtros[clave] === CONCRETADAS_TODAS) {
+      if (resultadoDe(opp[clave]) !== RESULTADO.CONCRETADA) return false
+      continue
+    }
+    if (!etiquetasDelFiltro(clave, filtros[clave]).includes(opp[clave])) return false
   }
   if (filtros.tipoSujeto && opp.tipoSujeto !== filtros.tipoSujeto) return false
   if (filtros.asignado) {
@@ -116,4 +148,30 @@ export function cumpleFiltros(opp, filtros, { nombreAsignado } = {}) {
     if (hasta && fecha > hasta) return false
   }
   return true
+}
+
+// Los "problemas" (accesos rápidos de la tabla y tarjetas de "Requiere atención hoy"). A
+// pedido, el error de un paso tiene que coincidir con el estado de la oportunidad en ese
+// paso — si no, es una oportunidad que ya siguió de largo y el error quedó viejo:
+//   - error en la cotización → la oportunidad sigue en Nueva;
+//   - error en el envío      → sigue en Cotización Emitida;
+//   - error en la emisión    → está en Concretada (la póliza se crea al concretar);
+//   - diferencias en la validación de la póliza → está en Ganada - Póliza (la póliza ya
+//     se emitió y la validación encontró diferencias con lo cotizado).
+export const PROBLEMAS = {
+  cotizacion: { estadoCotizacion: 'Error', estadoOportunidad: 'Nueva' },
+  envio: { estadoEnvio: 'Error', estadoOportunidad: 'Cotizacion Emitida' },
+  emision: { estadoCreacion: 'Error', estadoOportunidad: 'Concretada' },
+  diferencias: { validacionPoliza: 'Con diferencias', estadoOportunidad: 'Ganada - Póliza' },
+}
+
+// ¿La oportunidad tiene este problema? Es exactamente el filtro de la tabla (cumpleFiltros),
+// así el número de la tarjeta y el de la lista filtrada no pueden diferir.
+export function tieneProblema(opp, clave) {
+  return cumpleFiltros(opp, { ...FILTROS_VACIOS, ...PROBLEMAS[clave] })
+}
+
+// ¿Los filtros puestos son justo los de este problema?
+export function problemaActivo(filtros, clave) {
+  return Object.entries(PROBLEMAS[clave]).every(([campo, valor]) => filtros[campo] === valor)
 }

@@ -20,6 +20,9 @@ const STATUS_COLUMNS = {
   estadoCotizacion: 'color_mm51n7aa',
   estadoEnvio: 'color_mm4wr1t4',
   estadoCreacion: 'color_mm5ejysv',
+  // Validación de la póliza emitida (Datos válidos / Con diferencias…): filtro de la tabla,
+  // al que lleva la tarjeta "Pólizas con diferencias" del dashboard.
+  validacionPoliza: 'color_mm7ash2k',
   estadoLectura: 'color_mm5rzrhk',
   uso: 'color_mm52ey1d',
   tipoRiesgo: 'color_mm5atxav',

@@ -2705,7 +2705,18 @@ export async function setCostoManual(subitemId, compania, datos) {
 // Dashboard de Oportunidades (ver services/dashboardOportunidades.js): todas las
 // oportunidades, solo con lo que hace falta para contarlas — estado, asignado y las 3
 // fechas por las que se puede filtrar (creación, cotización y cierre).
-const DASHBOARD_OPORTUNIDADES_COLUMNAS = ['deal_stage', 'deal_owner', 'date_mm52w0h8', 'deal_expected_close_date']
+// Además, los estados que alimentan "Requiere atención hoy": cotización, envío, creación y
+// validación de la póliza.
+const DASHBOARD_OPORTUNIDADES_COLUMNAS = [
+  'deal_stage',
+  'deal_owner',
+  'date_mm52w0h8',
+  'deal_expected_close_date',
+  'color_mm51n7aa', // Estado Cotización
+  'color_mm4wr1t4', // Estado Envío
+  'color_mm5ejysv', // Crear Póliza
+  'color_mm7ash2k', // Validación Póliza
+]
 
 const DASHBOARD_OPORTUNIDADES_PAGE_QUERY = `
   query DashboardOportunidades($boardId: ID!, $limit: Int!, $cols: [String!]) {
@@ -2748,6 +2759,10 @@ export async function fetchOportunidadesDashboard() {
       creadaEn: it.created_at,
       fechaCotizacion: v.date_mm52w0h8,
       fechaCierre: v.deal_expected_close_date,
+      estadoCotizacion: v.color_mm51n7aa,
+      estadoEnvio: v.color_mm4wr1t4,
+      estadoCreacion: v.color_mm5ejysv,
+      validacionPoliza: v.color_mm7ash2k,
     }
   })
 }

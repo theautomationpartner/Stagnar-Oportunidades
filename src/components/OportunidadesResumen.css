@@ -1,0 +1,186 @@
+/* Resumen arriba de la tabla de Oportunidades (ver OportunidadesResumen.jsx), calcado del
+   "Dashboard de Drafts" de referencia: tarjetas con fondo tenue del color de su estado,
+   número grande y rótulo en el mismo tono. El color nunca va solo: cada tarjeta lleva
+   ícono y rótulo. */
+.resumen {
+  margin: 10px var(--page-gutter, 32px) 14px;
+}
+
+.resumen__barra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.resumen__plegar {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dark);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.resumen__plegar svg {
+  font-size: 18px;
+}
+
+.resumen__vivo {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  color: var(--text-gray);
+}
+
+.resumen__vivo > svg {
+  font-size: 15px;
+}
+
+.resumen__actualizar {
+  height: 30px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dark);
+  background: #fff;
+  border: 1px solid var(--border-input);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.resumen__actualizar:hover:not(:disabled) {
+  border-color: var(--text-gray);
+}
+
+.resumen__actualizar:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.resumen__cargando,
+.resumen__error {
+  margin: 4px 0 8px;
+  font-size: 13px;
+  color: var(--text-gray);
+}
+
+.resumen__error {
+  color: var(--negative-color, #d83a52);
+}
+
+.resumen__seccion {
+  margin: 12px 0 8px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+
+/* 5 por renglón. */
+.resumen__tarjetas {
+  display: grid;
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+  gap: 12px;
+}
+
+@media (max-width: 1100px) {
+  .resumen__tarjetas {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+.resumen-tarjeta {
+  --tono-fondo: #f5f6f8;
+  --tono-borde: #dfe2e8;
+  --tono-texto: var(--text-dark);
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  min-height: 96px;
+  padding: 10px 14px;
+  font: inherit;
+  text-align: left;
+  color: var(--tono-texto);
+  background: var(--tono-fondo);
+  border: 1px solid var(--tono-borde);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: box-shadow 0.15s, transform 0.15s;
+}
+
+.resumen-tarjeta:hover {
+  box-shadow: 0 4px 14px rgba(0, 0, 0, 0.08);
+  transform: translateY(-1px);
+}
+
+.resumen-tarjeta:focus-visible {
+  outline: 2px solid var(--primary-blue);
+  outline-offset: 2px;
+}
+
+.resumen-tarjeta__icono {
+  font-size: 17px;
+}
+
+.resumen-tarjeta__valor {
+  font-size: 26px;
+  font-weight: 700;
+  line-height: 1.15;
+  font-variant-numeric: tabular-nums;
+}
+
+.resumen-tarjeta__titulo {
+  font-size: 13px;
+  font-weight: 700;
+}
+
+.resumen-tarjeta__detalle {
+  font-size: 11px;
+  color: var(--text-gray);
+}
+
+.resumen-tarjeta--ambar {
+  --tono-fondo: #fff8e7;
+  --tono-borde: #f4dfa3;
+  --tono-texto: #8a5a00;
+}
+
+.resumen-tarjeta--verdeagua {
+  --tono-fondo: #eaf6f3;
+  --tono-borde: #bfe3da;
+  --tono-texto: #0b6b5c;
+}
+
+.resumen-tarjeta--azul {
+  --tono-fondo: #ecf2fd;
+  --tono-borde: #c3d5f4;
+  --tono-texto: #1f4fa3;
+}
+
+.resumen-tarjeta--verde {
+  --tono-fondo: #eaf7ee;
+  --tono-borde: #bfe5cb;
+  --tono-texto: #1a7a3e;
+}
+
+.resumen-tarjeta--rojo {
+  --tono-fondo: #fdeeee;
+  --tono-borde: #f3c6c6;
+  --tono-texto: #b3261e;
+}
+
+.resumen-tarjeta--lavanda {
+  --tono-fondo: #f0eefc;
+  --tono-borde: #d3cdf3;
+  --tono-texto: #4a3aa7;
+}

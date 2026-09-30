@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from 'react'
-import { MdClose, MdFilterList } from 'react-icons/md'
+import { MdCancelScheduleSend, MdClose, MdCompareArrows, MdErrorOutline, MdFilterList, MdReportProblem } from 'react-icons/md'
 import { Button, Dropdown, Search } from '@vibe/core'
 import { matchesSearchQuery } from '../services/format'
-import { RANGOS_DE_FECHA, cantidadDeFiltrosActivos } from '../services/filtrosOportunidades'
+import { PROBLEMAS as REGLAS_DE_PROBLEMAS, RANGOS_DE_FECHA, cantidadDeFiltrosActivos, problemaActivo } from '../services/filtrosOportunidades'
 import './FilterPanel.css'
 
 // Dropdown (@vibe/core) maneja {value, label} y el objeto entero como valor
@@ -61,6 +61,19 @@ function FilterDateRange({ label, clave, filters, onChange }) {
   )
 }
 
+// Accesos rápidos a los problemas (a pedido): cotizaciones con error en la cotización, en
+// el envío o en la emisión, y las que no se pueden concretar por diferencias en la
+// validación de la póliza. Cada uno pone el error del paso Y el estado de la oportunidad
+// que le corresponde (ver PROBLEMAS en filtrosOportunidades.js). Excluyentes entre sí:
+// combinarlos pediría oportunidades con TODOS esos problemas a la vez (los filtros van
+// con "y"), que casi siempre da una lista vacía.
+const PROBLEMAS = [
+  { clave: 'cotizacion', texto: 'Error en cotización', Icono: MdErrorOutline },
+  { clave: 'envio', texto: 'Error en envío', Icono: MdCancelScheduleSend },
+  { clave: 'emision', texto: 'Error en emisión', Icono: MdReportProblem },
+  { clave: 'diferencias', texto: 'Con diferencias en la validación', Icono: MdCompareArrows },
+]
+
 const fechaCorta = (iso) => (iso ? iso.split('-').reverse().join('/') : '')
 
 // Los filtros puestos, como etiquetas con su cruz para sacarlos (se ven sin abrir el
@@ -72,6 +85,8 @@ function etiquetasActivas(filters, filterOptions) {
   suelto('estadoOportunidad', 'Oportunidad', filters.estadoOportunidad)
   suelto('estadoCotizacion', 'Cotización', filters.estadoCotizacion)
   suelto('estadoEnvio', 'Envío', filters.estadoEnvio)
+  suelto('estadoCreacion', 'Crear póliza', filters.estadoCreacion)
+  suelto('validacionPoliza', 'Validación póliza', filters.validacionPoliza)
   suelto(
     'asignado',
     'Asignado',
@@ -220,6 +235,35 @@ export default function FilterPanel({
         )}
       </div>
 
+      <div className="filter-panel__rapidos" role="group" aria-label="Problemas">
+        <span className="filter-panel__rapidos-lbl">Problemas:</span>
+        {PROBLEMAS.map((p) => {
+          const activo = problemaActivo(filters, p.clave)
+          return (
+            <button
+              key={p.clave}
+              type="button"
+              aria-pressed={activo}
+              className={activo ? 'filter-panel__rapido filter-panel__rapido--activo' : 'filter-panel__rapido'}
+              onClick={() => {
+                // Uno por vez: primero se sacan los campos de los problemas que estén puestos
+                // (incluido este, si se está apagando) y después se ponen los de este.
+                for (const otro of PROBLEMAS) {
+                  if (problemaActivo(filters, otro.clave)) {
+                    Object.keys(REGLAS_DE_PROBLEMAS[otro.clave]).forEach((campo) => onFilterChange(campo, ''))
+                  }
+                }
+                if (!activo) {
+                  Object.entries(REGLAS_DE_PROBLEMAS[p.clave]).forEach(([campo, valor]) => onFilterChange(campo, valor))
+                }
+              }}
+            >
+              <p.Icono aria-hidden="true" /> {p.texto}
+            </button>
+          )
+        })}
+      </div>
+
       {abierto && (
         <div id="filter-panel-popover" className="filter-panel__popover" role="dialog" aria-label="Filtros">
           <div className="filter-panel__grupo">
@@ -248,6 +292,22 @@ export default function FilterPanel({
                 field="estadoEnvio"
                 value={filters.estadoEnvio}
                 options={filterOptions.estadosEnvio}
+                onChange={onFilterChange}
+                placeholder="Todos"
+              />
+              <FilterSelect
+                label="Crear póliza"
+                field="estadoCreacion"
+                value={filters.estadoCreacion}
+                options={filterOptions.estadosCreacion ?? []}
+                onChange={onFilterChange}
+                placeholder="Todos"
+              />
+              <FilterSelect
+                label="Validación de la póliza"
+                field="validacionPoliza"
+                value={filters.validacionPoliza}
+                options={filterOptions.validacionesPoliza ?? []}
                 onChange={onFilterChange}
                 placeholder="Todos"
               />

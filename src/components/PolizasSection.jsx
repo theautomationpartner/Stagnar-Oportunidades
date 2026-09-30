@@ -94,7 +94,7 @@ const claseEstado = (estado) => {
   return 'polizas__estado'
 }
 
-export default function PolizasSection({ onOpenPoliza }) {
+export default function PolizasSection({ onOpenPoliza, venceInicial, onVenceInicialUsado }) {
   const [polizas, setPolizas] = useState(null)
   const [error, setError] = useState(null)
   // Igual que el resto de la app, la búsqueda no es en vivo: se aplica con Enter o "Buscar".
@@ -104,8 +104,14 @@ export default function PolizasSection({ onOpenPoliza }) {
   // A pedido: "Vencen entre [mes] y [mes]". null = el valor por defecto, del mes actual al
   // vencimiento más lejano que haya, así arranca mostrando todas las que vencen de acá en
   // adelante. Los meses se aplican apenas se eligen (el texto sí espera a "Buscar").
-  const [venceDesde, setVenceDesde] = useState(null)
-  const [venceHasta, setVenceHasta] = useState(null)
+  // Si se llega desde el dashboard ("Vencen en 30 días"), arranca con ese rango.
+  const [venceDesde, setVenceDesde] = useState(venceInicial?.desde ?? null)
+  const [venceHasta, setVenceHasta] = useState(venceInicial?.hasta ?? null)
+  useEffect(() => {
+    if (venceInicial) onVenceInicialUsado?.()
+    // Solo al montar: el rango inicial se usa una vez.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   useEffect(() => {
     let vivo = true

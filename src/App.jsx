@@ -3,6 +3,7 @@ import LoadingScreen from './components/LoadingScreen'
 import { useHashRoute } from './hooks/useHashRoute'
 import { AppProviders } from './context/AppContext'
 import PageHeader from './components/PageHeader'
+import OportunidadesResumen from './components/OportunidadesResumen'
 import FilterPanel from './components/FilterPanel'
 import OpportunitiesTable from './components/OpportunitiesTable'
 // Auditoría: las 2 pantallas más pesadas (detalle ~1.300 líneas + sus 4 paneles, y el
@@ -34,6 +35,7 @@ import {
 } from './services/mondayApi'
 import {
   FILTROS_VACIOS,
+  CONCRETADAS_TODAS,
   cumpleFiltros,
   opcionesDeEstado,
   reglasDeFiltros,
@@ -72,6 +74,10 @@ export default function App() {
   // Cursor de la API: por dónde sigue la lista. null = no hay más para traer.
   const [cursor, setCursor] = useState(null)
   const [loadingMore, setLoadingMore] = useState(false)
+  // A pedido: al cambiar un filtro o la búsqueda, la tabla seguía mostrando las filas del
+  // filtro anterior hasta que llegaban las nuevas (parecía que el filtro no había hecho
+  // nada). Mientras se trae la lista de cero, la tabla muestra que está buscando.
+  const [buscando, setBuscando] = useState(false)
   // Sube de número cada vez que la lista se arma de cero (otra búsqueda, otro filtro):
   // lo que venga de una tanda anterior se descarta en vez de mezclarse.
   const generacionRef = useRef(0)
@@ -152,10 +158,12 @@ export default function App() {
 
   const filterOptions = useMemo(
     () => ({
-      estadosOportunidad: schema?.estadoOportunidad.options ?? [],
+      estadosOportunidad: [...(schema?.estadoOportunidad.options ?? []), CONCRETADAS_TODAS],
       estadosCotizacion: opcionesDeEstado('estadoCotizacion', schema?.estadoCotizacion.options ?? []),
       tiposSujeto: schema?.tipoSujeto.options ?? [],
       estadosEnvio: opcionesDeEstado('estadoEnvio', schema?.estadoEnvio.options ?? []),
+      estadosCreacion: opcionesDeEstado('estadoCreacion', schema?.estadoCreacion?.options ?? []),
+      validacionesPoliza: opcionesDeEstado('validacionPoliza', schema?.validacionPoliza?.options ?? []),
       asignados: usuarios.map((u) => ({ value: u.id, label: u.name })),
     }),
     [schema, usuarios]
@@ -165,6 +173,17 @@ export default function App() {
   const handleFilterChange = (field, value) => {
     setFilters((prev) => ({ ...prev, [field]: value }))
   }
+
+  // Desde el resumen de arriba de la tabla (a pedido: "clickeás acá y te la filtra"): con exactamente
+  // estos filtros y sin texto de búsqueda. El cambio de filtros ya recarga la lista.
+  const irAOportunidadesFiltradas = (filtros) => {
+    setSearchTerm('')
+    setFilters({ ...EMPTY_FILTERS, ...filtros })
+    setPage(1)
+    go('oportunidades')
+  }
+  // Y a la lista de pólizas con un rango de vencimiento ya puesto (tarjeta "Vencimientos").
+  const [polizasVenceInicial, setPolizasVenceInicial] = useState(null)
 
   // La búsqueda y los estados los resuelve el servidor (ver mondayApi.js). Acá queda
   // solo lo que la API no sabe filtrar: "Tipo de Sujeto" es una columna mirror y la
@@ -186,14 +205,19 @@ export default function App() {
   const cargarPrimeraPagina = useCallback(async () => {
     if (!schema) return
     generacionRef.current += 1
+    const generacion = generacionRef.current
     trayendoMasRef.current = false
     setLoadingMore(true)
+    setBuscando(true)
     try {
       const pagina = await fetchOpportunitiesPage({
         limit: pageSize,
         search: searchTerm,
         reglas: reglasDeFiltros(filters, schema),
       })
+      // Si mientras tanto se pidió otra cosa (otro filtro), esta respuesta ya no sirve: si
+      // llegara tarde, pisaría la lista nueva con la del filtro anterior.
+      if (generacion !== generacionRef.current) return
       setBoardTotalCount(pagina.totalCount)
       setCursor(pagina.cursor)
       setOpportunities(
@@ -203,9 +227,12 @@ export default function App() {
         })
       )
     } catch (err) {
-      setError(err.message)
+      if (generacion === generacionRef.current) setError(err.message)
     } finally {
-      setLoadingMore(false)
+      if (generacion === generacionRef.current) {
+        setLoadingMore(false)
+        setBuscando(false)
+      }
     }
   }, [schema, pageSize, searchTerm, filters])
 
@@ -391,7 +418,11 @@ export default function App() {
   } else if (route.seg === 'polizas') {
     main = (
       <Suspense fallback={<LoadingScreen title="Cargando pólizas" message="Un momento, estamos trayendo las pólizas desde monday." />}>
-        <PolizasSection onOpenPoliza={(id) => go('polizas', id)} />
+        <PolizasSection
+          venceInicial={polizasVenceInicial}
+          onVenceInicialUsado={() => setPolizasVenceInicial(null)}
+          onOpenPoliza={(id) => go('polizas', id)}
+        />
       </Suspense>
     )
   } else if (route.seg === 'dashboard') {
@@ -450,6 +481,15 @@ export default function App() {
     main = (
       <div className="app">
         <PageHeader />
+        {/* A pedido: el resumen del circuito y "Requiere atención hoy" arriba de la
+            búsqueda; cada tarjeta filtra la tabla de abajo. */}
+        <OportunidadesResumen
+          onFiltrar={irAOportunidadesFiltradas}
+          onVerPolizasPorVencer={(rango) => {
+            setPolizasVenceInicial(rango)
+            go('polizas')
+          }}
+        />
         <FilterPanel
           searchTerm={searchTerm}
           onSearchTermChange={setSearchTerm}
@@ -470,7 +510,8 @@ export default function App() {
           // efecto del cursor recién las pide ahí) mostraba "Sin oportunidades" en vez
           // de cargando — parecía vacía hasta volver y entrar de nuevo. Si la página
           // visible no tiene filas y hay una tanda en camino, es una carga, no un vacío.
-          loading={loading || (loadingMore && pagedOpportunities.length === 0)}
+          loading={loading || buscando || (loadingMore && pagedOpportunities.length === 0)}
+          buscando={buscando}
           error={error}
           page={page}
           totalPages={totalPages}

@@ -74,6 +74,8 @@ export default function OpportunitiesTable({
   hayBusqueda,
   boardTotalCount,
   loading,
+  // Trayendo la lista de cero por un filtro o una búsqueda nueva (ver App.jsx).
+  buscando = false,
   error,
   page,
   totalPages,
@@ -100,10 +102,12 @@ export default function OpportunitiesTable({
   return (
     <section className="opps-table-wrap">
       <div className="opps-table-wrap__head">
-        <span>
-          {hayBusqueda
-            ? `${totalFiltered} resultado${totalFiltered === 1 ? '' : 's'}`
-            : `Mostrando ${totalFiltered} de ${boardTotalCount || totalFiltered} oportunidades`}
+        <span className={buscando ? 'opps-table-wrap__buscando' : undefined} aria-live="polite">
+          {buscando
+            ? 'Buscando oportunidades con los filtros elegidos…'
+            : hayBusqueda
+              ? `${totalFiltered} resultado${totalFiltered === 1 ? '' : 's'}`
+              : `Mostrando ${totalFiltered} de ${boardTotalCount || totalFiltered} oportunidades`}
         </span>
       </div>
 
@@ -205,8 +209,9 @@ export default function OpportunitiesTable({
           como techo), y a la derecha el selector de cuántas mostrar por página
           (10/25/50/100). Antes era "Anterior/Siguiente" + "Página X de Y" nomás. Se
           esconde solo si no hay ningún resultado (ahí ya se ve el emptyState de la
-          tabla, no hace falta paginado de nada). */}
-      {totalFiltered > 0 && (
+          tabla, no hace falta paginado de nada). Tampoco mientras se busca con un filtro
+          nuevo: los números serían los del filtro anterior. */}
+      {totalFiltered > 0 && !buscando && (
         <div className="opps-table-wrap__pagination">
           <span className="opps-table-wrap__pagination-summary">
             Mostrando {firstShown} a {lastShown} de {totalFiltered} oportunidad{totalFiltered === 1 ? '' : 'es'}

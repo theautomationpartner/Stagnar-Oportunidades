@@ -227,3 +227,53 @@
   border-radius: 6px;
   background: #fff;
 }
+
+/* Accesos rápidos a los problemas (ver PROBLEMAS en FilterPanel.jsx). */
+.filter-panel__rapidos {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.filter-panel__rapidos-lbl {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-gray);
+}
+
+.filter-panel__rapido {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  height: 28px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: #b3261e;
+  background: #fff;
+  border: 1px solid #f3c6c6;
+  border-radius: 14px;
+  cursor: pointer;
+  transition: background 0.15s;
+}
+
+.filter-panel__rapido svg {
+  font-size: 15px;
+}
+
+.filter-panel__rapido:hover {
+  background: #fdeeee;
+}
+
+.filter-panel__rapido--activo {
+  color: #fff;
+  background: #b3261e;
+  border-color: #b3261e;
+}
+
+.filter-panel__rapido--activo:hover {
+  background: #9c211a;
+}
