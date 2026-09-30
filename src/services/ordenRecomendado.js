@@ -1,31 +1,47 @@
 import { isQuoteSelectable } from './pricingEngine'
 
 // "Orden recomendado" de las cotizaciones en "Comparar y enviar" (es el orden por
-// defecto; los demás siguen disponibles). A pedido, un orden FIJO:
+// defecto; los demás siguen disponibles). A pedido, un orden FIJO por puestos, uno para
+// cada familia de cobertura:
 //
-//   1° BSE Total (anual)
-//   2° SURA Total
-//   3° PORTO Total
-//   4° SANCOR, la opción Total con el menor deducible que haya cotizado (600/800/1500/2500)
-//   5° BSE Total 3x2
+//          Total                              Parcial
+//   1°  BSE Total (anual)                  BSE Triple (anual)
+//   2°  SURA Total                         SURA Triple y 4 EN 1
+//   3°  PORTO Total                        PORTO Triple
+//   4°  SANCOR: la Total con el menor      SANCOR Parcial y Parcial Plus
+//       deducible (600/800/1500/2500)
+//   5°  BSE Total 3x2                      BSE Triple 3x2
 //   después, el resto por precio (las que no tienen costo, al final).
 //
-// Si alguna de las primeras no cotizó (no hay cotización de esa compañía y cobertura), su
-// lugar se saltea y la siguiente sube: no bloquea nada. Si cotizó pero vino en 0 (tarjeta
-// gris, WINK no supo el valor), queda en su posición fija igual — así se ve que falta y se
-// puede completar a mano ("Completar manualmente").
+// Cuando dos comparten puesto (SURA y SANCOR en Parcial) van entre ellas por precio. En la
+// solapa General, donde se ven todas, va primero el ranking de Total y después el de
+// Parcial.
 //
-// Antes (reunión del 24/09) las cuatro principales iban ordenadas por precio entre ellas;
-// el criterio vigente las fija en este orden.
-const PRIMERAS = [
-  { compania: 'BSE', cobertura: 'GLOBAL - ANUAL' },
-  { compania: 'SURA', cobertura: 'TOTAL' },
-  { compania: 'PORTO', cobertura: 'GLOBAL' },
+// Si alguna no cotizó (no hay cotización de esa compañía y cobertura), su lugar se saltea
+// y la siguiente sube: no bloquea nada. Si cotizó pero vino en 0 (tarjeta gris, WINK no
+// supo el valor), queda en su puesto igual — así se ve que falta y se puede completar a
+// mano ("Completar manualmente").
+const PUESTOS_TOTAL = [
+  [{ compania: 'BSE', cobertura: 'GLOBAL - ANUAL' }],
+  [{ compania: 'SURA', cobertura: 'TOTAL' }],
+  [{ compania: 'PORTO', cobertura: 'GLOBAL' }],
+  'SANCOR_MENOR_DEDUCIBLE',
+  [{ compania: 'BSE', cobertura: 'GLOBAL - 3X2' }],
 ]
-const POSICION_SANCOR = PRIMERAS.length // 4°
-const BSE_3X2 = { compania: 'BSE', cobertura: 'GLOBAL - 3X2' }
-const POSICION_BSE_3X2 = POSICION_SANCOR + 1 // 5°
-const POSICION_RESTO = POSICION_BSE_3X2 + 1
+const PUESTOS_PARCIAL = [
+  [{ compania: 'BSE', cobertura: 'TRIPLE - ANUAL' }],
+  [
+    { compania: 'SURA', cobertura: 'TRIPLE' },
+    { compania: 'SURA', cobertura: '4 EN 1' },
+  ],
+  [{ compania: 'PORTO', cobertura: 'TRIPLE' }],
+  [
+    { compania: 'SANCOR', cobertura: 'PARCIAL' },
+    { compania: 'SANCOR', cobertura: 'PARCIAL PLUS' },
+  ],
+  [{ compania: 'BSE', cobertura: 'TRIPLE - 3X2' }],
+]
+const POSICION_RESTO = PUESTOS_TOTAL.length + PUESTOS_PARCIAL.length
 
 // Las opciones Total de SANCOR se llaman por su deducible ("TOTAL 600", "TOTAL 800"…).
 const SANCOR_TOTAL = /^TOTAL\s+(\d+)$/
@@ -43,15 +59,18 @@ function deducibleSancor(e) {
   return m ? Number(m[1]) : Infinity
 }
 
-// La posición de cada cotización (por id): 0..4 las fijas, POSICION_RESTO el resto.
+// La posición de cada cotización (por id): los puestos de Total, después los de Parcial,
+// y POSICION_RESTO para el resto.
 function posiciones(entries) {
   const sancorTotales = entries.filter((e) => companiaDe(e) === 'SANCOR' && SANCOR_TOTAL.test(normal(e.raw.cobertura)))
   const sancorMenor = sancorTotales.reduce((min, e) => (min && deducibleSancor(min) <= deducibleSancor(e) ? min : e), null)
+  const cumple = (e, puesto) => (puesto === 'SANCOR_MENOR_DEDUCIBLE' ? e === sancorMenor : puesto.some((ref) => es(e, ref)))
+
   const mapa = new Map()
   for (const e of entries) {
-    const fija = PRIMERAS.findIndex((ref) => es(e, ref))
-    const posicion =
-      fija >= 0 ? fija : e === sancorMenor ? POSICION_SANCOR : es(e, BSE_3X2) ? POSICION_BSE_3X2 : POSICION_RESTO
+    const total = PUESTOS_TOTAL.findIndex((puesto) => cumple(e, puesto))
+    const parcial = PUESTOS_PARCIAL.findIndex((puesto) => cumple(e, puesto))
+    const posicion = total >= 0 ? total : parcial >= 0 ? PUESTOS_TOTAL.length + parcial : POSICION_RESTO
     mapa.set(e.raw.id, posicion)
   }
   return mapa
@@ -65,8 +84,8 @@ export function ordenarRecomendado(entries) {
     const pa = posicion.get(a.raw.id)
     const pb = posicion.get(b.raw.id)
     if (pa !== pb) return pa - pb
-    // Solo el resto llega acá (las fijas tienen cada una su posición): por precio, y las
-    // que no tienen costo al final.
+    // Mismo puesto (dos que lo comparten, o el resto): por precio, y las que no tienen
+    // costo al final.
     const sa = isQuoteSelectable(a.quote)
     const sb = isQuoteSelectable(b.quote)
     if (sa !== sb) return sa ? -1 : 1
