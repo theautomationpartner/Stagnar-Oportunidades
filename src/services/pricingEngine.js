@@ -105,9 +105,13 @@ function portoAuxilioMecanico(eff, serviciosIlimitadosPortoMinYear) {
 // recargoPanel.js#buildConfiguracion.
 //
 // LOG-14/LOG-15: hasta ahora esto solo cambiaba el texto de la viñeta y el precio nunca
-// se movía. Ahora los opcionales SUMAN al total (ver computeAdicionales), salvo el AP de
-// SURA, que ya viene adentro del contado que trae el portal: ese arranca tildado y, al
-// destildarlo, se RESTA.
+// se movía. Ahora los opcionales SUMAN al total (ver computeAdicionales).
+//
+// El AP de SURA es uno más desde el requerimiento "Corregir cálculo y comportamiento del
+// campo Accidentes Personales": WINK dejó de cotizar con AP incluido, así que arranca
+// DESTILDADO, el costo sin tocar nada es el de WINK y tildarlo suma el adicional de PANEL.
+// Antes arrancaba tildado y destildarlo restaba — con el precio de WINK ya sin AP, eso
+// descontaba algo que no estaba.
 // `label` es el texto que va al bloque INCLUYE de la propuesta (en mayúsculas, como el
 // resto de los textos de PANEL); `labelCorto` es el de los controles de la app —
 // demasiado largo el otro para un checkbox. Los dos salen de acá para que la tarjeta de
@@ -122,8 +126,7 @@ const OPCIONALES = {
   SURA: [
     { field: 'granizo', precioKey: 'Granizo', label: 'GRANIZO SIN DEDUCIBLE', labelCorto: 'Granizo' },
     { field: 'suraTeLleva', precioKey: 'SURA te lleva', label: 'SURA TE LLEVA', labelCorto: 'SURA te lleva' },
-    // Incluido en el precio del portal: destildarlo descuenta.
-    { field: 'ap', precioKey: 'AP', label: 'ACCIDENTES PERSONALES', labelCorto: 'Accidentes Personales', incluidoPorDefecto: true },
+    { field: 'ap', precioKey: 'AP', label: 'ACCIDENTES PERSONALES', labelCorto: 'Accidentes Personales' },
   ],
 }
 
@@ -229,9 +232,9 @@ export function opcionesDePago(quote) {
   return opciones
 }
 
-// Lo que hay que sumarle (o restarle) al precio base por los opcionales de esta
-// cotización. Los que vienen incluidos por defecto (AP de SURA) restan cuando se
-// destildan; el resto suma cuando se tilda.
+// Lo que hay que sumarle al precio base por los opcionales tildados de esta cotización.
+// `incluidoPorDefecto` (un opcional que ya viene en el precio y resta al destildarlo) hoy
+// no lo usa ninguno: era el AP de SURA, ver OPCIONALES.
 function computeAdicionales(eff, preciosOpcionales) {
   if (todosIncluidos(eff)) return 0
   const precios = preciosDe(eff, preciosOpcionales)
@@ -254,8 +257,7 @@ function computeAdicionales(eff, preciosOpcionales) {
 // tarjeta y la imagen los muestren en su propio cuadro: "lo que ya viene con la
 // cobertura" y "lo que se cotiza aparte" son 2 cosas distintas y se leían igual.
 //
-// `contratado` incluye los que ya vienen adentro de la cobertura (SURA TOTAL PLUS) y el
-// AP de SURA, que arranca tildado. `desde` marca el caso de Auto extra sin duración
+// `contratado` incluye los que ya vienen adentro de la cobertura (SURA TOTAL PLUS). `desde` marca el caso de Auto extra sin duración
 // elegida: el precio es el de la opción más barata, no el final.
 function buildOpcionales(eff, preciosOpcionales) {
   const disponibles = opcionalesDisponibles(eff)

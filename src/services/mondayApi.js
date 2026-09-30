@@ -201,7 +201,7 @@ const SUBITEM_COLUMN_IDS = [
   // destildados y el total cambiaba.
   'boolean_mm6z3j9j', // Uso rural
   'boolean_mm6zhfhd', // SURA te lleva
-  'boolean_mm7fbtb', // AP sacado (SURA) — el AP se guarda al revés, ver quoteMapper.js
+  'boolean_mm6zzwq5', // AP (SURA) — opcional destildado por defecto, ver quoteMapper.js
   'color_mm6zpx3j', // Auto extra
 ]
 

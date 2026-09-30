@@ -51,11 +51,11 @@ export function mapSubitemToRawQuote(subitem) {
     cristales: boolOf(cv, 'boolean_mm5fqazp'),
     usoRural: boolOf(cv, 'boolean_mm6z3j9j'),
     suraTeLleva: boolOf(cv, 'boolean_mm6zhfhd'),
-    // El AP de SURA viene incluido en el precio del portal, así que se lee al revés, de
-    // "AP sacado": sin tildar (el valor por defecto) = incluido. No se puede leer de la
-    // columna AP porque monday devuelve lo mismo para una casilla que nunca se tocó y
-    // para una destildada (probado contra la API).
-    ap: !boolOf(cv, 'boolean_mm7fbtb'),
+    // AP de SURA: un opcional más, destildado por defecto (WINK ya no lo incluye en el
+    // precio, ver pricingEngine.js#OPCIONALES). Se lee de la columna AP como el resto: una
+    // casilla que nunca se tocó es "sin AP", que ahora es justamente el valor por defecto.
+    // "AP sacado" (boolean_mm7fbtb), la columna al revés de antes, ya no se usa.
+    ap: boolOf(cv, 'boolean_mm6zzwq5'),
     autoExtra: textOf(cv, 'color_mm6zpx3j'),
   }
   // A pedido: SANCOR manda el deducible de sus coberturas parciales en 0, que no es un
