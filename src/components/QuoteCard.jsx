@@ -237,6 +237,7 @@ function QuoteCard({
   onAutoExtraChange,
   onBonificacionEspecialChange,
   onCargarCostoManual,
+  onVaciarCostoManual,
   onPanelChange,
   rcOptions,
 }) {
@@ -562,12 +563,27 @@ function QuoteCard({
           seleccionable, el aviso de "sin costo total" — nunca una línea extra. */}
       <div
         className={
-          sinCostoDeWink && onCargarCostoManual
+          (sinCostoDeWink || raw.costoManual) && onCargarCostoManual
             ? 'quote-card__meta-warning quote-card__meta-warning--manual'
             : 'quote-card__meta-warning'
         }
       >
-        {sinCostoDeWink && onCargarCostoManual ? (
+        {raw.costoManual && selectable && onCargarCostoManual ? (
+          // A pedido: el reeditar de una completada manualmente es un botón que se lee como
+          // botón (antes era una etiqueta más entre RC, Deducible, etc.).
+          <>
+            {quote.warning ? (
+              <span className="quote-card__sin-costo">
+                <MdWarningAmber /> {quote.warning.short}
+              </span>
+            ) : (
+              <span className="quote-card__manual-nota">Completada manualmente</span>
+            )}
+            <button type="button" className="quote-card__reeditar" onClick={() => setCargandoCosto(true)}>
+              <MdEdit aria-hidden="true" /> Editar carga manual
+            </button>
+          </>
+        ) : sinCostoDeWink && onCargarCostoManual ? (
           // A pedido ("no se entiende el botón"): un botón de verdad, sin atenuar como el
           // resto de la tarjeta, que dice qué pasó y qué hace.
           <>
@@ -610,18 +626,12 @@ function QuoteCard({
           gris mientras no tengan valor, coloreadas con el valor puesto apenas lo tienen
           (override de "Parámetros ajustables", o el dato real del subitem). */}
       <div className="quote-card__override-tags">
-        {/* Cotización con costo y deducible cargados a mano: se marca, y un clic la
-            vuelve a abrir para corregirla. */}
+        {/* Cotización con costo y deducible cargados a mano: solo la marca. Se edita con
+            "Editar carga manual", arriba. */}
         {raw.costoManual && (
-          <button
-            type="button"
-            className="quote-card__manual"
-            title={onCargarCostoManual ? 'Completada manualmente — clic para editarla' : 'Completada manualmente'}
-            disabled={!onCargarCostoManual}
-            onClick={() => setCargandoCosto(true)}
-          >
-            <MdEdit aria-hidden="true" /> Manual
-          </button>
+          <span className="quote-card__tag quote-card__tag--manual" title="Costo y deducible completados manualmente">
+            Manual
+          </span>
         )}
         {fields.map((field) => {
           const active = hasTagValue(field, raw, overrides)
@@ -850,6 +860,13 @@ function QuoteCard({
             await onCargarCostoManual(datos)
             setCargandoCosto(false)
           }}
+          onVaciar={
+            onVaciarCostoManual &&
+            (async () => {
+              await onVaciarCostoManual()
+              setCargandoCosto(false)
+            })
+          }
           onClose={() => setCargandoCosto(false)}
         />
       )}

@@ -38,3 +38,59 @@
   font-size: 14px;
   color: var(--text-gray);
 }
+
+/* Vaciar una cotización completada manualmente (con confirmación). */
+.cotizacion-manual__vaciar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px 12px;
+  margin-top: 16px;
+  padding-top: 12px;
+  font-size: 13px;
+  color: var(--text-gray);
+  border-top: 1px solid var(--border);
+}
+
+.cotizacion-manual__vaciar-acciones {
+  display: inline-flex;
+  gap: 8px;
+}
+
+.cotizacion-manual__link {
+  padding: 4px 6px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--text-gray);
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+.cotizacion-manual__link--peligro {
+  padding-left: 0;
+  color: var(--negative-color, #d83a52);
+}
+
+.cotizacion-manual__link:hover:not(:disabled) {
+  text-decoration: underline;
+}
+
+.cotizacion-manual__vaciar-si {
+  padding: 4px 12px;
+  font: inherit;
+  font-weight: 600;
+  color: #fff;
+  background: var(--negative-color, #d83a52);
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.cotizacion-manual__vaciar-si:disabled,
+.cotizacion-manual__link:disabled {
+  opacity: 0.6;
+  cursor: default;
+}

@@ -14,11 +14,13 @@ import './CotizacionManualModal.css'
 // Una ya cargada a mano (raw.costoManual) se puede volver a editar: el popup arranca con
 // los valores guardados. Si la cobertura fija su deducible (SANCOR, ver
 // deducibleFijoDeCobertura) no se pide: se muestra y se guarda ese.
+// También se puede vaciar (onVaciar): vuelve a quedar sin costo, como la trajo WINK. Pide
+// confirmación antes, porque borra lo cargado.
 
 // Solo números, punto y coma: los campos no aceptan letras.
 const soloMonto = (v) => v.replace(/[^\d.,]/g, '')
 
-export default function CotizacionManualModal({ raw, onGuardar, onClose }) {
+export default function CotizacionManualModal({ raw, onGuardar, onVaciar, onClose }) {
   const editando = Boolean(raw.costoManual)
   const deducibleFijo = deducibleFijoDeCobertura(raw)
   const deducibleGuardado = raw.compania === 'SANCOR' ? raw.deducibleSancorUsd || raw.deducibleBase : raw.deducibleBase
@@ -28,6 +30,7 @@ export default function CotizacionManualModal({ raw, onGuardar, onClose }) {
   )
   const [guardando, setGuardando] = useState(false)
   const [error, setError] = useState(null)
+  const [confirmandoVaciar, setConfirmandoVaciar] = useState(false)
 
   const moneda = raw.compania === 'SANCOR' ? 'USD' : '$'
   // Acepta "42.960" (miles con punto) y "42960,50" (decimales con coma).
@@ -41,6 +44,17 @@ export default function CotizacionManualModal({ raw, onGuardar, onClose }) {
     setError(null)
     try {
       await onGuardar({ contado: numero(contado), deducible: numero(deducible) })
+    } catch (err) {
+      setError(err.message)
+      setGuardando(false)
+    }
+  }
+
+  const vaciar = async () => {
+    setGuardando(true)
+    setError(null)
+    try {
+      await onVaciar()
     } catch (err) {
       setError(err.message)
       setGuardando(false)
@@ -97,6 +111,27 @@ export default function CotizacionManualModal({ raw, onGuardar, onClose }) {
             </label>
           )}
         </div>
+        {editando && onVaciar && (
+          <div className="cotizacion-manual__vaciar">
+            {confirmandoVaciar ? (
+              <>
+                <span>El costo y el deducible vuelven a 0 y la tarjeta queda sin costo, como la trajo WINK.</span>
+                <span className="cotizacion-manual__vaciar-acciones">
+                  <button type="button" className="cotizacion-manual__link" disabled={guardando} onClick={() => setConfirmandoVaciar(false)}>
+                    No
+                  </button>
+                  <button type="button" className="cotizacion-manual__vaciar-si" disabled={guardando} onClick={vaciar}>
+                    {guardando ? 'Vaciando...' : 'Sí, vaciar'}
+                  </button>
+                </span>
+              </>
+            ) : (
+              <button type="button" className="cotizacion-manual__link cotizacion-manual__link--peligro" onClick={() => setConfirmandoVaciar(true)}>
+                Vaciar cotización (volver a 0)
+              </button>
+            )}
+          </div>
+        )}
         {error && (
           <AttentionBox type="danger" className="cotizacion-manual__aviso">
             {error}

@@ -27,6 +27,7 @@ import {
   setSubitemCheckboxValue,
   setSubitemColumnValue,
   setCostoManual,
+  vaciarCostoManual,
   uploadFileToColumn,
   clearFileColumn,
   fetchLatestUpdate,
@@ -1052,6 +1053,28 @@ export default function OpportunityDetail({
               ...(r.compania === 'SANCOR' ? { deducibleSancorUsd: String(datos.deducible) } : {}),
               ...(r.compania === 'BSE' ? { deducibleBSE: '1' } : {}),
               ...(r.compania === 'SURA' ? { deducibleSURA: '1' } : {}),
+            }
+      )
+    )
+  }
+
+  // Vaciar una cotización completada manualmente (ver mondayApi.js#vaciarCostoManual):
+  // vuelve a quedar sin costo, como la trajo WINK.
+  const handleVaciarCostoManual = async (rawId) => {
+    onOpportunityAction?.()
+    const raw = rawQuotes.find((r) => r.id === rawId)
+    if (!raw) return
+    await vaciarCostoManual(rawId, raw.compania)
+    setRawQuotes((prev) =>
+      prev.map((r) =>
+        r.id !== rawId
+          ? r
+          : {
+              ...r,
+              costoManual: false,
+              contado: '0',
+              deducibleBase: '0',
+              ...(r.compania === 'SANCOR' ? { deducibleSancorUsd: '0' } : {}),
             }
       )
     )
@@ -2331,6 +2354,7 @@ export default function OpportunityDetail({
                         onToggleOpcional={(field, checked) => handleToggleOpcional(raw.id, field, checked)}
                         onBonificacionEspecialChange={(field, valor) => handleBonificacionEspecialChange(raw.id, field, valor)}
                         onCargarCostoManual={(datos) => handleCargarCostoManual(raw.id, datos)}
+                        onVaciarCostoManual={() => handleVaciarCostoManual(raw.id)}
                         onAutoExtraChange={(dias) => handleAutoExtraChange(raw.id, dias)}
                         onPanelChange={(panel) => handlePanelChange(raw.id, panel)}
                         rcOptions={rcOptions}

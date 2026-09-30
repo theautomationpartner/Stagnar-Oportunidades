@@ -752,23 +752,49 @@
   outline-offset: 2px;
 }
 
-/* Marca de "Completada manualmente" junto al deducible; un clic la vuelve a editar. */
-.quote-card__manual {
+/* Completada manualmente: nota a la izquierda y el botón para reeditarla a la derecha
+   (secundario: borde y texto azul, se rellena al pasar el mouse). */
+.quote-card__manual-nota {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-gray);
+}
+
+.quote-card__reeditar {
   display: inline-flex;
   flex-shrink: 0;
   align-items: center;
-  gap: 3px;
-  padding: 1px 7px;
+  gap: 6px;
+  height: 28px;
+  padding: 0 12px;
   font: inherit;
-  font-size: 11px;
+  font-size: 13px;
   font-weight: 600;
   color: var(--primary-blue);
-  background: var(--tint-info, #eef4ff);
-  border: 1px solid currentColor;
-  border-radius: 10px;
+  background: #fff;
+  border: 1px solid var(--primary-blue);
+  border-radius: 6px;
   cursor: pointer;
+  transition: background 0.15s, color 0.15s;
 }
 
-.quote-card__manual:disabled {
-  cursor: default;
+.quote-card__reeditar svg {
+  font-size: 15px;
+}
+
+.quote-card__reeditar:hover {
+  color: #fff;
+  background: var(--primary-blue);
+}
+
+.quote-card__reeditar:focus-visible {
+  outline: 2px solid var(--primary-blue);
+  outline-offset: 2px;
+}
+
+/* Marca "Manual" entre las etiquetas: solo informa, no se toca. */
+.quote-card__tag--manual {
+  color: var(--primary-blue);
+  background: var(--tint-info, #eef4ff);
+  border-color: transparent;
 }

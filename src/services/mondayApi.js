@@ -2670,6 +2670,29 @@ export function columnasDeCostoManual(compania, { contado, deducible }) {
   return columnas
 }
 
+// A pedido: una cotización completada manualmente se puede vaciar — costo y deducible
+// vuelven a 0 y se destilda "Costo cargado a mano", así la tarjeta queda otra vez como la
+// trajo WINK (en gris, con "Completar manualmente"). El nivel de deducible de BSE/SURA
+// queda como está: no se sabe cuál traía antes.
+export function columnasDeVaciarCostoManual(compania) {
+  const columnas = {
+    numeric_mm4pc2y1: '0',
+    numeric_mm519my9: '0',
+    boolean_mm7n3mvm: { checked: 'false' },
+  }
+  if (compania === 'SANCOR') columnas.numeric_mm59qzvf = '0'
+  return columnas
+}
+
+export async function vaciarCostoManual(subitemId, compania) {
+  const data = await callMondayApi(CHANGE_MULTIPLE_COLUMN_VALUES_MUTATION, {
+    boardId: SUBITEMS_BOARD_ID,
+    itemId: subitemId,
+    columnValues: JSON.stringify(columnasDeVaciarCostoManual(compania)),
+  })
+  return data.change_multiple_column_values
+}
+
 export async function setCostoManual(subitemId, compania, datos) {
   const data = await callMondayApi(CHANGE_MULTIPLE_COLUMN_VALUES_MUTATION, {
     boardId: SUBITEMS_BOARD_ID,
