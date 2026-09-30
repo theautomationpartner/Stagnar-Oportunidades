@@ -1720,3 +1720,24 @@ button.crear-op__clientes-chip:hover {
   padding-top: 8px;
   padding-bottom: 8px;
 }
+
+/* Columna derecha del paso 1 con historial: el historial y, debajo, los Documentos del
+   cliente elegido (ver CrearOportunidadForm.jsx). */
+.crear-op__step1-lado {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-width: 0;
+}
+
+/* Las filas de contacto nunca más anchas que su tarjeta: el texto largo (teléfono,
+   email, "Contacto de N clientes") se corta de renglón en vez de salirse. */
+.crear-op__opcion {
+  min-width: 0;
+  overflow-wrap: anywhere;
+}
+
+/* Con historial al lado la tarjeta llega justo al borde: sin margen debajo. */
+.crear-op:has(.crear-op__card--paso1) {
+  padding-bottom: 0;
+}

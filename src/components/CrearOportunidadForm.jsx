@@ -1963,12 +1963,18 @@ export default function CrearOportunidadForm({
                       y recién después la sección Contacto — intercalar datos del cliente
                       con el contacto en el medio mareaba. En pantalla ancha, Documentos y
                       Contacto van lado a lado (mismo criterio que el alta de un lead), para
-                      que el paso entre sin scroll. */}
-                  <div className="crear-op__lead-pie crear-op__cliente-pie">
-                  <ClienteArchivos
-                    contactoId={resultadoSeleccionado.id}
-                    tipo={resultadoSeleccionado.source === 'contacto' ? 'cliente' : 'lead'}
-                  />
+                      que el paso entre sin scroll.
+                      Con historial al lado, la columna izquierda es la mitad del ancho: ahí
+                      Documentos se muda a la derecha, debajo del historial (ver
+                      crear-op__step1-lado), y Contacto queda solo a todo el ancho — partido
+                      en 2 quedaba tan angosto que sus filas se salían de la tarjeta. */}
+                  <div className={hasHistorial ? 'crear-op__cliente-pie' : 'crear-op__lead-pie crear-op__cliente-pie'}>
+                  {!hasHistorial && (
+                    <ClienteArchivos
+                      contactoId={resultadoSeleccionado.id}
+                      tipo={resultadoSeleccionado.source === 'contacto' ? 'cliente' : 'lead'}
+                    />
+                  )}
 
                   {/* MON-14: la sección Contacto también con un Cliente ya elegido —
                       lista sus contactos como radios y obliga a marcar uno (o crear
@@ -1998,7 +2004,10 @@ export default function CrearOportunidadForm({
                       gris sin ninguna pista de por qué (isStepValid ya lo bloqueaba,
                       pero en silencio). Se apaga sola apenas se completa lo que
                       falte (por "Editar", ver EditarContactoModal). */}
-                  {!isStepValid(0) && (
+                  {/* Con historial al lado, el aviso va en la columna derecha (debajo de
+                      Documentos), donde sobra lugar: acá abajo empujaba el paso fuera de la
+                      pantalla. */}
+                  {!hasHistorial && !isStepValid(0) && (
                     <AttentionBox type="warning">{avisoDatosDelCliente()}</AttentionBox>
                   )}
                   </>
@@ -2267,6 +2276,7 @@ export default function CrearOportunidadForm({
                   "Ver detalle"/resumen breve de siempre por oportunidad. Solo se muestra
                   si la persona elegida tiene oportunidades anteriores. */}
               {hasHistorial && (
+                <div className="crear-op__step1-lado">
                 <div className="crear-op__historial">
                   <span className="crear-op__historial-title">
                     <MdEventNote /> Oportunidades anteriores de{' '}
@@ -2353,6 +2363,16 @@ export default function CrearOportunidadForm({
                       </div>
                     )
                   })}
+                </div>
+                {resultadoSeleccionado && (
+                  <ClienteArchivos
+                    contactoId={resultadoSeleccionado.id}
+                    tipo={resultadoSeleccionado.source === 'contacto' ? 'cliente' : 'lead'}
+                  />
+                )}
+                {resultadoSeleccionado && !isStepValid(0) && (
+                  <AttentionBox type="warning">{avisoDatosDelCliente()}</AttentionBox>
+                )}
                 </div>
               )}
             </div>
