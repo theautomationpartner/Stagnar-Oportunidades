@@ -1645,3 +1645,78 @@ button.crear-op__clientes-chip:hover {
     grid-template-columns: repeat(4, minmax(0, 1fr));
   }
 }
+
+/* ============================================================================
+   Paso 1 compacto (a pedido): adentro de monday la app tiene ~800px de alto y el paso
+   1 tiene que entrar entero sin scroll. El Tipo de Riesgo sube a la fila del Stepper (ver
+   el JSX), y acá se recorta el aire: márgenes, separación entre secciones, la barra de
+   abajo, el ícono del recuadro de la cédula y las ayudas que no aportan (marcadas con
+   crear-op__hint-opcional). Solo en el paso 1: el resto del formulario queda igual.
+   ============================================================================ */
+.crear-op:has(.crear-op__card--paso1) {
+  padding-top: 12px;
+  padding-bottom: 8px;
+}
+
+.crear-op__card--paso1 {
+  padding-top: 12px;
+  padding-bottom: 10px;
+}
+
+.crear-op__card--paso1 .crear-op__header {
+  margin-bottom: 8px;
+}
+
+.crear-op__card--paso1 .crear-op__form-card,
+.crear-op__card--paso1 .crear-op__form-card:has(.crear-op__doc-y-campos) {
+  gap: 10px;
+  padding: 14px 20px;
+}
+
+.crear-op__card--paso1 .crear-op__section-title-row {
+  margin-bottom: 10px;
+}
+
+.crear-op__card--paso1 .crear-op__hint-opcional {
+  display: none;
+}
+
+.crear-op__card--paso1 .crear-op__doc-lado .file-field__dropzone-icon {
+  display: none;
+}
+
+.crear-op__card--paso1 .crear-op__footer {
+  margin-top: 10px;
+  padding-top: 12px;
+  padding-bottom: 12px;
+}
+
+/* Cliente ya elegido: Documentos y Contacto son 2 tarjetas; lado a lado, con la misma
+   separación que el resto de las tarjetas del paso y la misma altura. */
+.crear-op__cliente-pie {
+  gap: 16px;
+  align-items: stretch;
+}
+
+.crear-op__card--paso1 .crear-op__data-screen {
+  gap: 10px;
+}
+
+.crear-op__card--paso1 .crear-op__cliente-pie {
+  gap: 10px;
+}
+
+/* Con un cliente ya elegido (ficha + Documentos/Contacto + aviso) sobraban ~14px: se
+   recortan del aire de abajo. */
+.crear-op:has(.crear-op__card--paso1) {
+  padding-bottom: 4px;
+}
+
+.crear-op__card--paso1 {
+  padding-bottom: 4px;
+}
+
+.crear-op__card--paso1 .crear-op__footer {
+  padding-top: 8px;
+  padding-bottom: 8px;
+}

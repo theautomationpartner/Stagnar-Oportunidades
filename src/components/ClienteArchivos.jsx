@@ -99,7 +99,7 @@ export default function ClienteArchivos({ contactoId, tipo = 'lead', pendingFile
         </span>
         <h3 className="crear-op__section-title">Documentos {quien}</h3>
       </div>
-      <p className="crear-op__risk-subtitle">
+      <p className="crear-op__risk-subtitle crear-op__hint-opcional">
         Comprobantes, contratos, etc. Quedan en la ficha de la persona.
       </p>
       {error && <p className="crear-op__error">Error: {error}</p>}

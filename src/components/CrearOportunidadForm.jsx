@@ -1731,7 +1731,17 @@ export default function CrearOportunidadForm({
 
   return (
     <div className="crear-op">
-      <div className={hasHistorial ? 'crear-op__card crear-op__card--wide' : 'crear-op__card'}>
+      {/* crear-op__card--paso1: el paso 1 va más compacto, para que entre entero en la
+          pantalla sin scroll adentro de monday (a pedido; ver el CSS). */}
+      <div
+        className={[
+          'crear-op__card',
+          hasHistorial && 'crear-op__card--wide',
+          stepIndex === 0 && 'crear-op__card--paso1',
+        ]
+          .filter(Boolean)
+          .join(' ')}
+      >
         <div className="crear-op__header">
           {/* Columna vacía a la izquierda solo para que el grid de 3 columnas centre el
               Stepper de verdad (mismo criterio que .opp-detail__breadcrumb). */}
@@ -1744,17 +1754,14 @@ export default function CrearOportunidadForm({
           {/* A pedido, sin la lupa ni la casita: cambiar de tarea o volver al inicio vive
               en la AccionBar de arriba (su logo es "Inicio"), que además avisa que salir
               de acá descarta lo ingresado. El div queda: es la 3ª columna del grid que
-              centra el Stepper. */}
-          <div className="crear-op__header-actions" />
-        </div>
-
-        {stepIndex === 0 && (
-          <div className="crear-op__fields">
-            {/* Reunión del 24/09: el Tipo de Riesgo dejó de ser un paso propio — va acá,
-                arriba a la derecha, a la altura del título (Automóvil por defecto, ver el
-                useEffect que arranca con TIPO_RIESGO_AUTOMOVIL). */}
-            <div className="crear-op__paso1-cabecera">
-              <StepHeading number={1} title="Seleccionar Cliente" />
+              centra el Stepper.
+              En el paso 1 lleva el Tipo de Riesgo (reunión del 24/09: dejó de ser un paso
+              propio). Va en esta fila, al lado del Stepper, y no en una propia con el
+              título "Seleccionar Cliente" — que repetía lo que ya dice el Stepper — para
+              que el paso entre sin scroll (a pedido). Automóvil por defecto, ver el
+              useEffect que arranca con TIPO_RIESGO_AUTOMOVIL. */}
+          <div className="crear-op__header-actions">
+            {stepIndex === 0 && (
               <label className="crear-op__field crear-op__tipo-riesgo">
                 <span>
                   Tipo de Riesgo <Required />
@@ -1767,7 +1774,12 @@ export default function CrearOportunidadForm({
                   onChange={(option) => handleChange('tipoRiesgo', option?.value ?? '')}
                 />
               </label>
-            </div>
+            )}
+          </div>
+        </div>
+
+        {stepIndex === 0 && (
+          <div className="crear-op__fields">
             {/* A pedido: la búsqueda y los datos ya autocompletados viven en 2
                 "pantallas" separadas (nunca las 2 juntas) — antes el campo "Buscar
                 Persona" se quedaba visible arriba con el resultado ya elegido mientras
@@ -1949,7 +1961,10 @@ export default function CrearOportunidadForm({
 
                   {/* A pedido: primero TODO lo del Cliente junto (ficha + sus documentos)
                       y recién después la sección Contacto — intercalar datos del cliente
-                      con el contacto en el medio mareaba. */}
+                      con el contacto en el medio mareaba. En pantalla ancha, Documentos y
+                      Contacto van lado a lado (mismo criterio que el alta de un lead), para
+                      que el paso entre sin scroll. */}
+                  <div className="crear-op__lead-pie crear-op__cliente-pie">
                   <ClienteArchivos
                     contactoId={resultadoSeleccionado.id}
                     tipo={resultadoSeleccionado.source === 'contacto' ? 'cliente' : 'lead'}
@@ -1975,6 +1990,7 @@ export default function CrearOportunidadForm({
                     onBuscarContacto={buscarContactosCrmLibre}
                     onVincularContacto={aplicarContacto}
                   />
+                  </div>
 
                   {/* A pedido: la ficha de acá arriba es de solo lectura — sin esto,
                       si el Cliente/Lead elegido tiene algún dato obligatorio sin

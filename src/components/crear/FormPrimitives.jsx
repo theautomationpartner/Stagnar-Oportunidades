@@ -300,7 +300,7 @@ export function ContactoFields({
       {/* A pedido, el mismo rótulo en todos lados donde se cargan o eligen datos de
           contacto (popup de contacto nuevo, ficha del cliente, y este paso tanto con
           un Lead nuevo como con un Cliente ya elegido). */}
-      <p className="crear-op__section-hint">Información de contacto.</p>
+      <p className="crear-op__section-hint crear-op__hint-opcional">Información de contacto.</p>
 
       {contactoNuevo ? (
         // A pedido: el contacto nuevo se muestra igual que los demás, con una etiqueta
