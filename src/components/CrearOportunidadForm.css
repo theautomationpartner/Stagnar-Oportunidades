@@ -1633,3 +1633,15 @@ button.crear-op__clientes-chip:hover {
   margin-left: auto;
   font-size: 12px;
 }
+
+/* Empresa: sin el recuadro de la cédula, los campos ocupan todo el ancho (ver
+   CrearOportunidadForm.jsx, "Datos personales"). */
+@media (min-width: 900px) {
+  .crear-op__doc-y-campos--sin-doc {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .crear-op__doc-y-campos--sin-doc .crear-op__campos-lado .crear-op__fields--grid-3 {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+}

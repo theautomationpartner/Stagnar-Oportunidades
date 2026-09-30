@@ -1995,7 +1995,11 @@ export default function CrearOportunidadForm({
                         tipean. Continuar exige lo mismo en los dos casos. */}
                     <div className="crear-op__section">
                       <SectionTitle icon={MdPerson}>Datos personales</SectionTitle>
-                      <div className="crear-op__doc-y-campos">
+                      {/* A pedido: una Empresa no tiene cédula (lleva RUT), así que el
+                          recuadro para subirla no se muestra y los campos ocupan todo el
+                          ancho. */}
+                      <div className={esEmpresa ? 'crear-op__doc-y-campos crear-op__doc-y-campos--sin-doc' : 'crear-op__doc-y-campos'}>
+                        {!esEmpresa && (
                         <div className="crear-op__doc-lado">
                           {!cedulaLeadFile ? (
                             <FileUploadField
@@ -2025,6 +2029,7 @@ export default function CrearOportunidadForm({
                             </AttentionBox>
                           )}
                         </div>
+                        )}
                         <div className="crear-op__campos-lado">
   <div className="crear-op__fields--grid crear-op__fields--grid-3">
                           {/* A pedido: el alta declara si es una Empresa o un Particular
@@ -2042,7 +2047,13 @@ export default function CrearOportunidadForm({
                               ]}
                               value={{ value: form.tipoCliente, label: form.tipoCliente }}
                               onChange={(option) => {
-                                if (option) handleChange('tipoCliente', option.value)
+                                if (!option) return
+                                // Una Empresa no lleva cédula: si ya se había adjuntado una,
+                                // se saca (también de la Documentación, si entró desde acá)
+                                // para no subir la cédula de una persona a una empresa. Lo
+                                // ya completado con ella queda, editable.
+                                if (option.value === 'Empresa' && cedulaLeadFile) handleCedulaLeadChange(null)
+                                handleChange('tipoCliente', option.value)
                               }}
                             />
                           </label>
