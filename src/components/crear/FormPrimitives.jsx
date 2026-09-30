@@ -1,6 +1,6 @@
 // Primitivas de formulario del wizard "Crear Oportunidad" — extraídas de
 // CrearOportunidadForm.jsx (auditoría). Los estilos siguen en CrearOportunidadForm.css.
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Button, Dropdown, TextField } from '@vibe/core'
 import { MdCall, MdClear, MdEdit, MdInfoOutline, MdPersonAdd, MdPersonSearch } from 'react-icons/md'
 import { CODIGO_PAIS_OPTIONS, emailError, telefonoError, telefonoParaMostrar } from '../../services/personaFields'
@@ -357,6 +357,13 @@ export function ContactoFields({
                         name="contacto-oportunidad"
                         checked={false}
                         onChange={() => onElegirContacto?.(c.id)}
+                        // A pedido (navegar con teclado): Enter también elige el contacto
+                        // — el navegador solo lo hace con la barra espaciadora.
+                        onKeyDown={(e) => {
+                          if (e.key !== 'Enter') return
+                          e.preventDefault()
+                          onElegirContacto?.(c.id)
+                        }}
                       />
                       <span>
                         {etiquetaContacto(c)}
@@ -467,20 +474,27 @@ export function ContactoFields({
                   )}
                 </div>
               )}
-              <div className="crear-op__risk-toggle crear-op__contacto-caminos">
-                <button
-                  type="button"
-                  className={
-                    form.contactoModo === 'nuevo'
-                      ? 'crear-op__risk-option crear-op__risk-option--active'
-                      : 'crear-op__risk-option'
-                  }
-                  onClick={() => abrirNuevo()}
-                >
-                  <MdPersonAdd className="crear-op__risk-option-icon" />
-                  Crear un contacto nuevo
-                </button>
-              </div>
+              {/* A pedido: sin el botón suelto "Crear un contacto nuevo" — el contacto se
+                  busca, y si no aparece se crea desde el propio buscador con lo que se
+                  buscó ("Crear contacto con el celular…" / "Crear el contacto «…»"). El
+                  botón queda solo donde no hay buscador (no pasa hoy: las 2 pantallas del
+                  paso 1 lo tienen), para no dejar esa pantalla sin forma de crear uno. */}
+              {!permitirVincular && (
+                <div className="crear-op__risk-toggle crear-op__contacto-caminos">
+                  <button
+                    type="button"
+                    className={
+                      form.contactoModo === 'nuevo'
+                        ? 'crear-op__risk-option crear-op__risk-option--active'
+                        : 'crear-op__risk-option'
+                    }
+                    onClick={() => abrirNuevo()}
+                  >
+                    <MdPersonAdd className="crear-op__risk-option-icon" />
+                    Crear un contacto nuevo
+                  </button>
+                </div>
+              )}
             </>
           )}
 
@@ -620,5 +634,80 @@ export function StepHeading({ number, title, subtitle }) {
       </div>
       {subtitle && <p className="crear-op__step-subtitle">{subtitle}</p>}
     </div>
+  )
+}
+
+// Fecha escrita como dd/mm/aaaa, en un solo campo (a pedido: navegar el formulario con
+// Tab). El campo de fecha del navegador frenaba 4 veces — día, mes, año y el ícono del
+// calendario —, y una fecha de nacimiento se tipea, casi nunca se elige en el calendario.
+// Las barras se ponen solas al escribir. Hacia afuera sigue siendo AAAA-MM-DD, igual que
+// el <input type="date"> de antes: vacío ('') mientras la fecha no esté completa y sea real.
+const aTexto = (iso) => {
+  const m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(iso || '')
+  return m ? `${m[3]}/${m[2]}/${m[1]}` : ''
+}
+
+function conBarras(digitos) {
+  const d = digitos.slice(0, 8)
+  if (d.length <= 2) return d
+  if (d.length <= 4) return `${d.slice(0, 2)}/${d.slice(2)}`
+  return `${d.slice(0, 2)}/${d.slice(2, 4)}/${d.slice(4)}`
+}
+
+// ¿Existe esa fecha? (31/02 no). Devuelve el ISO o null.
+function isoDe(digitos) {
+  if (digitos.length !== 8) return null
+  const dia = Number(digitos.slice(0, 2))
+  const mes = Number(digitos.slice(2, 4))
+  const anio = Number(digitos.slice(4))
+  const f = new Date(anio, mes - 1, dia)
+  if (f.getFullYear() !== anio || f.getMonth() !== mes - 1 || f.getDate() !== dia) return null
+  return `${digitos.slice(4)}-${digitos.slice(2, 4)}-${digitos.slice(0, 2)}`
+}
+
+export function FechaTexto({ value, onChange, ariaLabel }) {
+  const [texto, setTexto] = useState(() => aTexto(value))
+  // Lo último que este campo mandó para arriba: si el valor cambia desde afuera (lo
+  // completó la lectura de la cédula, o se borró con la cruz), el texto se pone al día; si
+  // es el mismo que mandamos, no se toca lo que se está escribiendo (a medio escribir el
+  // valor de afuera es '').
+  const enviado = useRef(value)
+  useEffect(() => {
+    if (value !== enviado.current) {
+      enviado.current = value
+      setTexto(aTexto(value))
+    }
+  }, [value])
+
+  const digitos = texto.replace(/\D/g, '')
+  const invalida = digitos.length === 8 && !isoDe(digitos)
+
+  return (
+    <>
+      <input
+        type="text"
+        inputMode="numeric"
+        autoComplete="off"
+        placeholder="dd/mm/aaaa"
+        aria-label={ariaLabel}
+        aria-invalid={invalida || undefined}
+        value={texto}
+        maxLength={10}
+        onChange={(e) => {
+          // Las barras las pone conBarras solo entre números: borrar nunca deja una
+          // barra colgando.
+          const nuevos = e.target.value.replace(/\D/g, '').slice(0, 8)
+          setTexto(conBarras(nuevos))
+          const iso = isoDe(nuevos) ?? ''
+          enviado.current = iso
+          onChange(iso)
+        }}
+      />
+      {invalida && (
+        <span className="crear-op__field-error" role="alert">
+          Esa fecha no existe.
+        </span>
+      )}
+    </>
   )
 }

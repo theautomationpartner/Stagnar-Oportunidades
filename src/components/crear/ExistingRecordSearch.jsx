@@ -89,6 +89,10 @@ export function ExistingRecordSearch({ value, onChange }) {
         className="crear-op__search-row"
         onKeyDownCapture={(e) => {
           if (e.key !== 'Enter') return
+          // A pedido (navegar con teclado): si con las flechas ya se resaltó un resultado,
+          // Enter lo ELIGE — se deja pasar al Dropdown, que selecciona la opción
+          // resaltada. Solo sin nada resaltado, Enter es "Buscar".
+          if (menuOpen && options.length > 0 && e.target?.getAttribute?.('aria-activedescendant')) return
           e.preventDefault()
           e.stopPropagation()
           handleBuscar()

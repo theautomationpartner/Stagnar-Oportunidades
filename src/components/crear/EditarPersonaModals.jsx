@@ -11,7 +11,7 @@
 import { useState } from 'react'
 import { Modal, ModalContent, ModalFooter } from '@vibe/core'
 import { documentoDelTipoCliente, fechaError, fieldStateClass, maxFechaNacimiento, NACIONALIDAD_URUGUAY, stripCi } from '../../services/personaFields'
-import { ExtranjeroFields, Required, RequiredDropdown } from './FormPrimitives'
+import { ExtranjeroFields, FechaTexto, Required, RequiredDropdown } from './FormPrimitives'
 import { opcionesDeLocalidad } from '../../services/localidades'
 
 // Localidades filtradas por el departamento elegido (antes copiado en los 2 popups y en
@@ -50,7 +50,7 @@ function FechaNacimientoField({ value, onChange }) {
     <label className={`crear-op__field${fieldStateClass(value, fechaErr)}`}>
       <span>Fecha Nacimiento <Required /></span>
       <div className="crear-op__date-wrap">
-        <input type="date" value={value} max={maxFechaNacimiento()} onChange={(e) => onChange(e.target.value)} />
+        <FechaTexto ariaLabel="Fecha de nacimiento" value={value} onChange={onChange} />
       </div>
       {fechaErr && <span className="crear-op__field-error" role="alert">{fechaErr}</span>}
     </label>

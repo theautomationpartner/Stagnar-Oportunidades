@@ -1741,3 +1741,14 @@ button.crear-op__clientes-chip:hover {
 .crear-op:has(.crear-op__card--paso1) {
   padding-bottom: 0;
 }
+
+/* Fecha escrita (FechaTexto, ver FormPrimitives.jsx): sin el ícono del calendario del
+   navegador, la "x" de borrar va contra el borde. */
+.crear-op__date-wrap input[type='text'] {
+  width: 100%;
+  padding-right: 34px;
+}
+
+.crear-op__date-wrap:has(input[type='text']) .crear-op__date-clear {
+  right: 8px;
+}

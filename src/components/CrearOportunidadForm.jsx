@@ -76,7 +76,7 @@ import { revisarIdentificacion } from '../services/vehiculoIdentificacion'
 import { ciError, documentoDelTipoCliente, fechaError, fieldStateClass, maxFechaNacimiento, NACIONALIDAD_URUGUAY, normalizeFechaIA, splitNombreApellido, splitTelefono, stripCi, telefonoError, buildMondayPhone, emailError, buildMondayEmail } from '../services/personaFields'
 import { clearPersistedSearch, loadPersistedSearch, savePersistedSearch } from '../services/persistedSearch'
 import { publicarTrabajoEnCrear } from '../services/crearEnCurso'
-import { ContactoFields, ExtranjeroFields, Required, RequiredDropdown, SectionTitle, StepHeading } from './crear/FormPrimitives'
+import { ContactoFields, ExtranjeroFields, FechaTexto, Required, RequiredDropdown, SectionTitle, StepHeading } from './crear/FormPrimitives'
 import { ExistingRecordSearch } from './crear/ExistingRecordSearch'
 import { VehiculoManualFields } from './crear/VehiculoManualFields'
 import { EditarContactoModal } from './crear/EditarPersonaModals'
@@ -2148,11 +2148,10 @@ export default function CrearOportunidadForm({
                           <label className={`crear-op__field${fieldStateClass(form.fechaNacimiento, fechaError(form.fechaNacimiento))}`}>
                             <span>Fecha Nacimiento <Required /></span>
                             <div className="crear-op__date-wrap">
-                              <input
-                                type="date"
+                              <FechaTexto
+                                ariaLabel="Fecha de nacimiento"
                                 value={form.fechaNacimiento}
-                                max={maxFechaNacimiento()}
-                                onChange={(e) => handleChange('fechaNacimiento', e.target.value)}
+                                onChange={(iso) => handleChange('fechaNacimiento', iso)}
                               />
                               {form.fechaNacimiento && (
                                 <button
@@ -2160,6 +2159,9 @@ export default function CrearOportunidadForm({
                                   className="crear-op__date-clear"
                                   onClick={() => handleChange('fechaNacimiento', '')}
                                   aria-label="Borrar campo"
+                                  // Como las cruces de los demás campos: fuera del recorrido
+                                  // con Tab (a pedido, Tab de campo en campo).
+                                  tabIndex={-1}
                                 >
                                   <MdClear />
                                 </button>
