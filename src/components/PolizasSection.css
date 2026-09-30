@@ -1,0 +1,370 @@
+/* "Consultar pólizas": lista (PolizasSection) y ficha de solo lectura (PolizaDetalle).
+   Mismo esqueleto que Clientes. */
+.polizas {
+  margin: 20px var(--page-gutter, 32px) 32px;
+}
+
+.polizas__head h1,
+.poliza__head h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+
+.polizas__head p {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--text-gray);
+}
+
+.polizas__toolbar {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 14px;
+}
+
+.polizas__buscador {
+  width: 340px;
+  max-width: 100%;
+}
+
+.polizas__conteo {
+  font-size: 12px;
+  color: var(--text-gray);
+}
+
+.polizas__tabla-caja {
+  overflow-x: auto;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.polizas__tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.polizas__tabla th {
+  padding: 10px 14px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--text-gray);
+  border-bottom: 1px solid var(--border);
+  white-space: nowrap;
+}
+
+.polizas__tabla td {
+  padding: 11px 14px;
+  color: var(--text-dark);
+  border-bottom: 1px solid var(--border);
+  vertical-align: middle;
+}
+
+.polizas__tabla tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.polizas__fila {
+  cursor: pointer;
+}
+
+.polizas__fila:hover td,
+.polizas__fila:focus-visible td {
+  background: var(--tint-info);
+}
+
+.polizas__fila:focus-visible {
+  outline: none;
+}
+
+.polizas__cliente {
+  font-weight: 600;
+}
+
+.polizas__matricula,
+.polizas__vigencia,
+.polizas__num {
+  white-space: nowrap;
+}
+
+.polizas__num {
+  text-align: right !important;
+  font-variant-numeric: tabular-nums;
+}
+
+.polizas__muted {
+  color: var(--text-gray);
+}
+
+.polizas__vacio {
+  padding: 18px 14px !important;
+  color: var(--text-gray) !important;
+  text-align: center;
+}
+
+.polizas__estado {
+  display: inline-block;
+  padding: 2px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-gray);
+  background: var(--bg-subtle);
+  border-radius: 10px;
+  white-space: nowrap;
+}
+
+.polizas__estado--vigente {
+  color: #007a4d;
+  background: #e1f6ec;
+}
+
+.polizas__estado--baja {
+  color: #b3263a;
+  background: #fde7ea;
+}
+
+/* Paginado: mismo aspecto que Clientes. */
+.polizas__paginado {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+
+.polizas__paginado-resumen {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.polizas__paginado-paginas {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+
+.polizas__page-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 30px;
+  height: 30px;
+  padding: 0 6px;
+  font-size: 13px;
+  color: var(--text-dark);
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.polizas__page-btn:hover:not(:disabled) {
+  border-color: var(--border-input);
+}
+
+.polizas__page-btn:disabled {
+  color: var(--text-muted);
+  cursor: default;
+  opacity: 0.6;
+}
+
+.polizas__page-btn--activa {
+  font-weight: 700;
+  color: var(--tint-info-text);
+  background: var(--tint-info);
+  border-color: var(--primary-blue);
+}
+
+.polizas__page-gap {
+  padding: 0 4px;
+  color: var(--text-muted);
+}
+
+/* ---- Ficha de la póliza ---- */
+.poliza__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+  margin: 10px 0 16px;
+}
+
+.poliza__head p {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin: 0;
+  font-size: 14px;
+  color: var(--text-gray);
+}
+
+.poliza__resumen {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 2px;
+}
+
+.poliza__resumen-lbl {
+  font-size: 12px;
+  color: var(--text-gray);
+}
+
+.poliza__resumen-valor {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.15;
+  color: var(--text-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+.poliza__grilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: 14px;
+}
+
+.poliza__bloque {
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.poliza__bloque--ancho {
+  grid-column: 1 / -1;
+}
+
+.poliza__bloque h2 {
+  margin: 0 0 10px;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+
+.poliza__bloque dl {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 0 24px;
+  margin: 0;
+}
+
+.poliza__dato {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  border-bottom: 1px dashed var(--border);
+  font-size: 13px;
+}
+
+.poliza__dato dt {
+  flex: none;
+  color: var(--text-gray);
+}
+
+.poliza__dato dd {
+  margin: 0;
+  text-align: right;
+  color: var(--text-dark);
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+
+.poliza__observaciones {
+  font-weight: 400;
+  white-space: pre-wrap;
+  text-align: left;
+}
+
+.poliza__archivos {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 6px 0;
+  font-size: 13px;
+}
+
+.poliza__archivos-titulo {
+  min-width: 110px;
+  color: var(--text-gray);
+}
+
+.poliza__archivo {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  max-width: 100%;
+  padding: 5px 10px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--primary-blue);
+  background: #fff;
+  border: 1px solid var(--border-input);
+  border-radius: 6px;
+  cursor: pointer;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.poliza__archivo:hover:not(:disabled) {
+  border-color: var(--primary-blue);
+}
+
+.poliza__archivo-error {
+  width: 100%;
+  font-size: 12px;
+  color: var(--negative-color, #d83a52);
+}
+
+/* "Vencen entre [mes] y [mes]". */
+.polizas__vence {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: 8px;
+}
+
+.polizas__vence-lbl {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-gray);
+}
+
+/* Desplegable de mes (@vibe, igual que los filtros del resto de la app). */
+.polizas__mes {
+  width: 190px;
+}
+
+.polizas__restablecer {
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary-blue);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.polizas__restablecer:hover {
+  text-decoration: underline;
+}
+
+.polizas__rango {
+  margin: -6px 0 12px;
+  font-size: 12px;
+  color: var(--text-gray);
+}

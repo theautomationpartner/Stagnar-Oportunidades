@@ -1,5 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
-import { MdAdminPanelSettings, MdExpandMore, MdHome, MdNoteAdd, MdPeopleAlt, MdSearch } from 'react-icons/md'
+import {
+  MdAdminPanelSettings,
+  MdDescription,
+  MdExpandMore,
+  MdHome,
+  MdInsights,
+  MdNoteAdd,
+  MdPeopleAlt,
+  MdSearch,
+} from 'react-icons/md'
 import { usePuedeAdministrarUsuarios } from '../auth/AuthContext'
 import stagnariLogoSimple from '../assets/stagnari-logo-simple.png'
 import AlertModal from './AlertModal'
@@ -23,6 +32,8 @@ const ACCIONES = [
   { key: 'consultar', label: 'Consultar oportunidades', Icono: MdSearch },
   { key: 'crear', label: 'Crear una oportunidad', Icono: MdNoteAdd },
   { key: 'clientes', label: 'Gestionar clientes', Icono: MdPeopleAlt },
+  { key: 'polizas', label: 'Consultar pólizas', Icono: MdDescription },
+  { key: 'dashboard', label: 'Dashboards', Icono: MdInsights },
 ]
 // Solo para Admin (ver usePuedeAdministrarUsuarios).
 const ACCION_USUARIOS = { key: 'usuarios', label: 'Usuarios y accesos', Icono: MdAdminPanelSettings }

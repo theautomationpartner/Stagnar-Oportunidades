@@ -1,6 +1,7 @@
 import { useEffect, useState } from 'react'
 import {
   MdAdminPanelSettings,
+  MdInsights,
   MdAutorenew,
   MdChevronRight,
   MdDescription,
@@ -26,17 +27,18 @@ import './LandingScreen.css'
 // del alta (AsignadoPicker, que arranca con quien tiene la sesión) y adentro de la
 // oportunidad.
 //
-// Renovaciones y Consultar pólizas todavía no existen: se ven en gris, como
-// "Próximamente", para que la pantalla ya tenga su forma final.
+// Renovaciones todavía no existe: se ve en gris, como "Próximamente", para que la pantalla
+// ya tenga su forma final.
 //
 // "Usuarios y accesos" solo aparece para Admin (ver usePuedeAdministrarUsuarios).
-function acciones({ onCreateNew, onSearchExisting, onClientes, onUsuarios }) {
+function acciones({ onCreateNew, onSearchExisting, onClientes, onDashboard, onPolizas, onUsuarios }) {
   return [
     { key: 'consultar', label: 'Consultar oportunidades', desc: 'Buscar y continuar una existente', Icono: MdSearch, onClick: onSearchExisting },
     { key: 'crear', label: 'Crear una oportunidad', desc: 'Cotizar un riesgo nuevo', Icono: MdNoteAdd, onClick: onCreateNew },
     { key: 'clientes', label: 'Gestionar clientes', desc: 'Contactos, relaciones y grupo económico', Icono: MdPeopleAlt, onClick: onClientes },
+    { key: 'dashboard', label: 'Dashboards', desc: 'Oportunidades concretadas y no concretadas', Icono: MdInsights, onClick: onDashboard },
     { key: 'renovaciones', label: 'Renovaciones', desc: 'Seguimiento de las pólizas por vencer', Icono: MdAutorenew },
-    { key: 'polizas', label: 'Consultar pólizas', desc: 'Buscar una póliza emitida', Icono: MdDescription },
+    { key: 'polizas', label: 'Consultar pólizas', desc: 'Buscar una póliza emitida', Icono: MdDescription, onClick: onPolizas },
     ...(onUsuarios
       ? [{ key: 'usuarios', label: 'Usuarios y accesos', desc: 'Altas, bajas y roles de la lista blanca', Icono: MdAdminPanelSettings, onClick: onUsuarios }]
       : []),
@@ -53,7 +55,7 @@ function AvatarPersona({ persona }) {
   )
 }
 
-export default function LandingScreen({ onCreateNew, onSearchExisting, onClientes, onUsuarios }) {
+export default function LandingScreen({ onCreateNew, onSearchExisting, onClientes, onDashboard, onPolizas, onUsuarios }) {
   const puedeAdministrar = usePuedeAdministrarUsuarios()
   // Quién está en el sistema, en orden de certeza: la sesión de autenticación, el
   // contexto de monday (embebido), y de respaldo el dueño del token con el que la app
@@ -81,7 +83,14 @@ export default function LandingScreen({ onCreateNew, onSearchExisting, onCliente
   // que muestra (la descripción, o "Próximamente"). Sin distinguir acentos ni mayúsculas.
   const [busqueda, setBusqueda] = useState('')
   const buscado = normalizarParaMatch(busqueda)
-  const visibles = acciones({ onCreateNew, onSearchExisting, onClientes, onUsuarios: puedeAdministrar ? onUsuarios : null })
+  const visibles = acciones({
+            onCreateNew,
+            onSearchExisting,
+            onClientes,
+            onDashboard,
+            onPolizas,
+            onUsuarios: puedeAdministrar ? onUsuarios : null,
+          })
     .map((a) => ({ ...a, texto: a.onClick ? a.desc : 'Próximamente' }))
     .filter((a) => !buscado || normalizarParaMatch(`${a.label} ${a.texto}`).includes(buscado))
   const puedeSalir = !deshabilitada && Boolean(usuarioSesion)

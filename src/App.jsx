@@ -22,6 +22,9 @@ const ClienteGestion = lazy(() => import('./components/ClienteGestion'))
 const GruposSection = lazy(() => import('./components/GruposSection'))
 const GrupoDetalle = lazy(() => import('./components/GrupoDetalle'))
 const UsuariosAdmin = lazy(() => import('./components/UsuariosAdmin'))
+const DashboardSection = lazy(() => import('./components/DashboardSection'))
+const PolizasSection = lazy(() => import('./components/PolizasSection'))
+const PolizaDetalle = lazy(() => import('./components/PolizaDetalle'))
 import {
   fetchOpportunitiesPage,
   fetchDepartamentos,
@@ -379,6 +382,24 @@ export default function App() {
         />
       </Suspense>
     )
+  } else if (route.seg === 'polizas' && route.id) {
+    main = (
+      <Suspense fallback={<LoadingScreen title="Abriendo la póliza" message="Estamos trayendo sus datos desde monday." />}>
+        <PolizaDetalle key={route.id} polizaId={route.id} onBack={() => go('polizas')} />
+      </Suspense>
+    )
+  } else if (route.seg === 'polizas') {
+    main = (
+      <Suspense fallback={<LoadingScreen title="Cargando pólizas" message="Un momento, estamos trayendo las pólizas desde monday." />}>
+        <PolizasSection onOpenPoliza={(id) => go('polizas', id)} />
+      </Suspense>
+    )
+  } else if (route.seg === 'dashboard') {
+    main = (
+      <Suspense fallback={<LoadingScreen title="Armando el dashboard" message="Estamos trayendo las oportunidades desde monday." />}>
+        <DashboardSection />
+      </Suspense>
+    )
   } else if (route.seg === 'usuarios') {
     // La pantalla la protege el backend (el endpoint exige usuarios.administrar); acá solo
     // se esconde el acceso para quien no es Admin (ver LandingScreen y AccionBar).
@@ -393,6 +414,8 @@ export default function App() {
         onCreateNew={nav.goCreate}
         onSearchExisting={nav.goTable}
         onClientes={() => go('clientes')}
+        onDashboard={() => go('dashboard')}
+        onPolizas={() => go('polizas')}
         onUsuarios={() => go('usuarios')}
       />
     )
@@ -484,8 +507,8 @@ export default function App() {
                   // dropdown no tiene entrada propia, la tarea sigue siendo esa.
                   route.seg === 'clientes' || route.seg === 'grupos' || route.seg === 'contactos'
                   ? 'clientes'
-                  : route.seg === 'usuarios'
-                    ? 'usuarios'
+                  : route.seg === 'usuarios' || route.seg === 'dashboard' || route.seg === 'polizas'
+                    ? route.seg
                     : 'consultar'
             }
             enDetalle={enDetalle}
@@ -495,6 +518,8 @@ export default function App() {
               if (accion === 'crear') nav.goCreate()
               else if (accion === 'clientes') go('clientes')
               else if (accion === 'usuarios') go('usuarios')
+              else if (accion === 'dashboard') go('dashboard')
+              else if (accion === 'polizas') go('polizas')
               else nav.goTable()
             }}
           />

@@ -1,0 +1,345 @@
+/* Sección de Dashboards (ver DashboardSection.jsx). Mismo esqueleto que Clientes.
+   Colores de las series: slots categóricos 3 / 2 / 1 de la paleta de referencia de dataviz,
+   validados juntos (modo claro, pasa CVD); siempre acompañados de su etiqueta. */
+.dash {
+  --dash-concretada: #1baf7a;
+  --dash-no-concretada: #eb6834;
+  --dash-en-curso: #2a78d6;
+  margin: 20px var(--page-gutter, 32px) 32px;
+}
+
+.dash__head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+
+.dash__head h1 {
+  margin: 0 0 4px;
+  font-size: 24px;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+
+.dash__head p {
+  margin: 0;
+  font-size: 13px;
+  color: var(--text-gray);
+}
+
+.dash__secciones {
+  display: inline-flex;
+  margin-bottom: 14px;
+}
+
+.dash__filtros {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 12px 20px;
+  margin-bottom: 8px;
+}
+
+.dash__pills {
+  display: inline-flex;
+}
+
+.dash__pills .pill-tabs__tab {
+  padding: 7px 12px;
+}
+
+.dash__pills .pill-tabs__tab:disabled {
+  opacity: 0.45;
+  cursor: default;
+}
+
+.dash__filtro-fecha {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.dash__filtro-lbl {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-gray);
+}
+
+.dash__rango {
+  margin: 0 0 16px;
+  font-size: 13px;
+  color: var(--text-gray);
+}
+
+.dash__sin-fecha {
+  color: var(--text-warning);
+}
+
+/* Fila de indicadores. */
+.dash__tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.dash__tile {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 16px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.dash__tile-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-gray);
+}
+
+.dash__tile-valor {
+  font-size: 32px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--text-dark);
+  font-variant-numeric: tabular-nums;
+}
+
+.dash__tile-detalle {
+  font-size: 12px;
+  color: var(--text-gray);
+}
+
+.dash__swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 3px;
+}
+
+/* Panel por vendedor. */
+.dash__panel {
+  padding: 14px 16px 12px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.dash__panel-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 8px;
+}
+
+.dash__panel-head h2 {
+  margin: 0;
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+
+.dash__leyenda {
+  display: flex;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  font-size: 12px;
+  color: var(--text-gray);
+}
+
+.dash__leyenda li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.dash__tabla {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+}
+
+.dash__tabla th {
+  padding: 8px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  text-align: left;
+  color: var(--text-gray);
+  border-bottom: 1px solid var(--border);
+}
+
+.dash__tabla td {
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  color: var(--text-dark);
+}
+
+.dash__tabla tbody tr:last-child td {
+  border-bottom: none;
+}
+
+.dash__nombre {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.dash__col-barra {
+  width: 38%;
+}
+
+.dash__num {
+  text-align: right !important;
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
+
+.dash__num--total {
+  font-weight: 700;
+}
+
+/* Barra apilada: marcas finas, 2px de separación entre segmentos y extremos redondeados. */
+.dash__barra {
+  display: flex;
+  gap: 2px;
+  min-width: 6px;
+  height: 12px;
+}
+
+.dash__segmento {
+  flex-basis: 0;
+  min-width: 4px;
+  height: 100%;
+  cursor: default;
+}
+
+.dash__segmento:first-child {
+  border-radius: 4px 0 0 4px;
+}
+
+.dash__segmento:last-child {
+  border-radius: 0 4px 4px 0;
+}
+
+.dash__segmento:only-child {
+  border-radius: 4px;
+}
+
+.dash__vacio {
+  margin: 12px 0;
+  font-size: 13px;
+  color: var(--text-gray);
+}
+
+.dash__nota {
+  margin: 10px 0 0;
+  font-size: 12px;
+  color: var(--text-gray);
+}
+
+.dash__tooltip {
+  position: fixed;
+  z-index: 50;
+  padding: 6px 10px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #fff;
+  background: #1f1f1f;
+  border-radius: 6px;
+  pointer-events: none;
+  white-space: nowrap;
+}
+
+/* Por estado: los 3 grupos lado a lado, cada estado con su barra (misma escala para todos). */
+.dash__panel--estados {
+  margin-bottom: 16px;
+}
+
+.dash__grupos {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(340px, 1fr));
+  gap: 12px 24px;
+}
+
+.dash__grupo-head {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding-bottom: 6px;
+  margin-bottom: 4px;
+  font-size: 13px;
+  font-weight: 700;
+  color: var(--text-dark);
+  border-bottom: 1px solid var(--border);
+}
+
+.dash__grupo-total {
+  margin-left: auto;
+  font-variant-numeric: tabular-nums;
+}
+
+.dash__estados {
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.dash__estados li {
+  display: grid;
+  grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr) 32px 40px;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 0;
+  font-size: 13px;
+  color: var(--text-dark);
+}
+
+.dash__estado--cero {
+  color: var(--text-gray) !important;
+}
+
+.dash__estado-nombre {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.dash__estado-barra-caja {
+  display: block;
+  height: 10px;
+}
+
+.dash__estado-barra {
+  display: block;
+  min-width: 4px;
+  height: 100%;
+  border-radius: 0 4px 4px 0;
+}
+
+.dash__estado-pct {
+  color: var(--text-gray);
+  font-size: 12px;
+}
+
+/* "Actualizado el …" al lado del botón. */
+.dash__actualizar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.dash__actualizado {
+  font-size: 12px;
+  color: var(--text-gray);
+  white-space: nowrap;
+}

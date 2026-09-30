@@ -11,6 +11,14 @@ export function formatUsd(value) {
   return `USD ${Number(value).toLocaleString('es-UY')}`
 }
 
+// Importe de una póliza con su moneda ("UYU" / "USD", columna Moneda) y con centavos: los
+// importes de las pólizas (prima, IVA, redondeo) los traen.
+export function formatImporte(valor, moneda) {
+  if (valor === '' || valor == null || Number.isNaN(Number(valor))) return '—'
+  const prefijo = String(moneda).toUpperCase() === 'USD' ? 'U$S' : '$'
+  return `${prefijo} ${Number(valor).toLocaleString('es-UY', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`
+}
+
 // Las columnas "date" de monday devuelven texto tipo "2026-08-11" o, si la columna
 // tiene hora habilitada, "2026-08-11 11:39:00" — acá se corta a dd/mm/aa siempre,
 // sin hora, sin importar cuál de los 2 formatos llegó (ver opportunityMapper.js,

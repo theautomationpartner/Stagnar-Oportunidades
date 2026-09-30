@@ -16,6 +16,9 @@ import { useCallback, useEffect, useState } from 'react'
 //   #/grupos                    lista de grupos económicos
 //   #/grupos/:id                administración de un grupo (miembros, roles)
 //   #/usuarios                  usuarios y accesos (lista blanca, solo Admin)
+//   #/dashboard                 dashboards (por ahora, Oportunidades)
+//   #/polizas                   lista de pólizas (solo lectura)
+//   #/polizas/:id               ficha de una póliza (solo lectura)
 //
 // Hash (no pathname) a propósito: la app corre embebida en un iframe de monday y en
 // Vercel/Vite como SPA — el hash no requiere reglas de rewrite y no interfiere con la
@@ -29,6 +32,8 @@ const parse = () => {
   if (seg === 'grupos') return { seg, id: id || null, step: null }
   if (seg === 'crear') return { seg, id: null, step: null }
   if (seg === 'usuarios') return { seg, id: null, step: null }
+  if (seg === 'dashboard') return { seg, id: null, step: null }
+  if (seg === 'polizas') return { seg, id: id || null, step: null }
   return { seg: 'inicio', id: null, step: null }
 }
 

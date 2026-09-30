@@ -2701,3 +2701,302 @@ export async function setCostoManual(subitemId, compania, datos) {
   })
   return data.change_multiple_column_values
 }
+
+// Dashboard de Oportunidades (ver services/dashboardOportunidades.js): todas las
+// oportunidades, solo con lo que hace falta para contarlas — estado, asignado y las 3
+// fechas por las que se puede filtrar (creación, cotización y cierre).
+const DASHBOARD_OPORTUNIDADES_COLUMNAS = ['deal_stage', 'deal_owner', 'date_mm52w0h8', 'deal_expected_close_date']
+
+const DASHBOARD_OPORTUNIDADES_PAGE_QUERY = `
+  query DashboardOportunidades($boardId: ID!, $limit: Int!, $cols: [String!]) {
+    boards(ids: [$boardId]) {
+      items_page(limit: $limit) {
+        cursor
+        items { id created_at column_values(ids: $cols) { id text } }
+      }
+    }
+  }
+`
+
+const DASHBOARD_OPORTUNIDADES_NEXT_QUERY = `
+  query DashboardOportunidadesNext($cursor: String!, $limit: Int!, $cols: [String!]) {
+    next_items_page(cursor: $cursor, limit: $limit) {
+      cursor
+      items { id created_at column_values(ids: $cols) { id text } }
+    }
+  }
+`
+
+export async function fetchOportunidadesDashboard() {
+  const items = []
+  let cursor = null
+  do {
+    const vars = { limit: 500, cols: DASHBOARD_OPORTUNIDADES_COLUMNAS }
+    const data = cursor
+      ? await callMondayApi(DASHBOARD_OPORTUNIDADES_NEXT_QUERY, { ...vars, cursor })
+      : await callMondayApi(DASHBOARD_OPORTUNIDADES_PAGE_QUERY, { ...vars, boardId: OPPORTUNITIES_BOARD_ID })
+    const pagina = cursor ? data.next_items_page : data.boards[0].items_page
+    items.push(...pagina.items)
+    cursor = pagina.cursor
+  } while (cursor)
+  return items.map((it) => {
+    const v = Object.fromEntries(it.column_values.map((cv) => [cv.id, (cv.text ?? '').trim()]))
+    return {
+      id: String(it.id),
+      estado: v.deal_stage,
+      asignados: v.deal_owner ? v.deal_owner.split(',').map((n) => n.trim()).filter(Boolean) : [],
+      creadaEn: it.created_at,
+      fechaCotizacion: v.date_mm52w0h8,
+      fechaCierre: v.deal_expected_close_date,
+    }
+  })
+}
+
+// Los estados de "Estado Oportunidad" (deal_stage) en el mismo orden que tienen en el
+// tablero (labels_positions_v2), para que el dashboard los muestre todos — también los que
+// hoy no tienen ninguna oportunidad, y cualquiera que se agregue después.
+const ESTADOS_OPORTUNIDAD_QUERY = `
+  query EstadosOportunidad($boardId: ID!) {
+    boards(ids: [$boardId]) { columns(ids: ["deal_stage"]) { settings_str } }
+  }
+`
+
+export async function fetchEstadosOportunidad() {
+  const data = await callMondayApi(ESTADOS_OPORTUNIDAD_QUERY, { boardId: OPPORTUNITIES_BOARD_ID })
+  const settings = JSON.parse(data.boards?.[0]?.columns?.[0]?.settings_str || '{}')
+  const posiciones = settings.labels_positions_v2 ?? {}
+  const desactivadas = new Set((settings.deactivated_labels ?? []).map(String))
+  return Object.entries(settings.labels ?? {})
+    .filter(([id, nombre]) => String(nombre).trim() && !desactivadas.has(String(id)))
+    .sort(([a], [b]) => (posiciones[a] ?? 999) - (posiciones[b] ?? 999))
+    .map(([, nombre]) => String(nombre).trim())
+}
+
+// ---- Pólizas (solo lectura) --------------------------------------------------------
+//
+// Sección "Consultar pólizas" (ver components/PolizasSection.jsx y PolizaDetalle.jsx): la
+// lista con los datos básicos y la ficha completa de una póliza. La app no escribe nada
+// acá. El tablero "📄 Pólizas Automóviles" lleva el Cliente, el Vehículo y la Tarjeta como
+// relaciones; la ficha trae además los datos de esos ítems.
+export const POLIZAS_BOARD_ID = Number(import.meta.env.VITE_MONDAY_POLIZAS_BOARD_ID) || 18420863011
+const VEHICULOS_BOARD_COLUMNAS = [
+  'text_mm4pj3gx', // Matrícula
+  'text_mm4pj57', // Marca
+  'text_mm4pvqp8', // Modelo
+  'numeric_mm4p20j9', // Año
+  'text_mm4pygkk', // Motor
+  'text_mm4pwdp3', // Chasis
+  'text_mm5eskkj', // Padrón
+  'text_mm5e62tr', // Plan
+  'color_mm5es3aq', // Categoría Vehículo
+  'color_mm512r7r', // Zona circulación
+]
+const CLIENTE_POLIZA_COLUMNAS = ['text_mm4vk9aq', 'numeric_mm51eyk2', 'color_mm51rgar', 'long_text_mm6m7d8c']
+const TARJETA_COLUMNAS = ['text_mm4p4324', 'text_mm4ptsem', 'color_mm4p1pya', 'text_mm4pmk1f', 'text_mm4pq220']
+
+// Lo que se muestra en la lista (y por lo que se busca).
+const POLIZAS_LISTA_COLUMNAS = [
+  'text_mm4p95y5', // Número de póliza
+  'dropdown_mm5sybw1', // Compañía
+  'dropdown_mm57pbjp', // Cobertura
+  'board_relation_mm4pgvx7', // Cliente
+  'board_relation_mm4pd2t6', // Vehículo
+  'lookup_mm5j2bdr', // Matrícula (espejo del vehículo)
+  'timerange_mm4psxd9', // Vigencia
+  'date_mm4vhenz', // Vencimiento
+  'color_mm4phwhf', // Estado
+  'color_mm4p1gw4', // Moneda
+  'numeric_mm5en5gx', // Premio Total
+  'dropdown_mm5e1mcq', // Tipo de Mov
+]
+
+const POLIZA_VALORES_FRAGMENT = `
+  id
+  text
+  value
+  ... on BoardRelationValue { display_value linked_item_ids }
+  ... on MirrorValue { display_value }
+`
+
+const POLIZAS_PAGE_QUERY = `
+  query Polizas($boardId: ID!, $limit: Int!, $cols: [String!]) {
+    boards(ids: [$boardId]) {
+      items_page(limit: $limit) { cursor items { id name column_values(ids: $cols) { ${POLIZA_VALORES_FRAGMENT} } } }
+    }
+  }
+`
+
+const POLIZAS_NEXT_QUERY = `
+  query PolizasNext($cursor: String!, $limit: Int!, $cols: [String!]) {
+    next_items_page(cursor: $cursor, limit: $limit) { cursor items { id name column_values(ids: $cols) { ${POLIZA_VALORES_FRAGMENT} } } }
+  }
+`
+
+const valoresPorId = (item) =>
+  Object.fromEntries(
+    item.column_values.map((cv) => [
+      cv.id,
+      { texto: (cv.display_value ?? cv.text ?? '').trim(), value: cv.value, ids: cv.linked_item_ids ?? [] },
+    ])
+  )
+
+// "2026-08-24 - 2027-09-06" → { desde, hasta }
+function vigenciaDe(texto) {
+  const m = /(\d{4}-\d{2}-\d{2})\s*-\s*(\d{4}-\d{2}-\d{2})/.exec(texto ?? '')
+  return m ? { desde: m[1], hasta: m[2] } : { desde: '', hasta: '' }
+}
+
+function mapPolizaLista(item) {
+  const v = valoresPorId(item)
+  const t = (id) => v[id]?.texto ?? ''
+  return {
+    id: String(item.id),
+    nombre: item.name,
+    numero: t('text_mm4p95y5'),
+    compania: t('dropdown_mm5sybw1'),
+    cobertura: t('dropdown_mm57pbjp'),
+    cliente: t('board_relation_mm4pgvx7'),
+    vehiculo: t('board_relation_mm4pd2t6'),
+    matricula: t('lookup_mm5j2bdr'),
+    ...vigenciaDe(t('timerange_mm4psxd9')),
+    vencimiento: t('date_mm4vhenz'),
+    estado: t('color_mm4phwhf'),
+    moneda: t('color_mm4p1gw4'),
+    premioTotal: t('numeric_mm5en5gx'),
+    tipoMovimiento: t('dropdown_mm5e1mcq'),
+  }
+}
+
+export async function fetchPolizas() {
+  const items = []
+  let cursor = null
+  do {
+    const vars = { limit: 500, cols: POLIZAS_LISTA_COLUMNAS }
+    const data = cursor
+      ? await callMondayApi(POLIZAS_NEXT_QUERY, { ...vars, cursor })
+      : await callMondayApi(POLIZAS_PAGE_QUERY, { ...vars, boardId: POLIZAS_BOARD_ID })
+    const pagina = cursor ? data.next_items_page : data.boards[0].items_page
+    items.push(...pagina.items)
+    cursor = pagina.cursor
+  } while (cursor)
+  return items.map(mapPolizaLista)
+}
+
+const ITEMS_POR_ID_QUERY = `
+  query ItemsPorId($ids: [ID!], $cols: [String!]) {
+    items(ids: $ids) { id name column_values(ids: $cols) { ${POLIZA_VALORES_FRAGMENT} } }
+  }
+`
+
+const POLIZA_COMPLETA_QUERY = `
+  query PolizaCompleta($ids: [ID!]) {
+    items(ids: $ids) { id name group { title } created_at column_values { ${POLIZA_VALORES_FRAGMENT} } }
+  }
+`
+
+// Archivos de una columna file: [{ assetId, nombre }] (se abren con fetchAssetAsFile).
+function archivosDe(valor) {
+  try {
+    return (JSON.parse(valor?.value || '{}').files ?? [])
+      .filter((f) => f.assetId)
+      .map((f) => ({ assetId: f.assetId, nombre: f.name }))
+  } catch {
+    return []
+  }
+}
+
+// La ficha completa: todas las columnas de la póliza + los datos del vehículo, el cliente
+// y la tarjeta vinculados. Solo lee.
+export async function fetchPolizaDetalle(id) {
+  const data = await callMondayApi(POLIZA_COMPLETA_QUERY, { ids: [String(id)] })
+  const item = data.items?.[0]
+  if (!item) return null
+  const v = valoresPorId(item)
+  const t = (col) => v[col]?.texto ?? ''
+  const primero = (col) => v[col]?.ids?.[0] ?? null
+
+  const vinculado = async (col, cols) => {
+    const ligado = primero(col)
+    if (!ligado) return null
+    const r = await callMondayApi(ITEMS_POR_ID_QUERY, { ids: [String(ligado)], cols }).catch(() => null)
+    const it = r?.items?.[0]
+    if (!it) return null
+    const vv = valoresPorId(it)
+    return { id: String(it.id), nombre: it.name, t: (c) => vv[c]?.texto ?? '' }
+  }
+  const [vehiculo, cliente, tarjeta] = await Promise.all([
+    vinculado('board_relation_mm4pd2t6', VEHICULOS_BOARD_COLUMNAS),
+    vinculado('board_relation_mm4pgvx7', CLIENTE_POLIZA_COLUMNAS),
+    vinculado('board_relation_mm4p7y89', TARJETA_COLUMNAS),
+  ])
+
+  return {
+    id: String(item.id),
+    nombre: item.name,
+    grupo: item.group?.title ?? '',
+    numero: t('text_mm4p95y5'),
+    compania: t('dropdown_mm5sybw1'),
+    cobertura: t('dropdown_mm57pbjp'),
+    producto: t('text_mm5e7cg6'),
+    estado: t('color_mm4phwhf'),
+    tipoMovimiento: t('dropdown_mm5e1mcq'),
+    origen: t('dropdown_mm5eq90c'),
+    tipoRenovacion: t('dropdown_mm5ejggf'),
+    fechaEmision: t('date_mm5et40'),
+    ...vigenciaDe(t('timerange_mm4psxd9')),
+    vencimiento: t('date_mm4vhenz'),
+    uso: t('color_mm4wrqfb'),
+    moneda: t('color_mm4p1gw4'),
+    importes: {
+      primaComercial: t('numeric_mm4prray'),
+      primaMinima: t('numeric_mm5e1bhs'),
+      impuestoMsp: t('numeric_mm5eat41'),
+      iva: t('numeric_mm5ebrr8'),
+      redondeo: t('numeric_mm5eased'),
+      premioTotal: t('numeric_mm5en5gx'),
+      costoTotal: t('numeric_mm4wht62'),
+    },
+    bonificacion: t('numeric_mm4w85n'),
+    deducible: t('numeric_mm4wb54q'),
+    formaPago: t('color_mm4pz8v0'),
+    medioPago: t('color_mm5e8ksz'),
+    modoFacturacion: t('dropdown_mm5e59p3'),
+    adicionales: t('dropdown_mm5eftr0'),
+    corredor: t('multiple_person_mm5sfbeg'),
+    carpeta: t('numeric_mm5ebybw'),
+    observaciones: t('long_text_mm4pyc26'),
+    renovaciones: t('board_relation_mm4t9ake'),
+    polizaRelacionada: t('board_relation_mm5j7dj6'),
+    archivosPoliza: archivosDe(v.file_mm5edy60),
+    otrosArchivos: archivosDe(v.file_mm4vbtec),
+    cliente: {
+      nombre: cliente?.nombre ?? t('board_relation_mm4pgvx7'),
+      ci: cliente?.t('text_mm4vk9aq') ?? '',
+      rut: cliente?.t('numeric_mm51eyk2') ?? '',
+      tipo: cliente?.t('color_mm51rgar') ?? '',
+      direccion: cliente?.t('long_text_mm6m7d8c') ?? '',
+    },
+    vehiculo: {
+      nombre: vehiculo?.nombre ?? t('board_relation_mm4pd2t6'),
+      matricula: vehiculo?.t('text_mm4pj3gx') || t('lookup_mm5j2bdr'),
+      marca: vehiculo?.t('text_mm4pj57') ?? '',
+      modelo: vehiculo?.t('text_mm4pvqp8') ?? '',
+      anio: vehiculo?.t('numeric_mm4p20j9') ?? '',
+      motor: vehiculo?.t('text_mm4pygkk') ?? '',
+      chasis: vehiculo?.t('text_mm4pwdp3') ?? '',
+      padron: vehiculo?.t('text_mm5eskkj') ?? '',
+      plan: vehiculo?.t('text_mm5e62tr') ?? '',
+      categoria: vehiculo?.t('color_mm5es3aq') ?? '',
+      zona: vehiculo?.t('color_mm512r7r') ?? '',
+    },
+    tarjeta: tarjeta
+      ? {
+          tipo: tarjeta.t('color_mm4p1pya'),
+          banco: tarjeta.t('text_mm4ptsem'),
+          ultimos4: tarjeta.t('text_mm4p4324'),
+          vencimiento: tarjeta.t('text_mm4pmk1f'),
+          titular: tarjeta.t('text_mm4pq220'),
+        }
+      : null,
+  }
+}
