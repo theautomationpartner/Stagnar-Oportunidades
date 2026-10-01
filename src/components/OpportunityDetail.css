@@ -332,6 +332,11 @@
   overflow-y: auto;
 }
 
+/* Botón "Recargar la página" adentro del aviso de que se cayó el chunk del envío. */
+.opp-detail__recargar-accion {
+  margin-top: 10px;
+}
+
 .opp-detail__lectura-gate {
   margin: 20px var(--page-gutter) 32px;
   display: flex;

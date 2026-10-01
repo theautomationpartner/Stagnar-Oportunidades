@@ -32,6 +32,8 @@ import logoSancor from '../assets/aseguradoras/oficial/sancor.png'
 import logoSura from '../assets/aseguradoras/oficial/sura.png'
 
 const WIDTH = 900
+// Calidad del JPEG de salida (ver el final de renderQuoteImageDataUrl).
+const CALIDAD_JPEG = 0.85
 const PAD = 36
 const INNER = WIDTH - PAD * 2
 const FONT = 'Arial, Helvetica, sans-serif'
@@ -57,6 +59,12 @@ const INSURER_LOGOS = {
   SURA: logoSura,
 }
 
+// Cuánto se espera un logo antes de dibujar la cotización sin él. Sin esto, una imagen
+// que no dispara ni onload ni onerror (pasa: una respuesta que queda colgada) dejaba la
+// promesa sin resolver para siempre, y con ella el "Preparando imágenes..." del botón de
+// enviar, que nunca llegaba a abrir el popup.
+const LOGO_TIMEOUT_MS = 8000
+
 const imageCache = new Map()
 function loadImage(src) {
   if (!src) return Promise.resolve(null)
@@ -65,9 +73,20 @@ function loadImage(src) {
       src,
       new Promise((resolve) => {
         const img = new Image()
-        img.onload = () => resolve(img)
+        const timer = setTimeout(() => {
+          // Se saca del cache: fue un problema de este momento (red lenta), no del logo.
+          // Si queda cacheado el null, la cotización se dibuja sin logo por el resto de
+          // la sesión aunque la red ya se haya recuperado.
+          imageCache.delete(src)
+          resolve(null)
+        }, LOGO_TIMEOUT_MS)
+        const terminar = (valor) => {
+          clearTimeout(timer)
+          resolve(valor)
+        }
+        img.onload = () => terminar(img)
         // Un logo que no carga no debe romper la cotización: se dibuja sin él.
-        img.onerror = () => resolve(null)
+        img.onerror = () => terminar(null)
         img.src = src
       })
     )
@@ -825,5 +844,13 @@ export async function renderQuoteImageDataUrl(opportunity, raw, quote) {
   drawContent(ctx, opportunity, raw, quote, height, logos, { benefitsFont, benefitsExtra, gapExtra })
   drawFooter(ctx, height - FOOTER_TOTAL, logos)
 
-  return canvas.toDataURL('image/png')
+  // JPEG y no PNG: el envío por WhatsApp pasa por /api/make-webhook, que es una función
+  // serverless de Vercel y rechaza con 413 cualquier cuerpo de más de 4,5 MB. Con varias
+  // propuestas seleccionadas, los PNG de ~300-450 KB cada uno se acercaban a ese techo.
+  // En JPEG la misma tarjeta queda en ~80-130 KB.
+  //
+  // El canvas se rellena opaco antes de dibujar (ver drawContent), así que no hay
+  // transparencia que el JPEG pueda ensuciar. 0.85 es el punto donde no se ven artefactos
+  // en los números ni en el texto chico a 900 px de ancho, que es lo único que importa acá.
+  return canvas.toDataURL('image/jpeg', CALIDAD_JPEG)
 }

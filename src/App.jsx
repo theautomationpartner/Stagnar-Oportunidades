@@ -1,5 +1,9 @@
 import { Suspense, lazy, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import LoadingScreen from './components/LoadingScreen'
+// Todas las pantallas lazy de acá abajo van envueltas en importarConReintento: si se
+// publicó una versión nueva mientras la pestaña estaba abierta, el archivo con el hash
+// viejo ya no existe y entrar a esa pantalla daba pantalla en blanco. Ver cargaDiferida.js.
+import { importarConReintento } from './services/cargaDiferida'
 import { useHashRoute } from './hooks/useHashRoute'
 import { AppProviders } from './context/AppContext'
 import PageHeader from './components/PageHeader'
@@ -9,23 +13,23 @@ import OpportunitiesTable from './components/OpportunitiesTable'
 // Auditoría: las 2 pantallas más pesadas (detalle ~1.300 líneas + sus 4 paneles, y el
 // wizard de creación ~2.900 líneas) se cargan recién cuando se entra a ellas — el
 // chunk inicial queda con landing + tabla + filtros.
-const OpportunityDetail = lazy(() => import('./components/OpportunityDetail'))
+const OpportunityDetail = lazy(() => importarConReintento(() => import('./components/OpportunityDetail')))
 import LandingScreen from './components/LandingScreen'
 import AccionBar from './components/AccionBar'
-const CrearOportunidadForm = lazy(() => import('./components/CrearOportunidadForm'))
+const CrearOportunidadForm = lazy(() => importarConReintento(() => import('./components/CrearOportunidadForm')))
 // Sección Clientes (gestión de contactos, relaciones y grupo económico) — mismo criterio
 // de lazy que el detalle/wizard: se carga recién al entrar.
-const ClientesSection = lazy(() => import('./components/ClientesSection'))
+const ClientesSection = lazy(() => importarConReintento(() => import('./components/ClientesSection')))
 // Tabla del tablero Contactos. Va lazy por lo mismo que las otras secciones: no se abre
 // en el camino normal de cotizar, y no tiene por qué pesar en el bundle inicial.
-const ContactosSection = lazy(() => import('./components/ContactosSection'))
-const ClienteGestion = lazy(() => import('./components/ClienteGestion'))
-const GruposSection = lazy(() => import('./components/GruposSection'))
-const GrupoDetalle = lazy(() => import('./components/GrupoDetalle'))
-const UsuariosAdmin = lazy(() => import('./components/UsuariosAdmin'))
-const DashboardSection = lazy(() => import('./components/DashboardSection'))
-const PolizasSection = lazy(() => import('./components/PolizasSection'))
-const PolizaDetalle = lazy(() => import('./components/PolizaDetalle'))
+const ContactosSection = lazy(() => importarConReintento(() => import('./components/ContactosSection')))
+const ClienteGestion = lazy(() => importarConReintento(() => import('./components/ClienteGestion')))
+const GruposSection = lazy(() => importarConReintento(() => import('./components/GruposSection')))
+const GrupoDetalle = lazy(() => importarConReintento(() => import('./components/GrupoDetalle')))
+const UsuariosAdmin = lazy(() => importarConReintento(() => import('./components/UsuariosAdmin')))
+const DashboardSection = lazy(() => importarConReintento(() => import('./components/DashboardSection')))
+const PolizasSection = lazy(() => importarConReintento(() => import('./components/PolizasSection')))
+const PolizaDetalle = lazy(() => importarConReintento(() => import('./components/PolizaDetalle')))
 import {
   fetchOpportunitiesPage,
   fetchDepartamentos,

@@ -52,22 +52,126 @@ function dataUrlToBlob(dataUrl) {
 // mismo flag que usan las solapas del paso "Comparar y enviar" (coberturaGroupOf) — si
 // una cobertura no cae en ninguna familia, se manda "SIN-FAMILIA" en vez de un segmento
 // vacío (un "____" ambiguo al hacer split() del lado de Make).
-function buildFilename(raw, opportunity, ext = 'png') {
+// La extensión por defecto es .jpg porque renderQuoteImageDataUrl ahora genera JPEG (ver
+// el comentario ahí: en PNG el envío de varias propuestas se acercaba al límite de 4,5 MB
+// de Vercel). Si el escenario de Make filtrara por extensión, es acá donde hay que mirar.
+function buildFilename(raw, opportunity, ext = 'jpg') {
   const cobertura = raw.cobertura || raw.name
   const tipo = coberturaGroupOf(raw.cobertura) ?? 'SIN-FAMILIA'
   return `${raw.compania}__${cobertura}__${tipo}__${opportunity.oppNumber}.${ext}`
+}
+
+// ---------------------------------------------------------------------------
+// Envío por tandas
+//
+// /api/make-webhook es una función serverless de Vercel y Vercel rechaza con 413
+// cualquier cuerpo de más de 4,5 MB, en el borde, antes de que corra el handler. Con el
+// pasaje a JPEG una tanda de 10 propuestas ronda 1 MB, así que esto casi nunca se va a
+// disparar — pero si alguien selecciona muchas, en vez de un 413 sin explicación el
+// envío se parte en varios POST.
+//
+// Las tandas van SECUENCIALES, no en paralelo: así el cliente las recibe en orden y, si
+// el escenario rechaza el envío por una razón de negocio (ver leerErrorDeMake), se corta
+// antes de mandar el resto.
+//
+// IMPORTANTE para el lado de Make: cada tanda es una EJECUCIÓN distinta del escenario, y
+// el escenario manda un saludo y escribe en monday una vez por ejecución. Por eso viajan
+// `parte` y `totalPartes`: el saludo y las escrituras tienen que quedar condicionados a
+// `parte = 1`, o el cliente recibe el saludo repetido.
+// ---------------------------------------------------------------------------
+const LIMITE_VERCEL_BYTES = 4.5 * 1024 * 1024
+// Margen para los campos de texto (phone, opportunityId, formato...), los boundaries del
+// multipart y los headers de cada parte.
+const PRESUPUESTO_TANDA = LIMITE_VERCEL_BYTES - 256 * 1024
+// Lo que ocupa el envoltorio de cada archivo dentro del multipart (boundary,
+// Content-Disposition con el nombre, Content-Type, saltos de línea).
+const OVERHEAD_POR_ARCHIVO = 256
+
+// Agrupa las cotizaciones en tandas que entren en el presupuesto. Cada cotización viaja
+// entera en una sola tanda (su imagen y su texto juntos): si se separaran, del lado de
+// Make la iteración de `images` y la de `texts` dejarían de corresponderse.
+function repartirEnTandas(adjuntos) {
+  const tandas = []
+  let actual = []
+  let pesoActual = 0
+  for (const adjunto of adjuntos) {
+    // Una cotización que sola no entra igual se manda: que el proxy la rechace con un
+    // error es mejor que descartarla en silencio. Con JPEG a 900 px es inalcanzable.
+    if (actual.length && pesoActual + adjunto.peso > PRESUPUESTO_TANDA) {
+      tandas.push(actual)
+      actual = []
+      pesoActual = 0
+    }
+    actual.push(adjunto)
+    pesoActual += adjunto.peso
+  }
+  if (actual.length) tandas.push(actual)
+  return tandas
 }
 
 // LOG-17: qué se le manda al cliente. "imagen" es lo de siempre; "texto" manda la misma
 // cotización escrita (ver whatsappText.js) y "ambos", las dos cosas.
 export const FORMATOS_ENVIO = ['imagen', 'texto', 'ambos']
 
-export async function sendQuotesToWhatsApp({ phone, opportunity, images, formato = 'imagen', telefonoEnvio }) {
+export async function sendQuotesToWhatsApp({ phone, opportunity, images, formato = 'imagen', telefonoEnvio, onTanda }) {
+  const mandaImagen = formato === 'imagen' || formato === 'ambos'
+  const mandaTexto = formato === 'texto' || formato === 'ambos'
+
+  // Los archivos de cada cotización, ya convertidos a Blob y con su peso medido, para
+  // poder repartirlos en tandas antes de mandar nada.
+  const adjuntos = images
+    .map(({ raw, imageDataUrl, texto }) => {
+      const archivos = []
+      if (mandaImagen && imageDataUrl) {
+        archivos.push({ campo: 'images', blob: dataUrlToBlob(imageDataUrl), nombre: buildFilename(raw, opportunity) })
+      }
+      // El texto viaja como archivo .txt bajo el campo "texts" — mismo esquema que las
+      // imágenes (un solo campo repetido, con compañía/cobertura/familia codificadas en el
+      // "name") para que del lado de Make se itere igual, con el mismo split(), y no haya
+      // que correlacionar dos arrays sueltos por índice. Ver el comentario grande de arriba.
+      if (mandaTexto && texto) {
+        archivos.push({
+          campo: 'texts',
+          blob: new Blob([texto], { type: 'text/plain' }),
+          nombre: buildFilename(raw, opportunity, 'txt'),
+        })
+      }
+      const peso = archivos.reduce((t, a) => t + a.blob.size + a.nombre.length + OVERHEAD_POR_ARCHIVO, 0)
+      return { archivos, peso }
+    })
+    .filter((a) => a.archivos.length)
+
+  const tandas = repartirEnTandas(adjuntos)
+  let enviadas = 0
+  for (const [indice, tanda] of tandas.entries()) {
+    onTanda?.({ parte: indice + 1, totalPartes: tandas.length })
+    try {
+      await postearTanda({ phone, opportunity, formato, telefonoEnvio, tanda, parte: indice + 1, totalPartes: tandas.length })
+    } catch (err) {
+      // Si se cortó después de haber mandado algo, el cliente ya recibió esa parte: hay
+      // que decirlo, porque reintentar a ciegas le manda repetido lo que ya le llegó.
+      if (enviadas > 0) {
+        throw new Error(
+          `Se enviaron ${enviadas} de ${adjuntos.length} cotizaciones y el envío se cortó. ${err.message}`
+        )
+      }
+      throw err
+    }
+    enviadas += tanda.length
+  }
+}
+
+async function postearTanda({ phone, opportunity, formato, telefonoEnvio, tanda, parte, totalPartes }) {
   const formData = new FormData()
   formData.append('phone', phone)
   formData.append('opportunityId', opportunity.id)
   formData.append('oppNumber', opportunity.oppNumber)
   formData.append('clienteNombre', opportunity.clienteNombre)
+  // Para el lado de Make: cada tanda es una ejecución nueva del escenario, así que el
+  // saludo al cliente y las escrituras en monday tienen que condicionarse a `parte = 1`.
+  // En el caso normal (una sola tanda) viajan como 1 y 1, y el filtro se cumple siempre.
+  formData.append('parte', String(parte))
+  formData.append('totalPartes', String(totalPartes))
   // A pedido: el número de origen elegido en WhatsAppSendModal (ver
   // fetchTelefonosEnvioHabilitados), para que el escenario de Make pueda usarlo para
   // decidir por cuál línea/dispositivo mandar. Solo viaja si hay uno resuelto — el
@@ -79,20 +183,11 @@ export async function sendQuotesToWhatsApp({ phone, opportunity, images, formato
   // llega ya se comporta bien sin mirarlo.
   formData.append('formato', formato)
 
-  const mandaImagen = formato === 'imagen' || formato === 'ambos'
-  const mandaTexto = formato === 'texto' || formato === 'ambos'
-
-  for (const { raw, imageDataUrl, texto } of images) {
-    if (mandaImagen && imageDataUrl) {
-      const blob = dataUrlToBlob(imageDataUrl)
-      formData.append('images', blob, buildFilename(raw, opportunity))
-    }
-    // El texto viaja como archivo .txt bajo el campo "texts" — mismo esquema que las
-    // imágenes (un solo campo repetido, con compañía/cobertura/familia codificadas en el
-    // "name") para que del lado de Make se itere igual, con el mismo split(), y no haya
-    // que correlacionar dos arrays sueltos por índice. Ver el comentario grande de arriba.
-    if (mandaTexto && texto) {
-      formData.append('texts', new Blob([texto], { type: 'text/plain' }), buildFilename(raw, opportunity, 'txt'))
+  // Los archivos de esta tanda, ya armados y medidos por sendQuotesToWhatsApp. El orden
+  // importa: así el cliente recibe las cotizaciones como estaban en pantalla.
+  for (const { archivos } of tanda) {
+    for (const { campo, blob, nombre } of archivos) {
+      formData.append(campo, blob, nombre)
     }
   }
 

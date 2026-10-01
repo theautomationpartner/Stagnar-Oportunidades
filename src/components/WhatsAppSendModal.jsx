@@ -38,6 +38,7 @@ export default function WhatsAppSendModal({
   onClose,
   onSendStart,
   onSendFailed,
+  onSendSettled,
   onSent,
   sendPolling,
   envioErrorDetail,
@@ -107,10 +108,17 @@ export default function WhatsAppSendModal({
     opcionesContacto.find((o) => o.value === opportunity.contactoId) ??
     opcionesContacto.find((o) => o.telefono.replace(/\D/g, '') === String(phone).replace(/\D/g, '')) ??
     null
-  const [formato, setFormato] = useState('imagen')
+  // 'imagen' es el default de siempre, salvo que NINGUNA cotización haya podido
+  // dibujarse (ver openWhatsAppModalWith: una que falla llega con imageDataUrl null).
+  // En ese caso arrancar en "Imagen" mostraría una previsualización vacía y el envío no
+  // adjuntaría nada, así que se arranca en "Texto", que sí tiene contenido.
+  const [formato, setFormato] = useState(() => (images.some((i) => i.imageDataUrl) ? 'imagen' : 'texto'))
   const mandaImagen = formato === 'imagen' || formato === 'ambos'
   const mandaTexto = formato === 'texto' || formato === 'ambos'
   const [sending, setSending] = useState(false)
+  // En qué tanda va el envío, cuando el paquete fue tan grande que hubo que partirlo
+  // ({ parte, totalPartes }, ver sendQuotesToWhatsApp). null en el caso normal.
+  const [tanda, setTanda] = useState(null)
   const [error, setError] = useState(null)
   const [submitted, setSubmitted] = useState(false)
 
@@ -177,7 +185,14 @@ export default function WhatsAppSendModal({
     try {
       estadoAnterior = await onSendStart?.()
       setSubmitted(true)
-      await sendQuotesToWhatsApp({ phone, opportunity, images, formato, telefonoEnvio: telefonoEnvioSeleccionado?.telefono })
+      await sendQuotesToWhatsApp({
+        phone,
+        opportunity,
+        images,
+        formato,
+        telefonoEnvio: telefonoEnvioSeleccionado?.telefono,
+        onTanda: setTanda,
+      })
       enviado = true
       await onSent?.(images)
     } catch (err) {
@@ -193,6 +208,10 @@ export default function WhatsAppSendModal({
       }
     } finally {
       setSending(false)
+      // Haya salido bien o mal, ya no queda nada en vuelo: recién acá el polling del
+      // detalle puede volver a avanzar de paso según el Estado Envío (ver
+      // handleWhatsAppSendSettled — importa cuando el envío se partió en tandas).
+      onSendSettled?.()
     }
   }
 
@@ -216,7 +235,12 @@ export default function WhatsAppSendModal({
             {sendInProgress && (
               <div className="wa-modal__sending">
                 <GradientSpinner size={48} />
-                <h2 className="wa-modal__sending-title">Enviando propuesta por WhatsApp...</h2>
+                <h2 className="wa-modal__sending-title">
+                  Enviando propuesta por WhatsApp
+                  {/* Solo cuando el envío se parte en varias tandas por tamaño (ver
+                      repartirEnTandas): si no, decir "tanda 1 de 1" confunde. */}
+                  {tanda && tanda.totalPartes > 1 ? ` (tanda ${tanda.parte} de ${tanda.totalPartes})` : ''}...
+                </h2>
                 <p className="wa-modal__sending-subtitle">
                   Procesando imagen y conectando con el destinatario (+{phone})
                 </p>
@@ -357,7 +381,16 @@ export default function WhatsAppSendModal({
               <div className="wa-modal__preview-grid">
                 {images.map(({ raw, imageDataUrl }) => (
                   <div className="wa-modal__preview-item" key={raw.id}>
-                    <img src={imageDataUrl} alt={`${raw.compania} ${coberturaParaMostrar(raw)}`} />
+                    {/* Sin imageDataUrl el <img> quedaría roto y, peor, daría a entender
+                        que esa cotización se va a mandar con imagen cuando no se adjunta
+                        (ver sendQuotesToWhatsApp). Se dice explícitamente. */}
+                    {imageDataUrl ? (
+                      <img src={imageDataUrl} alt={`${raw.compania} ${coberturaParaMostrar(raw)}`} />
+                    ) : (
+                      <div className="wa-modal__preview-item--sin-imagen">
+                        No se pudo generar la imagen de esta cotización. Se manda solo el texto.
+                      </div>
+                    )}
                     <span>
                       {raw.compania} · {coberturaParaMostrar(raw)}
                     </span>

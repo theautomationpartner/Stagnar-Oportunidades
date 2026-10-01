@@ -50,11 +50,38 @@ import { textOf } from '../services/mondayColumns'
 import { useSchema } from '../context/AppContext'
 import { mapSubitemToRawQuote, groupQuotesByCompania } from '../services/quoteMapper'
 import { renderQuoteText } from '../services/whatsappText'
+import { esChunkCaido } from '../services/cargaDiferida'
 import { computeQuote, isQuoteSelectable } from '../services/pricingEngine'
 import { applyBonificacionPorDefecto, applyRecargoLookup } from '../services/recargoPanel'
 import { ordenarRecomendado } from '../services/ordenRecomendado'
 import { COTIZAR_FIELDS, getInvalidCotizarFields, getMissingCotizarFields } from '../services/cotizarFields'
 import { COBERTURA_TABS, coberturaGroupOf } from '../services/coberturaGroups'
+
+// A diferencia de las pantallas lazy de App.jsx, acá NO se usa importarConReintento: esa
+// recarga la página sola, y en este punto la persona ya tiene propuestas seleccionadas y
+// un popup por abrir. Se reintenta una vez por si fue un corte de red puntual y, si
+// vuelve a fallar, el error sube para que handleOpenWhatsAppModal lo muestre con un botón
+// de recargar — la decisión de perder la selección es de quien está usando la app, no
+// nuestra. El por qué del 404 está explicado en cargaDiferida.js.
+async function importarWhatsappImage() {
+  try {
+    return await import('../services/whatsappImage')
+  } catch (err) {
+    if (!esChunkCaido(err)) throw err
+    return import('../services/whatsappImage')
+  }
+}
+
+// renderQuoteText con red: una cotización que no se puede escribir queda con el texto
+// vacío (el popup lo avisa) en vez de tumbar el envío de todas las demás.
+function textoDeCotizacion(opportunity, raw, quote) {
+  try {
+    return renderQuoteText(opportunity, raw, quote)
+  } catch (err) {
+    console.error(`No se pudo armar el texto de la cotización ${raw?.id}`, err)
+    return ''
+  }
+}
 
 // A pedido: órdenes disponibles para las tarjetas de "Comparar y enviar" (ver
 // ordenElegido y el selector arriba de la grilla). Las claves son las del mapa de
@@ -254,6 +281,18 @@ export default function OpportunityDetail({
   const [confirmingPaso3, setConfirmingPaso3] = useState(false)
   const [confirmPaso3Error, setConfirmPaso3Error] = useState(null)
   const [sendPolling, setSendPolling] = useState(false)
+  // Mientras el envío está en vuelo, el polling de Estado Envío NO avanza de paso.
+  //
+  // El escenario de Make escribe "Enviado" al terminar cada ejecución, y un envío que se
+  // partió en tandas por tamaño (ver repartirEnTandas en makeWebhook.js) son varias
+  // ejecuciones: sin esto, la primera tanda dejaba "Enviado" en monday y el polling
+  // saltaba a "Confirmar" mientras las demás todavía estaban saliendo — y si una fallaba,
+  // la persona ya estaba en el paso siguiente con un envío a medias.
+  //
+  // En el caso normal (una sola tanda) no cambia nada perceptible: Make escribe "Enviado"
+  // y responde casi al mismo tiempo, así que la bandera se baja justo cuando el polling
+  // iba a encontrar el cambio igual.
+  const envioEnCursoRef = useRef(false)
   const [polizaPolling, setPolizaPolling] = useState(false)
   const [confirmandoEmision, setConfirmandoEmision] = useState(false)
   const [confirmarEmisionError, setConfirmarEmisionError] = useState(null)
@@ -609,7 +648,9 @@ export default function OpportunityDetail({
 
       // --- Estado Envio (color_mm4wr1t4): corta en "Enviado" o "Error". El paso activo
       // pasa a "Confirmar" recién acá, cuando "Enviado" se confirma de verdad.
-      if (sendPolling) {
+      // envioEnCursoRef: ver su declaración — con el envío partido en tandas, la primera
+      // ya deja "Enviado" en monday y saltar acá sería adelantarse a las que faltan.
+      if (sendPolling && !envioEnCursoRef.current) {
         const estadoEnvio = textOf(data.column_values, ESTADO_ENVIO_COLUMN_ID)
         if (estadoEnvio === 'Enviado' || estadoEnvio === 'Error') {
           setSendPolling(false)
@@ -1239,6 +1280,7 @@ export default function OpportunityDetail({
   // Devuelve el estado que había, para poder volver atrás si el POST falla.
   const handleWhatsAppSendStart = async () => {
     onOpportunityAction?.()
+    envioEnCursoRef.current = true
     setEnvioErrorDetail(null)
     setActividadError(null)
     const anterior = textOf(item?.column_values ?? [], ESTADO_ENVIO_COLUMN_ID)
@@ -1251,6 +1293,13 @@ export default function OpportunityDetail({
     }))
     setSendPolling(true)
     return anterior
+  }
+
+  // Se terminó de postear todo (haya salido bien o mal): a partir de acá el polling puede
+  // volver a decidir según el Estado Envío que dejó Make. Lo llama el modal en su finally,
+  // que es el único punto por el que pasan los dos desenlaces.
+  const handleWhatsAppSendSettled = () => {
+    envioEnCursoRef.current = false
   }
 
   // El POST no salió: dejar la oportunidad marcada como "Enviando" sería mentir sobre algo
@@ -1988,32 +2037,78 @@ export default function OpportunityDetail({
   }
 
   const [preparingWaImages, setPreparingWaImages] = useState(false)
+  // Por qué no se pudo abrir el popup de envío. { mensaje, recargar } — `recargar` pide
+  // mostrar el botón de recargar la página (ver esChunkCaido más abajo).
+  const [prepararEnvioError, setPrepararEnvioError] = useState(null)
+
   const handleOpenWhatsAppModal = async () => {
     // Auditoría: antes el botón quedaba "muerto" (sin spinner ni disabled) mientras se
     // renderizaban N imágenes a canvas en serie. whatsappImage.js se importa recién acá
     // (import dinámico) — es el único uso y no tiene sentido cargarlo con la app entera.
     setPreparingWaImages(true)
+    setPrepararEnvioError(null)
     try {
-      const { renderQuoteImageDataUrl } = await import('../services/whatsappImage')
+      const { renderQuoteImageDataUrl } = await importarWhatsappImage()
       await openWhatsAppModalWith(renderQuoteImageDataUrl)
+    } catch (err) {
+      // REPORTE: "había varias propuestas marcadas, apreté Enviar y no cargaba el popup;
+      // recargué la página y anduvo". Antes acá no había catch: cualquier falla dejaba el
+      // popup sin abrir, el spinner se apagaba solo (por el finally) y el botón quedaba
+      // como si nunca lo hubieran tocado — sin una sola pista de qué había pasado. Ahora
+      // el error se ve y, si es del tipo que se arregla recargando, se ofrece hacerlo.
+      console.error('No se pudo preparar el envío por WhatsApp', err)
+      setPrepararEnvioError(
+        esChunkCaido(err)
+          ? {
+              recargar: true,
+              mensaje:
+                'Se publicó una versión nueva de la app mientras tenías esta pestaña abierta, así que faltó una parte que se carga recién al enviar. Recargá la página y volvé a intentar: no se pierde nada de lo que seleccionaste.',
+            }
+          : { recargar: false, mensaje: err?.message || 'Error desconocido al preparar las imágenes.' }
+      )
     } finally {
       setPreparingWaImages(false)
     }
   }
+
   const openWhatsAppModalWith = async (renderQuoteImageDataUrl) => {
     const selectedEntries = groups
       .flatMap((g) => g.entries)
       .filter((e) => selectableSelectedIds.has(e.raw.id))
-    const images = await Promise.all(
-      selectedEntries.map(async (e) => ({
-        raw: e.raw,
-        quote: e.quote,
-        imageDataUrl: await renderQuoteImageDataUrl(opportunity, e.raw, e.quote),
-        // LOG-17: la misma cotización en texto. Se arma siempre (es un string, no cuesta
-        // nada al lado del canvas) — el formato se elige después, adentro del popup.
-        texto: renderQuoteText(opportunity, e.raw, e.quote),
-      }))
+    // allSettled y no all: con varias propuestas marcadas, UNA sola que falle al
+    // dibujarse hacía que no se abriera el popup para NINGUNA. Ahora la que falla queda
+    // sin imagen (imageDataUrl: null) y el envío sigue siendo posible — el texto de esa
+    // cotización se arma igual, y tanto el popup como el webhook ya toleran que falte la
+    // imagen (ver sendQuotesToWhatsApp: solo adjunta las que existen).
+    const renders = await Promise.allSettled(
+      selectedEntries.map((e) => renderQuoteImageDataUrl(opportunity, e.raw, e.quote))
     )
+    renders.forEach((r, i) => {
+      if (r.status === 'rejected') {
+        console.error(`No se pudo dibujar la cotización ${selectedEntries[i].raw.id}`, r.reason)
+      }
+    })
+    const images = selectedEntries.map((e, i) => ({
+      raw: e.raw,
+      quote: e.quote,
+      imageDataUrl: renders[i].status === 'fulfilled' ? renders[i].value : null,
+      // LOG-17: la misma cotización en texto. Se arma siempre (es un string, no cuesta
+      // nada al lado del canvas) — el formato se elige después, adentro del popup.
+      // Por el mismo motivo que el allSettled de arriba: que una cotización no se pueda
+      // escribir no puede impedir mandar las otras. El popup ya muestra un cartel cuando
+      // `texto` viene vacío.
+      texto: textoDeCotizacion(opportunity, e.raw, e.quote),
+    }))
+    const fallaron = images.filter((i) => !i.imageDataUrl).length
+    if (fallaron) {
+      setPrepararEnvioError({
+        recargar: false,
+        mensaje:
+          fallaron === images.length
+            ? 'No se pudo generar la imagen de ninguna de las cotizaciones. Podés mandarlas igual eligiendo el formato "Texto" en el popup.'
+            : `No se pudo generar la imagen de ${fallaron} de las ${images.length} cotizaciones seleccionadas. Las demás se mandan normal; esas van solo con el texto.`,
+      })
+    }
     setWaModalImages(images)
   }
 
@@ -2368,6 +2463,30 @@ export default function OpportunityDetail({
                 </AttentionBox>
               )}
 
+              {/* Por qué no se abrió el popup de envío (o por qué se abrió incompleto).
+                  Antes esto fallaba en silencio: el botón volvía a la normalidad y no
+                  pasaba nada más. */}
+              {prepararEnvioError && (
+                <AttentionBox
+                  type={prepararEnvioError.recargar ? 'warning' : 'danger'}
+                  title={
+                    prepararEnvioError.recargar
+                      ? 'Hay que recargar la página para poder enviar'
+                      : 'No se pudo preparar el envío'
+                  }
+                  onClose={() => setPrepararEnvioError(null)}
+                >
+                  {prepararEnvioError.mensaje}
+                  {prepararEnvioError.recargar && (
+                    <div className="opp-detail__recargar-accion">
+                      <Button kind="primary" size="small" onClick={() => window.location.reload()}>
+                        <MdAutorenew /> Recargar la página
+                      </Button>
+                    </div>
+                  )}
+                </AttentionBox>
+              )}
+
               {/* A pedido: mismo footer pegado abajo del todo que los otros 3 pasos de
                   la Oportunidad (ver StepFooter) — "Volver" a la izquierda vuelve a
                   Cotizar, el contador de seleccionadas + estado de envío quedan al
@@ -2525,6 +2644,7 @@ export default function OpportunityDetail({
           onClose={() => setWaModalImages(null)}
           onSendStart={handleWhatsAppSendStart}
           onSendFailed={handleWhatsAppSendFailed}
+          onSendSettled={handleWhatsAppSendSettled}
           onSent={handleWhatsAppSent}
           sendPolling={sendPolling}
           envioErrorDetail={envioErrorDetail}
