@@ -3,6 +3,7 @@ import mondaySdk from 'monday-sdk-js'
 import { fetchProtegido } from '../auth/fetchProtegido'
 import { COLUMNAS_VALIDACION_POLIZA } from './validacionPoliza'
 import { textOf } from './mondayColumns'
+import { prepararArchivoParaSubir } from './subidaArchivos'
 
 // SDK cliente de monday (no confundir con `callMondayApi` de acá abajo, que pega
 // contra /api/monday con la API key del servidor) — se usa solo para lo que hace
@@ -875,12 +876,15 @@ export async function setSubitemColumnValue(subitemId, columnId, value) {
 // constantes, así que no hay riesgo de inyección.
 export async function uploadFileToColumn(itemId, columnId, file) {
   invalidateCache(`files:${itemId}:${columnId}`)
+  // Las fotos se achican acá: /api/monday-file es una función serverless de Vercel y
+  // Vercel rechaza con 413 cualquier cuerpo de más de 4,5 MB (ver subidaArchivos.js).
+  const archivo = await prepararArchivoParaSubir(file)
   const formData = new FormData()
   formData.append(
     'query',
     `mutation ($file: File!) { add_file_to_column (item_id: ${itemId}, column_id: "${columnId}", file: $file) { id } }`
   )
-  formData.append('variables[file]', file, file.name)
+  formData.append('variables[file]', archivo, archivo.name)
 
   const response = await fetchProtegido('/api/monday-file', { method: 'POST', body: formData })
   const data = await leerRespuestaMonday(response)
@@ -902,8 +906,12 @@ export async function uploadFileToColumn(itemId, columnId, file) {
 // nunca llegue al bundle del navegador) y de paso evita el problema de CORS de pegarle
 // directo a un Custom Webhook de Make desde el cliente.
 export async function leerCartaAutomovil(file) {
+  // Mismo límite de 4,5 MB que la subida a monday — este proxy también es una función de
+  // Vercel. Achicar no le cuesta nada a la lectura: el escenario manda la imagen directo
+  // a Claude, que de todas formas la redimensiona antes de leerla (ver subidaArchivos.js).
+  const archivo = await prepararArchivoParaSubir(file)
   const formData = new FormData()
-  formData.append('file', file, file.name)
+  formData.append('file', archivo, archivo.name)
   const response = await fetchProtegido('/api/leer-carta-automovil', { method: 'POST', body: formData })
   if (!response.ok) {
     throw new Error(`El escenario de Make devolvió un error (${response.status})`)
@@ -923,8 +931,10 @@ export async function leerCartaAutomovil(file) {
 // nombres de campo (fecha_nacimineto/departametno) están así, con el typo y todo, en el
 // escenario real de Make; CrearOportunidadForm.jsx los lee tal cual llegan.
 export async function leerCedula(file) {
+  // Idem leerCartaAutomovil: proxy en Vercel, mismo tope de 4,5 MB.
+  const archivo = await prepararArchivoParaSubir(file)
   const formData = new FormData()
-  formData.append('file', file, file.name)
+  formData.append('file', archivo, archivo.name)
   const response = await fetchProtegido('/api/leer-cedula', { method: 'POST', body: formData })
   if (!response.ok) {
     throw new Error(`El escenario de Make devolvió un error (${response.status})`)
