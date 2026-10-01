@@ -368,3 +368,180 @@
   font-size: 12px;
   color: var(--text-gray);
 }
+
+/* Visor del PDF de la póliza (ver PolizaDetalle.jsx#VisorPdf). */
+.poliza__visor {
+  margin-bottom: 14px;
+  padding: 12px 16px 16px;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+}
+
+.poliza__visor-barra {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 16px;
+  margin-bottom: 10px;
+}
+
+.poliza__visor-barra h2 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+  font-size: 14px;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+
+.poliza__visor-barra h2 svg {
+  font-size: 18px;
+  color: #d83a52;
+}
+
+.poliza__visor-archivos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.poliza__visor-archivo {
+  max-width: 260px;
+  padding: 4px 10px;
+  overflow: hidden;
+  font: inherit;
+  font-size: 12px;
+  color: var(--text-gray);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  background: #fff;
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  cursor: pointer;
+}
+
+.poliza__visor-archivo--activo {
+  color: var(--primary-blue);
+  border-color: var(--primary-blue);
+  background: var(--tint-info);
+}
+
+.poliza__visor-acciones {
+  display: flex;
+  gap: 8px;
+  margin-left: auto;
+}
+
+.poliza__visor-boton {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 30px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-dark);
+  text-decoration: none;
+  background: #fff;
+  border: 1px solid var(--border-input);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.poliza__visor-boton:hover {
+  border-color: var(--text-gray);
+}
+
+.poliza__visor-marco {
+  height: 640px;
+  overflow: hidden;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.poliza__visor-pdf {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.poliza__visor-mensaje {
+  margin: 0;
+  padding: 24px;
+  font-size: 13px;
+  color: var(--text-gray);
+}
+
+/* Ficha: 3 columnas de tarjetas de peso parecido (ver PolizaDetalle.jsx). La última de
+   cada columna se estira para que las 3 terminen a la misma altura. */
+.poliza__columnas {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 14px;
+}
+
+.poliza__columna {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  min-width: 0;
+}
+
+.poliza__columna > .poliza__bloque:last-child {
+  flex: 1;
+}
+
+.poliza__columna .poliza__bloque dl {
+  grid-template-columns: minmax(0, 1fr);
+}
+
+@media (max-width: 1000px) {
+  .poliza__columnas {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* El visor, ahora abajo de los datos. */
+.poliza .poliza__visor {
+  margin: 14px 0 0;
+}
+
+/* Pantallas angostas (celular / monday en una ventana chica): la barra de búsqueda y
+   "Vencen entre [mes] y [mes]" se apilan a todo el ancho en vez de desbordar la página.
+   La tabla sigue con scroll horizontal adentro de su caja. */
+@media (max-width: 640px) {
+  .polizas__buscador {
+    flex: 1;
+    width: auto;
+    min-width: 0;
+  }
+
+  .polizas__vence {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) auto minmax(0, 1fr);
+    width: 100%;
+    margin-left: 0;
+  }
+
+  .polizas__vence-lbl:first-child,
+  .polizas__restablecer {
+    grid-column: 1 / -1;
+  }
+
+  .polizas__mes {
+    width: auto;
+    min-width: 0;
+  }
+}
+
+/* El visor no pasa del alto de la pantalla (en un celular 640px fijos eran más que la
+   pantalla entera). */
+.poliza__visor-marco {
+  height: clamp(360px, 75vh, 640px);
+}
