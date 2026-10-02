@@ -86,6 +86,9 @@ export function mapOpportunityItem(item, statusColors = {}) {
   const clienteLocalidad = boardRelationDisplayOf(ccv, 'board_relation_mm65e7he')
   const clienteDepartamento = boardRelationDisplayOf(ccv, 'board_relation_mm657jse')
   const clienteSituacion = textOf(ccv, 'color_mm6570m0')
+  // Tipo Cliente (Particular/Empresa): con una Empresa el documento de la oportunidad es
+  // el RUT y así se rotula al editarlo (ver CotizarStepPanel).
+  const clienteTipo = textOf(ccv, 'color_mm51rgar')
 
   // MON-14: el Contacto de esta oportunidad — con quien se habló y a quien se le mandó la
   // información. El Teléfono y el Email son SUYOS (ya no del Cliente: esas columnas se
@@ -129,6 +132,7 @@ export function mapOpportunityItem(item, statusColors = {}) {
     clienteNombre,
     clienteId: clienteItem?.id ?? null,
     clienteSituacion,
+    clienteTipo,
     // MON-14: datos del Contacto (a quien se le manda la info). `contactoTelefono` es el
     // número VIGENTE del contacto; `telefono` (más abajo) es la copia que quedó en la
     // oportunidad al cotizar — se mantienen los dos a propósito: la copia es el registro

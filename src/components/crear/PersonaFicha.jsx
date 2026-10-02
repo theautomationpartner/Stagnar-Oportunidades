@@ -14,8 +14,10 @@ import { formatShortDate } from '../../services/format'
 //
 // - source: 'contacto' | 'lead' → tag "Cliente"/"Lead".
 // - cedula: { file, uploading?, onChange } para el campo "Cédula de Identidad (frente)".
+// - documentoLabel: "CI" o "RUT" según el tipo de cliente (ver documentoDelTipoCliente).
 export default function PersonaFicha({
   form,
+  documentoLabel = 'CI',
   selectedLocalidad,
   selectedDepartamento,
   source,
@@ -44,7 +46,9 @@ export default function PersonaFicha({
         )}
       </div>
       <div className="crear-op__ficha-badges">
-        <span className="crear-op__ficha-badge">CI: {form.ci || '—'}</span>
+        <span className="crear-op__ficha-badge">
+          {documentoLabel}: {form.ci || '—'}
+        </span>
         <span className="crear-op__ficha-badge">
           Nacimiento: {form.fechaNacimiento ? formatShortDate(form.fechaNacimiento) : '—'}
         </span>

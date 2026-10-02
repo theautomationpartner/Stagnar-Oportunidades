@@ -90,7 +90,7 @@ export default function ClientContextBar({ opportunity, onEdit, actions, tag }) 
         <div className="client-bar__panel" id="client-bar-panel" role="region" aria-label="Más datos del cliente">
           <dl className="client-bar__details">
             <div className="client-bar__detail">
-              <dt>CI</dt>
+              <dt>{opportunity.clienteTipo === 'Empresa' ? 'RUT' : 'CI'}</dt>
               <dd>{opportunity.ci || '—'}</dd>
             </div>
             {/* MON-14: Teléfono y Email son del CONTACTO (a quien se le manda la

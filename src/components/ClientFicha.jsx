@@ -74,7 +74,8 @@ export default function ClientFicha({
       </div>
 
       <div className="client-ficha__badges">
-        <span className="client-ficha__badge">CI: {opportunity.ci || '—'}</span>
+        {/* Una Empresa lleva RUT, no cédula. */}
+        <span className="client-ficha__badge">{opportunity.clienteTipo === 'Empresa' ? 'RUT' : 'CI'}: {opportunity.ci || '—'}</span>
         <span className="client-ficha__badge">Nacimiento: {opportunity.fechaNacimiento ? formatShortDate(opportunity.fechaNacimiento) : "—"}</span>
         {/* MON-14: el teléfono es del Contacto de la oportunidad; las anteriores a MON-14
             no tienen contacto y caen a la copia guardada en la propia oportunidad. */}

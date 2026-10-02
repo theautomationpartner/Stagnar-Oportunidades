@@ -164,6 +164,10 @@ export default function CotizarStepPanel({
   // startEditing/ClientFicha onEdit/onEditVehiculo más abajo). Antes era un solo
   // booleano para un único popup con las 2 secciones juntas.
   const [editingSection, setEditingSection] = useState(null)
+  // A pedido: con una Empresa el documento es el RUT, no la cédula — se rotula así en la
+  // ficha, el checklist, el popup de editar y los avisos de "falta completar".
+  const esEmpresa = opportunity.clienteTipo === 'Empresa'
+  const etiqueta = (f) => (f.key === 'ci' && esEmpresa ? 'RUT' : f.label)
   const [form, setForm] = useState(() => buildInitialForm(opportunity, dropdownOptions))
   const [saving, setSaving] = useState(false)
   const [saveError, setSaveError] = useState(null)
@@ -358,7 +362,7 @@ export default function CotizarStepPanel({
     const missing = getMissingCotizarFields(form).filter((f) => sectionKeys.has(f.key))
     if (missing.length > 0) {
       setSaveError(
-        `Completá estos campos antes de guardar: ${missing.map((f) => f.label).join(', ')}.`
+        `Completá estos campos antes de guardar: ${missing.map(etiqueta).join(', ')}.`
       )
       return
     }
@@ -406,7 +410,7 @@ export default function CotizarStepPanel({
   // decirlo el usuario ve el campo completo y no entiende por qué no puede cotizar.
   const invalidKeys = new Set(invalidFields.map((f) => f.key))
   const checklistItems = [
-    { key: 'ci', label: 'Cédula de identidad', value: opportunity.ci, missing: missingKeys.has('ci') },
+    { key: 'ci', label: esEmpresa ? 'RUT' : 'Cédula de identidad', value: opportunity.ci, missing: missingKeys.has('ci') },
     {
       key: 'fechaNacimiento',
       label: 'Fecha de nacimiento',
@@ -542,10 +546,10 @@ export default function CotizarStepPanel({
                     style={{ gridColumn: `span ${span}` }}
                     key={f.key}
                   >
-                    <span className="cotizar-step__field-label">{f.label}</span>
+                    <span className="cotizar-step__field-label">{etiqueta(f)}</span>
                     <FieldControl
                       field={f}
-                      placeholder={falta ? `Falta completar ${f.label}` : 'Sin definir'}
+                      placeholder={falta ? `Falta completar ${etiqueta(f)}` : 'Sin definir'}
                       value={
                         f.kind === 'connected'
                           ? form[f.idKey]
@@ -640,7 +644,7 @@ export default function CotizarStepPanel({
           {missingFields.length > 0 && (
             <>
               Completá estos campos antes de {hasQuotes ? 'recotizar' : 'cotizar'}:{' '}
-              <strong>{missingFields.map((f) => f.label).join(', ')}</strong>.{' '}
+              <strong>{missingFields.map(etiqueta).join(', ')}</strong>.{' '}
             </>
           )}
           {/* LOG-09: el campo está cargado, pero con un valor que la columna de monday
@@ -651,7 +655,7 @@ export default function CotizarStepPanel({
               Estos campos tienen un valor que no está en la lista de monday y hay que
               corregirlos:{' '}
               <strong>
-                {invalidFields.map((f) => `${f.label} ("${opportunity[f.key]}")`).join(', ')}
+                {invalidFields.map((f) => `${etiqueta(f)} ("${opportunity[f.key]}")`).join(', ')}
               </strong>
               .
             </>
@@ -786,10 +790,10 @@ export default function CotizarStepPanel({
           description={`No podés ${hasQuotes ? 'recotizar' : 'cotizar'} porque hay información obligatoria que no ha sido completada.`}
           detailsTitle="Campos pendientes:"
           detailsList={[
-            ...missingFields.map((f) => f.label),
+            ...missingFields.map(etiqueta),
             // LOG-09: los que están cargados pero con un valor fuera del catálogo se
             // listan igual acá, aclarando cuál es el valor que no se acepta.
-            ...invalidFields.map((f) => `${f.label}: "${opportunity[f.key]}" no está en la lista`),
+            ...invalidFields.map((f) => `${etiqueta(f)}: "${opportunity[f.key]}" no está en la lista`),
             ...(ubicacionPendiente
               ? ['Ubicación: falta elegir el departamento y la zona principal de circulación']
               : []),

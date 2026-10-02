@@ -441,15 +441,22 @@ export default function CrearOportunidadForm({
     // splitNombreApellido de más arriba.
     // A pedido: Nombre/Apellido ahora tienen columnas propias en Clientes — se usan si
     // están; partir el nombre del ítem queda solo como respaldo para ítems viejos.
-    const { nombre, apellido } =
-      resultado.nombre || resultado.apellido
+    // Una Empresa no tiene apellido ni CI: el nombre es la razón social entera (partirlo
+    // la cortaba en "nombre" y "apellido") y el documento es su RUT. La fecha de
+    // nacimiento de la oportunidad tampoco viene del cliente: no la tiene (se carga en el
+    // alta y se guarda solo en la oportunidad).
+    const esEmpresaElegida = resultado.tipo === 'Empresa'
+    const { nombre, apellido } = esEmpresaElegida
+      ? { nombre: resultado.nombre || resultado.name, apellido: '' }
+      : resultado.nombre || resultado.apellido
         ? { nombre: resultado.nombre, apellido: resultado.apellido }
         : splitNombreApellido(resultado.name)
     setForm((prev) => ({
       ...prev,
+      tipoCliente: esEmpresaElegida ? 'Empresa' : 'Particular',
       nombre: nombre || prev.nombre,
-      apellido: apellido || prev.apellido,
-      ci: resultado.ci || prev.ci,
+      apellido: esEmpresaElegida ? '' : apellido || prev.apellido,
+      ci: (esEmpresaElegida ? resultado.rut : resultado.ci) || prev.ci,
       fechaNacimiento: resultado.fechaNacimiento || prev.fechaNacimiento,
       departamentoId: departamentoMatch?.id ?? prev.departamentoId,
       localidadId: localidadMatch?.id ?? prev.localidadId,
@@ -871,7 +878,9 @@ export default function CrearOportunidadForm({
       // MON-14: acá SOLO van datos del Cliente. El teléfono y el email son del Contacto
       // (se escriben en ensureContactoCrmId, al guardar la oportunidad).
       await setContactoColumnValues(resultadoSeleccionado.id, {
-        [CONTACTO_FECHA_NACIMIENTO_COLUMN_ID]: values.fechaNacimiento,
+        // A pedido: la fecha de nacimiento de una Empresa no es suya — queda solo en el
+        // form y de ahí en la oportunidad (ver buildBaseColumnValues).
+        ...(esEmpresa ? {} : { [CONTACTO_FECHA_NACIMIENTO_COLUMN_ID]: values.fechaNacimiento }),
         [CONTACTO_LOCALIDAD_COLUMN_ID]: { item_ids: [Number(values.localidadId)] },
         // A diferencia de antes (mirror automático desde Localidad), ahora Departamento
         // es una conexión propia — hay que escribirla explícitamente.
@@ -1035,9 +1044,12 @@ export default function CrearOportunidadForm({
       return Boolean(
         busquedaResuelta &&
           form.nombre &&
-          // Una empresa no tiene apellido ni fecha de nacimiento: esos dos campos no se
-          // muestran y no se piden. El nombre pasa a ser la razón social, que va solo.
-          (esEmpresa || (form.apellido && form.fechaNacimiento && !fechaError(form.fechaNacimiento))) &&
+          // Una empresa no tiene apellido: el nombre pasa a ser la razón social, que va
+          // solo. La fecha de nacimiento sí se pide también a una empresa (a pedido: hace
+          // falta para cotizar), pero se guarda solo en la oportunidad, no en el cliente.
+          (esEmpresa || form.apellido) &&
+          form.fechaNacimiento &&
+          !fechaError(form.fechaNacimiento) &&
           form.ci &&
           !documento.validar(form.ci) &&
           // MON-14: Teléfono y Email son del Contacto. El teléfono sigue siendo
@@ -1106,7 +1118,7 @@ export default function CrearOportunidadForm({
     pedir(!form.nombre, false, esEmpresa ? 'razón social' : 'nombre')
     if (!esEmpresa) pedir(!form.apellido, false, 'apellido')
     pedir(!form.ci, documento.validar(form.ci), documento.label)
-    if (!esEmpresa) pedir(!form.fechaNacimiento, fechaError(form.fechaNacimiento), 'fecha de nacimiento')
+    pedir(!form.fechaNacimiento, fechaError(form.fechaNacimiento), 'fecha de nacimiento')
     pedir(!form.codigoPais || !form.telefono, telefonoError(form.telefono, form.codigoPais), 'teléfono')
     // El email es opcional: solo molesta si está escrito y mal.
     if (form.email && emailError(form.email)) revisar.push('email')
@@ -1174,10 +1186,12 @@ export default function CrearOportunidadForm({
       deal_stage: 'Nueva',
       text_mm51b055: form.nombre,
       numeric_mm51mb0s: stripCi(form.ci),
-      // De una empresa no se escriben apellido ni nacimiento: quedarían con lo que se
-      // hubiera tipeado antes de cambiar el tipo, y un dato viejo escondido es peor que
-      // uno vacío.
-      ...(esEmpresa ? {} : { text_mm51ez7e: form.apellido, date_mm516agw: form.fechaNacimiento }),
+      // De una empresa no se escribe el apellido: quedaría con lo que se hubiera tipeado
+      // antes de cambiar el tipo, y un dato viejo escondido es peor que uno vacío. La
+      // fecha de nacimiento va siempre: a una empresa también se le pide (a pedido), y
+      // es la oportunidad, no el cliente, quien la guarda.
+      ...(esEmpresa ? {} : { text_mm51ez7e: form.apellido }),
+      date_mm516agw: form.fechaNacimiento,
       phone_mm519m27: buildMondayPhone(form.codigoPais, form.telefono),
       color_mm5atxav: form.tipoRiesgo,
       board_relation_mm5sqf8t: { item_ids: [Number(form.localidadId)] },
@@ -1948,15 +1962,21 @@ export default function CrearOportunidadForm({
                       muestra con su preview o deja subir una nueva. */}
                   <PersonaFicha
                     form={form}
+                    documentoLabel={documento.label}
                     selectedLocalidad={selectedLocalidad}
                     selectedDepartamento={selectedDepartamento}
                     source={resultadoSeleccionado.source}
                     onEdit={() => setEditingContacto(true)}
-                    cedula={{
-                      file: form.cedulaIdentidad,
-                      uploading: cedulaAutofillLoading,
-                      onChange: handleCedulaIdentidadChange,
-                    }}
+                    // Una Empresa no tiene cédula (mismo criterio que el alta de un cliente nuevo).
+                    cedula={
+                      esEmpresa
+                        ? null
+                        : {
+                            file: form.cedulaIdentidad,
+                            uploading: cedulaAutofillLoading,
+                            onChange: handleCedulaIdentidadChange,
+                          }
+                    }
                   />
 
                   {/* A pedido: primero TODO lo del Cliente junto (ficha + sus documentos)
@@ -2144,7 +2164,8 @@ export default function CrearOportunidadForm({
                                   : undefined
                             }
                           />
-                          {!esEmpresa && (
+                          {/* También para una Empresa (a pedido): se guarda en la
+                              oportunidad y no en el cliente (ver buildBaseColumnValues). */}
                           <label className={`crear-op__field${fieldStateClass(form.fechaNacimiento, fechaError(form.fechaNacimiento))}`}>
                             <span>Fecha Nacimiento <Required /></span>
                             <div className="crear-op__date-wrap">
@@ -2171,7 +2192,6 @@ export default function CrearOportunidadForm({
                               <span className="crear-op__field-error" role="alert">{fechaError(form.fechaNacimiento)}</span>
                             )}
                           </label>
-                          )}
                           </div>
                         </div>
                       </div>

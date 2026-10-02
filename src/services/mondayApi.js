@@ -238,7 +238,7 @@ const OPPORTUNITY_DETAIL_QUERY = `
           linked_items {
             id
             name
-            column_values(ids: ["long_text_mm6m7d8c", "board_relation_mm65e7he", "board_relation_mm657jse", "text_mm6mrx0a", "text_mm6mx38p", "color_mm6570m0", "contact_phone", "contact_email", "text_mm4pj3gx", "text_mm4pwdp3", "text_mm4pygkk", "text_mm4pj57", "numeric_mm4p20j9"]) {
+            column_values(ids: ["long_text_mm6m7d8c", "board_relation_mm65e7he", "board_relation_mm657jse", "text_mm6mrx0a", "text_mm6mx38p", "color_mm6570m0", "color_mm51rgar", "contact_phone", "contact_email", "text_mm4pj3gx", "text_mm4pwdp3", "text_mm4pygkk", "text_mm4pj57", "numeric_mm4p20j9"]) {
               id
               text
               # MON-14: el teléfono del Contacto necesita el JSON crudo — el código de
@@ -1382,6 +1382,11 @@ const CLIENTE_COLUMN_IDS = [
   CONTACTO_EXTRANJERO_COLUMN_ID,
   CONTACTO_NACIONALIDAD_COLUMN_ID,
   CLIENTE_CONTACTOS_COLUMN_ID,
+  // Tipo Cliente y RUT (CLIENTE_TIPO_COLUMN_ID / CLIENTE_RUT_COLUMN_ID, declaradas más
+  // abajo — acá van los ids a mano porque esta lista se arma antes): con una Empresa
+  // elegida, el alta muestra y guarda su RUT en vez de una CI que no tiene.
+  'color_mm51rgar',
+  'numeric_mm51eyk2',
 ]
 
 const CLIENTE_COLUMN_VALUES_FRAGMENT = `
@@ -1453,6 +1458,8 @@ function mapContactoItem(item) {
     apellido: byId[CONTACTO_APELLIDO_COLUMN_ID]?.text?.trim() || '',
     extranjero: byId[CONTACTO_EXTRANJERO_COLUMN_ID]?.text?.trim() || '',
     nacionalidad: byId[CONTACTO_NACIONALIDAD_COLUMN_ID]?.text?.trim() || '',
+    tipo: byId.color_mm51rgar?.text?.trim() || '',
+    rut: (byId.numeric_mm51eyk2?.text || '').replace(/\D/g, ''),
   }
 }
 
