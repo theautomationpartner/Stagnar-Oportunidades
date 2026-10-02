@@ -13,7 +13,7 @@ import {
 import { FaWhatsapp } from 'react-icons/fa'
 import { Button, IconButton, Dropdown, Checkbox, NumberField } from '@vibe/core'
 import { formatMoney, CUOTA_COUNTS, toPercentString } from '../services/format'
-import { autoExtraOpciones, BONIF_MAX, formatDeducible, isQuoteSelectable, opcionalesDeCompania } from '../services/pricingEngine'
+import { autoExtraOpciones, BONIF_MAX, esBse3x2, formatDeducible, isQuoteSelectable, opcionalesDeCompania } from '../services/pricingEngine'
 import { accentForCompania, selectionForCompania } from '../services/companyColors'
 import CompanyMark from './CompanyMark'
 import CotizacionManualModal from './CotizacionManualModal'
@@ -424,6 +424,12 @@ function QuoteCard({
   // Reunión del 24/09: si vino en 0 es que WINK no supo el valor — solo esas se pueden
   // completar a mano (ver CotizacionManualModal).
   const sinCostoDeWink = !selectable && !(Number(raw.contado) > 0)
+  // A pedido: el BSE 3x2 solo lleva BNS (en Parámetros) — ni la bonificación comercial de
+  // la tarjeta ni la de flota (ver pricingEngine.js#esBse3x2, que tampoco las calcula).
+  const soloBns = esBse3x2(raw)
+  const bonificacionesEspeciales = soloBns
+    ? BONIFICACIONES_ESPECIALES_BSE.filter((b) => b.key === 'bns')
+    : BONIFICACIONES_ESPECIALES_BSE
   return (
     <div
       className={[
@@ -503,6 +509,7 @@ function QuoteCard({
           {/* Reunión del 24/09: la Bonificación a la vista y editable, sin abrir
               Parámetros. Arranca en la de PANEL para la compañía (ver
               recargoPanel.js#applyBonificacionPorDefecto). */}
+          {!soloBns && (
           <div
             className={bonifNoAplica ? 'quote-card__bonif quote-card__bonif--no-aplica' : 'quote-card__bonif'}
             title={bonifNoAplica ? quote.warning?.full : 'Bonificación comercial sobre el contado'}
@@ -550,6 +557,7 @@ function QuoteCard({
               <MdAdd aria-hidden="true" />
             </button>
           </div>
+          )}
         </div>
       </div>
 
@@ -773,9 +781,9 @@ function QuoteCard({
 
           {raw.compania === 'BSE' && onBonificacionEspecialChange && (
             <>
-              <div className="quote-card__params-subtitle">Bonificaciones especiales BSE</div>
+              <div className="quote-card__params-subtitle">{soloBns ? 'Bonificación BSE' : 'Bonificaciones especiales BSE'}</div>
               <div className="quote-card__params-grid">
-                {BONIFICACIONES_ESPECIALES_BSE.map((b) => (
+                {bonificacionesEspeciales.map((b) => (
                   <BonificacionEspecial
                     key={b.key}
                     label={b.label}

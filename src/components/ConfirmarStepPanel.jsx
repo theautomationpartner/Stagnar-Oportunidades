@@ -6,6 +6,7 @@ import { formatMoney, CUOTA_COUNTS, toPercentString } from '../services/format'
 import {
   autoExtraOpciones,
   CUOTAS_SIN_CONFIRMAR,
+  esBse3x2,
   isQuoteSelectable,
   opcionalesDeCompania,
   opcionesDePago,
@@ -214,6 +215,8 @@ function AjustesElegida({ entry, onSetBonif, onToggleOpcional, onAutoExtraChange
       </div>
 
       <div className="confirmar-step__ajustes-grid">
+        {/* El BSE 3x2 no lleva bonificación comercial (ver pricingEngine.js#esBse3x2). */}
+        {!esBse3x2(raw) && (
         <label className="confirmar-step__ajustes-field">
           <span>Bonificación (%)</span>
           <div className="confirmar-step__ajustes-bonif">
@@ -232,6 +235,7 @@ function AjustesElegida({ entry, onSetBonif, onToggleOpcional, onAutoExtraChange
             </Button>
           </div>
         </label>
+        )}
 
         {autoExtraDias.length > 0 && (
           <label className="confirmar-step__ajustes-field">

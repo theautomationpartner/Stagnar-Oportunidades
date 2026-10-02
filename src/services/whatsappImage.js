@@ -12,6 +12,8 @@ import { formatMoney, modeloSinMarca, zonaParaMostrar } from './format'
 import { BRAND_COLORS } from './companyColors'
 import { coberturaGroupOf, coberturaParaMostrar, FAMILIA_LABEL, subtituloDeCobertura } from './coberturaGroups'
 import { iconoUrlParaBeneficio } from './beneficiosIconos'
+import { esBse3x2 } from './pricingEngine'
+import { edadDesde } from './edad'
 // El logo del header de la imagen de la cotización: a pedido, el logo con el círculo verde
 // relleno (el mismo de la pantalla de inicio de la app, src/assets/stagnari-logo.png). Antes
 // era logo_stagnari/logo-blanco-.png (la S en contorno, stagnari-logo-original.png).
@@ -279,6 +281,22 @@ function iconCar(ctx, cx, cy, s, color = C.verde, lineWidth = 2) {
   }
 }
 
+function iconPerson(ctx, cx, cy, s) {
+  ctx.strokeStyle = C.verde
+  ctx.lineWidth = 2
+  ctx.beginPath()
+  ctx.arc(cx, cy - s * 0.2, s * 0.22, 0, Math.PI * 2)
+  ctx.stroke()
+  ctx.beginPath()
+  ctx.arc(cx, cy + s * 0.5, s * 0.42, Math.PI * 1.15, Math.PI * 1.85)
+  ctx.stroke()
+}
+
+function iconPeople(ctx, cx, cy, s) {
+  iconPerson(ctx, cx - s * 0.2, cy, s * 0.8)
+  iconPerson(ctx, cx + s * 0.25, cy, s * 0.8)
+}
+
 function iconCard(ctx, cx, cy, s) {
   ctx.strokeStyle = C.verde
   ctx.lineWidth = 2
@@ -338,7 +356,10 @@ function drawCoverTitle(ctx, raw, y) {
   // igual que las solapas (coberturaGroupOf sobre la cobertura real). Solo si la cobertura
   // no tiene familia (hoy "TOTAL c/ Mov" de SURA) queda su nombre, para no mandar una
   // imagen sin título.
-  const title = (FAMILIA_LABEL[group] || coberturaParaMostrar(raw) || 'COTIZACIÓN').toUpperCase()
+  // A pedido: en el BSE 3x2 se aclara que es 3x2 ("TOTAL 3X2" / "PARCIAL 3X2") — el precio
+  // es por los 3 años y no se puede confundir con la anual.
+  const familia = FAMILIA_LABEL[group]
+  const title = ((familia && esBse3x2(raw) ? `${familia} 3x2` : familia) || coberturaParaMostrar(raw) || 'COTIZACIÓN').toUpperCase()
   // Detalle de lo que cubre, en mayúsculas (texto definido por Stagnari, compartido con la
   // versión en texto — ver coberturaGroups.js#subtituloDeCobertura). Es descriptivo, no
   // una condición contractual: el detalle real va en "Beneficios incluidos".
@@ -412,7 +433,10 @@ function drawVehicleCard(ctx, opportunity, raw, quote, y) {
 
   // Una sola fila: el deducible pasó a la banda del precio y el combustible al renglón del
   // modelo, así que quedan la zona, el uso y (si no hay límites cargados) el RC.
-  const gridH = 44 + 16
+  // A pedido: la fila lleva los datos del cliente (nombre, CI y edad) además de la zona y el
+  // destino, y en BSE la limitante de edad si se eligió (ver drawDatosCliente). Los
+  // rótulos van en hasta 2 renglones ("Zona principal / de circulación").
+  const gridH = 76
   const h = headH + 16 + gridH + 8 + rcH
   card(ctx, x, y, w, h, { radius: 16 })
 
@@ -438,37 +462,7 @@ function drawVehicleCard(ctx, opportunity, raw, quote, y) {
   ctx.moveTo(x + 16, gy)
   ctx.lineTo(x + w - 16, gy)
   ctx.stroke()
-  // Reunión del 24/09: "Localidad" pasa a "Zona principal de circulación" y muestra el
-  // departamento (en Canelones, también la localidad), sin el código postal.
-  const datos = [
-    { icon: iconPin, label: 'ZONA PRINCIPAL DE CIRCULACIÓN', value: zonaParaMostrar(opportunity) || '—' },
-    { icon: iconCar, label: 'USO', value: raw.uso || opportunity.uso || '—' },
-  ]
-  // Sin límites cargados el RC vuelve a la grilla: el nivel a secas es mejor que nada.
-  if (!rcLineas.length) {
-    datos.push({
-      icon: (c, cx, cy, s) => strokeShield(c, cx, cy, s * 0.8),
-      label: 'RC',
-      value: quote.rc ? `Hasta ${quote.rc}` : '—',
-    })
-  }
-  // La zona se lleva la mitad: su rótulo es el más largo y en Canelones también su valor.
-  const anchos = datos.map((_, i) => (i === 0 ? w * 0.5 : (w * 0.5) / (datos.length - 1)))
-  datos.forEach((it, i) => {
-    const colX = x + anchos.slice(0, i).reduce((acc, n) => acc + n, 0)
-    const colW = anchos[i]
-    const cx = colX + 16
-    if (i > 0) {
-      ctx.beginPath()
-      ctx.moveTo(colX, gy + 14)
-      ctx.lineTo(colX, gy + gridH - 6)
-      ctx.stroke()
-    }
-    const iy = gy + 26
-    it.icon(ctx, cx + 16, iy + 6, 24)
-    text(ctx, ellipsize(ctx, it.label, colW - 64, `13px ${FONT}`), cx + 48, iy, { size: 13, color: C.gris })
-    text(ctx, ellipsize(ctx, it.value, colW - 64, `bold 18px ${FONT}`), cx + 48, iy + 21, { size: 18, weight: 'bold' })
-  })
+  drawDatosCliente(ctx, opportunity, raw, quote, { x, w, gy, gridH, conRc: !rcLineas.length })
 
   if (rcLineas.length) {
     const ry = gy + gridH + 2
@@ -488,6 +482,79 @@ function drawVehicleCard(ctx, opportunity, raw, quote, y) {
   }
 
   return y + h
+}
+
+// "41234567" → "4.123.456-7". Solo una CI uruguaya (7 u 8 dígitos); otro documento
+// (pasaporte, DNI) va tal cual.
+function ciParaMostrar(ci) {
+  const limpio = String(ci ?? '').trim()
+  if (!/^\d{7,8}$/.test(limpio)) return limpio
+  const cuerpo = limpio.slice(0, -1).replace(/\B(?=(\d{3})+(?!\d))/g, '.')
+  return `${cuerpo}-${limpio.slice(-1)}`
+}
+
+// Fila de datos de la tarjeta del vehículo: cliente (nombre, y debajo CI y edad), zona
+// principal de circulación, destino (el uso) y, en BSE, la limitante de edad si se eligió
+// en Parámetros (35 a 75 / 56 a 75 — el descuento que da el BSE). Sin límites de RC
+// cargados, el RC vuelve a esta fila: el nivel a secas es mejor que nada.
+function drawDatosCliente(ctx, opportunity, raw, quote, { x, w, gy, gridH, conRc }) {
+  const edad = opportunity.edad || edadDesde(opportunity.fechaNacimiento)
+  const ci = ciParaMostrar(opportunity.ci)
+  const debajoDelNombre = [ci && `CI: ${ci}`, edad && `${edad} años`].filter(Boolean).join('  |  ')
+  const edadBse = raw.compania === 'BSE' ? quote.efectivo?.edadBSE : ''
+  const datos = [
+    { icon: iconPerson, peso: 1.45, nombre: opportunity.clienteNombre || '—', debajo: debajoDelNombre },
+    // Reunión del 24/09: "Localidad" pasa a "Zona principal de circulación" y muestra el
+    // departamento (en Canelones, también la localidad), sin el código postal.
+    { icon: iconPin, peso: 1.1, label: 'Zona principal de circulación', value: zonaParaMostrar(opportunity) || '—' },
+    { icon: iconCar, peso: 0.9, label: 'Destino', value: raw.uso || opportunity.uso || '—' },
+  ]
+  if (edadBse && edadBse !== 'No') {
+    datos.push({ icon: iconPeople, peso: 1, label: 'Limitante de edad', value: `${edadBse} años` })
+  }
+  if (conRc) {
+    datos.push({
+      icon: (c, cx, cy, s) => strokeShield(c, cx, cy, s * 0.8),
+      peso: 1,
+      label: 'RC',
+      value: quote.rc ? `Hasta ${quote.rc}` : '—',
+    })
+  }
+  const pesoTotal = datos.reduce((acc, d) => acc + d.peso, 0)
+  const valorY = gy + 56
+  let colX = x
+  datos.forEach((it, i) => {
+    const colW = (w * it.peso) / pesoTotal
+    const textoX = colX + 48
+    const textoW = colW - 56
+    if (i > 0) {
+      ctx.strokeStyle = C.borde
+      ctx.lineWidth = 1
+      ctx.beginPath()
+      ctx.moveTo(colX, gy + 14)
+      ctx.lineTo(colX, gy + gridH - 6)
+      ctx.stroke()
+    }
+    it.icon(ctx, colX + 26, gy + 40, 24)
+    if (it.nombre) {
+      const nombre = fitOneLine(ctx, it.nombre, textoW, { sizes: [18, 16, 14], weight: 'bold' })
+      text(ctx, nombre.texto, textoX, valorY - 20, { size: nombre.size, weight: 'bold' })
+      if (it.debajo) {
+        const debajo = fitOneLine(ctx, it.debajo, textoW, { sizes: [14, 13, 12] })
+        text(ctx, debajo.texto, textoX, valorY, { size: debajo.size, color: C.gris })
+      }
+    } else {
+      // Rótulo en hasta 2 renglones, pegado al valor (alineado abajo).
+      const lineas = wrapLines(ctx, it.label, textoW, `13px ${FONT}`).slice(0, 2)
+      lineas.forEach((linea, li) =>
+        text(ctx, linea, textoX, valorY - 22 - (lineas.length - 1 - li) * 15, { size: 13, color: C.gris })
+      )
+      // Achica la letra antes de recortar: con 4-5 columnas el valor puede no entrar a 18px.
+      const valor = fitOneLine(ctx, it.value, textoW, { sizes: [18, 16, 14], weight: 'bold' })
+      text(ctx, valor.texto, textoX, valorY, { size: valor.size, weight: 'bold' })
+    }
+    colX += colW
+  })
 }
 
 // "PEUGEOT" + "PEUGEOT - 206 1.6 Presence Full, ABS Aut. 5p. (BRA)" (el modelo de
@@ -520,7 +587,7 @@ function strokeShield(ctx, cx, cy, size) {
   ctx.stroke()
 }
 
-function drawPriceBand(ctx, quote, y) {
+function drawPriceBand(ctx, raw, quote, y) {
   // EST-06: con condición (BSE/SURA) la banda crece 22px en vez de apretar tres renglones
   // en el alto de dos — así la condición entra a un tamaño que se lee (14px, en crema
   // sobre el verde) y no como letra chica pegada al borde de la caja.
@@ -533,7 +600,12 @@ function drawPriceBand(ctx, quote, y) {
   // pegado arriba con un hueco debajo.
   const shift = conCondicion && !deducible ? 10 : 0
   card(ctx, PAD, y, INNER, h, { fill: C.verdeOscuro, stroke: null, radius: 16 })
-  text(ctx, 'PRECIO ANUAL', PAD + 28, y + 36 + shift, { size: 16, weight: 'bold', color: '#cfe6e4' })
+  // A pedido: el BSE 3x2 cubre 3 años y su precio es por los 3, no anual.
+  text(ctx, esBse3x2(raw) ? 'PRECIO POR LOS 3 AÑOS' : 'PRECIO ANUAL', PAD + 28, y + 36 + shift, {
+    size: 16,
+    weight: 'bold',
+    color: '#cfe6e4',
+  })
   text(ctx, formatMoney(quote.total), PAD + 26, y + 92 + shift, { size: 52, weight: 'bold', color: C.blanco })
   if (deducible) {
     text(ctx, ellipsize(ctx, `Deducible: ${deducible}`, 370, `bold 20px ${FONT}`), PAD + 28, y + 128, {
@@ -750,7 +822,7 @@ function drawContent(ctx, opportunity, raw, quote, canvasHeight, logos, layout =
   let y = drawHeader(ctx, logos)
   y = drawCoverTitle(ctx, raw, y + 14 + g)
   y = drawVehicleCard(ctx, opportunity, raw, quote, y + 6 + g)
-  y = drawPriceBand(ctx, quote, y + 18 + g)
+  y = drawPriceBand(ctx, raw, quote, y + 18 + g)
   y = drawPaymentOptions(ctx, quote, y + 22 + g)
   if (quote.incluye?.length) {
     y = drawBenefits(ctx, quote.incluye, y + 18, {
@@ -794,7 +866,9 @@ function drawContent(ctx, opportunity, raw, quote, canvasHeight, logos, layout =
 // la tarjeta de beneficios compactando su letra, que es el síntoma que arregló EST-04: el
 // mismo texto en otro tamaño según la compañía. Las coberturas con menos límites reparten
 // la holgura estirando la tarjeta de beneficios, igual que la promo sin condición.
-const FIXED_HEIGHT = 1542
+// Datos del cliente en la tarjeta del vehículo: +16 porque la fila de datos pasa de 60 a
+// 76 (rótulos en 2 renglones y el nombre con la CI debajo).
+const FIXED_HEIGHT = 1558
 
 // Dos pasadas: la primera sobre un canvas descartable para medir hasta dónde llega el
 // contenido (el nombre del vehículo y los beneficios varían de alto), la segunda sobre

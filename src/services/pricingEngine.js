@@ -565,7 +565,15 @@ function sancorSinDescuento(eff) {
 // factor a multiplicar (1 = sin bonificación especial).
 function factorBonificacionesEspeciales(eff) {
   if (eff.compania !== 'BSE') return 1
-  return (1 - num(eff.bns) / 100) * (1 - num(eff.flota) / 100)
+  const flota = esBse3x2(eff) ? 0 : num(eff.flota)
+  return (1 - num(eff.bns) / 100) * (1 - flota / 100)
+}
+
+// A pedido: el BSE 3x2 (Total o Parcial) solo admite la bonificación por no siniestro
+// (BNS). Ni la comercial ni la de flota se ofrecen ni entran en el cálculo, aunque haya
+// un valor cargado (por ejemplo, la bonificación por defecto de PANEL para BSE).
+export function esBse3x2({ compania, cobertura }) {
+  return compania === 'BSE' && /3x2$/i.test(String(cobertura ?? '').trim())
 }
 
 // LOG-11: cuánta bonificación entra en el cálculo, como fracción.
@@ -580,6 +588,7 @@ export const BONIF_MAX = 99
 
 function bonificacionAplicable(eff) {
   if (sancorSinDescuento(eff)) return 0
+  if (esBse3x2(eff)) return 0
   // Siempre entre 0 y BONIF_MAX %: una negativa se colaba como recargo (reportado: "-5"
   // subía el precio) y con 100 % el total queda en 0 y la tarjeta pasa a "sin costo".
   return Math.min(BONIF_MAX, Math.max(0, num(eff.bonif))) / 100
