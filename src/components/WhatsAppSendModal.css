@@ -140,6 +140,123 @@
   text-align: center;
 }
 
+/* "Ojito" sobre cada miniatura: abre la cotización en grande (ver VisorCotizacion). */
+.wa-modal__preview-img {
+  position: relative;
+}
+
+.wa-modal__preview-ver {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 34px;
+  height: 34px;
+  padding: 0;
+  font-size: 20px;
+  color: var(--text-dark);
+  background: rgba(255, 255, 255, 0.95);
+  border: 1px solid var(--border);
+  border-radius: 50%;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.15);
+  cursor: pointer;
+}
+
+.wa-modal__preview-ver:hover,
+.wa-modal__preview-ver:focus-visible {
+  color: var(--primary-blue);
+  border-color: var(--primary-blue);
+}
+
+/* Visor en grande, arriba del modal de envío. */
+.wa-visor {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(20, 24, 33, 0.82);
+}
+
+.wa-visor__barra {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  max-width: 900px;
+  padding: 12px 16px;
+  color: #fff;
+}
+
+.wa-visor__titulo {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 15px;
+  font-weight: 600;
+}
+
+.wa-visor__contador {
+  font-size: 13px;
+  font-weight: 400;
+  opacity: 0.75;
+}
+
+.wa-visor__boton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 38px;
+  height: 38px;
+  padding: 0;
+  font-size: 24px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.wa-visor__boton:hover {
+  background: rgba(255, 255, 255, 0.25);
+}
+
+.wa-visor__marco {
+  flex: 1;
+  width: 100%;
+  max-width: 900px;
+  min-height: 0;
+  padding: 0 16px 16px;
+  overflow-y: auto;
+}
+
+.wa-visor__marco img {
+  display: block;
+  width: 100%;
+  border-radius: 8px;
+}
+
+.wa-visor__flecha {
+  position: absolute;
+  top: 50%;
+  width: 46px;
+  height: 46px;
+  font-size: 30px;
+  transform: translateY(-50%);
+}
+
+.wa-visor__flecha--izq {
+  left: 16px;
+}
+
+.wa-visor__flecha--der {
+  right: 16px;
+}
+
 /* Solo separación: el color y el tamaño los pone el propio cartel de error
    (AttentionBox). Antes esto era un renglón de texto suelto. */
 .wa-modal__error {

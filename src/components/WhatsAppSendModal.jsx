@@ -1,5 +1,17 @@
 import { useEffect, useState } from 'react'
-import { MdSend, MdCheckCircle, MdArrowForward, MdImage, MdNotes, MdLibraryAddCheck } from 'react-icons/md'
+import { createPortal } from 'react-dom'
+import {
+  MdSend,
+  MdCheckCircle,
+  MdArrowForward,
+  MdImage,
+  MdNotes,
+  MdLibraryAddCheck,
+  MdVisibility,
+  MdClose,
+  MdChevronLeft,
+  MdChevronRight,
+} from 'react-icons/md'
 import { Modal, ModalHeader, ModalContent, ModalFooter, AttentionBox, TextField, Dropdown } from '@vibe/core'
 import { sendQuotesToWhatsApp } from '../services/makeWebhook'
 import { fetchClienteContactos, fetchContactosCrm, fetchTelefonosEnvioHabilitados } from '../services/mondayApi'
@@ -32,6 +44,65 @@ const FORMATOS = [
 // (se cierra solo, ver AUTO_CLOSE_DELAY_MS más arriba) o "Error" (se queda abierto, el
 // usuario cierra a mano) apenas llega a un estado terminal. El usuario puede cerrar en
 // cualquier momento — el polling de fondo sigue funcionando aunque se cierre.
+// A pedido: el "ojito" de cada cotización abre la imagen en grande, para leerla antes de
+// mandarla (en la grilla se ve en miniatura). Va en un portal arriba del modal y no en
+// otra pestaña: adentro de monday (iframe) abrir una imagen data: en pestaña nueva lo
+// bloquea el navegador. Con varias, se pasa de una a otra con las flechas. Escape cierra
+// solo el visor (se intercepta antes de que le llegue al modal, que también se cerraría).
+function VisorCotizacion({ items, indice, onCambiar, onCerrar }) {
+  const item = items[indice]
+  useEffect(() => {
+    const alTeclear = (e) => {
+      if (e.key === 'Escape') onCerrar()
+      else if (e.key === 'ArrowLeft' && indice > 0) onCambiar(indice - 1)
+      else if (e.key === 'ArrowRight' && indice < items.length - 1) onCambiar(indice + 1)
+      else return
+      e.preventDefault()
+      e.stopImmediatePropagation()
+    }
+    window.addEventListener('keydown', alTeclear, true)
+    return () => window.removeEventListener('keydown', alTeclear, true)
+  }, [indice, items.length, onCambiar, onCerrar])
+  const titulo = `${item.raw.compania} · ${coberturaParaMostrar(item.raw)}`
+  const flecha = (paso, lado, Icono, etiqueta) => (
+    <button
+      type="button"
+      className={`wa-visor__boton wa-visor__flecha wa-visor__flecha--${lado}`}
+      aria-label={etiqueta}
+      onClick={(e) => {
+        e.stopPropagation()
+        onCambiar(indice + paso)
+      }}
+    >
+      <Icono aria-hidden="true" />
+    </button>
+  )
+  // Clic en el fondo oscuro cierra; en la imagen o la barra, no.
+  return createPortal(
+    <div className="wa-visor" role="dialog" aria-modal="true" aria-label={`Cotización ${titulo}`} onClick={onCerrar}>
+      <div className="wa-visor__barra" onClick={(e) => e.stopPropagation()}>
+        <span className="wa-visor__titulo">
+          {titulo}
+          {items.length > 1 && (
+            <span className="wa-visor__contador">
+              {indice + 1} de {items.length}
+            </span>
+          )}
+        </span>
+        <button type="button" className="wa-visor__boton" onClick={onCerrar} aria-label="Cerrar" autoFocus>
+          <MdClose aria-hidden="true" />
+        </button>
+      </div>
+      {indice > 0 && flecha(-1, 'izq', MdChevronLeft, 'Cotización anterior')}
+      <div className="wa-visor__marco">
+        <img src={item.imageDataUrl} alt={titulo} onClick={(e) => e.stopPropagation()} />
+      </div>
+      {indice < items.length - 1 && flecha(1, 'der', MdChevronRight, 'Cotización siguiente')}
+    </div>,
+    document.body
+  )
+}
+
 export default function WhatsAppSendModal({
   opportunity,
   images,
@@ -113,6 +184,9 @@ export default function WhatsAppSendModal({
   // En ese caso arrancar en "Imagen" mostraría una previsualización vacía y el envío no
   // adjuntaría nada, así que se arranca en "Texto", que sí tiene contenido.
   const [formato, setFormato] = useState(() => (images.some((i) => i.imageDataUrl) ? 'imagen' : 'texto'))
+  // Visor en grande (el "ojito"): índice dentro de las que tienen imagen; null = cerrado.
+  const conImagen = images.filter((i) => i.imageDataUrl)
+  const [viendo, setViendo] = useState(null)
   const mandaImagen = formato === 'imagen' || formato === 'ambos'
   const mandaTexto = formato === 'texto' || formato === 'ambos'
   const [sending, setSending] = useState(false)
@@ -385,7 +459,18 @@ export default function WhatsAppSendModal({
                         que esa cotización se va a mandar con imagen cuando no se adjunta
                         (ver sendQuotesToWhatsApp). Se dice explícitamente. */}
                     {imageDataUrl ? (
-                      <img src={imageDataUrl} alt={`${raw.compania} ${coberturaParaMostrar(raw)}`} />
+                      <div className="wa-modal__preview-img">
+                        <img src={imageDataUrl} alt={`${raw.compania} ${coberturaParaMostrar(raw)}`} />
+                        <button
+                          type="button"
+                          className="wa-modal__preview-ver"
+                          title="Ver la cotización en grande"
+                          aria-label={`Ver en grande: ${raw.compania} ${coberturaParaMostrar(raw)}`}
+                          onClick={() => setViendo(conImagen.findIndex((i) => i.raw.id === raw.id))}
+                        >
+                          <MdVisibility aria-hidden="true" />
+                        </button>
+                      </div>
                     ) : (
                       <div className="wa-modal__preview-item--sin-imagen">
                         No se pudo generar la imagen de esta cotización. Se manda solo el texto.
@@ -421,6 +506,9 @@ export default function WhatsAppSendModal({
           más salida que la X del modal. */}
       {(sendFailed || sendInProgress) && (
         <ModalFooter primaryButton={{ text: 'Cerrar', onClick: onClose }} />
+      )}
+      {viendo != null && conImagen[viendo] && (
+        <VisorCotizacion items={conImagen} indice={viendo} onCambiar={setViendo} onCerrar={() => setViendo(null)} />
       )}
       {!showStatus && (
         <ModalFooter
