@@ -150,7 +150,12 @@ export default function OpportunitiesTable({
                       <div>
                         <div className="opps-table__cliente-name">{opp.clienteNombre}</div>
                         <div className="opps-table__cliente-meta">
-                          {opp.ci && <span>CI: {opp.ci}</span>}
+                          {/* Una Empresa lleva RUT, no cédula. */}
+                          {opp.ci && (
+                            <span>
+                              {opp.clienteTipo === 'Empresa' ? 'RUT' : 'CI'}: {opp.ci}
+                            </span>
+                          )}
                         </div>
                       </div>
                     </div>

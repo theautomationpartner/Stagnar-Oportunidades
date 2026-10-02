@@ -87,8 +87,9 @@ export function mapOpportunityItem(item, statusColors = {}) {
   const clienteDepartamento = boardRelationDisplayOf(ccv, 'board_relation_mm657jse')
   const clienteSituacion = textOf(ccv, 'color_mm6570m0')
   // Tipo Cliente (Particular/Empresa): con una Empresa el documento de la oportunidad es
-  // el RUT y así se rotula al editarlo (ver CotizarStepPanel).
-  const clienteTipo = textOf(ccv, 'color_mm51rgar')
+  // el RUT y así se rotula al editarlo (ver CotizarStepPanel). En el detalle viene con el
+  // cliente vinculado; en el listado lo agrega fetchOpportunitiesPage (conTipoDeCliente).
+  const clienteTipo = textOf(ccv, 'color_mm51rgar') || item.clienteTipo || ''
 
   // MON-14: el Contacto de esta oportunidad — con quien se habló y a quien se le mandó la
   // información. El Teléfono y el Email son SUYOS (ya no del Cliente: esas columnas se
@@ -130,6 +131,10 @@ export function mapOpportunityItem(item, statusColors = {}) {
     id: item.id,
     oppNumber: `ID-${item.id}`,
     clienteNombre,
+    // Por separado, para poder editarlos en el paso Cotizar (a pedido: cambiar el nombre
+    // del cliente). Una Empresa lleva todo en `nombre` (la razón social) y sin apellido.
+    nombre,
+    apellido,
     clienteId: clienteItem?.id ?? null,
     clienteSituacion,
     clienteTipo,

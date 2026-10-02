@@ -92,6 +92,7 @@ const CAMPOS_FILA = `
     text
     ... on BoardRelationValue {
       display_value
+      linked_item_ids
     }
     ... on MirrorValue {
       display_value
@@ -687,6 +688,40 @@ async function leerRespuestaMonday(response) {
 // Con `cursor` pide la página siguiente de esa misma búsqueda; sin él, arranca de cero
 // aplicando búsqueda y filtros. totalCount solo viene en la primera (la API no lo trae en
 // next_items_page).
+// A pedido: la tabla muestra "RUT" en vez de "CI" cuando el cliente es una Empresa, y se
+// puede filtrar solo empresas. Oportunidades no tiene una columna espejo del Tipo Cliente
+// (se decidió no agregarla), así que se lee del cliente vinculado: una consulta más por
+// página con los clientes de esas filas. Si falla, las filas quedan sin tipo (se ven con
+// "CI", como antes) en vez de romper la tabla.
+const TIPOS_CLIENTE_QUERY = `
+  query TiposCliente($ids: [ID!]) {
+    items(ids: $ids, limit: 100) {
+      id
+      column_values(ids: ["color_mm51rgar"]) {
+        id
+        text
+      }
+    }
+  }
+`
+
+async function conTipoDeCliente(items) {
+  const clienteDe = (item) =>
+    item.column_values?.find((c) => c.id === 'board_relation_mm4qg1n2')?.linked_item_ids?.[0] ?? null
+  const ids = [...new Set(items.map(clienteDe).filter(Boolean).map(String))]
+  if (!ids.length) return items
+  const tipos = new Map()
+  try {
+    for (let i = 0; i < ids.length; i += 100) {
+      const data = await callMondayApi(TIPOS_CLIENTE_QUERY, { ids: ids.slice(i, i + 100) })
+      for (const it of data.items ?? []) tipos.set(String(it.id), it.column_values?.[0]?.text ?? '')
+    }
+  } catch {
+    return items
+  }
+  return items.map((item) => ({ ...item, clienteTipo: tipos.get(String(clienteDe(item))) ?? '' }))
+}
+
 export async function fetchOpportunitiesPage({ limit = 10, cursor = null, search = '', reglas = [] } = {}) {
   // A pedido: nombre/CI/RUT buscan por el CLIENTE y un teléfono por el CONTACTO. Nombre,
   // CI y teléfono ya los cubren las reglas del servidor (COLUMNAS_BUSQUEDA — el teléfono
@@ -707,7 +742,7 @@ export async function fetchOpportunitiesPage({ limit = 10, cursor = null, search
       columnIds: OPPORTUNITY_COLUMN_IDS,
     })
     const pagina = data.next_items_page
-    return { items: pagina?.items ?? [], cursor: pagina?.cursor ?? null, totalCount: null }
+    return { items: await conTipoDeCliente(pagina?.items ?? []), cursor: pagina?.cursor ?? null, totalCount: null }
   }
 
   const data = await callMondayApi(ITEMS_PAGE_QUERY, {
@@ -718,7 +753,7 @@ export async function fetchOpportunitiesPage({ limit = 10, cursor = null, search
   })
   const board = data.boards?.[0]
   return {
-    items: board?.items_page.items ?? [],
+    items: await conTipoDeCliente(board?.items_page.items ?? []),
     cursor: board?.items_page.cursor ?? null,
     totalCount: board?.items_count ?? 0,
   }
@@ -2404,6 +2439,32 @@ export async function fetchClienteGestion(clienteId) {
   const data = await callMondayApi(CLIENTE_GESTION_BY_ID_QUERY, { ids: [clienteId] })
   const item = data.items?.[0]
   return item ? mapClienteGestion(item) : null
+}
+
+// A pedido: cambiar el nombre del cliente, desde el paso Cotizar o desde su ficha en
+// Clientes. El nombre vive en el ítem de Clientes (nombre del ítem + columnas Nombre y
+// Apellido; una Empresa va sin apellido) y, si el cliente tiene un contacto que es él
+// mismo — el homónimo: el contacto con su MISMO nombre de antes, mismo criterio que la
+// ficha —, también se renombra. Las oportunidades guardan su propia copia del nombre: la
+// de la oportunidad desde la que se cambia la actualiza quien llama (OpportunityDetail).
+export async function renombrarCliente(clienteId, { nombre, apellido = '' }) {
+  const cliente = await fetchClienteGestion(clienteId)
+  if (!cliente) throw new Error('No se encontró el cliente.')
+  const esEmpresa = cliente.tipo === 'Empresa'
+  const nombreCompleto = (esEmpresa ? nombre : `${nombre} ${apellido}`).trim().replace(/\s+/g, ' ')
+  if (!nombreCompleto) throw new Error('El nombre no puede quedar vacío.')
+  const anterior = cliente.name.trim().toLowerCase()
+  const homonimos = cliente.contactos.filter((c) => c.name.trim().toLowerCase() === anterior)
+
+  await setContactoColumnValues(clienteId, {
+    [CONTACTO_NOMBRE_COLUMN_ID]: nombre.trim(),
+    ...(esEmpresa ? {} : { [CONTACTO_APELLIDO_COLUMN_ID]: apellido.trim() }),
+  })
+  if (nombreCompleto !== cliente.name) await setItemName(clienteId, nombreCompleto, CLIENTES_BOARD_ID)
+  for (const contacto of homonimos) {
+    if (contacto.name !== nombreCompleto) await setItemName(contacto.id, nombreCompleto, CONTACTOS_BOARD_ID)
+  }
+  return { nombreCompleto, contactosRenombrados: homonimos.length }
 }
 
 export async function setClienteTipo(clienteId, tipo) {

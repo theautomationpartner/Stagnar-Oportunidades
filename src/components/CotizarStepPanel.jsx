@@ -37,6 +37,8 @@ const VEHICULO_FIELD_LAYOUT = [
 
 function buildInitialForm(opportunity, dropdownOptions) {
   const form = {
+    nombre: opportunity.nombre ?? '',
+    apellido: opportunity.apellido ?? '',
     ci: opportunity.ci,
     anio: opportunity.anio,
     modelo: opportunity.modelo,
@@ -359,11 +361,15 @@ export default function CotizarStepPanel({
     const sectionKeys = new Set(
       (editingSection === 'vehiculo' ? VEHICULO_FIELD_LAYOUT : PERSONAL_FIELD_LAYOUT).map((f) => f.key)
     )
-    const missing = getMissingCotizarFields(form).filter((f) => sectionKeys.has(f.key))
+    // El nombre no es de COTIZAR_FIELDS (no lo necesita el robot), pero vacío no puede quedar.
+    const personales = editingSection === 'personales'
+    const missing = [
+      ...(personales && !form.nombre?.trim() ? [esEmpresa ? 'Razón social' : 'Nombre'] : []),
+      ...(personales && !esEmpresa && !form.apellido?.trim() ? ['Apellido'] : []),
+      ...getMissingCotizarFields(form).filter((f) => sectionKeys.has(f.key)).map(etiqueta),
+    ]
     if (missing.length > 0) {
-      setSaveError(
-        `Completá estos campos antes de guardar: ${missing.map(etiqueta).join(', ')}.`
-      )
+      setSaveError(`Completá estos campos antes de guardar: ${missing.join(', ')}.`)
       return
     }
     setSaving(true)
@@ -525,6 +531,35 @@ export default function CotizarStepPanel({
               {editingSection === 'vehiculo' ? 'Editar vehículo' : 'Editar datos personales'}
             </h2>
             <div className="cotizar-step__grid">
+              {/* A pedido: el nombre del cliente también se puede cambiar acá. Una Empresa
+                  lleva solo la razón social. Se guarda en la oportunidad y en el cliente
+                  (y en su contacto homónimo, ver mondayApi.js#renombrarCliente). */}
+              {editingSection === 'personales' && (
+                <>
+                  <label
+                    className={`cotizar-step__field cotizar-step__field--edit${!form.nombre?.trim() ? ' cotizar-step__field--missing' : ''}`}
+                    style={{ gridColumn: `span ${esEmpresa ? 6 : 3}` }}
+                  >
+                    <span className="cotizar-step__field-label">{esEmpresa ? 'Razón social' : 'Nombre'}</span>
+                    <TextField size="small" value={form.nombre} onChange={(v) => handleFieldChange('nombre', v)} />
+                  </label>
+                  {!esEmpresa && (
+                    <label
+                      className={`cotizar-step__field cotizar-step__field--edit${!form.apellido?.trim() ? ' cotizar-step__field--missing' : ''}`}
+                      style={{ gridColumn: 'span 3' }}
+                    >
+                      <span className="cotizar-step__field-label">Apellido</span>
+                      <TextField size="small" value={form.apellido} onChange={(v) => handleFieldChange('apellido', v)} />
+                    </label>
+                  )}
+                  {opportunity.clienteId && (
+                    <p className="cotizar-step__editar-nota" style={{ gridColumn: 'span 6' }}>
+                      Si cambiás el nombre, se cambia también en la ficha del cliente y en su contacto con el mismo
+                      nombre.
+                    </p>
+                  )}
+                </>
+              )}
               {/* A pedido: orden propio (no el de COTIZAR_FIELDS) — de a 2 por
                   renglón cuando tiene sentido agruparlos (CI/Fecha, Departamento/
                   Localidad, Año/Marca), Modelo solo en su propio renglón a lo ancho

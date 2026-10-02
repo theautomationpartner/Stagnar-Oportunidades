@@ -53,6 +53,9 @@ export const FILTROS_VACIOS = {
   estadoCreacion: '',
   validacionPoliza: '',
   tipoSujeto: '',
+  // A pedido: check "Solo empresas" (true / ''). Como Tipo de Sujeto, se filtra en el
+  // navegador: el tipo viene del cliente vinculado (ver mondayApi.js#conTipoDeCliente).
+  soloEmpresas: '',
   // id de monday de la persona (columna people "Asignado").
   asignado: '',
   ...Object.fromEntries(RANGOS_DE_FECHA.flatMap((r) => [[`${r.clave}Desde`, ''], [`${r.clave}Hasta`, '']])),
@@ -84,6 +87,7 @@ export function cantidadDeFiltrosActivos(filtros) {
     'estadoCreacion',
     'validacionPoliza',
     'tipoSujeto',
+    'soloEmpresas',
     'asignado',
   ].filter(
     (k) => filtros[k]
@@ -134,6 +138,7 @@ export function cumpleFiltros(opp, filtros, { nombreAsignado } = {}) {
     if (!etiquetasDelFiltro(clave, filtros[clave]).includes(opp[clave])) return false
   }
   if (filtros.tipoSujeto && opp.tipoSujeto !== filtros.tipoSujeto) return false
+  if (filtros.soloEmpresas && opp.clienteTipo !== 'Empresa') return false
   if (filtros.asignado) {
     const asignados = String(opp.asignado ?? '').split(',').map((n) => n.trim())
     if (!nombreAsignado || !asignados.includes(nombreAsignado)) return false

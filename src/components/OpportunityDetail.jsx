@@ -22,6 +22,7 @@ import {
   setBoardRelationItems,
   fetchColumnText,
   setItemName,
+  renombrarCliente,
   setDropdownColumnValue,
   setConnectedColumnValue,
   setSubitemCheckboxValue,
@@ -1905,6 +1906,25 @@ export default function OpportunityDetail({
     // esperar a un nuevo intento de Cotizar para que se pise solo.
     setMarkError(null)
     setCotizarErrorDetail(null)
+
+    // A pedido: el nombre del cliente se puede cambiar desde "Editar datos personales".
+    // Va primero en la oportunidad (su copia propia: Nombre/Apellido) y después en el
+    // cliente vinculado y su contacto homónimo (ver renombrarCliente). Una Empresa no
+    // lleva apellido.
+    const esEmpresa = opportunity.clienteTipo === 'Empresa'
+    const nombreNuevoCliente = (formValues.nombre ?? opportunity.nombre ?? '').trim()
+    const apellidoNuevoCliente = esEmpresa ? '' : (formValues.apellido ?? opportunity.apellido ?? '').trim()
+    const cambiaNombre =
+      nombreNuevoCliente !== (opportunity.nombre ?? '').trim() ||
+      apellidoNuevoCliente !== (esEmpresa ? '' : (opportunity.apellido ?? '').trim())
+    if (cambiaNombre) {
+      await setSimpleColumnValue(opportunityId, 'text_mm51b055', nombreNuevoCliente)
+      await setSimpleColumnValue(opportunityId, 'text_mm51ez7e', apellidoNuevoCliente)
+      if (opportunity.clienteId) {
+        await renombrarCliente(opportunity.clienteId, { nombre: nombreNuevoCliente, apellido: apellidoNuevoCliente })
+      }
+    }
+
     for (const field of COTIZAR_FIELDS) {
       if (field.kind === 'connected' || field.kind === 'autodata') continue
       const newValue = formValues[field.key] ?? ''
@@ -1968,6 +1988,8 @@ export default function OpportunityDetail({
       color_mm52ey1d: formValues.uso,
       dropdown_mm5jqdk: formValues.tipo,
       date_mm516agw: formValues.fechaNacimiento,
+      text_mm51b055: nombreNuevoCliente,
+      text_mm51ez7e: apellidoNuevoCliente,
     }
 
     setItem((prev) => ({
@@ -1988,7 +2010,7 @@ export default function OpportunityDetail({
     // Va al final y aparte: es un dato de presentación, y si monday lo rechaza no tiene
     // sentido desandar los valores que sí se guardaron bien.
     const nombreNuevo = nombreDeOportunidad({
-      nombre: opportunity.clienteNombre,
+      nombre: cambiaNombre ? [nombreNuevoCliente, apellidoNuevoCliente].filter(Boolean).join(' ') : opportunity.clienteNombre,
       marca: textByColumnId.dropdown_mm51ykrd,
       modelo: textByColumnId.text_mm54fb7m,
       anio: textByColumnId.dropdown_mm51mdmq,

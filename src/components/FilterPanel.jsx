@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react'
 import { MdCancelScheduleSend, MdClose, MdCompareArrows, MdErrorOutline, MdFilterList, MdReportProblem } from 'react-icons/md'
-import { Button, Dropdown, Search } from '@vibe/core'
+import { Button, Checkbox, Dropdown, Search } from '@vibe/core'
 import { matchesSearchQuery } from '../services/format'
 import { PROBLEMAS as REGLAS_DE_PROBLEMAS, RANGOS_DE_FECHA, cantidadDeFiltrosActivos, problemaActivo } from '../services/filtrosOportunidades'
 import './FilterPanel.css'
@@ -93,6 +93,7 @@ function etiquetasActivas(filters, filterOptions) {
     filterOptions.asignados?.find((o) => o.value === filters.asignado)?.label ?? filters.asignado
   )
   suelto('tipoSujeto', 'Sujeto', filters.tipoSujeto)
+  if (filters.soloEmpresas) etiquetas.push({ key: 'soloEmpresas', texto: 'Solo empresas', campos: ['soloEmpresas'] })
   for (const r of RANGOS_DE_FECHA) {
     const desde = filters[`${r.clave}Desde`]
     const hasta = filters[`${r.clave}Hasta`]
@@ -332,6 +333,13 @@ export default function FilterPanel({
                 options={filterOptions.tiposSujeto}
                 onChange={onFilterChange}
                 placeholder="Todos"
+              />
+              {/* A pedido: solo las oportunidades cuyo cliente es una Empresa. */}
+              <Checkbox
+                className="filter-panel__check"
+                label="Solo empresas"
+                checked={Boolean(filters.soloEmpresas)}
+                onChange={(e) => onFilterChange('soloEmpresas', e.target.checked ? true : '')}
               />
             </div>
           </div>

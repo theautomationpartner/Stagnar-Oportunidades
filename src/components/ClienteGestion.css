@@ -60,6 +60,32 @@
   margin: 0 0 6px;
 }
 
+/* Nombre + "Cambiar nombre", y el formulario que lo reemplaza al editar. */
+.gcli__nombre {
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.gcli__nombre h1 {
+  margin-bottom: 0;
+}
+
+.gcli__nombre-form {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+
+.gcli__nombre-form .gcli__nombre-nota {
+  flex-basis: 100%;
+  margin: 0;
+}
+
 .gcli__cabecera-meta {
   display: flex;
   align-items: center;

@@ -259,6 +259,13 @@
   font-size: 12px;
 }
 
+/* Aviso bajo Nombre/Apellido en "Editar datos personales": a dónde más llega el cambio. */
+.cotizar-step__editar-nota {
+  margin: -4px 0 0;
+  font-size: 12px;
+  color: var(--text-gray);
+}
+
 .cotizar-step__error-detail-spacing {
   margin-top: 16px;
 }

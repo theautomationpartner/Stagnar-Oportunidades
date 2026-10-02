@@ -167,6 +167,11 @@
   grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
+/* "Solo empresas": en su propio renglón, debajo de Asignado / Tipo de sujeto. */
+.filter-panel__check {
+  grid-column: 1 / -1;
+}
+
 @media (max-width: 720px) {
   .filter-panel__grupo-campos--3,
   .filter-panel__grupo-campos--2,

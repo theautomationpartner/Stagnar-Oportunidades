@@ -198,6 +198,9 @@ export default function App() {
     () =>
       opportunities.filter((opp) => {
         if (filters.tipoSujeto && opp.tipoSujeto !== filters.tipoSujeto) return false
+        // "Solo empresas": mismo caso — el tipo viene del cliente vinculado, no de una
+        // columna de Oportunidades que la API pueda filtrar.
+        if (filters.soloEmpresas && opp.clienteTipo !== 'Empresa') return false
         if (hayBusqueda) return cumpleFiltros(opp, filters, { nombreAsignado })
         return true
       }),
@@ -262,13 +265,16 @@ export default function App() {
   // respuesta como vieja y las filas nuevas se descartaban — se pedía la página 2 y
   // seguían viéndose 10. Y la generación descarta lo que llegue tarde de una búsqueda
   // anterior, que es el otro riesgo de traer en varias tandas.
+  // Se cuentan las filas que QUEDAN después de los filtros del navegador (Tipo de sujeto,
+  // Solo empresas): contando las traídas, con un filtro puesto la página quedaba con 2
+  // filas y "siguiente" deshabilitado aunque más adelante en el tablero hubiera más.
   useEffect(() => {
     const necesarias = page * pageSize
-    if (!cursor || trayendoMasRef.current || opportunities.length >= necesarias || !schema) return undefined
+    if (!cursor || trayendoMasRef.current || filteredOpportunities.length >= necesarias || !schema) return undefined
     const generacion = generacionRef.current
     trayendoMasRef.current = true
     setLoadingMore(true)
-    fetchOpportunitiesPage({ limit: Math.max(pageSize, necesarias - opportunities.length), cursor })
+    fetchOpportunitiesPage({ limit: Math.max(pageSize, necesarias - filteredOpportunities.length), cursor })
       .then((pagina) => {
         if (generacion !== generacionRef.current) return
         setCursor(pagina.cursor)
@@ -288,7 +294,7 @@ export default function App() {
         setLoadingMore(false)
       })
     return undefined
-  }, [page, pageSize, cursor, opportunities.length, schema])
+  }, [page, pageSize, cursor, filteredOpportunities.length, schema])
 
   // Con cursor todavía queda al menos una página más, aunque no sepamos cuántas filas
   // trae: se habilita una página extra para que "siguiente" no quede muerto.

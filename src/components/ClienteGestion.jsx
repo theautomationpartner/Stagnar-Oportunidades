@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react'
-import { MdArrowBack, MdBusiness, MdCall, MdClear, MdGroups, MdPeopleAlt, MdPersonAdd } from 'react-icons/md'
+import { MdArrowBack, MdBusiness, MdCall, MdClear, MdEdit, MdGroups, MdPeopleAlt, MdPersonAdd } from 'react-icons/md'
 import { Button, Dropdown, TextField } from '@vibe/core'
 import Avatar from './Avatar'
 import StatusBadge from './StatusBadge'
@@ -16,6 +16,7 @@ import {
   vincularContactoACliente,
   desvincularContactoDeCliente,
   setClienteTipo,
+  renombrarCliente,
   setClienteEmpresa,
   vincularRelacionClientes,
   desvincularRelacionClientes,
@@ -28,7 +29,7 @@ import {
   rolesGrupoParaTipo,
 } from '../services/mondayApi'
 import { normalizarParaMatch } from '../services/format'
-import { buildMondayPhone, buildMondayEmail, initialsOf } from '../services/personaFields'
+import { buildMondayPhone, buildMondayEmail, initialsOf, splitNombreApellido } from '../services/personaFields'
 import './ClienteGestion.css'
 
 // Ficha de gestión de un Cliente: sus Contactos (vincular/crear/quitar), la Empresa
@@ -111,6 +112,8 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
   // pisadas entre acciones (las conexiones se releen y reescriben completas).
   const [ocupado, setOcupado] = useState('')
   const [confirmar, setConfirmar] = useState(null) // { titulo, descripcion, textoOk, onOk }
+  // Cambio de nombre (a pedido): null = no se está editando; si no, el borrador.
+  const [editandoNombre, setEditandoNombre] = useState(null) // { nombre, apellido }
 
   // Alta/vínculo de contactos.
   const [busquedaContacto, setBusquedaContacto] = useState('')
@@ -245,7 +248,76 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
       <header className="gcli__cabecera">
         <Avatar label={initialsOf(cliente.name)} />
         <div className="gcli__cabecera-datos">
-          <h1>{cliente.name}</h1>
+          {/* A pedido: cambiar el nombre desde la ficha. Renombra el cliente y, si tiene
+              un contacto homónimo (él mismo), también a ese contacto — ver
+              mondayApi.js#renombrarCliente. */}
+          {editandoNombre ? (
+            <form
+              className="gcli__nombre-form"
+              onSubmit={(e) => {
+                e.preventDefault()
+                const { nombre, apellido } = editandoNombre
+                if (!nombre.trim() || (!esEmpresa && !apellido.trim())) return
+                accion('nombre', async () => {
+                  await renombrarCliente(clienteId, { nombre, apellido })
+                  setEditandoNombre(null)
+                })
+              }}
+            >
+              <TextField
+                size="small"
+                title={esEmpresa ? 'Razón social' : 'Nombre'}
+                value={editandoNombre.nombre}
+                onChange={(v) => setEditandoNombre((prev) => ({ ...prev, nombre: v }))}
+                autoFocus
+              />
+              {!esEmpresa && (
+                <TextField
+                  size="small"
+                  title="Apellido"
+                  value={editandoNombre.apellido}
+                  onChange={(v) => setEditandoNombre((prev) => ({ ...prev, apellido: v }))}
+                />
+              )}
+              <Button
+                type="submit"
+                size="small"
+                loading={ocupado === 'nombre'}
+                disabled={!editandoNombre.nombre.trim() || (!esEmpresa && !editandoNombre.apellido.trim())}
+              >
+                Guardar
+              </Button>
+              <Button kind="tertiary" size="small" onClick={() => setEditandoNombre(null)} disabled={ocupado === 'nombre'}>
+                Cancelar
+              </Button>
+              {homonimoDelCliente && (
+                <p className="gcli__hint gcli__nombre-nota">
+                  También se renombra su contacto «{homonimoDelCliente.name}».
+                </p>
+              )}
+            </form>
+          ) : (
+            <div className="gcli__nombre">
+              <h1>{cliente.name}</h1>
+              <Button
+                kind="tertiary"
+                size="small"
+                onClick={() =>
+                  // Los ítems viejos pueden no tener las columnas Nombre/Apellido: se
+                  // arranca del nombre del ítem, partido igual que en el alta.
+                  setEditandoNombre(
+                    esEmpresa
+                      ? { nombre: cliente.nombre || cliente.name, apellido: '' }
+                      : cliente.nombre || cliente.apellido
+                        ? { nombre: cliente.nombre, apellido: cliente.apellido }
+                        : splitNombreApellido(cliente.name)
+                  )
+                }
+              >
+                <MdEdit aria-hidden="true" /> Cambiar nombre
+              </Button>
+            </div>
+          )}
           <div className="gcli__cabecera-meta">
             {cliente.estado && (
               <StatusBadge
