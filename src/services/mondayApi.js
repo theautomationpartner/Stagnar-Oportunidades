@@ -46,6 +46,7 @@ const OPPORTUNITY_COLUMN_IDS = [
   'pulse_log_mm4pzxca', // Registro de creación
   'numeric_mm658a9j', // Recotizaciones
   'color_mm51n7aa', // Estado Cotizacion
+  'text_mm7v1vg6', // Avance cotización: lo escribe el actor en cada paso (ver CotizandoModal)
   // Tipo de Sujeto (Cliente/Lead): columna Mirror de la "Situación" del Cliente vinculado
   // (la color_mm51mm5v propia de Oportunidades quedó obsoleta, la automatización ya no la escribe).
   'lookup_mm6m64w7', // Tipo de Sujeto (mirror desde Clientes)

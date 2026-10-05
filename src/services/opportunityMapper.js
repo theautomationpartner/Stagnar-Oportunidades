@@ -201,6 +201,8 @@ export function mapOpportunityItem(item, statusColors = {}) {
     estadoColor,
     estadoCotizacion,
     estadoCotizacionColor,
+    // "4/11 · Cargando los datos del vehículo": lo escribe el actor de WINK en cada paso.
+    avanceCotizacion: textOf(cv, 'text_mm7v1vg6'),
     tipoSujeto,
     estadoEnvio,
     estadoEnvioColor,

@@ -9,6 +9,21 @@ import './CotizandoModal.css'
 // mismo criterio que el resto de la app (ej. .quote-card__company en QuoteCard.jsx).
 const COMPANIAS = Object.keys(EXPECTED_QUOTE_COUNT_BY_COMPANIA)
 
+// Hasta dónde llena la barra el actor de WINK: sus pasos son lo más largo (cotizar en el
+// portal). El resto lo completan los subitems a medida que el Responder los crea.
+const TRAMO_ACTOR = 70
+
+// El avance que escribe el actor ("4/11 · Cargando los datos del vehículo", columna
+// text_mm7v1vg6): el número de paso para la barra y el texto para mostrar.
+function leerAvance(avance) {
+  const m = /^\s*(\d+)\s*\/\s*(\d+)\s*·\s*(.+)$/.exec(avance ?? '')
+  if (!m) return null
+  const paso = Number(m[1])
+  const total = Number(m[2])
+  if (!total || paso < 0) return null
+  return { fraccion: Math.min(paso / total, 1), texto: m[3].trim() }
+}
+
 // A pedido: popup con el avance en vivo de la cotización automática, compañía por
 // compañía — a diferencia del AttentionBox genérico de antes (un solo texto "Cotizando
 // con las compañías..."), acá se ve cuántas opciones ya se generaron de cada una
@@ -18,7 +33,7 @@ const COMPANIAS = Object.keys(EXPECTED_QUOTE_COUNT_BY_COMPANIA)
 // importar el vehículo), `progress` es lo que ya se creó de verdad (ver el polling en
 // OpportunityDetail.jsx). El cierre de este popup es solo visual — no corta el polling
 // de fondo, mismo criterio que WhatsAppSendModal.
-export default function CotizandoModal({ show, recotizando, progress, onClose, onCancelar, cancelando }) {
+export default function CotizandoModal({ show, recotizando, progress, avance, onClose, onCancelar, cancelando }) {
   if (!show) return null
 
   const totalExpected = COMPANIAS.reduce((sum, c) => sum + EXPECTED_QUOTE_COUNT_BY_COMPANIA[c], 0)
@@ -26,8 +41,15 @@ export default function CotizandoModal({ show, recotizando, progress, onClose, o
     (sum, c) => sum + Math.min(progress[c] ?? 0, EXPECTED_QUOTE_COUNT_BY_COMPANIA[c]),
     0
   )
-  const percent = totalExpected > 0 ? Math.round((totalDone / totalExpected) * 100) : 0
   const allDone = totalDone >= totalExpected
+  const avanceActor = leerAvance(avance)
+  // Mientras no hay subitems, la barra sigue los pasos del actor (0 a TRAMO_ACTOR); desde
+  // el primer subitem, los subitems completan el resto.
+  const percent = allDone
+    ? 100
+    : totalDone > 0
+      ? Math.round(TRAMO_ACTOR + ((100 - TRAMO_ACTOR) * totalDone) / totalExpected)
+      : Math.round(TRAMO_ACTOR * (avanceActor?.fraccion ?? 0))
   // A pedido: 3 fases en vez de 2 — la automatización de monday no expone un estado
   // propio para cada una (Estado Cotización solo tiene "Cotizar"/"Cotizando"/"Cotizado
   // (Subitems)"/"Error", ver color_mm51n7aa), así que se infieren del progreso real de
@@ -44,13 +66,17 @@ export default function CotizandoModal({ show, recotizando, progress, onClose, o
   // aseguradoras...") mientras totalDone seguía en cero. En ese tramo (el más largo,
   // antes de que aparezca el primer subitem) ahora avisa que puede demorar en vez de
   // repetir el título con otras palabras.
+  // Con el texto del actor, mientras todavía no hay subitems se muestra qué está haciendo
+  // en el portal; antes de que escriba el primero, lo de siempre.
   const subtitle = allDone
     ? '¡Cotizaciones obtenidas con éxito!'
-    : recotizando && totalDone === 0
-      ? 'Eliminando cotizaciones anteriores...'
-      : totalDone === 0
-        ? 'Esto puede tardar unos minutos.'
-        : 'Creando los subitems...'
+    : totalDone > 0
+      ? 'Creando los subitems...'
+      : avanceActor
+        ? avanceActor.texto
+        : recotizando
+          ? 'Eliminando cotizaciones anteriores...'
+          : 'Esto puede tardar unos minutos.'
 
   return (
     <Modal id="cotizando-modal" show={show} onClose={onClose} size="small">

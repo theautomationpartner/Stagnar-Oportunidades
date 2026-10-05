@@ -171,6 +171,10 @@ const REQUISITO_A_ESTADO = {
   Autorización: 'Ganada - Requiere Autorización',
 }
 const ESTADO_COTIZACION_COLUMN_ID = 'color_mm51n7aa'
+// "4/11 · Cargando los datos del vehículo": lo escribe el actor de WINK en cada paso y se
+// muestra en CotizandoModal. Se vacía al apretar Cotizar, para no mostrar el de la vez
+// anterior mientras arranca el robot.
+const AVANCE_COTIZACION_COLUMN_ID = 'text_mm7v1vg6'
 const ESTADO_ENVIO_COLUMN_ID = 'color_mm4wr1t4'
 const ESTADO_CREACION_COLUMN_ID = 'color_mm5ejysv'
 const POSEE_VEHICULO_COLUMN_ID = 'color_mm51n4j'
@@ -315,6 +319,9 @@ export default function OpportunityDetail({
   // Cantidad de subitems nuevos ya vistos en esta cotización — sirve para detectar
   // progreso entre ticks y reiniciar el reloj de arriba (ver el tick del polling).
   const cotizarProgresoVistoRef = useRef(0)
+  // Último texto de avance del actor visto (AVANCE_COTIZACION_COLUMN_ID): cuando cambia,
+  // el robot sigue vivo y también se reinicia el reloj.
+  const ultimoAvanceRef = useRef('')
   // A pedido: en un RECOTIZAR, el primer paso de la automatización es BORRAR todas las
   // cotizaciones anteriores y recién después crear las nuevas desde cero — sin esto, los
   // subitems viejos (todavía sin borrar en el momento de un tick) se contarían como si
@@ -598,6 +605,11 @@ export default function OpportunityDetail({
         // viva nunca se da por muerta.
         if (newRaws.length > cotizarProgresoVistoRef.current) {
           cotizarProgresoVistoRef.current = newRaws.length
+          if (cotizarPollStartRef.current) cotizarPollStartRef.current = Date.now()
+        }
+        const avance = textOf(data.column_values, AVANCE_COTIZACION_COLUMN_ID)
+        if (avance && avance !== ultimoAvanceRef.current) {
+          ultimoAvanceRef.current = avance
           if (cotizarPollStartRef.current) cotizarPollStartRef.current = Date.now()
         }
 
@@ -1199,12 +1211,15 @@ export default function OpportunityDetail({
       // fecha de nacimiento. Sin fecha no se escribe nada y el escenario avisa qué falta.
       const edad = edadDesde(opportunity?.fechaNacimiento)
       if (edad) await setSimpleColumnValue(opportunityId, EDAD_COLUMN_ID, String(edad))
+      await setSimpleColumnValue(opportunityId, AVANCE_COTIZACION_COLUMN_ID, '')
       await setSimpleColumnValue(opportunityId, ESTADO_COTIZACION_COLUMN_ID, 'Cotizar')
       setItem((prev) => ({
         ...prev,
-        column_values: prev.column_values.map((cv) =>
-          cv.id === ESTADO_COTIZACION_COLUMN_ID ? { ...cv, text: 'Cotizar' } : cv
-        ),
+        column_values: prev.column_values.map((cv) => {
+          if (cv.id === ESTADO_COTIZACION_COLUMN_ID) return { ...cv, text: 'Cotizar' }
+          if (cv.id === AVANCE_COTIZACION_COLUMN_ID) return { ...cv, text: '' }
+          return cv
+        }),
       }))
       oldSubitemIdsRef.current = new Set(rawQuotes.map((r) => r.id))
       setCotizarProgress({})
@@ -2677,6 +2692,7 @@ export default function OpportunityDetail({
         show={polling && !cotizandoModalDismissed}
         recotizando={hasQuotes}
         progress={cotizarProgress}
+        avance={opportunity?.avanceCotizacion}
         onClose={() => setCotizandoModalDismissed(true)}
         onCancelar={handleCancelarCotizacion}
         cancelando={cancelando}
