@@ -1526,7 +1526,9 @@ export function tipoDeTerminoNumerico(term) {
 // CLIENTE; un TELÉFONO busca al CONTACTO y devuelve sus Clientes vinculados (la persona
 // a la que se le cotiza). Qué es cada cosa lo decide la pinta del número (ver
 // tipoDeTerminoNumerico).
-export async function searchContactos(term) {
+// `limit`: cuántos resultados por nombre/CI (el alta pide pocos; la tabla de Clientes,
+// que ahora busca en monday en vez de traer el tablero entero, pide más).
+export async function searchContactos(term, { limit = 20 } = {}) {
   const query = (term ?? '').trim()
   if (query.length < 2) return []
   const isNumeric = /\d/.test(query)
@@ -1547,12 +1549,28 @@ export async function searchContactos(term) {
     }
   }
 
-  const rules = isNumeric
-    ? [{ column_id: CONTACTO_CI_COLUMN_ID, compare_value: [digits], operator: 'contains_text' }]
-    : [{ column_id: 'name', compare_value: [query], operator: 'contains_text' }]
-  const data = await callMondayApi(SEARCH_CONTACTOS_QUERY, { boardId: CLIENTES_BOARD_ID, rules, limit: 20 })
-  const items = data.boards[0]?.items_page.items ?? []
-  return items.map(mapContactoItem)
+  if (isNumeric) {
+    const rules = [{ column_id: CONTACTO_CI_COLUMN_ID, compare_value: [digits], operator: 'contains_text' }]
+    const data = await callMondayApi(SEARCH_CONTACTOS_QUERY, { boardId: CLIENTES_BOARD_ID, rules, limit })
+    return (data.boards[0]?.items_page.items ?? []).map(mapContactoItem)
+  }
+  const items = await porNombreConYSinTildes(query, async (texto) => {
+    const rules = [{ column_id: 'name', compare_value: [texto], operator: 'contains_text' }]
+    const data = await callMondayApi(SEARCH_CONTACTOS_QUERY, { boardId: CLIENTES_BOARD_ID, rules, limit })
+    return data.boards[0]?.items_page.items ?? []
+  })
+  return items.slice(0, limit).map(mapContactoItem)
+}
+
+// La búsqueda de monday distingue tildes ("Lucía" no encuentra "LUCIA") y la mayoría de
+// los nombres están cargados sin ellas. Con un término que lleva tildes se busca también
+// sin tildes y se juntan los resultados, sin repetir. `buscar(texto)` devuelve ítems con id.
+async function porNombreConYSinTildes(termino, buscar) {
+  const sinTildes = termino.normalize('NFD').replace(/[̀-ͯ]/g, '')
+  const variantes = sinTildes === termino ? [termino] : [termino, sinTildes]
+  const listas = await Promise.all(variantes.map(buscar))
+  const vistos = new Set()
+  return listas.flat().filter((it) => (vistos.has(String(it.id)) ? false : vistos.add(String(it.id))))
 }
 
 // Caso "el contacto no existe": antes de crear la oportunidad se avisa si esa Cédula YA
@@ -1812,52 +1830,6 @@ const FETCH_CONTACTOS_CRM_QUERY = `
   }
 `
 
-// Todos los contactos del tablero, para la vista de Contactos. Se recorre con cursor
-// aunque hoy sean unas decenas: el límite por página de monday es 500 y una consulta sin
-// cursor se queda callada con lo que entró, que es la clase de error que aparece recién
-// cuando el tablero creció.
-const CONTACTOS_CRM_PAGE_QUERY = `
-  query ContactosCrmPage($boardId: ID!, $limit: Int!) {
-    boards(ids: [$boardId]) {
-      items_page(limit: $limit) {
-        cursor
-        items {
-          id
-          name
-          ${CONTACTO_CRM_COLUMN_VALUES_FRAGMENT}
-        }
-      }
-    }
-  }
-`
-
-const CONTACTOS_CRM_NEXT_QUERY = `
-  query ContactosCrmNext($cursor: String!, $limit: Int!) {
-    next_items_page(cursor: $cursor, limit: $limit) {
-      cursor
-      items {
-        id
-        name
-        ${CONTACTO_CRM_COLUMN_VALUES_FRAGMENT}
-      }
-    }
-  }
-`
-
-export async function fetchContactosCrmTodos() {
-  const items = []
-  let cursor = null
-  do {
-    const data = cursor
-      ? await callMondayApi(CONTACTOS_CRM_NEXT_QUERY, { cursor, limit: 100 })
-      : await callMondayApi(CONTACTOS_CRM_PAGE_QUERY, { boardId: CONTACTOS_BOARD_ID, limit: 100 })
-    const pagina = cursor ? data.next_items_page : data.boards[0].items_page
-    items.push(...pagina.items)
-    cursor = pagina.cursor
-  } while (cursor)
-  return items.map(mapContactoCrmItem)
-}
-
 function mapContactoCrmItem(item) {
   const byId = Object.fromEntries(item.column_values.map((cv) => [cv.id, cv]))
   // Mismo formato que phone_mm519m27 de Oportunidades: el código de país solo está en el
@@ -1901,7 +1873,7 @@ export async function searchContactosCrm({ columnId, value, limit = 10 } = {}) {
 // nuevo): decide la columna por la pinta del término — con @ es email, mayoría de
 // dígitos (6+) es teléfono, si no el nombre del ítem — y devuelve los contactos con su
 // Cliente vinculado en el label (mapContactoCrmItem.clienteNombre) para distinguirlos.
-export async function buscarContactosCrmLibre(term) {
+export async function buscarContactosCrmLibre(term, { limit = 10 } = {}) {
   const q = (term ?? '').trim()
   if (q.length < 2) return []
   const digits = q.replace(/\D/g, '')
@@ -1911,7 +1883,10 @@ export async function buscarContactosCrmLibre(term) {
     : esTelefono
       ? CONTACTO_CRM_TELEFONO_COLUMN_ID
       : undefined
-  return searchContactosCrm({ columnId, value: esTelefono ? digits : q, limit: 10 })
+  if (columnId) return searchContactosCrm({ columnId, value: esTelefono ? digits : q, limit })
+  // Por nombre: con y sin tildes (ver porNombreConYSinTildes).
+  const encontrados = await porNombreConYSinTildes(q, (texto) => searchContactosCrm({ value: texto, limit }))
+  return encontrados.slice(0, limit)
 }
 
 // Contactos concretos por id, con su teléfono y email.
@@ -2393,46 +2368,9 @@ function mapClienteGestion(item) {
   }
 }
 
-const CLIENTES_GESTION_PAGE_QUERY = `
-  query ClientesGestionPage($boardId: ID!, $limit: Int!) {
-    boards(ids: [$boardId]) {
-      items_page(limit: $limit) {
-        cursor
-        items { ${CLIENTE_GESTION_FRAGMENT} }
-      }
-    }
-  }
-`
-
-const CLIENTES_GESTION_NEXT_QUERY = `
-  query ClientesGestionNext($cursor: String!, $limit: Int!) {
-    next_items_page(cursor: $cursor, limit: $limit) {
-      cursor
-      items { ${CLIENTE_GESTION_FRAGMENT} }
-    }
-  }
-`
-
-// TODOS los clientes del tablero, con sus vínculos de gestión. El tablero de Clientes es
-// chico (decenas, no miles) — se trae entero y la búsqueda de la tabla filtra local, que
-// además permite buscar por RUT/razón social sin armar reglas por columna.
-export async function fetchClientesGestion() {
-  const items = []
-  let cursor = null
-  do {
-    const data = cursor
-      ? await callMondayApi(CLIENTES_GESTION_NEXT_QUERY, { cursor, limit: 100 })
-      : await callMondayApi(CLIENTES_GESTION_PAGE_QUERY, { boardId: CLIENTES_BOARD_ID, limit: 100 })
-    const pagina = cursor ? data.next_items_page : data.boards[0].items_page
-    items.push(...pagina.items)
-    cursor = pagina.cursor
-  } while (cursor)
-  return items.map(mapClienteGestion)
-}
-
 const CLIENTE_GESTION_BY_ID_QUERY = `
   query ClienteGestion($ids: [ID!]) {
-    items(ids: $ids) { ${CLIENTE_GESTION_FRAGMENT} }
+    items(ids: $ids, limit: 100) { ${CLIENTE_GESTION_FRAGMENT} }
   }
 `
 
@@ -2466,6 +2404,32 @@ export async function renombrarCliente(clienteId, { nombre, apellido = '' }) {
     if (contacto.name !== nombreCompleto) await setItemName(contacto.id, nombreCompleto, CONTACTOS_BOARD_ID)
   }
   return { nombreCompleto, contactosRenombrados: homonimos.length }
+}
+
+// A pedido: las pantallas de gestión (tabla de Clientes, ficha del cliente, grupo
+// económico) ya no traen el tablero entero — con miles de clientes tardaban más de un
+// minuto en abrir. Se busca en monday recién cuando se escribe y se aprieta Buscar, con
+// el mismo buscador del alta (nombre, CI, RUT o celular del contacto, ver
+// searchContactos), y de lo encontrado se trae la ficha de gestión.
+// Fichas de gestión de clientes puntuales (los miembros de un grupo, ver GrupoDetalle).
+export async function fetchClientesGestionPorIds(ids) {
+  const lista = [...new Set((ids ?? []).filter(Boolean).map(String))]
+  const fichas = []
+  for (let i = 0; i < lista.length; i += 100) {
+    const data = await callMondayApi(CLIENTE_GESTION_BY_ID_QUERY, { ids: lista.slice(i, i + 100) })
+    fichas.push(...(data.items ?? []).map(mapClienteGestion))
+  }
+  return fichas
+}
+
+export async function buscarClientesGestion(term, { limit = 50 } = {}) {
+  const encontrados = await searchContactos(term, { limit })
+  const ids = [...new Set(encontrados.map((c) => String(c.id)))].slice(0, 100)
+  if (!ids.length) return []
+  const data = await callMondayApi(CLIENTE_GESTION_BY_ID_QUERY, { ids })
+  const porId = new Map((data.items ?? []).map((item) => [String(item.id), mapClienteGestion(item)]))
+  // En el orden en que los devolvió la búsqueda.
+  return ids.map((id) => porId.get(id)).filter(Boolean)
 }
 
 export async function setClienteTipo(clienteId, tipo) {
@@ -2538,40 +2502,48 @@ export async function desvincularRelacionClientes(aId, bId) {
   await setContactoColumnValues(bId, { [CLIENTE_RELACIONES_COLUMN_ID]: { item_ids: deB.map(Number) } })
 }
 
-const FETCH_GRUPOS_QUERY = `
-  query GruposEconomicos($boardId: ID!) {
-    boards(ids: [$boardId]) {
-      items_page(limit: 100) {
-        items {
-          id
-          name
-          column_values(ids: ["${GRUPO_ALIAS_COLUMN_ID}"]) {
-            id
-            text
-          }
-          subitems {
-            id
-            name
-            column_values(ids: ["${MIEMBRO_CLIENTE_COLUMN_ID}", "${MIEMBRO_ROL_COLUMN_ID}"]) {
-              id
-              text
-              ... on BoardRelationValue {
-                linked_items { id name }
-              }
-            }
-          }
-        }
+// Un grupo con sus miembros (subitems: Cliente vinculado + Rol).
+const GRUPO_FRAGMENT = `
+  id
+  name
+  column_values(ids: ["${GRUPO_ALIAS_COLUMN_ID}"]) {
+    id
+    text
+  }
+  subitems {
+    id
+    name
+    column_values(ids: ["${MIEMBRO_CLIENTE_COLUMN_ID}", "${MIEMBRO_ROL_COLUMN_ID}"]) {
+      id
+      text
+      ... on BoardRelationValue {
+        linked_items { id name }
       }
     }
   }
 `
 
-// Grupos con sus miembros resueltos ({subitemId, clienteId, clienteNombre, rol}) — la
+const SEARCH_GRUPOS_QUERY = `
+  query BuscarGrupos($boardId: ID!, $rules: [ItemsQueryRule!], $limit: Int!) {
+    boards(ids: [$boardId]) {
+      items_page(limit: $limit, query_params: { rules: $rules, operator: or }) {
+        items { ${GRUPO_FRAGMENT} }
+      }
+    }
+  }
+`
+
+const GRUPO_BY_ID_QUERY = `
+  query GrupoEconomico($ids: [ID!]) {
+    items(ids: $ids) { ${GRUPO_FRAGMENT} }
+  }
+`
+
+// Grupo con sus miembros resueltos ({subitemId, clienteId, clienteNombre, rol}) — la
 // ficha usa los miembros para saber QUÉ subitem borrar al quitar un cliente del grupo y
 // qué rol tiene hoy.
-export async function fetchGruposEconomicos() {
-  const data = await callMondayApi(FETCH_GRUPOS_QUERY, { boardId: GRUPOS_BOARD_ID })
-  return (data.boards[0]?.items_page.items ?? []).map((g) => ({
+function mapGrupoEconomico(g) {
+  return {
     id: String(g.id),
     name: g.name,
     alias: textOf(g.column_values, GRUPO_ALIAS_COLUMN_ID),
@@ -2584,7 +2556,31 @@ export async function fetchGruposEconomicos() {
         rol: textOf(s.column_values, MIEMBRO_ROL_COLUMN_ID),
       }
     }),
-  }))
+  }
+}
+
+// A pedido: los grupos ya no se traen todos con sus miembros (cientos de subitems) — se
+// buscan por nombre o alias recién al apretar Buscar, con y sin tildes.
+export async function buscarGruposEconomicos(term, { limit = 50 } = {}) {
+  const q = (term ?? '').trim()
+  if (q.length < 2) return []
+  const items = await porNombreConYSinTildes(q, async (texto) => {
+    const rules = [
+      { column_id: 'name', compare_value: [texto], operator: 'contains_text' },
+      { column_id: GRUPO_ALIAS_COLUMN_ID, compare_value: [texto], operator: 'contains_text' },
+    ]
+    const data = await callMondayApi(SEARCH_GRUPOS_QUERY, { boardId: GRUPOS_BOARD_ID, rules, limit })
+    return data.boards[0]?.items_page.items ?? []
+  })
+  return items.slice(0, limit).map(mapGrupoEconomico)
+}
+
+// Un grupo puntual (el detalle del grupo, o el grupo del cliente en su ficha).
+export async function fetchGrupoEconomico(grupoId) {
+  if (!grupoId) return null
+  const data = await callMondayApi(GRUPO_BY_ID_QUERY, { ids: [String(grupoId)] })
+  const item = data.items?.[0]
+  return item ? mapGrupoEconomico(item) : null
 }
 
 // Alta de un grupo económico desde la app (ver GruposSection). El alias es opcional.
@@ -2633,7 +2629,7 @@ export async function agregarClienteAGrupo({ clienteId, clienteNombre, grupoId, 
 }
 
 // Baja del grupo: borra el/los subitems del cliente en ese grupo y limpia la conexión.
-// `subitemIds` sale de fetchGruposEconomicos (los miembros de su grupo actual).
+// `subitemIds` sale de los miembros de su grupo actual (ver fetchGrupoEconomico).
 export async function quitarClienteDeGrupo({ clienteId, subitemIds = [] }) {
   for (const id of subitemIds) {
     await deleteItem(id)

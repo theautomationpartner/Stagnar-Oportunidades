@@ -319,3 +319,18 @@
 .contactos__aviso {
   margin: 0 0 14px;
 }
+
+/* Búsqueda sin resultados: el aviso y el botón para crearlo con lo buscado. */
+.contactos__sin-resultados {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 10px 14px;
+  margin: 0 0 14px;
+  padding: 12px 16px;
+  font-size: 13px;
+  color: var(--text-gray);
+  background: var(--bg-subtle);
+  border: 1px dashed var(--border);
+  border-radius: 10px;
+}

@@ -3,7 +3,14 @@
 import { useEffect, useRef, useState } from 'react'
 import { Button, Dropdown, TextField } from '@vibe/core'
 import { MdCall, MdClear, MdEdit, MdInfoOutline, MdPersonAdd, MdPersonSearch } from 'react-icons/md'
-import { CODIGO_PAIS_OPTIONS, emailError, telefonoError, telefonoParaMostrar } from '../../services/personaFields'
+import {
+  CODIGO_PAIS_OPTIONS,
+  contactoDesdeBusqueda,
+  emailError,
+  telefonoError,
+  telefonoParaMostrar,
+  textoCrearDesdeBusqueda,
+} from '../../services/personaFields'
 import FlagIcon from './FlagIcon'
 import { matchesSearchQuery } from '../../services/format'
 // El popup de contacto nuevo es COMPARTIDO (también lo usa la ficha de gestión del
@@ -171,23 +178,7 @@ export function SectionTitle({ icon: Icon, children }) {
 // El teléfono/email quedan visibles también con contacto elegido: solo completan lo que
 // al contacto le falte (ensureContactoCrmId nunca pisa lo que ya tenía cargado).
 // Reunión del 24/09: si la búsqueda de contacto no encuentra nada, se ofrece crearlo con
-// lo que se buscó. Un término que es un número se toma como celular (con su código de
-// país si lo trae, "+54 11..."); cualquier otra cosa, como el nombre del contacto.
-const pareceTelefono = (termino) => /^\+?[\d\s().-]{6,}$/.test(termino.trim())
-
-function contactoDesdeBusqueda(termino, codigoPaisPorDefecto) {
-  const limpio = termino.trim()
-  if (!pareceTelefono(limpio)) return { nombre: limpio }
-  if (limpio.startsWith('+')) {
-    const digitos = limpio.replace(/\D/g, '')
-    // El código más largo primero: "+595" no tiene que leerse como "+59" + "5...".
-    const codigo = [...CODIGO_PAIS_OPTIONS]
-      .sort((a, b) => b.value.length - a.value.length)
-      .find((o) => digitos.startsWith(o.value.slice(1)))
-    if (codigo) return { codigoPais: codigo.value, telefono: digitos.slice(codigo.value.length - 1) }
-  }
-  return { codigoPais: codigoPaisPorDefecto || '+598', telefono: limpio }
-}
+// lo que se buscó (ver personaFields.js#contactoDesdeBusqueda).
 
 export function ContactoFields({
   form,
@@ -436,10 +427,7 @@ export function ContactoFields({
                         size="small"
                         onClick={() => abrirNuevo(contactoDesdeBusqueda(terminoBuscado, form.codigoPais))}
                       >
-                        <MdPersonAdd />{' '}
-                        {pareceTelefono(terminoBuscado)
-                          ? `Crear contacto con el celular ${terminoBuscado}`
-                          : `Crear el contacto «${terminoBuscado}»`}
+                        <MdPersonAdd /> {textoCrearDesdeBusqueda(terminoBuscado)}
                       </Button>
                     </div>
                   )}
@@ -470,6 +458,19 @@ export function ContactoFields({
                           )
                         })}
                       </ul>
+                      {/* A pedido: crearlo también cuando hay resultados — lo buscado puede
+                          traer homónimos u otras personas que no son la que se busca. Si el
+                          celular ya existe, el popup avisa del duplicado igual. */}
+                      <div className="crear-op__crear-igual">
+                        <span className="crear-op__section-hint">¿No es ninguno de estos?</span>
+                        <Button
+                          kind="secondary"
+                          size="small"
+                          onClick={() => abrirNuevo(contactoDesdeBusqueda(terminoBuscado, form.codigoPais))}
+                        >
+                          <MdPersonAdd /> {textoCrearDesdeBusqueda(terminoBuscado)}
+                        </Button>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -515,7 +516,7 @@ export function ContactoFields({
                   nombre: nuevoDesdeBusqueda.nombre ?? '',
                   codigoPais: nuevoDesdeBusqueda.codigoPais ?? form.codigoPais,
                   telefono: nuevoDesdeBusqueda.telefono ?? '',
-                  email: '',
+                  email: nuevoDesdeBusqueda.email ?? '',
                 }
               : {
                   nombre: form.contactoNombre ?? '',

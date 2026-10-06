@@ -8,8 +8,9 @@ import ContactoNuevoModal from './ContactoNuevoModal'
 import LoadingScreen from './LoadingScreen'
 import {
   fetchClienteGestion,
-  fetchClientesGestion,
-  fetchGruposEconomicos,
+  buscarClientesGestion,
+  fetchGrupoEconomico,
+  buscarGruposEconomicos,
   fetchContactosCrm,
   buscarContactosCrmLibre,
   createContactoCrm,
@@ -28,8 +29,14 @@ import {
   ROL_GRUPO_EMPRESA,
   rolesGrupoParaTipo,
 } from '../services/mondayApi'
-import { normalizarParaMatch } from '../services/format'
-import { buildMondayPhone, buildMondayEmail, initialsOf, splitNombreApellido } from '../services/personaFields'
+import {
+  buildMondayPhone,
+  buildMondayEmail,
+  contactoDesdeBusqueda,
+  initialsOf,
+  splitNombreApellido,
+  textoCrearDesdeBusqueda,
+} from '../services/personaFields'
 import './ClienteGestion.css'
 
 // Ficha de gestión de un Cliente: sus Contactos (vincular/crear/quitar), la Empresa
@@ -43,32 +50,38 @@ import './ClienteGestion.css'
 
 // A pedido: nada de dropdowns con live search para elegir clientes/empresas/grupos (son
 // muchos datos) — el gesto es escribir y apretar Buscar (o Enter), como en el resto de
-// la app. La búsqueda es local (las listas ya están en memoria) e ignora tildes.
-function BuscadorLocal({ placeholder, sinOpciones, textoAccion, opciones, ocupado, onElegir }) {
+// la app. A pedido, los clientes y los grupos ya no se traen enteros (son miles): se busca
+// en monday, y `buscar(termino)` devuelve las opciones ({id, label, meta}).
+function BuscadorEnMonday({ placeholder, textoAccion, buscar: buscarOpciones, ocupado, onElegir }) {
   const [busqueda, setBusqueda] = useState('')
   const [resultados, setResultados] = useState(null)
-  const buscar = () => {
-    const q = normalizarParaMatch(busqueda)
+  const [buscando, setBuscando] = useState(false)
+  const buscar = async () => {
+    const q = busqueda.trim()
     if (q.length < 2) return
-    setResultados(
-      opciones.filter((o) => [o.label, o.meta].filter(Boolean).some((v) => normalizarParaMatch(v).includes(q)))
-    )
+    setBuscando(true)
+    try {
+      setResultados(await buscarOpciones(q))
+    } catch {
+      setResultados([])
+    } finally {
+      setBuscando(false)
+    }
   }
   return (
     <div className="gcli__buscador-local">
       <div className="gcli__buscar">
         <TextField
           size="medium"
-          placeholder={opciones.length ? placeholder : sinOpciones}
+          placeholder={placeholder}
           value={busqueda}
-          disabled={!opciones.length}
           onChange={(v) => {
             setBusqueda(v)
             setResultados(null)
           }}
           onKeyDown={(e) => e.key === 'Enter' && buscar()}
         />
-        <Button kind="secondary" size="medium" disabled={busqueda.trim().length < 2} onClick={buscar}>
+        <Button kind="secondary" size="medium" loading={buscando} disabled={busqueda.trim().length < 2} onClick={buscar}>
           Buscar
         </Button>
       </div>
@@ -104,8 +117,8 @@ function BuscadorLocal({ placeholder, sinOpciones, textoAccion, opciones, ocupad
 export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
   const [cliente, setCliente] = useState(null)
   const [contactosDetalle, setContactosDetalle] = useState([])
-  const [clientes, setClientes] = useState([])
-  const [grupos, setGrupos] = useState([])
+  // Solo el grupo del cliente (con sus miembros): a pedido, ya no se traen todos.
+  const [grupoDelCliente, setGrupoDelCliente] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   // Qué acción está escribiendo ahora mismo ('' = ninguna) — deshabilita su botón y evita
@@ -120,15 +133,19 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
   const [resultadosContacto, setResultadosContacto] = useState(null)
   const [buscandoContacto, setBuscandoContacto] = useState(false)
   const [creandoContacto, setCreandoContacto] = useState(false)
+  // null = el popup abre como siempre; si no, con lo buscado (búsqueda sin resultados).
+  const [contactoDesdeLaBusqueda, setContactoDesdeLaBusqueda] = useState(null)
+  // El término que dio los resultados de abajo (el campo puede haber cambiado después).
+  const [terminoContacto, setTerminoContacto] = useState('')
 
   // Rol pendiente de "Agregar al grupo" (solo personas — las empresas entran fijas
   // como Empresa vinculada).
   const [rolElegido, setRolElegido] = useState(ROL_GRUPO_DEFAULT)
 
   const recargar = useCallback(async () => {
-    const [cli, grs] = await Promise.all([fetchClienteGestion(clienteId), fetchGruposEconomicos()])
+    const cli = await fetchClienteGestion(clienteId)
     setCliente(cli)
-    setGrupos(grs)
+    setGrupoDelCliente(cli?.grupo ? await fetchGrupoEconomico(cli.grupo.id) : null)
     setContactosDetalle(cli?.contactos.length ? await fetchContactosCrm(cli.contactos.map((c) => c.id)) : [])
   }, [clienteId])
 
@@ -136,7 +153,9 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
     let vivo = true
     setLoading(true)
     setError(null)
-    Promise.all([recargar(), fetchClientesGestion().then((lista) => vivo && setClientes(lista))])
+    // A pedido: ya no se traen todos los clientes (son miles): la empresa y las relaciones
+    // se buscan en monday al apretar Buscar (ver BuscadorEnMonday).
+    recargar()
       .catch((err) => vivo && setError(err.message))
       .finally(() => vivo && setLoading(false))
     return () => {
@@ -161,28 +180,17 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
   }
 
   const esEmpresa = cliente?.tipo === 'Empresa'
-  const empresas = useMemo(
-    () => clientes.filter((c) => c.tipo === 'Empresa' && c.id !== clienteId),
-    [clientes, clienteId]
-  )
-  const posiblesRelaciones = useMemo(
-    () =>
-      clientes.filter(
-        (c) => c.id !== clienteId && !(cliente?.relaciones ?? []).some((r) => r.id === c.id)
-      ),
-    [clientes, clienteId, cliente]
-  )
   // El/los subitems "miembro" de ESTE cliente en su grupo actual — son los que hay que
   // borrar al quitarlo, y de ahí sale también su rol de hoy.
   const miembrosDelCliente = useMemo(() => {
     if (!cliente?.grupo) return []
-    const grupo = grupos.find((g) => g.id === cliente.grupo.id)
-    return (grupo?.miembros ?? []).filter((m) => m.clienteId === cliente.id)
-  }, [cliente, grupos])
+    return (grupoDelCliente?.miembros ?? []).filter((m) => m.clienteId === cliente.id)
+  }, [cliente, grupoDelCliente])
   const rolActual = miembrosDelCliente[0]?.rol || ''
 
   const buscarContactos = async () => {
     if (busquedaContacto.trim().length < 2) return
+    setTerminoContacto(busquedaContacto.trim())
     setBuscandoContacto(true)
     try {
       const res = await buscarContactosCrmLibre(busquedaContacto)
@@ -417,7 +425,22 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
             </Button>
           </div>
           {resultadosContacto !== null && resultadosContacto.length === 0 && !buscandoContacto && (
-            <p className="gcli__hint">Sin resultados en Contactos (o ya están vinculados a este cliente).</p>
+            // A pedido: si no está, crearlo con lo que se buscó (celular, email o nombre).
+            <div className="gcli__sin-resultados">
+              <p className="gcli__hint">
+                Sin resultados para «{terminoContacto}» en Contactos (o ya están vinculados a este cliente).
+              </p>
+              <Button
+                kind="primary"
+                size="small"
+                onClick={() => {
+                  setContactoDesdeLaBusqueda(contactoDesdeBusqueda(terminoContacto))
+                  setCreandoContacto(true)
+                }}
+              >
+                <MdPersonAdd /> {textoCrearDesdeBusqueda(terminoContacto)}
+              </Button>
+            </div>
           )}
           {(resultadosContacto ?? []).length > 0 && (
             <ul className="gcli__lista gcli__lista--resultados">
@@ -448,11 +471,34 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
               ))}
             </ul>
           )}
+          {/* A pedido: crearlo también cuando hay resultados (puede no ser ninguno de ellos). */}
+          {(resultadosContacto ?? []).length > 0 && (
+            <div className="gcli__crear-igual">
+              <span className="gcli__hint">¿No es ninguno de estos?</span>
+              <Button
+                kind="secondary"
+                size="small"
+                onClick={() => {
+                  setContactoDesdeLaBusqueda(contactoDesdeBusqueda(terminoContacto))
+                  setCreandoContacto(true)
+                }}
+              >
+                <MdPersonAdd /> {textoCrearDesdeBusqueda(terminoContacto)}
+              </Button>
+            </div>
+          )}
 
           {/* A pedido: el contacto nuevo se carga en el MISMO popup que usa el paso 1
               del wizard (ContactoNuevoModal), con su validación de homónimo y de
               teléfono repetido adentro. */}
-          <Button kind="tertiary" size="small" onClick={() => setCreandoContacto(true)}>
+          <Button
+            kind="tertiary"
+            size="small"
+            onClick={() => {
+              setContactoDesdeLaBusqueda(null)
+              setCreandoContacto(true)
+            }}
+          >
             <MdPersonAdd /> Crear un contacto nuevo
           </Button>
         </div>
@@ -484,16 +530,19 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
               </Button>
             </div>
           ) : (
-            <BuscadorLocal
+            <BuscadorEnMonday
               placeholder="Buscar la empresa por nombre o RUT"
-              sinOpciones="Todavía no hay clientes de tipo Empresa para elegir"
               textoAccion="Elegir"
               ocupado={ocupado === 'empresa'}
-              opciones={empresas.map((e) => ({
-                id: e.id,
-                label: e.name,
-                meta: [e.rut && `RUT: ${e.rut}`, e.razonSocial].filter(Boolean).join(' · '),
-              }))}
+              buscar={async (termino) =>
+                (await buscarClientesGestion(termino))
+                  .filter((e) => e.tipo === 'Empresa' && e.id !== clienteId)
+                  .map((e) => ({
+                    id: e.id,
+                    label: e.name,
+                    meta: [e.rut && `RUT: ${e.rut}`, e.razonSocial].filter(Boolean).join(' · '),
+                  }))
+              }
               onElegir={(o) => accion('empresa', () => setClienteEmpresa(clienteId, o.id))}
             />
           )}
@@ -528,16 +577,19 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
             </li>
           ))}
         </ul>
-        <BuscadorLocal
+        <BuscadorEnMonday
           placeholder="Buscar un cliente por nombre, CI o RUT"
-          sinOpciones="No quedan clientes para relacionar"
           textoAccion="Vincular"
           ocupado={ocupado === 'agregar-relacion'}
-          opciones={posiblesRelaciones.map((c) => ({
-            id: c.id,
-            label: c.name,
-            meta: [c.ci && `CI: ${c.ci}`, c.rut && `RUT: ${c.rut}`, c.tipo].filter(Boolean).join(' · '),
-          }))}
+          buscar={async (termino) =>
+            (await buscarClientesGestion(termino))
+              .filter((c) => c.id !== clienteId && !(cliente?.relaciones ?? []).some((r) => r.id === c.id))
+              .map((c) => ({
+                id: c.id,
+                label: c.name,
+                meta: [c.ci && `CI: ${c.ci}`, c.rut && `RUT: ${c.rut}`, c.tipo].filter(Boolean).join(' · '),
+              }))
+          }
           onElegir={(o) => accion('agregar-relacion', () => vincularRelacionClientes(clienteId, o.id))}
         />
       </section>
@@ -622,16 +674,17 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
                 />
               </label>
             )}
-            <BuscadorLocal
+            <BuscadorEnMonday
               placeholder="Buscar el grupo por nombre o alias"
-              sinOpciones="Todavía no hay grupos económicos creados en monday"
               textoAccion="Agregar"
               ocupado={ocupado === 'agregar-grupo'}
-              opciones={grupos.map((g) => ({
-                id: g.id,
-                label: g.alias ? `${g.name} (${g.alias})` : g.name,
-                meta: `${g.miembros.length} miembro${g.miembros.length === 1 ? '' : 's'}`,
-              }))}
+              buscar={async (termino) =>
+                (await buscarGruposEconomicos(termino)).map((g) => ({
+                  id: g.id,
+                  label: g.alias ? `${g.name} (${g.alias})` : g.name,
+                  meta: `${g.miembros.length} miembro${g.miembros.length === 1 ? '' : 's'}`,
+                }))
+              }
               onElegir={(o) =>
                 accion('agregar-grupo', async () => {
                   await agregarClienteAGrupo({
@@ -655,7 +708,9 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
           nombreCliente={cliente.name}
           // Con contactos ya cargados, lo típico acá es agregar a OTRA persona; sin
           // ninguno, el caso común es el propio cliente (igual que en el alta).
-          mismoClienteInicial={contactosDetalle.length === 0}
+          // Desde una búsqueda por nombre, ese nombre es el de otra persona (como en el alta).
+          mismoClienteInicial={contactoDesdeLaBusqueda ? !contactoDesdeLaBusqueda.nombre : contactosDetalle.length === 0}
+          inicial={contactoDesdeLaBusqueda ?? {}}
           homonimo={homonimoDelCliente}
           contactosDelCliente={contactosDetalle}
           // El homónimo ya está vinculado a este cliente: "usarlo" es simplemente no

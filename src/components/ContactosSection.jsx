@@ -1,19 +1,24 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useMemo, useRef, useState } from 'react'
 import { MdChevronLeft, MdChevronRight, MdClear, MdContactPhone, MdGroups, MdPeopleAlt, MdPersonAdd, MdSearch } from 'react-icons/md'
 import { AttentionBox, Button, EmptyState, Modal, ModalContent, ModalFooter, Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, TextField } from '@vibe/core'
 import Avatar from './Avatar'
-import LoadingScreen from './LoadingScreen'
 import ContactoNuevoModal from './ContactoNuevoModal'
 import {
   createContactoCrm,
-  fetchContactosCrmTodos,
   fetchContactoFicha,
   updateContactoCrmFicha,
   buscarContactosCrmLibre,
 } from '../services/mondayApi'
-import { buildMondayPhone, CODIGO_PAIS_OPTIONS, emailError, initialsOf, telefonoError } from '../services/personaFields'
+import {
+  buildMondayPhone,
+  CODIGO_PAIS_OPTIONS,
+  contactoDesdeBusqueda,
+  emailError,
+  initialsOf,
+  telefonoError,
+  textoCrearDesdeBusqueda,
+} from '../services/personaFields'
 import { RequiredDropdown, codigoPaisDropdownProps, Required } from './crear/FormPrimitives'
-import { normalizarParaMatch } from '../services/format'
 // Estilos de los campos del modo edición (crear-op__field / crear-op__phone) — los
 // mismos del wizard, para que los inputs de la card se vean como el resto de la app.
 import './CrearOportunidadForm.css'
@@ -26,9 +31,9 @@ import './ContactosSection.css'
 // consulta — de acá no se edita nada; el alta y la vinculación pasan por el paso 1 de
 // Crear Oportunidad.
 //
-// El tablero es chico (decenas), así que se trae entero y la búsqueda filtra en memoria.
-// El recorrido con cursor igual está en fetchContactosCrmTodos: el día que crezca, lo que
-// falla en silencio es traer una sola página y no enterarse.
+// A pedido: no se trae el tablero entero (ya tiene miles de contactos y la pantalla
+// tardaba más de un minuto en abrir). Se busca en monday recién con "Buscar" o Enter,
+// por nombre, celular o email (ver buscarContactosCrmLibre).
 
 const COLUMNS = [
   { id: 'contacto', title: 'Contacto', width: '30%' },
@@ -400,15 +405,21 @@ function ContactoFichaModal({ contacto, onOpenCliente, onActualizado, onClose })
   )
 }
 
+// La última búsqueda, para que al volver a esta sección la tabla siga como estaba.
+const ultimaBusqueda = { termino: '', contactos: null }
+
 export default function ContactosSection({ onIrAClientes, onIrAGrupos, onOpenCliente }) {
   const [fichaDe, setFichaDe] = useState(null)
-  const [contactos, setContactos] = useState([])
-  const [loading, setLoading] = useState(true)
+  // null = todavía no se buscó nada (la tabla invita a buscar).
+  const [contactos, setContactos] = useState(ultimaBusqueda.contactos)
+  const [buscando, setBuscando] = useState(false)
   const [error, setError] = useState(null)
   // Igual que en Clientes (a pedido): la búsqueda se aplica con "Buscar" o Enter, no
-  // mientras se tipea. `busqueda` es lo tipeado; `termino` lo que filtra la tabla.
-  const [busqueda, setBusqueda] = useState('')
-  const [termino, setTermino] = useState('')
+  // mientras se tipea. `busqueda` es lo tipeado; `termino` lo que se buscó.
+  const [busqueda, setBusqueda] = useState(ultimaBusqueda.termino)
+  const [termino, setTermino] = useState(ultimaBusqueda.termino)
+  // Descarta la respuesta de una búsqueda vieja si llega después de una más nueva.
+  const ultimaBusquedaRef = useRef(0)
   const [page, setPage] = useState(1)
   // Alta de un contacto desde acá. A diferencia del wizard, el contacto no nace colgado
   // de una oportunidad: hay que decir a qué cliente pertenece, y por eso al popup se le
@@ -416,9 +427,13 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos, onOpenCli
   const [creando, setCreando] = useState(false)
   const [errorCrear, setErrorCrear] = useState(null)
   const [guardandoNuevo, setGuardandoNuevo] = useState(false)
+  // Con qué abre el popup: vacío con "Crear contacto"; con lo buscado si se abre desde una
+  // búsqueda sin resultados (a pedido, ver contactoDesdeBusqueda).
+  const [inicialAlta, setInicialAlta] = useState({})
 
-  const abrirAlta = () => {
+  const abrirAlta = (inicial = {}) => {
     setErrorCrear(null)
+    setInicialAlta(inicial)
     setCreando(true)
   }
 
@@ -433,11 +448,10 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos, onOpenCli
         clienteId: datos.clienteId,
         existingContactIds: (datos.contactosDelCliente ?? []).map((c) => c.id),
       })
-      // La lista se vuelve a traer entera: el contacto nuevo ya viene con su cliente
-      // vinculado, y así la fila se arma igual que las demás.
-      const lista = await fetchContactosCrmTodos()
-      setContactos(lista)
+      // Se repite la búsqueda: el contacto nuevo ya viene con su cliente vinculado y así
+      // la fila se arma igual que las demás (si coincide con lo buscado, aparece).
       setCreando(false)
+      if (termino) await buscar(termino)
     } catch (err) {
       setErrorCrear(err.message)
     } finally {
@@ -445,38 +459,32 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos, onOpenCli
     }
   }
 
-  const buscar = (valor = busqueda) => {
-    setTermino(valor)
+  const buscar = async (valor = busqueda) => {
+    const q = valor.trim()
+    setTermino(q)
     setPage(1)
+    setError(null)
+    if (q.length < 2) {
+      setContactos(null)
+      Object.assign(ultimaBusqueda, { termino: '', contactos: null })
+      return
+    }
+    const esta = ++ultimaBusquedaRef.current
+    setBuscando(true)
+    try {
+      const lista = await buscarContactosCrmLibre(q, { limit: 100 })
+      if (esta === ultimaBusquedaRef.current) {
+        setContactos(lista)
+        Object.assign(ultimaBusqueda, { termino: q, contactos: lista })
+      }
+    } catch (err) {
+      if (esta === ultimaBusquedaRef.current) setError(err.message)
+    } finally {
+      if (esta === ultimaBusquedaRef.current) setBuscando(false)
+    }
   }
 
-  useEffect(() => {
-    let vivo = true
-    fetchContactosCrmTodos()
-      .then((lista) => {
-        if (vivo) setContactos(lista)
-      })
-      .catch((err) => {
-        if (vivo) setError(err.message)
-      })
-      .finally(() => {
-        if (vivo) setLoading(false)
-      })
-    return () => {
-      vivo = false
-    }
-  }, [])
-
-  const filtrados = useMemo(() => {
-    // Sin distinguir tildes (normalizarParaMatch): "lucia" encuentra "Lucía".
-    const q = normalizarParaMatch(termino)
-    if (!q) return contactos
-    return contactos.filter((c) =>
-      [c.name, c.telefono, c.email, c.clienteNombre]
-        .filter(Boolean)
-        .some((v) => normalizarParaMatch(v).includes(q))
-    )
-  }, [contactos, termino])
+  const filtrados = contactos ?? []
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / PAGE_SIZE))
   const paginaActual = Math.min(page, totalPaginas)
@@ -486,12 +494,6 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos, onOpenCli
   )
   const primeraFila = filtrados.length === 0 ? 0 : (paginaActual - 1) * PAGE_SIZE + 1
   const ultimaFila = filtrados.length === 0 ? 0 : primeraFila + pagina.length - 1
-
-  // La misma pantalla verde que Clientes, Grupos y el fallback de Suspense: el esqueleto
-  // de la tabla era otra espera distinta para lo mismo.
-  if (loading) {
-    return <LoadingScreen title="Cargando contactos" message="Estamos trayendo la lista de contactos desde monday." />
-  }
 
   return (
     <section className="contactos">
@@ -517,27 +519,27 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos, onOpenCli
         <div className="contactos__buscador">
           <TextField
             size="medium"
-            placeholder="Buscar por nombre, teléfono, email o cliente..."
+            placeholder="Buscar por nombre, celular o email..."
             icon={MdClear}
             value={busqueda}
             onChange={(v) => {
               setBusqueda(v)
-              // Borrar todo el texto vuelve a la lista completa sin apretar Buscar.
+              // Borrar todo el texto limpia la tabla sin apretar Buscar.
               if (!v.trim()) buscar('')
             }}
             onKeyDown={(e) => e.key === 'Enter' && buscar()}
           />
-          <Button kind="secondary" size="medium" onClick={() => buscar()}>
+          <Button kind="secondary" size="medium" loading={buscando} disabled={busqueda.trim().length < 2} onClick={() => buscar()}>
             <MdSearch /> Buscar
           </Button>
-          <Button kind="primary" size="medium" onClick={abrirAlta}>
+          <Button kind="primary" size="medium" onClick={() => abrirAlta()}>
             <MdPersonAdd /> Crear contacto
           </Button>
-          <span className="contactos__conteo">
-            {termino.trim()
-              ? `${filtrados.length} de ${contactos.length} contactos`
-              : `${contactos.length} contactos`}
-          </span>
+          {contactos !== null && !buscando && (
+            <span className="contactos__conteo">
+              {filtrados.length === 1 ? '1 contacto' : `${filtrados.length} contactos`}
+            </span>
+          )}
         </div>
       </div>
 
@@ -547,9 +549,32 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos, onOpenCli
         </AttentionBox>
       )}
 
+      {/* A pedido: si lo buscado no está en la lista, crearlo con ese mismo dato (celular,
+          email o nombre) en vez de tener que volver a tipearlo en el popup. */}
+      {/* También con resultados (a pedido): lo buscado puede no ser ninguno de ellos. */}
+      {termino.trim() && (
+        <div className="contactos__sin-resultados">
+          <span>
+            {filtrados.length === 0
+              ? `Sin resultados para «${termino.trim()}» en Contactos.`
+              : filtrados.length === 1
+                ? '¿No es este?'
+                : `¿No es ninguno de estos ${filtrados.length}?`}
+          </span>
+          <Button
+            kind={filtrados.length === 0 ? 'primary' : 'secondary'}
+            size="small"
+            onClick={() => abrirAlta(contactoDesdeBusqueda(termino))}
+          >
+            <MdPersonAdd /> {textoCrearDesdeBusqueda(termino)}
+          </Button>
+        </div>
+      )}
+
       {creando && (
         <ContactoNuevoModal
           pedirCliente
+          inicial={inicialAlta}
           onGuardar={crearContacto}
           guardando={guardandoNuevo}
           onClose={() => setCreando(false)}
@@ -557,15 +582,19 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos, onOpenCli
       )}
 
       <div className="contactos__tabla">
-        {/* isLoading en false siempre: mientras carga, el componente devuelve la
-            pantalla de carga y no llega a renderizar la tabla. */}
         <Table
           columns={COLUMNS}
           size="large"
           style={{ '--table-row-size': '68px' }}
-          dataState={{ isLoading: false, isError: Boolean(error) }}
-          errorState={<EmptyState title="Error" description={error || 'No se pudieron cargar los contactos.'} />}
-          emptyState={<EmptyState title="Sin contactos" description="No se encontraron contactos para mostrar." />}
+          dataState={{ isLoading: buscando, isError: Boolean(error) }}
+          errorState={<EmptyState title="Error" description={error || 'No se pudieron buscar los contactos.'} />}
+          emptyState={
+            contactos === null ? (
+              <EmptyState title="Buscá un contacto" description="Escribí el nombre, el celular o el email y tocá Buscar." />
+            ) : (
+              <EmptyState title="Sin resultados" description={`No hay contactos para «${termino}».`} />
+            )
+          }
         >
           <TableHeader>
             {COLUMNS.map((col) => (
@@ -682,7 +711,7 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos, onOpenCli
           onOpenCliente={onOpenCliente}
           onActualizado={(f) =>
             setContactos((prev) =>
-              prev.map((c) => (c.id === f.id ? { ...c, name: f.name, telefono: f.telefono, email: f.email } : c))
+              (prev ?? []).map((c) => (c.id === f.id ? { ...c, name: f.name, telefono: f.telefono, email: f.email } : c))
             )
           }
           onClose={() => setFichaDe(null)}

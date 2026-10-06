@@ -318,3 +318,27 @@
     align-items: flex-start;
   }
 }
+
+/* Búsqueda de contacto sin resultados: el aviso y el botón para crearlo con lo buscado. */
+.gcli__sin-resultados {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+
+.gcli__sin-resultados .gcli__hint {
+  margin: 0;
+}
+
+/* Debajo de los resultados: crear igual con lo buscado si no es ninguno de ellos. */
+.gcli__crear-igual {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 12px;
+}
+
+.gcli__crear-igual .gcli__hint {
+  margin: 0;
+}

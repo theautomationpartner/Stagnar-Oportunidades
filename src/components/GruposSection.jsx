@@ -1,8 +1,7 @@
-import { useEffect, useState } from 'react'
-import { MdContactPhone, MdGroupAdd, MdGroups, MdPeopleAlt } from 'react-icons/md'
+import { useRef, useState } from 'react'
+import { MdClear, MdContactPhone, MdGroupAdd, MdGroups, MdPeopleAlt, MdSearch } from 'react-icons/md'
 import { Button, EmptyState, Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, TextField } from '@vibe/core'
-import LoadingScreen from './LoadingScreen'
-import { fetchGruposEconomicos, createGrupoEconomico } from '../services/mondayApi'
+import { buscarGruposEconomicos, createGrupoEconomico } from '../services/mondayApi'
 // El estilo pill-tabs se importa por componente (no es global) — mismas solapas que
 // General/Global/Triple en las cotizaciones.
 import './PillTabs.css'
@@ -11,6 +10,12 @@ import './GruposSection.css'
 // Lista de Grupos Económicos (a pedido: lista, no tarjetas con todo a la vista) — de acá
 // se entra a cada grupo para administrarlo (miembros, roles, altas/bajas: ver
 // GrupoDetalle). Lo único que se hace desde la lista es crear un grupo nuevo.
+//
+// A pedido: no se traen todos los grupos con sus miembros — la lista arranca vacía y se
+// busca en monday por nombre o alias recién con "Buscar" o Enter.
+
+// La última búsqueda, para que al volver de un grupo la lista siga como estaba.
+const ultimaBusqueda = { termino: '', grupos: null }
 
 const COLUMNS = [
   { id: 'grupo', title: 'Grupo', width: '34%' },
@@ -19,25 +24,40 @@ const COLUMNS = [
 ]
 
 export default function GruposSection({ onOpenGrupo, onIrAClientes, onIrAContactos }) {
-  const [grupos, setGrupos] = useState([])
-  const [loading, setLoading] = useState(true)
+  // null = todavía no se buscó nada (la tabla invita a buscar).
+  const [grupos, setGrupos] = useState(ultimaBusqueda.grupos)
+  const [buscando, setBuscando] = useState(false)
   const [error, setError] = useState(null)
+  const [busqueda, setBusqueda] = useState(ultimaBusqueda.termino)
+  const [termino, setTermino] = useState(ultimaBusqueda.termino)
+  const ultimaBusquedaRef = useRef(0)
   const [ocupado, setOcupado] = useState(false)
   const [creando, setCreando] = useState(false)
   const [nuevoGrupo, setNuevoGrupo] = useState({ nombre: '', alias: '' })
 
-  const recargar = () => fetchGruposEconomicos().then(setGrupos)
-
-  useEffect(() => {
-    let vivo = true
-    fetchGruposEconomicos()
-      .then((grs) => vivo && setGrupos(grs))
-      .catch((err) => vivo && setError(err.message))
-      .finally(() => vivo && setLoading(false))
-    return () => {
-      vivo = false
+  const buscar = async (valor = busqueda) => {
+    const q = valor.trim()
+    setTermino(q)
+    setError(null)
+    if (q.length < 2) {
+      setGrupos(null)
+      Object.assign(ultimaBusqueda, { termino: '', grupos: null })
+      return
     }
-  }, [])
+    const esta = ++ultimaBusquedaRef.current
+    setBuscando(true)
+    try {
+      const lista = await buscarGruposEconomicos(q, { limit: 100 })
+      if (esta === ultimaBusquedaRef.current) {
+        setGrupos(lista)
+        Object.assign(ultimaBusqueda, { termino: q, grupos: lista })
+      }
+    } catch (err) {
+      if (esta === ultimaBusquedaRef.current) setError(err.message)
+    } finally {
+      if (esta === ultimaBusquedaRef.current) setBuscando(false)
+    }
+  }
 
   const crearGrupo = async () => {
     setOcupado(true)
@@ -46,7 +66,6 @@ export default function GruposSection({ onOpenGrupo, onIrAClientes, onIrAContact
       const { id } = await createGrupoEconomico({ nombre: nuevoGrupo.nombre.trim(), alias: nuevoGrupo.alias })
       setNuevoGrupo({ nombre: '', alias: '' })
       setCreando(false)
-      await recargar().catch(() => {})
       // Directo adentro del grupo recién creado, que es donde se le cargan los miembros.
       onOpenGrupo(id)
     } catch (err) {
@@ -54,10 +73,6 @@ export default function GruposSection({ onOpenGrupo, onIrAClientes, onIrAContact
     } finally {
       setOcupado(false)
     }
-  }
-
-  if (loading) {
-    return <LoadingScreen title="Cargando grupos económicos" message="Estamos trayendo los grupos y sus miembros desde monday." />
   }
 
   return (
@@ -78,6 +93,27 @@ export default function GruposSection({ onOpenGrupo, onIrAClientes, onIrAContact
           <button type="button" role="tab" aria-selected="false" className="pill-tabs__tab" onClick={onIrAContactos}>
             <MdContactPhone aria-hidden="true" /> Contactos
           </button>
+        </div>
+
+        <div className="grupos__buscador">
+          <TextField
+            size="medium"
+            placeholder="Buscar por nombre o alias del grupo..."
+            icon={MdClear}
+            value={busqueda}
+            onChange={(v) => {
+              setBusqueda(v)
+              // Borrar todo el texto limpia la tabla sin apretar Buscar.
+              if (!v.trim()) buscar('')
+            }}
+            onKeyDown={(e) => e.key === 'Enter' && buscar()}
+          />
+          <Button kind="secondary" size="medium" loading={buscando} disabled={busqueda.trim().length < 2} onClick={() => buscar()}>
+            <MdSearch /> Buscar
+          </Button>
+          {grupos !== null && !buscando && (
+            <span className="grupos__conteo">{grupos.length === 1 ? '1 grupo' : `${grupos.length} grupos`}</span>
+          )}
         </div>
 
         {!creando && (
@@ -131,10 +167,14 @@ export default function GruposSection({ onOpenGrupo, onIrAClientes, onIrAContact
           columns={COLUMNS}
           size="large"
           style={{ '--table-row-size': '60px' }}
-          dataState={{ isLoading: false, isError: Boolean(error) }}
-          errorState={<EmptyState title="Error" description={error || 'No se pudieron cargar los grupos.'} />}
+          dataState={{ isLoading: buscando, isError: Boolean(error) }}
+          errorState={<EmptyState title="Error" description={error || 'No se pudieron buscar los grupos.'} />}
           emptyState={
-            <EmptyState title="Sin grupos" description="Todavía no hay grupos económicos — creá el primero con el botón de arriba." />
+            grupos === null ? (
+              <EmptyState title="Buscá un grupo" description="Escribí el nombre o el alias del grupo y tocá Buscar." />
+            ) : (
+              <EmptyState title="Sin resultados" description={`No hay grupos para «${termino}».`} />
+            )
           }
         >
           <TableHeader>
@@ -143,7 +183,7 @@ export default function GruposSection({ onOpenGrupo, onIrAClientes, onIrAContact
             ))}
           </TableHeader>
           <TableBody>
-            {grupos.map((g) => {
+            {(grupos ?? []).map((g) => {
               const abrir = () => onOpenGrupo(g.id)
               return (
                 <TableRow key={g.id} className="grupos__row">

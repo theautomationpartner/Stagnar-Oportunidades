@@ -426,3 +426,22 @@
     width: 100%;
   }
 }
+
+/* Buscador de la lista (a pedido: se busca en monday, la lista arranca vacía). */
+.grupos__buscador {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex: 1 1 320px;
+}
+
+.grupos__buscador > :first-child {
+  flex: 1;
+  max-width: 480px;
+}
+
+.grupos__conteo {
+  font-size: 13px;
+  color: var(--text-gray);
+  white-space: nowrap;
+}

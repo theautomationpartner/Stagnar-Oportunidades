@@ -159,6 +159,37 @@ export function splitNombreApellido(fullName) {
   return { nombre: parts[0], apellido: parts.slice(1).join(' ') }
 }
 
+// Reunión del 24/09: si una búsqueda de contacto no encuentra nada, se ofrece crearlo con
+// lo que se buscó. Lo usan el alta (ContactoFields), la sección Contactos y la ficha del
+// cliente. Un término que es un número se toma como celular (con su código de país si lo
+// trae, "+54 11..."); uno con "@", como email; cualquier otra cosa, como el nombre.
+export const pareceTelefono = (termino) => /^\+?[\d\s().-]{6,}$/.test(String(termino ?? '').trim())
+const pareceEmail = (termino) => String(termino ?? '').includes('@')
+
+export function contactoDesdeBusqueda(termino, codigoPaisPorDefecto) {
+  const limpio = String(termino ?? '').trim()
+  if (pareceEmail(limpio)) return { email: limpio }
+  if (!pareceTelefono(limpio)) return { nombre: limpio }
+  if (limpio.startsWith('+')) {
+    const digitos = limpio.replace(/\D/g, '')
+    // El código más largo primero: "+595" no tiene que leerse como "+59" + "5...".
+    const codigo = [...CODIGO_PAIS_OPTIONS]
+      .sort((a, b) => b.value.length - a.value.length)
+      .find((o) => digitos.startsWith(o.value.slice(1)))
+    if (codigo) return { codigoPais: codigo.value, telefono: digitos.slice(codigo.value.length - 1) }
+  }
+  return { codigoPais: codigoPaisPorDefecto || '+598', telefono: limpio }
+}
+
+// El texto del botón: "Crear contacto con el celular 099…", "…con el email …" o
+// "Crear el contacto «Ana Gómez»".
+export function textoCrearDesdeBusqueda(termino) {
+  const limpio = String(termino ?? '').trim()
+  if (pareceEmail(limpio)) return `Crear contacto con el email ${limpio}`
+  if (pareceTelefono(limpio)) return `Crear contacto con el celular ${limpio}`
+  return `Crear el contacto «${limpio}»`
+}
+
 // El escenario de Make que lee la Cédula de Identidad con IA (ver
 // mondayApi.js#leerCedula) puede devolver la fecha como texto "dd/mm/aaaa" (formato
 // que suele traer una CI uruguaya) en vez del "aaaa-mm-dd" que espera el

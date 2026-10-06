@@ -1,20 +1,18 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useMemo, useRef, useState } from 'react'
 import { MdChevronLeft, MdChevronRight, MdClear, MdContactPhone, MdGroups, MdPeopleAlt, MdSearch } from 'react-icons/md'
 import { Button, Table, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell, EmptyState, TextField } from '@vibe/core'
 import Avatar from './Avatar'
-import LoadingScreen from './LoadingScreen'
 import StatusBadge from './StatusBadge'
-import { fetchClientesGestion } from '../services/mondayApi'
+import { buscarClientesGestion } from '../services/mondayApi'
 import { initialsOf } from '../services/personaFields'
-import { normalizarParaMatch } from '../services/format'
 // El estilo pill-tabs se importa por componente (no es global) — sin esto las solapas
 // Clientes/Grupos quedaban como botones pelados.
 import './PillTabs.css'
 import './ClientesSection.css'
 
 // Tabla de Clientes — puerta de entrada a la gestión de cada uno (contactos, empresa
-// donde trabaja, relaciones y grupo económico, ver ClienteGestion). El tablero es chico
-// (decenas), así que se trae entero y la búsqueda filtra local — sin paginado ni cursor.
+// donde trabaja, relaciones y grupo económico, ver ClienteGestion). Se busca en monday
+// (el tablero ya tiene miles de clientes); el paginado es sobre los resultados.
 
 const COLUMNS = [
   { id: 'cliente', title: 'Cliente', width: '26%' },
@@ -52,49 +50,50 @@ function paginasVisibles(actual, total) {
   return conHuecos
 }
 
-export default function ClientesSection({ onOpenCliente, onIrAGrupos, onIrAContactos }) {
-  const [clientes, setClientes] = useState([])
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState(null)
-  // A pedido, igual que el resto de la app: la búsqueda NO es en vivo. `busqueda` es lo
-  // que se está tipeando y `termino` lo que de verdad filtra la tabla — se aplica recién
-  // con "Buscar" o Enter.
-  const [busqueda, setBusqueda] = useState('')
-  const [termino, setTermino] = useState('')
-  const [page, setPage] = useState(1)
+// La última búsqueda, para que al volver de la ficha de un cliente la tabla siga como
+// estaba (la sección se desmonta al abrir la ficha).
+const ultimaBusqueda = { termino: '', clientes: null }
 
-  const buscar = (valor = busqueda) => {
-    setTermino(valor)
+export default function ClientesSection({ onOpenCliente, onIrAGrupos, onIrAContactos }) {
+  // A pedido: no se trae el tablero entero (con miles de clientes la pantalla tardaba
+  // más de un minuto en abrir). La tabla arranca vacía y se busca en monday recién con
+  // "Buscar" o Enter (ver buscarClientesGestion). null = todavía no se buscó nada.
+  const [clientes, setClientes] = useState(ultimaBusqueda.clientes)
+  const [buscando, setBuscando] = useState(false)
+  const [error, setError] = useState(null)
+  // `busqueda` es lo que se está tipeando y `termino` lo que se buscó.
+  const [busqueda, setBusqueda] = useState(ultimaBusqueda.termino)
+  const [termino, setTermino] = useState(ultimaBusqueda.termino)
+  const [page, setPage] = useState(1)
+  // Descarta la respuesta de una búsqueda vieja si llega después de una más nueva.
+  const ultimaBusquedaRef = useRef(0)
+
+  const buscar = async (valor = busqueda) => {
+    const q = valor.trim()
+    setTermino(q)
     setPage(1)
+    setError(null)
+    if (q.length < 2) {
+      setClientes(null)
+      Object.assign(ultimaBusqueda, { termino: '', clientes: null })
+      return
+    }
+    const esta = ++ultimaBusquedaRef.current
+    setBuscando(true)
+    try {
+      const lista = await buscarClientesGestion(q, { limit: 100 })
+      if (esta === ultimaBusquedaRef.current) {
+        setClientes(lista)
+        Object.assign(ultimaBusqueda, { termino: q, clientes: lista })
+      }
+    } catch (err) {
+      if (esta === ultimaBusquedaRef.current) setError(err.message)
+    } finally {
+      if (esta === ultimaBusquedaRef.current) setBuscando(false)
+    }
   }
 
-  useEffect(() => {
-    let vivo = true
-    fetchClientesGestion()
-      .then((lista) => {
-        if (vivo) setClientes(lista)
-      })
-      .catch((err) => {
-        if (vivo) setError(err.message)
-      })
-      .finally(() => {
-        if (vivo) setLoading(false)
-      })
-    return () => {
-      vivo = false
-    }
-  }, [])
-
-  const filtrados = useMemo(() => {
-    // Sin distinguir tildes (normalizarParaMatch): "logistica" encuentra "Logística".
-    const q = normalizarParaMatch(termino)
-    if (!q) return clientes
-    return clientes.filter((c) =>
-      [c.name, c.nombre, c.apellido, c.ci, c.rut, c.razonSocial, c.grupo?.name, c.empresa?.name]
-        .filter(Boolean)
-        .some((v) => normalizarParaMatch(v).includes(q))
-    )
-  }, [clientes, termino])
+  const filtrados = clientes ?? []
 
   const totalPaginas = Math.max(1, Math.ceil(filtrados.length / PAGE_SIZE))
   const paginaActual = Math.min(page, totalPaginas)
@@ -104,12 +103,6 @@ export default function ClientesSection({ onOpenCliente, onIrAGrupos, onIrAConta
   )
   const primeraFila = filtrados.length === 0 ? 0 : (paginaActual - 1) * PAGE_SIZE + 1
   const ultimaFila = filtrados.length === 0 ? 0 : primeraFila + pagina.length - 1
-
-  // La misma pantalla verde que Grupos y el fallback de Suspense: el esqueleto de la
-  // tabla era otra espera distinta para lo mismo.
-  if (loading) {
-    return <LoadingScreen title="Cargando clientes" message="Estamos trayendo la lista de clientes desde monday." />
-  }
 
   return (
     <section className="clientes">
@@ -137,38 +130,41 @@ export default function ClientesSection({ onOpenCliente, onIrAGrupos, onIrAConta
         <div className="clientes__buscador">
           <TextField
             size="medium"
-            placeholder="Buscar por nombre, CI, RUT, razón social, grupo..."
+            placeholder="Buscar por nombre, CI, RUT o celular..."
             icon={MdClear}
             value={busqueda}
             onChange={(v) => {
               setBusqueda(v)
-              // Borrar todo el texto vuelve a la lista completa sin apretar Buscar: es
-              // "salir de la búsqueda", no una búsqueda nueva.
+              // Borrar todo el texto limpia la tabla sin apretar Buscar.
               if (!v.trim()) buscar('')
             }}
             onKeyDown={(e) => e.key === 'Enter' && buscar()}
           />
-          <Button kind="secondary" size="medium" onClick={() => buscar()}>
+          <Button kind="secondary" size="medium" loading={buscando} disabled={busqueda.trim().length < 2} onClick={() => buscar()}>
             <MdSearch /> Buscar
           </Button>
-          <span className="clientes__conteo">
-            {termino.trim()
-              ? `${filtrados.length} de ${clientes.length} clientes`
-              : `${clientes.length} clientes`}
-          </span>
+          {clientes !== null && !buscando && (
+            <span className="clientes__conteo">
+              {filtrados.length === 1 ? '1 cliente' : `${filtrados.length} clientes`}
+            </span>
+          )}
         </div>
       </div>
 
       <div className="clientes__tabla">
-        {/* isLoading en false siempre: mientras carga, el componente devuelve la
-            pantalla de carga y no llega a renderizar la tabla. */}
         <Table
           columns={COLUMNS}
           size="large"
           style={{ '--table-row-size': '68px' }}
-          dataState={{ isLoading: false, isError: Boolean(error) }}
-          errorState={<EmptyState title="Error" description={error || 'No se pudieron cargar los clientes.'} />}
-          emptyState={<EmptyState title="Sin clientes" description="No se encontraron clientes para mostrar." />}
+          dataState={{ isLoading: buscando, isError: Boolean(error) }}
+          errorState={<EmptyState title="Error" description={error || 'No se pudieron buscar los clientes.'} />}
+          emptyState={
+            clientes === null ? (
+              <EmptyState title="Buscá un cliente" description="Escribí el nombre, la CI, el RUT o el celular y tocá Buscar." />
+            ) : (
+              <EmptyState title="Sin resultados" description={`No hay clientes para «${termino}».`} />
+            )
+          }
         >
           <TableHeader>
             {COLUMNS.map((col) => (

@@ -4,8 +4,9 @@ import { Button, Dropdown, TextField } from '@vibe/core'
 import AlertModal from './AlertModal'
 import LoadingScreen from './LoadingScreen'
 import {
-  fetchGruposEconomicos,
-  fetchClientesGestion,
+  fetchGrupoEconomico,
+  fetchClientesGestionPorIds,
+  buscarClientesGestion,
   agregarClienteAGrupo,
   quitarClienteDeGrupo,
   setRolEnGrupo,
@@ -16,7 +17,7 @@ import {
 } from '../services/mondayApi'
 import Avatar from './Avatar'
 import { initialsOf } from '../services/personaFields'
-import { normalizarParaMatch } from '../services/format'
+
 import './GruposSection.css'
 
 // Color por rol (los mismos tonos del tablero: Titular naranja, Miembro verde, Empresa
@@ -37,24 +38,27 @@ const claseRol = (rol) => CLASE_POR_ROL[rol] ?? 'sinrol'
 // pertenece a un grupo a la vez (solo se ofrecen los que no tienen grupo).
 
 export default function GrupoDetalle({ grupoId, onBack, onOpenCliente }) {
-  const [grupos, setGrupos] = useState([])
+  const [grupo, setGrupo] = useState(null)
   const [clientes, setClientes] = useState([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState(null)
   const [ocupado, setOcupado] = useState('')
   const [confirmar, setConfirmar] = useState(null)
 
-  // Buscar con botón (a pedido, sin live search) — la búsqueda es local (los clientes ya
-  // están en memoria) pero el gesto es el mismo que en el resto de la app.
+  // Buscar con botón (a pedido, sin live search). A pedido también: los clientes ya no se
+  // traen enteros (son miles) — se buscan en monday al apretar Buscar, y de los miembros
+  // se trae solo su ficha.
   const [busqueda, setBusqueda] = useState('')
   const [resultados, setResultados] = useState(null)
+  const [buscando, setBuscando] = useState(false)
   const [rolElegido, setRolElegido] = useState(ROL_GRUPO_DEFAULT)
 
   const recargar = useCallback(async () => {
-    const [grs, clis] = await Promise.all([fetchGruposEconomicos(), fetchClientesGestion()])
-    setGrupos(grs)
-    setClientes(clis)
-  }, [])
+    // Solo este grupo (no la lista entera) y las fichas de sus miembros.
+    const delGrupo = await fetchGrupoEconomico(grupoId)
+    setGrupo(delGrupo)
+    setClientes(await fetchClientesGestionPorIds((delGrupo?.miembros ?? []).map((m) => m.clienteId)))
+  }, [grupoId])
 
   useEffect(() => {
     let vivo = true
@@ -80,21 +84,22 @@ export default function GrupoDetalle({ grupoId, onBack, onOpenCliente }) {
     }
   }
 
-  const grupo = grupos.find((g) => g.id === String(grupoId)) ?? null
-  const clientesSinGrupo = useMemo(() => clientes.filter((c) => !c.grupo), [clientes])
-  // La ficha completa de cada miembro (CI/RUT, tipo) — los clientes ya están cargados
-  // para el alta, así que la tarjeta del integrante los muestra sin pedir nada extra.
+  // La ficha completa de cada miembro (CI/RUT, tipo), para la tarjeta del integrante.
   const clientePorId = useMemo(() => new Map(clientes.map((c) => [c.id, c])), [clientes])
 
-  const buscar = () => {
-    // Sin distinguir tildes (normalizarParaMatch): "logistica" encuentra "Logística".
-    const q = normalizarParaMatch(busqueda)
+  const buscar = async () => {
+    const q = busqueda.trim()
     if (q.length < 2) return
-    setResultados(
-      clientesSinGrupo.filter((c) =>
-        [c.name, c.ci, c.rut, c.razonSocial].filter(Boolean).some((v) => normalizarParaMatch(v).includes(q))
-      )
-    )
+    setBuscando(true)
+    try {
+      // Solo se ofrecen los que todavía no están en ningún grupo.
+      setResultados((await buscarClientesGestion(q)).filter((c) => !c.grupo))
+    } catch (err) {
+      setResultados([])
+      setError(err.message)
+    } finally {
+      setBuscando(false)
+    }
   }
 
   const quitarMiembro = (miembro) =>
@@ -244,16 +249,15 @@ export default function GrupoDetalle({ grupoId, onBack, onOpenCliente }) {
             <div className="grupos__buscar">
               <TextField
                 size="small"
-                placeholder={clientesSinGrupo.length ? 'Nombre, CI o RUT' : 'No quedan clientes sin grupo'}
+                placeholder="Nombre, CI o RUT"
                 value={busqueda}
-                disabled={!clientesSinGrupo.length}
                 onChange={(v) => {
                   setBusqueda(v)
                   setResultados(null)
                 }}
                 onKeyDown={(e) => e.key === 'Enter' && buscar()}
               />
-              <Button kind="secondary" size="small" disabled={busqueda.trim().length < 2} onClick={buscar}>
+              <Button kind="secondary" size="small" loading={buscando} disabled={busqueda.trim().length < 2} onClick={buscar}>
                 Buscar
               </Button>
             </div>
