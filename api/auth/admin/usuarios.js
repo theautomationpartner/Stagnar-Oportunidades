@@ -49,6 +49,7 @@ import {
   usuariosDeLaCuenta,
   sincronizarTeams,
   teamsDeFila,
+  vincularUsuarioAFila,
 } from '../../_auth/listaBlancaEscritura.js'
 import { config } from '../../_auth/env.js'
 import { oportunidadesAsignadasA, reasignarOportunidades } from '../../_auth/asignaciones.js'
@@ -132,7 +133,7 @@ export default protegerEndpoint(
       return res.status(200).json(await usuarioDeMonday(req, cuerpo, usuario))
     }
 
-    if (['estado', 'teams', 'alta', 'invitar', 'sincronizar-teams'].includes(cuerpo.accion)) {
+    if (['estado', 'teams', 'alta', 'invitar', 'reinvitar', 'sincronizar-teams'].includes(cuerpo.accion)) {
       return res.status(200).json(await administrarLista(req, cuerpo, usuario))
     }
 
@@ -259,7 +260,35 @@ async function administrarLista(req, cuerpo, usuario) {
     const esMiFila = usuario?.mondayItemId != null && String(usuario.mondayItemId) === fila.itemId
     const eraAdmin = teamsDeFila(fila).admin && fila.estado === 'activo'
 
-    if (cuerpo.accion === 'estado') {
+    if (cuerpo.accion === 'reinvitar') {
+      // A pedido: la persona de esta fila no está en la cuenta de monday (su invitación se
+      // canceló o venció, o se cargó sin usuario). Se la invita de nuevo — siempre como
+      // Invitado, igual que el alta — y la fila queda vinculada a ese usuario.
+      const email = String(cuerpo.email ?? fila.email ?? '').trim().toLowerCase()
+      if (!EMAIL_VALIDO.test(email)) throw new ErrorDeFlujo('DATOS_INCOMPLETOS', 'Falta el email (o está mal escrito).')
+      const cuentas = await usuariosDeLaCuenta()
+      if (fila.mondayUserId && cuentas.some((u) => u.id === fila.mondayUserId)) {
+        throw new ErrorDeFlujo('YA_ESTA', 'Esta fila ya tiene su usuario en monday: no hace falta reinvitarla.')
+      }
+      const cuenta = cuentas.find((u) => u.email?.toLowerCase() === email)
+      let mondayUserId
+      if (cuenta) {
+        mondayUserId = cuenta.id
+        aviso = 'Ese email ya era usuario de monday: no se lo invitó de nuevo, solo se vinculó la fila.'
+      } else {
+        const invitado = await invitarAMonday(email, 'GUEST')
+        mondayUserId = invitado.id
+        aviso = invitado.yaExistia
+          ? 'Ese email ya era usuario de monday: no se lo invitó de nuevo, solo se vinculó la fila.'
+          : 'Se le mandó la invitación a monday de nuevo. Va a poder entrar a la app cuando la acepte.'
+      }
+      if (entradas.some((e) => e.mondayUserId === mondayUserId && e.itemId !== fila.itemId)) {
+        throw new ErrorDeFlujo('YA_ESTA', 'Ese usuario de monday ya tiene otra fila en la lista.')
+      }
+      await vincularUsuarioAFila(fila, { mondayUserId, email })
+      afectado = mondayUserId
+      detalle = { itemId: fila.itemId, mondayUserId, email, reinvitada: true }
+    } else if (cuerpo.accion === 'estado') {
       const estado = cuerpo.estado
       if (estado !== 'activo' && estado !== 'inactivo') throw new ErrorDeFlujo('DATOS_INCOMPLETOS', 'Estado inválido.')
       if (estado === 'inactivo' && esMiFila) {

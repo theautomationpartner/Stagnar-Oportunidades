@@ -81,8 +81,8 @@ const OPPORTUNITY_COLUMN_IDS = [
   'board_relation_mm4pngbs',
   // LOG-13: con cuántas cuotas se cierra la venta, elegido en el paso "Confirmar".
   'color_mm71kfpr', // Cuotas elegidas
-  // Bonificación de PORTO (30%) según el CI: la app pone "Consultar" al cotizar y el
-  // escenario de Make escribe el resultado por zona (ver services/bonificacionPorto.js).
+  // Bonificación de PORTO (30%) según el CI: la app llama al escenario al pasar a
+  // "Cotizando" y este escribe el resultado por zona (ver services/bonificacionPorto.js).
   'color_mm7wqkj9', // Consultar Bonificacion Porto (Consultar/Consultando/Consultado/Error)
   'color_mm7whw7r', // Bonificacion Porto (Con respuesta/Sin Respuesta)
   'color_mm7w9q1a', // Bonificacion CANELONES SUR/MONTEVIDEO
@@ -1889,7 +1889,9 @@ export async function buscarContactosCrmLibre(term, { limit = 10 } = {}) {
     : esTelefono
       ? CONTACTO_CRM_TELEFONO_COLUMN_ID
       : undefined
-  if (columnId) return searchContactosCrm({ columnId, value: esTelefono ? digits : q, limit })
+  // El teléfono se busca por sus últimos 8 dígitos: monday lo guarda con el código de país
+  // y sin el 0 ("59894991425"), así que "094991425" tal cual no aparecía.
+  if (columnId) return searchContactosCrm({ columnId, value: esTelefono ? digits.slice(-8) : q, limit })
   // Por nombre: con y sin tildes (ver porNombreConYSinTildes).
   const encontrados = await porNombreConYSinTildes(q, (texto) => searchContactosCrm({ value: texto, limit }))
   return encontrados.slice(0, limit)

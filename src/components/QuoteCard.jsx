@@ -249,6 +249,8 @@ function QuoteCard({
   onPanelChange,
   rcOptions,
   zonasBonifPorto = null,
+  reservarBonifPorto = false,
+  reservarRenglonManual = false,
 }) {
   // A pedido, estética tipo mockup: 2 botones separados ("Parámetros"/"Coberturas") que
   // NO se pueden desplegar a la vez — un solo estado con el panel abierto (o ninguno) en
@@ -445,6 +447,7 @@ function QuoteCard({
         'quote-card',
         selected && selectable && 'quote-card--selected',
         !selectable && 'quote-card--unavailable',
+        reservarRenglonManual && 'quote-card--reserva-manual',
       ]
         .filter(Boolean)
         .join(' ')}
@@ -511,9 +514,15 @@ function QuoteCard({
           <span className="quote-card__total-label">COSTO TOTAL</span>
           {/* El precio sin la bonificación comercial, tachado: que se vea de un vistazo
               cuánto está descontando. Solo cuando de verdad descuenta algo. */}
-          {precioSinBonif > quote.total && (
-            <span className="quote-card__total-antes">{formatMoney(precioSinBonif)}</span>
-          )}
+          {/* A pedido (alto parejo): el renglón del tachado se reserva siempre, aunque no
+              haya bonificación — si no, el precio y todo lo de abajo quedaba 18px más
+              arriba que en las tarjetas vecinas. */}
+          <span
+            className={precioSinBonif > quote.total ? 'quote-card__total-antes' : 'quote-card__total-antes quote-card__reservado'}
+            aria-hidden={precioSinBonif > quote.total ? undefined : true}
+          >
+            {formatMoney(precioSinBonif > quote.total ? precioSinBonif : quote.total)}
+          </span>
           <span className="quote-card__total-value">{formatMoney(quote.total)}</span>
           {/* Reunión del 24/09: la Bonificación a la vista y editable, sin abrir
               Parámetros. Arranca en la de PANEL para la compañía (ver
@@ -567,6 +576,8 @@ function QuoteCard({
             </button>
           </div>
           )}
+          {/* Sin control de bonificación (BSE 3x2) se reserva su lugar, por el alto parejo. */}
+          {soloBns && <div className="quote-card__bonif quote-card__reservado" aria-hidden="true">Bonif.</div>}
         </div>
       </div>
 
@@ -645,6 +656,9 @@ function QuoteCard({
       {/* A pedido: en las de PORTO, si el cliente tiene la bonificación del 30% según su CI,
           por zona — verde aprobada, rojo no aprobada (ver services/bonificacionPorto.js).
           Solo informa: el precio no cambia. */}
+      {/* Alto parejo: si alguna tarjeta de la solapa muestra las zonas de PORTO, las demás
+          reservan ese renglón vacío (reservarBonifPorto, lo decide OpportunityDetail). */}
+      {!zonasBonifPorto && reservarBonifPorto && <div className="quote-card__bonif-porto" aria-hidden="true" />}
       {zonasBonifPorto && (
         <div className="quote-card__bonif-porto" aria-label="Bonificación PORTO 30% por zona">
           <span className="quote-card__bonif-porto-titulo">Bonif. 30%</span>

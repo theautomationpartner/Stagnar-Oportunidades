@@ -31,11 +31,13 @@ const figuraComo = (clave) => [NOMBRE_TEAM[clave], idTeam(clave)]
 const esNuestra = (etiqueta) => [...figuraComo('admin'), ...figuraComo('ventas')].includes(String(etiqueta))
 export { esNuestra as esEtiquetaDeTeamApp }
 
-async function gql(query, variables) {
+// `version`: la API de monday. Casi todo va en 2024-10; las consultas de usuarios que
+// necesitan ver las invitaciones PENDIENTES van en 2026-07 (ver usuariosDeLaCuenta).
+async function gql(query, variables, version = '2024-10') {
   if (!config.mondayApiKey) throw new Error('MONDAY_API_KEY no está configurada')
   const res = await fetch('https://api.monday.com/v2', {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json', Authorization: config.mondayApiKey, 'API-Version': '2024-10' },
+    headers: { 'Content-Type': 'application/json', Authorization: config.mondayApiKey, 'API-Version': version },
     body: JSON.stringify({ query, variables }),
   })
   if (!res.ok) throw new Error('La API de monday devolvió ' + res.status)
@@ -118,6 +120,15 @@ export function cambiarEstado(fila, estado) {
   return cambiarColumnas(fila.itemId, columnas)
 }
 
+// Reinvitar (a pedido): una fila cuya persona no está en la cuenta de monday (invitación
+// cancelada o vencida, o cargada sin usuario) queda vinculada al usuario de la invitación
+// nueva. El email solo se escribe si cambió (la fila no tenía, o se corrigió).
+export function vincularUsuarioAFila(fila, { mondayUserId, email }) {
+  const columnas = { [config.columnas.mondayUserId]: String(mondayUserId) }
+  if (email && email !== fila.email) columnas[config.columnas.email] = { email, text: email }
+  return cambiarColumnas(fila.itemId, columnas)
+}
+
 export async function crearFila({ nombre, mondayUserId, email, seleccion, otras = [] }) {
   const columnas = {
     [config.columnas.mondayUserId]: String(mondayUserId),
@@ -141,13 +152,19 @@ export async function crearFila({ nombre, mondayUserId, email, seleccion, otras 
 // los desactivados, marcados (habilitado: false): el buscador los muestra para que se
 // entienda por qué no se pueden elegir.
 //
-// monday no devuelve a los desactivados si no se le pide (non_active: true), así que se
-// piden las dos listas. De la de inactivos se descartan las invitaciones canceladas o
-// vencidas ("Deleted on invitation cancelation"…): son pendientes que nunca fueron
-// usuarios.
+// Se piden con la versión 2026-07 de la API (ver Usuarios_Teams.md): con `status` trae
+// también las invitaciones PENDIENTES. En 2024-10 un recién invitado no aparecía hasta que
+// aceptara, y su fila se veía "Sin usuario de monday" aunque ya tuviera su ID guardado.
+// Los desactivados se piden aparte (status: INACTIVE, lo que en 2024-10 era non_active).
+// De esa lista se descartan las invitaciones canceladas o vencidas ("Deleted on invitation
+// cancelation"…): son pendientes que nunca fueron usuarios.
 const CAMPOS_USUARIO = 'id name email enabled is_guest is_pending'
 export async function usuariosDeLaCuenta() {
-  const data = await gql(`{ activos: users(limit: 500) { ${CAMPOS_USUARIO} } inactivos: users(limit: 500, non_active: true) { ${CAMPOS_USUARIO} } }`)
+  const data = await gql(
+    `{ activos: users(limit: 500, status: [ACTIVE, PENDING]) { ${CAMPOS_USUARIO} } inactivos: users(limit: 500, status: [INACTIVE]) { ${CAMPOS_USUARIO} } }`,
+    {},
+    '2026-07'
+  )
   const inactivos = (data.inactivos ?? []).filter((u) => !u.is_pending)
   const porId = new Map([...(data.activos ?? []), ...inactivos].map((u) => [String(u.id), u]))
   return [...porId.values()]
@@ -215,7 +232,13 @@ export async function invitarAMonday(email, tipo) {
   const invitado = data.invite_users?.invited_users?.[0]
   if (invitado?.id) return { id: String(invitado.id), yaExistia: false }
 
-  const buscado = await gql(`query ($emails: [String]) { users(emails: $emails) { id email } }`, { emails: [email] })
+  // Si invite_users no devolvió el id (por ejemplo, el email ya estaba en la cuenta), se
+  // busca por email incluyendo las invitaciones pendientes (API 2026-07, ver arriba).
+  const buscado = await gql(
+    `query ($emails: [String!]) { users(emails: $emails, status: [ACTIVE, PENDING]) { id email } }`,
+    { emails: [email] },
+    '2026-07'
+  )
   const existente = buscado.users?.[0]
   if (existente?.id) return { id: String(existente.id), yaExistia: true }
 

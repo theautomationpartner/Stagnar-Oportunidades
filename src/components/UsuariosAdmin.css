@@ -534,3 +534,18 @@
   border: 1px solid var(--border);
   border-radius: 6px;
 }
+
+/* "Sin usuario de monday" + botón Reinvitar (a pedido). */
+.usuarios-admin__sin-cuenta {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+}
+
+.usuarios-admin__modal-titulo {
+  margin: 0 0 10px;
+  font-size: 17px;
+  font-weight: 700;
+  color: var(--text-dark);
+}

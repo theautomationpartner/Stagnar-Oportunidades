@@ -1,8 +1,8 @@
-// Bonificación de PORTO (30%) según el CI del cliente. Al cotizar, la app pone "Consultar"
-// en "Consultar Bonificacion Porto" (ver OpportunityDetail#handleMarcarParaCotizar); eso
-// dispara el escenario de Make "[TAP] Se cotiza una oportunidad -> se valida si tiene
-// bonificacion en PORTO", que consulta el portal y escribe el resultado por zona. La app
-// solo lo muestra en las tarjetas de PORTO: no toca el precio (a pedido).
+// Bonificación de PORTO (30%) según el CI del cliente. Cuando la cotización pasa a
+// "Cotizando", la app llama al escenario de Make "[TAP] Se cotiza una oportunidad -> se
+// valida si tiene bonificacion en PORTO" (ver OpportunityDetail#pedirBonificacionPorto),
+// que consulta el portal y escribe el resultado por zona. La app solo lo muestra en las
+// tarjetas de PORTO: no toca el precio (a pedido).
 
 export const CONSULTA_BONIF_PORTO_COLUMN_ID = 'color_mm7wqkj9'
 export const RESPUESTA_BONIF_PORTO_COLUMN_ID = 'color_mm7whw7r'

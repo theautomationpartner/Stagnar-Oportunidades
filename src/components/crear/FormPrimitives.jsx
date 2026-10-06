@@ -5,6 +5,7 @@ import { Button, Dropdown, TextField } from '@vibe/core'
 import { MdCall, MdClear, MdEdit, MdInfoOutline, MdPersonAdd, MdPersonSearch } from 'react-icons/md'
 import {
   CODIGO_PAIS_OPTIONS,
+  busquedaYaRegistrada,
   contactoDesdeBusqueda,
   emailError,
   telefonoError,
@@ -461,14 +462,25 @@ export function ContactoFields({
                       {/* A pedido: crearlo también cuando hay resultados — lo buscado puede
                           traer homónimos u otras personas que no son la que se busca. Si el
                           celular ya existe, el popup avisa del duplicado igual. */}
+                      {/* Si el celular/email buscado ya es de uno de estos, no se precarga
+                          (el popup no dejaría guardarlo): se abre vacío para cargar otro dato. */}
                       <div className="crear-op__crear-igual">
                         <span className="crear-op__section-hint">¿No es ninguno de estos?</span>
                         <Button
                           kind="secondary"
                           size="small"
-                          onClick={() => abrirNuevo(contactoDesdeBusqueda(terminoBuscado, form.codigoPais))}
+                          onClick={() =>
+                            abrirNuevo(
+                              busquedaYaRegistrada(terminoBuscado, resultados)
+                                ? {}
+                                : contactoDesdeBusqueda(terminoBuscado, form.codigoPais)
+                            )
+                          }
                         >
-                          <MdPersonAdd /> {textoCrearDesdeBusqueda(terminoBuscado)}
+                          <MdPersonAdd />{' '}
+                          {busquedaYaRegistrada(terminoBuscado, resultados)
+                            ? 'Crear un contacto nuevo'
+                            : textoCrearDesdeBusqueda(terminoBuscado)}
                         </Button>
                       </div>
                     </div>

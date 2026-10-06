@@ -181,6 +181,23 @@ export function contactoDesdeBusqueda(termino, codigoPaisPorDefecto) {
   return { codigoPais: codigoPaisPorDefecto || '+598', telefono: limpio }
 }
 
+// Bug reportado: si se buscó por un celular o un email y alguno de los resultados YA lo
+// tiene, ofrecer "crearlo con lo buscado" lleva a un popup que de todos modos no deja
+// crearlo (teléfono repetido) y se llenaba de avisos. En ese caso el botón no se ofrece.
+// Por nombre sí: puede ser otra persona que se llama igual. Los teléfonos se comparan por
+// los últimos 8 dígitos, igual que el chequeo de duplicados del popup.
+export function busquedaYaRegistrada(termino, resultados = []) {
+  const limpio = String(termino ?? '').trim()
+  if (pareceEmail(limpio)) {
+    return resultados.some((r) => String(r.email ?? '').trim().toLowerCase() === limpio.toLowerCase())
+  }
+  if (pareceTelefono(limpio)) {
+    const cola = limpio.replace(/\D/g, '').slice(-8)
+    return resultados.some((r) => String(r.telefono ?? '').replace(/\D/g, '').slice(-8) === cola)
+  }
+  return false
+}
+
 // El texto del botón: "Crear contacto con el celular 099…", "…con el email …" o
 // "Crear el contacto «Ana Gómez»".
 export function textoCrearDesdeBusqueda(termino) {

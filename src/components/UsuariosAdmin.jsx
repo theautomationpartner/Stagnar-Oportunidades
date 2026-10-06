@@ -381,6 +381,40 @@ function AltaModal({ usuariosCuenta, filas, etiquetasTeam, onClose, onCreado }) 
 // Baja de un usuario en monday. A pedido, si tiene oportunidades asignadas, antes se elige
 // a quién pasárselas o si quedan sin asignar (el backend las resuelve ANTES de
 // desactivarlo, ver api/_auth/asignaciones.js).
+// A pedido: para una fila cuya persona no está en la cuenta de monday (su invitación se
+// canceló o venció, o se cargó sin usuario). La invita de nuevo, siempre como Invitado, y
+// vincula la fila a ese usuario. El email sale de la fila; si no tiene, se carga acá.
+function ReinvitarModal({ fila, onClose, onConfirmar }) {
+  const [email, setEmail] = useState(fila.email ?? '')
+  const valido = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())
+  return (
+    <Modal id="usuarios-reinvitar" show onClose={onClose} size="small">
+      <ModalContent className="crear-op__editar-contacto-content">
+        <h2 className="usuarios-admin__modal-titulo">Reinvitar a {fila.nombre}</h2>
+        <p className="usuarios-admin__ayuda">
+          No está en la cuenta de monday (la invitación se canceló o venció, o la fila se cargó sin usuario). Se le
+          manda una invitación nueva como Invitado (no ocupa licencia) y la fila queda vinculada a ese usuario. Va a
+          poder entrar a la app cuando la acepte.
+        </p>
+        <label className="usuarios-admin__campo">
+          <span>Email</span>
+          <input
+            className="usuarios-admin__input"
+            type="email"
+            placeholder="nombre@stagnariseguros.com"
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
+          />
+        </label>
+      </ModalContent>
+      <ModalFooter
+        secondaryButton={{ text: 'Cancelar', onClick: onClose }}
+        primaryButton={{ text: 'Reinvitar', disabled: !valido, onClick: () => onConfirmar(email.trim()) }}
+      />
+    </Modal>
+  )
+}
+
 function BajaModal({ alcance, fila, candidatos, comparteUsuario, onClose, onConfirmar }) {
   const enMonday = alcance === 'monday'
   const [asignadas, setAsignadas] = useState(null) // { total, items } | { error }
@@ -487,6 +521,7 @@ export default function UsuariosAdmin() {
   // { tipo: 'app' | 'monday', fila, valor: 'activo' | 'inactivo' }.
   const [cambio, setCambio] = useState(null)
   const [altaAbierta, setAltaAbierta] = useState(false)
+  const [reinvitando, setReinvitando] = useState(null) // la fila a reinvitar
 
   const cargar = useCallback(async () => {
     try {
@@ -652,7 +687,22 @@ export default function UsuariosAdmin() {
                   <td>
                     {(() => {
                       const cuenta = f.mondayUserId ? cuentaDe(f.mondayUserId) : null
-                      if (!cuenta) return <span className="usuarios-admin__muted">Sin usuario de monday</span>
+                      if (!cuenta)
+                        return (
+                          <span className="usuarios-admin__sin-cuenta">
+                            <span className="usuarios-admin__muted">Sin usuario de monday</span>
+                            {/* A pedido: invitarla de nuevo (invitación cancelada/vencida o fila sin usuario). */}
+                            <Button
+                              kind="secondary"
+                              size="xs"
+                              disabled={Boolean(ocupado)}
+                              onClick={() => setReinvitando(f)}
+                            >
+                              <MdPersonAdd aria-hidden="true" /> Reinvitar
+                            </Button>
+                            {ocupado === 'reinvitar-' + f.itemId && <span className="usuarios-admin__guardando">Invitando...</span>}
+                          </span>
+                        )
                       const bloqueado = protegido(f.mondayUserId)
                       const valor = cuenta.habilitado ? 'activo' : 'inactivo'
                       return (
@@ -765,6 +815,18 @@ export default function UsuariosAdmin() {
             />
           )
         })()}
+
+      {reinvitando && (
+        <ReinvitarModal
+          fila={reinvitando}
+          onClose={() => setReinvitando(null)}
+          onConfirmar={(email) => {
+            const fila = reinvitando
+            setReinvitando(null)
+            ejecutar('reinvitar-' + fila.itemId, { accion: 'reinvitar', itemId: fila.itemId, email }, null)
+          }}
+        />
+      )}
 
       {altaAbierta && (
         <AltaModal

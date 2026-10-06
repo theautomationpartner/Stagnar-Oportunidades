@@ -844,3 +844,26 @@
   background: var(--bg-subtle, #f5f6f8);
   border-color: var(--border);
 }
+
+/* Alto parejo de las tarjetas (a pedido): lugares reservados aunque estén vacíos, así
+   todas miden lo mismo y precio, avisos y botones quedan alineados entre tarjetas. */
+.quote-card__reservado {
+  visibility: hidden;
+}
+
+/* Si en la solapa hay alguna con "Completar manualmente" / "Editar carga manual", el
+   renglón del aviso mide en todas lo que mide con ese botón (reservarRenglonManual). */
+.quote-card--reserva-manual .quote-card__meta-warning {
+  min-height: 30px;
+}
+
+/* El renglón de las zonas de PORTO, también cuando se reserva vacío en otras compañías. */
+.quote-card__bonif-porto {
+  min-height: 22px;
+}
+
+/* El lugar reservado de "Bonif." (BSE 3x2) mide lo mismo que el control real. */
+.quote-card__bonif.quote-card__reservado {
+  height: 26px;
+  box-sizing: border-box;
+}

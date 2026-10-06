@@ -13,6 +13,9 @@ export const ESCENARIOS = {
   cotizar: 'MAKE_COTIZAR_WEBHOOK_URL',
   'validar-poliza': 'MAKE_VALIDAR_POLIZA_WEBHOOK_URL',
   'crear-poliza': 'MAKE_CREAR_POLIZA_WEBHOOK_URL',
+  // "[TAP] Se cotiza una oportunidad -> se valida si tiene bonificacion en PORTO": lo
+  // dispara la app cuando la cotización pasa a "Cotizando" (ver OpportunityDetail).
+  'bonificacion-porto': 'MAKE_BONIFICACION_PORTO_WEBHOOK_URL',
 }
 
 // Devuelve { status, body } para reenviarle tal cual al navegador. Un escenario o un

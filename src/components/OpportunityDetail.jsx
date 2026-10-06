@@ -521,6 +521,26 @@ export default function OpportunityDetail({
   // "Enviando" un instante después de mandar por WhatsApp. Un número de secuencia: si ya
   // arrancó un tick más nuevo para cuando esta respuesta vuelve, se descarta.
   const tickSeqRef = useRef(0)
+
+  // A pedido: la consulta de la bonificación del 30% de PORTO sale A LA PAR de la
+  // cotización — cuando el Estado Cotización pasa a "Cotizando" (el robot de WINK ya
+  // arrancó) —, así al terminar de cotizar ya se sabe si tiene bonificación. Una sola vez
+  // por cotización (bonifPortoPedidaRef). La consulta es por CI: sin CI no se pide. Va
+  // aparte y sin frenar: si falla, se cotiza igual y las tarjetas no muestran zonas.
+  const bonifPortoPedidaRef = useRef(false)
+  const pedirBonificacionPorto = (columnValues) => {
+    if (bonifPortoPedidaRef.current) return
+    bonifPortoPedidaRef.current = true
+    const ci = textOf(columnValues, 'numeric_mm51mb0s')
+    // Ya está en curso (por ejemplo, se recargó la página en medio de la cotización).
+    if (!ci || textOf(columnValues, CONSULTA_BONIF_PORTO_COLUMN_ID) === 'Consultando') return
+    // A pedido: se llama al escenario directo (su webhook, por el proxy del servidor; ver
+    // api/_make/escenarios.js) en vez de poner "Consultar" en la columna. El propio
+    // escenario la pasa a "Consultando" y escribe el resultado por zona.
+    dispararEscenario('bonificacion-porto', opportunityId).then((respuesta) => {
+      if (respuesta?.error) console.warn('Bonificación PORTO:', respuesta.error)
+    })
+  }
   const [pollStalled, setPollStalled] = useState(false)
   // El tick del polling en curso, para poder adelantarlo cuando un escenario de Make
   // contesta que ya terminó (ver avisarAlEscenario) en vez de esperar al próximo
@@ -587,6 +607,8 @@ export default function OpportunityDetail({
       if (polling) {
         const estadoCotizacion = textOf(data.column_values, ESTADO_COTIZACION_COLUMN_ID)
         const estadoOportunidad = textOf(data.column_values, ESTADO_OPORTUNIDAD_COLUMN_ID)
+        // El robot arrancó: se pide la bonificación de PORTO a la par (ver arriba).
+        if (estadoCotizacion === 'Cotizando') pedirBonificacionPorto(data.column_values)
         const mapped = (data.subitems ?? []).map(mapSubitemToRawQuote)
         const raws = mapped
 
@@ -1223,27 +1245,9 @@ export default function OpportunityDetail({
       if (edad) await setSimpleColumnValue(opportunityId, EDAD_COLUMN_ID, String(edad))
       await setSimpleColumnValue(opportunityId, AVANCE_COTIZACION_COLUMN_ID, '')
       await setSimpleColumnValue(opportunityId, ESTADO_COTIZACION_COLUMN_ID, 'Cotizar')
-      // A pedido: junto con la cotización se consulta si el cliente tiene la bonificación
-      // del 30% de PORTO (la consulta es por CI; sin CI el escenario no tiene con qué).
-      // Va aparte y sin frenar: si falla, se cotiza igual y las tarjetas no muestran zonas.
-      if (opportunity?.ci) {
-        try {
-          // El escenario arranca cuando la columna CAMBIA a "Consultar": si quedó así de
-          // una vez anterior, volver a ponerla igual no lo dispararía.
-          if (opportunity.bonificacionPorto?.consulta === 'Consultar') {
-            await setSimpleColumnValue(opportunityId, CONSULTA_BONIF_PORTO_COLUMN_ID, '')
-          }
-          await setSimpleColumnValue(opportunityId, CONSULTA_BONIF_PORTO_COLUMN_ID, 'Consultar')
-          setItem((prev) => ({
-            ...prev,
-            column_values: prev.column_values.map((cv) =>
-              cv.id === CONSULTA_BONIF_PORTO_COLUMN_ID ? { ...cv, text: 'Consultar' } : cv
-            ),
-          }))
-        } catch (err) {
-          console.warn('No se pudo pedir la consulta de bonificación PORTO', err)
-        }
-      }
+      // La consulta de la bonificación de PORTO sale cuando el robot pasa a "Cotizando"
+      // (ver pedirBonificacionPorto en el polling): queda pendiente para esta cotización.
+      bonifPortoPedidaRef.current = false
       setItem((prev) => ({
         ...prev,
         column_values: prev.column_values.map((cv) => {
@@ -2513,6 +2517,15 @@ export default function OpportunityDetail({
                         rcOptions={rcOptions}
                         // Bonificación de PORTO por zona (solo esas tarjetas la muestran).
                         zonasBonifPorto={raw.compania === 'PORTO' ? zonasBonifPorto : null}
+                        // Alto parejo: si en esta solapa hay alguna de PORTO con zonas, las
+                        // demás reservan ese renglón.
+                        reservarBonifPorto={
+                          Boolean(zonasBonifPorto) && visibleQuoteEntries.some((e) => e.raw.compania === 'PORTO')
+                        }
+                        // Y si alguna lleva el botón de carga manual, todas reservan ese alto.
+                        reservarRenglonManual={visibleQuoteEntries.some(
+                          (e) => e.raw.costoManual || (!isQuoteSelectable(e.quote) && !(Number(e.raw.contado) > 0))
+                        )}
                       />
                     ))}
                   </div>

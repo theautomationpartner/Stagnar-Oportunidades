@@ -32,6 +32,7 @@ import {
 import {
   buildMondayPhone,
   buildMondayEmail,
+  busquedaYaRegistrada,
   contactoDesdeBusqueda,
   initialsOf,
   splitNombreApellido,
@@ -131,6 +132,9 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
   // Alta/vínculo de contactos.
   const [busquedaContacto, setBusquedaContacto] = useState('')
   const [resultadosContacto, setResultadosContacto] = useState(null)
+  // Lo que devolvió la búsqueda ANTES de sacar los ya vinculados: para saber si el celular
+  // o email buscado ya existe (y entonces no ofrecer crearlo, ver busquedaYaRegistrada).
+  const [resultadosContactoTodos, setResultadosContactoTodos] = useState([])
   const [buscandoContacto, setBuscandoContacto] = useState(false)
   const [creandoContacto, setCreandoContacto] = useState(false)
   // null = el popup abre como siempre; si no, con lo buscado (búsqueda sin resultados).
@@ -188,6 +192,15 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
   }, [cliente, grupoDelCliente])
   const rolActual = miembrosDelCliente[0]?.rol || ''
 
+  // Crear con lo buscado. Si el celular/email buscado ya es de otro contacto, el popup no
+  // dejaría guardarlo: se abre vacío ("Crear un contacto nuevo") para cargar otro dato.
+  const datoYaRegistrado = busquedaYaRegistrada(terminoContacto, resultadosContactoTodos)
+  const textoBotonCrear = datoYaRegistrado ? 'Crear un contacto nuevo' : textoCrearDesdeBusqueda(terminoContacto)
+  const crearDesdeBusqueda = () => {
+    setContactoDesdeLaBusqueda(datoYaRegistrado ? {} : contactoDesdeBusqueda(terminoContacto))
+    setCreandoContacto(true)
+  }
+
   const buscarContactos = async () => {
     if (busquedaContacto.trim().length < 2) return
     setTerminoContacto(busquedaContacto.trim())
@@ -195,6 +208,7 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
     try {
       const res = await buscarContactosCrmLibre(busquedaContacto)
       // Los que ya están vinculados a este cliente no se ofrecen de nuevo.
+      setResultadosContactoTodos(res)
       setResultadosContacto(res.filter((r) => !(cliente?.contactos ?? []).some((c) => c.id === r.id)))
     } catch {
       setResultadosContacto([])
@@ -430,15 +444,8 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
               <p className="gcli__hint">
                 Sin resultados para «{terminoContacto}» en Contactos (o ya están vinculados a este cliente).
               </p>
-              <Button
-                kind="primary"
-                size="small"
-                onClick={() => {
-                  setContactoDesdeLaBusqueda(contactoDesdeBusqueda(terminoContacto))
-                  setCreandoContacto(true)
-                }}
-              >
-                <MdPersonAdd /> {textoCrearDesdeBusqueda(terminoContacto)}
+              <Button kind="primary" size="small" onClick={crearDesdeBusqueda}>
+                <MdPersonAdd /> {textoBotonCrear}
               </Button>
             </div>
           )}
@@ -475,15 +482,8 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
           {(resultadosContacto ?? []).length > 0 && (
             <div className="gcli__crear-igual">
               <span className="gcli__hint">¿No es ninguno de estos?</span>
-              <Button
-                kind="secondary"
-                size="small"
-                onClick={() => {
-                  setContactoDesdeLaBusqueda(contactoDesdeBusqueda(terminoContacto))
-                  setCreandoContacto(true)
-                }}
-              >
-                <MdPersonAdd /> {textoCrearDesdeBusqueda(terminoContacto)}
+              <Button kind="secondary" size="small" onClick={crearDesdeBusqueda}>
+                <MdPersonAdd /> {textoBotonCrear}
               </Button>
             </div>
           )}

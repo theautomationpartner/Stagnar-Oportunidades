@@ -12,6 +12,7 @@ import {
 import {
   buildMondayPhone,
   CODIGO_PAIS_OPTIONS,
+  busquedaYaRegistrada,
   contactoDesdeBusqueda,
   emailError,
   initialsOf,
@@ -552,7 +553,9 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos, onOpenCli
       {/* A pedido: si lo buscado no está en la lista, crearlo con ese mismo dato (celular,
           email o nombre) en vez de tener que volver a tipearlo en el popup. */}
       {/* También con resultados (a pedido): lo buscado puede no ser ninguno de ellos. */}
-      {termino.trim() && (
+      {/* Si el celular o email buscado ya es de uno de los resultados, el popup no dejaría
+          guardarlo: se ofrece "Crear un contacto nuevo" vacío (ver busquedaYaRegistrada). */}
+      {termino.trim() && !buscando && (
         <div className="contactos__sin-resultados">
           <span>
             {filtrados.length === 0
@@ -564,9 +567,10 @@ export default function ContactosSection({ onIrAClientes, onIrAGrupos, onOpenCli
           <Button
             kind={filtrados.length === 0 ? 'primary' : 'secondary'}
             size="small"
-            onClick={() => abrirAlta(contactoDesdeBusqueda(termino))}
+            onClick={() => abrirAlta(busquedaYaRegistrada(termino, filtrados) ? {} : contactoDesdeBusqueda(termino))}
           >
-            <MdPersonAdd /> {textoCrearDesdeBusqueda(termino)}
+            <MdPersonAdd />{' '}
+            {busquedaYaRegistrada(termino, filtrados) ? 'Crear un contacto nuevo' : textoCrearDesdeBusqueda(termino)}
           </Button>
         </div>
       )}

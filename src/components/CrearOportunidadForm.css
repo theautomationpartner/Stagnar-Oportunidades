@@ -295,6 +295,12 @@
    resto de los ModalContent de la app. */
 .crear-op__editar-contacto-content {
   padding: 28px 32px 8px;
+  /* Bug reportado: con varios avisos juntos (contacto propio del cliente + teléfono ya
+     cargado) el popup quedaba más alto que la pantalla, cortado y sin scroll. El
+     contenido no pasa del alto disponible (adentro de monday, el del iframe) y scrollea;
+     el pie con los botones queda siempre a la vista. */
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
 }
 
 .crear-op__editar-contacto-title {
