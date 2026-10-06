@@ -432,12 +432,10 @@ const LOCALIDADES_QUERY = `
   }
 `
 
-// Modelo (board_relation_mm5422v9) conecta con estos dos tableros de Autodata, que
-// combinados superan los 15.000 ítems — a diferencia de Departamentos, no se pueden
-// precargar enteros. V1 y V2 tienen cobertura de marcas/modelos distinta (no son
-// duplicados uno del otro, confirmado contra la API real) y usan IDs DE COLUMNA
-// DISTINTOS para los mismos conceptos, así que todo lo de Autodata queda parametrizado
-// por tablero acá en vez de asumir una columna compartida.
+// Modelo (board_relation_mm5422v9) conecta con Autodata: un ítem por modelo y año (~47.000),
+// no se puede precargar entero como Departamentos. Antes eran dos tableros (V1 y V2, un
+// ítem por modelo con todos sus años); se unificaron en el de V1 (ver
+// scripts/autodata-generar-csv.mjs).
 const AUTODATA_BOARDS = [
   {
     boardId: 18421913144,
@@ -446,14 +444,6 @@ const AUTODATA_BOARDS = [
     anioColumnId: 'dropdown_mm584cbx',
     combustibleColumnId: 'dropdown_mm5wybn4',
     tipoColumnId: 'dropdown_mm5w8xbm',
-  },
-  {
-    boardId: 18421911963,
-    modeloColumnId: 'text_mm58pyh1',
-    marcaColumnId: 'dropdown_mm5861x5',
-    anioColumnId: 'dropdown_mm583r6w',
-    combustibleColumnId: 'dropdown_mm5w74r6',
-    tipoColumnId: 'dropdown_mm5wx4s6',
   },
 ]
 
@@ -493,9 +483,7 @@ const datoRealONull = (texto) => (texto && !esSinDato(texto) ? texto : null)
 // A pedido: las casas rodantes y los trailers no se cotizan, así que no tienen por qué
 // aparecer como vehículo elegible al crear una oportunidad. Se filtran por marca y no por
 // el "sin datos" de más abajo, que solo agarra las fichas sin combustible ni tipo: las hay
-// de esta marca con los dos campos cargados, y tampoco son cotizables. La marca vive solo
-// en AUTODATA V2 (en V1 no existe), pero el filtro corre sobre los dos: si mañana aparece
-// en el otro, ya está cubierto.
+// de esta marca con los dos campos cargados, y tampoco son cotizables.
 export const MARCAS_NO_COTIZABLES = new Set(['CASA RODANTE/TRAILERS'])
 
 function esCotizable(vehiculo) {
@@ -565,13 +553,12 @@ export async function searchAutodataModelos(searchText) {
 
 // Modelo cuando "Posee Vehículo" = "No": en vez de buscar por texto libre, se arma con
 // Año + Marca ya elegidos en el formulario, mostrando solo los modelos reales que
-// existen para esa combinación en cualquiera de los dos tableros de Autodata. contains_text
-// funciona sobre columnas dropdown, no hace falta resolver el id interno de la label
-// (que además difiere entre V1 y V2 para la misma marca/año). 500 (el máximo real de
-// items_page por página) en vez de 100: confirmado contra la API real que Marca+Año
-// solos (sin "Modelo") pueden matchear MUCHO más de 100 variantes — Peugeot 2006 solo en
-// V1 son 135 — con el límite de 100 de antes, un modelo real (ej. "Boxer Minibus 1905cc
-// Turbo Diesel") quedaba afuera de la lista sin que se notara que existía.
+// existen para esa combinación en Autodata. Cada ítem tiene un solo año, así que el
+// resultado trae cada modelo una vez, con los códigos de ese año. contains_text funciona
+// sobre columnas dropdown, no hace falta resolver el id interno de la label. 500 (el
+// máximo real de items_page por página) en vez de 100: Marca+Año solos pueden matchear
+// más de 100 variantes (Peugeot 2006 eran 135) y con 100 un modelo real quedaba afuera
+// de la lista sin que se notara.
 export async function fetchAutodataModelosByAnioMarca(anio, marca) {
   if (!anio || !marca) return []
   const buildRules = (board) => [

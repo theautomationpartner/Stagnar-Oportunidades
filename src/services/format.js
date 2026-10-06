@@ -83,13 +83,20 @@ export function matchOption(options, rawValue) {
   return found.value ?? found
 }
 
+// Saca solo el último "(n)": el código de modelo de Autodata. Hay nombres que ya terminan
+// en un número entre paréntesis ("Accent 1.4 Full 3p. (2006)").
+export function sinCodigoModelo(nombre) {
+  return String(nombre ?? '').replace(/\s*\(\d+\)\s*$/, '').trim()
+}
+
 // El nombre de un modelo de Autodata ya trae la marca adelante ("PEUGEOT - 206 1.6
 // Presence Full…"). Para textos donde la marca ya se menciona aparte (nombre del ítem
 // "Nombre-Marca-Año-Modelo", tarjeta de WhatsApp) se la quita del principio junto con el
-// separador. Si el modelo no empieza con la marca, vuelve tal cual.
+// separador, y también el código de modelo del final. Si el modelo no empieza con la
+// marca, vuelve sin el código.
 export function modeloSinMarca(marca, modelo) {
   const m = (marca ?? '').trim()
-  const texto = (modelo ?? '').trim()
+  const texto = sinCodigoModelo(modelo)
   if (!m || !texto.toUpperCase().startsWith(m.toUpperCase())) return texto
   return texto.slice(m.length).replace(/^[\s\-–·]+/, '').trim()
 }

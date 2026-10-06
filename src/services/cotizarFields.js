@@ -13,8 +13,8 @@
 //    según `idKey`/`optionsKey`), y se guarda con change_column_value (JSON con
 //    item_ids), no con change_simple_column_value.
 //  - 'autodata': caso especial de "connected" solo para Modelo — a diferencia de
-//    Departamento, el tablero vinculado (board_relation_mm5422v9, AUTODATA V1+V2) tiene
-//    más de 15.000 ítems combinados, así que no se puede precargar: se busca en vivo por
+//    Departamento, el tablero vinculado (board_relation_mm5422v9, AUTODATA) tiene
+//    unos 47.000 ítems (uno por modelo y año), así que no se puede precargar: se busca en vivo por
 //    texto (ver mondayApi.js#searchAutodataModelos). Se guarda igual que 'connected'
 //    (change_column_value), pero el VALOR REAL para mostrar/validar sigue viviendo en
 //    `text_mm54fb7m` (columnId de este field), no en la columna conectada — la

@@ -3,7 +3,7 @@ import { MdAutorenew, MdArrowForward, MdCheckCircle, MdWarningAmber } from 'reac
 import { Button, Dropdown, AttentionBox, TextField, NumberField, Modal, ModalContent, ModalFooter } from '@vibe/core'
 import { COTIZAR_FIELDS, getInvalidCotizarFields, getMissingCotizarFields } from '../services/cotizarFields'
 import { fetchAutodataModelosByAnioMarca } from '../services/mondayApi'
-import { matchesSearchQuery, matchOption, sinCodigoPostal } from '../services/format'
+import { matchesSearchQuery, matchOption, sinCodigoModelo, sinCodigoPostal } from '../services/format'
 import AutodataModeloPorAnioMarca from './AutodataModeloPorAnioMarca'
 import AlertModal from './AlertModal'
 import ErrorDetailBox from './ErrorDetailBox'
@@ -310,7 +310,11 @@ export default function CotizarStepPanel({
     setCheckingConsistencia(true)
     try {
       const modelos = await fetchAutodataModelosByAnioMarca(opportunity.anio, opportunity.marca)
-      const match = modelos.find((m) => m.name.trim().toLowerCase() === opportunity.modelo.trim().toLowerCase())
+      const guardado = opportunity.modelo.trim().toLowerCase()
+      // Las oportunidades anteriores a la unificación de Autodata guardaron el nombre sin el código de modelo.
+      const match = modelos.find(
+        (m) => m.name.trim().toLowerCase() === guardado || sinCodigoModelo(m.name).toLowerCase() === guardado
+      )
       if (!match) {
         return {
           title: 'El modelo no coincide con Marca/Año',
