@@ -231,7 +231,9 @@ async function administrarLista(req, cuerpo, usuario) {
       email = String(cuerpo.email ?? '').trim().toLowerCase()
       if (!EMAIL_VALIDO.test(email)) throw new ErrorDeFlujo('DATOS_INCOMPLETOS', 'Revisá el email.')
       if (!nombre) throw new ErrorDeFlujo('DATOS_INCOMPLETOS', 'Falta el nombre.')
-      const tipo = cuerpo.tipo === 'MEMBER' ? 'MEMBER' : 'GUEST'
+      // A pedido: desde la app solo se invita como Invitado — aunque llegue otro tipo en
+      // el pedido, no se invita a nadie como Miembro (ocuparía una licencia).
+      const tipo = 'GUEST'
       const cuenta = (await usuariosDeLaCuenta()).find((u) => u.email?.toLowerCase() === email)
       if (cuenta) {
         mondayUserId = cuenta.id

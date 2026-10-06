@@ -141,6 +141,7 @@ function useFlipDeTarjetas(contenedorRef, idsEnOrden) {
 }
 import { nombreDeOportunidad } from '../services/nombreOportunidad'
 import { ANIO_COTIZACION_COLUMN_ID, anioParaCotizar } from '../services/anioCotizacion'
+import { CONSULTA_BONIF_PORTO_COLUMN_ID, zonasBonificacionPorto } from '../services/bonificacionPorto'
 import {
   ESTADO_VALIDACION,
   ESTADO_GENERAL,
@@ -794,6 +795,15 @@ export default function OpportunityDetail({
     [item, statusColors]
   )
 
+  // Bonificación de PORTO por zona para las tarjetas de PORTO. Memorizada por sus valores:
+  // QuoteCard es memo y el polling rehace `opportunity` cada pocos segundos.
+  const bonifPorto = opportunity?.bonificacionPorto
+  const zonasBonifPorto = useMemo(
+    () => zonasBonificacionPorto(bonifPorto),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [bonifPorto?.consulta, bonifPorto?.respuesta, bonifPorto?.montevideo, bonifPorto?.resto]
+  )
+
   const groups = useMemo(() => {
     // Uso y Año Vehículo ya no se leen del subitem (se sacaron esas columnas por
     // duplicar datos que ya vienen de la oportunidad) — se inyectan acá para no tener
@@ -1213,6 +1223,27 @@ export default function OpportunityDetail({
       if (edad) await setSimpleColumnValue(opportunityId, EDAD_COLUMN_ID, String(edad))
       await setSimpleColumnValue(opportunityId, AVANCE_COTIZACION_COLUMN_ID, '')
       await setSimpleColumnValue(opportunityId, ESTADO_COTIZACION_COLUMN_ID, 'Cotizar')
+      // A pedido: junto con la cotización se consulta si el cliente tiene la bonificación
+      // del 30% de PORTO (la consulta es por CI; sin CI el escenario no tiene con qué).
+      // Va aparte y sin frenar: si falla, se cotiza igual y las tarjetas no muestran zonas.
+      if (opportunity?.ci) {
+        try {
+          // El escenario arranca cuando la columna CAMBIA a "Consultar": si quedó así de
+          // una vez anterior, volver a ponerla igual no lo dispararía.
+          if (opportunity.bonificacionPorto?.consulta === 'Consultar') {
+            await setSimpleColumnValue(opportunityId, CONSULTA_BONIF_PORTO_COLUMN_ID, '')
+          }
+          await setSimpleColumnValue(opportunityId, CONSULTA_BONIF_PORTO_COLUMN_ID, 'Consultar')
+          setItem((prev) => ({
+            ...prev,
+            column_values: prev.column_values.map((cv) =>
+              cv.id === CONSULTA_BONIF_PORTO_COLUMN_ID ? { ...cv, text: 'Consultar' } : cv
+            ),
+          }))
+        } catch (err) {
+          console.warn('No se pudo pedir la consulta de bonificación PORTO', err)
+        }
+      }
       setItem((prev) => ({
         ...prev,
         column_values: prev.column_values.map((cv) => {
@@ -2480,6 +2511,8 @@ export default function OpportunityDetail({
                         onAutoExtraChange={(dias) => handleAutoExtraChange(raw.id, dias)}
                         onPanelChange={(panel) => handlePanelChange(raw.id, panel)}
                         rcOptions={rcOptions}
+                        // Bonificación de PORTO por zona (solo esas tarjetas la muestran).
+                        zonasBonifPorto={raw.compania === 'PORTO' ? zonasBonifPorto : null}
                       />
                     ))}
                   </div>

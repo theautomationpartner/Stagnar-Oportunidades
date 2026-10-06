@@ -193,7 +193,6 @@ function AltaModal({ usuariosCuenta, filas, etiquetasTeam, onClose, onCreado }) 
   const [elegido, setElegido] = useState(null)
   const [nombre, setNombre] = useState('')
   const [email, setEmail] = useState('')
-  const [tipo, setTipo] = useState('GUEST')
   const [teams, setTeams] = useState({ admin: false, ventas: true })
   const [etiquetas, setEtiquetas] = useState([])
   const [guardando, setGuardando] = useState(false)
@@ -214,7 +213,7 @@ function AltaModal({ usuariosCuenta, filas, etiquetasTeam, onClose, onCreado }) 
       const r =
         modo === 'monday'
           ? await postear({ accion: 'alta', mondayUserId: elegido.id, nombre: nombre.trim(), ...teams, etiquetas })
-          : await postear({ accion: 'invitar', email: email.trim(), nombre: nombre.trim(), tipo, ...teams, etiquetas })
+          : await postear({ accion: 'invitar', email: email.trim(), nombre: nombre.trim(), ...teams, etiquetas })
       onCreado(r)
     } catch (err) {
       setError(err.message)
@@ -332,13 +331,12 @@ function AltaModal({ usuariosCuenta, filas, etiquetasTeam, onClose, onCreado }) 
                   onChange={(e) => setEmail(e.target.value)}
                 />
               </label>
-              <label className="usuarios-admin__campo">
+              {/* A pedido: desde la app solo se invita como Invitado (no ocupa licencia).
+                  Para sumar a alguien como Miembro se hace desde monday. */}
+              <div className="usuarios-admin__campo">
                 <span>Tipo de usuario en monday</span>
-                <select className="usuarios-admin__select" value={tipo} onChange={(e) => setTipo(e.target.value)}>
-                  <option value="GUEST">Invitado</option>
-                  <option value="MEMBER">Miembro (ocupa licencia)</option>
-                </select>
-              </label>
+                <span className="usuarios-admin__tipo-fijo">Invitado (no ocupa licencia)</span>
+              </div>
             </div>
           </>
         )}

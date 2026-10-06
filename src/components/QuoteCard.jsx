@@ -60,6 +60,14 @@ const BONIFICACIONES_ESPECIALES_BSE = [
   { key: 'flota', label: 'Flota (%)' },
 ]
 
+// El detalle de cada zona de la bonificación de PORTO, al pasar el mouse.
+const TEXTO_ESTADO_ZONA = {
+  aprobado: 'Aprobada: el cliente tiene la bonificación del 30% en esta zona.',
+  noAprobado: 'No aprobada: el cliente no tiene la bonificación en esta zona.',
+  consultando: 'Consultando en el portal de PORTO…',
+  sinRespuesta: 'El portal de PORTO no respondió para esta zona.',
+}
+
 function fieldsForRaw(raw, rcOptions) {
   const common = []
 
@@ -240,6 +248,7 @@ function QuoteCard({
   onVaciarCostoManual,
   onPanelChange,
   rcOptions,
+  zonasBonifPorto = null,
 }) {
   // A pedido, estética tipo mockup: 2 botones separados ("Parámetros"/"Coberturas") que
   // NO se pueden desplegar a la vez — un solo estado con el panel abierto (o ninguno) en
@@ -633,6 +642,28 @@ function QuoteCard({
           (Bonificación, Descuento, RC, Deducible/Edad específicos, Opcionales PORTO) —
           gris mientras no tengan valor, coloreadas con el valor puesto apenas lo tienen
           (override de "Parámetros ajustables", o el dato real del subitem). */}
+      {/* A pedido: en las de PORTO, si el cliente tiene la bonificación del 30% según su CI,
+          por zona — verde aprobada, rojo no aprobada (ver services/bonificacionPorto.js).
+          Solo informa: el precio no cambia. */}
+      {zonasBonifPorto && (
+        <div className="quote-card__bonif-porto" aria-label="Bonificación PORTO 30% por zona">
+          <span className="quote-card__bonif-porto-titulo">Bonif. 30%</span>
+          {zonasBonifPorto.map((z) => (
+            <span
+              key={z.key}
+              className={`quote-card__zona quote-card__zona--${z.estado ?? 'sinRespuesta'}`}
+              title={TEXTO_ESTADO_ZONA[z.estado ?? 'sinRespuesta']}
+            >
+              {/* Con ✓/✗ además del color, para que se lea aunque no se distingan. */}
+              {z.estado === 'aprobado' ? '✓ ' : z.estado === 'noAprobado' ? '✗ ' : ''}
+              {z.label}
+              {z.estado === 'consultando' ? ' · consultando…' : ''}
+              {z.estado === 'sinRespuesta' || !z.estado ? ' · sin respuesta' : ''}
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="quote-card__override-tags">
         {/* Cotización con costo y deducible cargados a mano: solo la marca. Se edita con
             "Editar carga manual", arriba. */}

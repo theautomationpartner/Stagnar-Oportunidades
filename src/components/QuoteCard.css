@@ -798,3 +798,49 @@
   background: var(--tint-info, #eef4ff);
   border-color: transparent;
 }
+
+/* Bonificación PORTO 30% por zona (solo tarjetas de PORTO): verde aprobada, rojo no
+   aprobada, gris mientras se consulta o si el portal no respondió. */
+.quote-card__bonif-porto {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 2px 0 8px;
+}
+
+.quote-card__bonif-porto-titulo {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-gray);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.quote-card__zona {
+  padding: 3px 9px;
+  font-size: 11px;
+  font-weight: 600;
+  border-radius: 10px;
+  border: 1px solid transparent;
+  white-space: nowrap;
+}
+
+.quote-card__zona--aprobado {
+  color: #0b6b3a;
+  background: #def7e8;
+  border-color: #00c875;
+}
+
+.quote-card__zona--noAprobado {
+  color: #a01c2e;
+  background: #fde4e7;
+  border-color: #df2f4a;
+}
+
+.quote-card__zona--consultando,
+.quote-card__zona--sinRespuesta {
+  color: var(--text-gray);
+  background: var(--bg-subtle, #f5f6f8);
+  border-color: var(--border);
+}

@@ -81,6 +81,12 @@ const OPPORTUNITY_COLUMN_IDS = [
   'board_relation_mm4pngbs',
   // LOG-13: con cuántas cuotas se cierra la venta, elegido en el paso "Confirmar".
   'color_mm71kfpr', // Cuotas elegidas
+  // Bonificación de PORTO (30%) según el CI: la app pone "Consultar" al cotizar y el
+  // escenario de Make escribe el resultado por zona (ver services/bonificacionPorto.js).
+  'color_mm7wqkj9', // Consultar Bonificacion Porto (Consultar/Consultando/Consultado/Error)
+  'color_mm7whw7r', // Bonificacion Porto (Con respuesta/Sin Respuesta)
+  'color_mm7w9q1a', // Bonificacion CANELONES SUR/MONTEVIDEO
+  'color_mm7wftck', // Bonificacion RESTO DEL PAIS
 ]
 
 // Los campos de cada fila de la tabla, una sola vez: los usan la primera página y las

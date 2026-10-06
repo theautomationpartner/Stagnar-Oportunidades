@@ -282,3 +282,14 @@
   border: 1px solid #fdd776;
   border-radius: 8px;
 }
+
+/* Verificación del CI/RUT editado (que no sea de otro cliente). */
+.cotizar-step__ci-aviso {
+  font-size: 12px;
+  color: var(--text-gray);
+}
+
+.cotizar-step__ci-aviso--error {
+  color: var(--tint-danger-text);
+  font-weight: 600;
+}

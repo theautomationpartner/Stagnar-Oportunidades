@@ -174,6 +174,13 @@ export function mapOpportunityItem(item, statusColors = {}) {
     vehiculoAsegurado,
     // LOG-13: forma de pago con la que se cierra (etiqueta de color_mm71kfpr).
     cuotasElegidas: textOf(cv, 'color_mm71kfpr'),
+    // Bonificación de PORTO (30%) por zona, según el CI (ver services/bonificacionPorto.js).
+    bonificacionPorto: {
+      consulta: textOf(cv, 'color_mm7wqkj9'),
+      respuesta: textOf(cv, 'color_mm7whw7r'),
+      montevideo: textOf(cv, 'color_mm7w9q1a'),
+      resto: textOf(cv, 'color_mm7wftck'),
+    },
     // Validación de la póliza emitida: el veredicto de cada cosa con su motivo, tal cual
     // lo dejó el escenario (ver validacionPoliza.js). Agrupado acá y no suelto en nueve
     // campos, porque siempre se usan juntos.

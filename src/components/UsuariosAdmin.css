@@ -521,3 +521,16 @@
   color: var(--text-gray);
   white-space: nowrap;
 }
+
+/* Tipo de usuario fijo al invitar (solo Invitado, a pedido): se muestra, no se elige. */
+.usuarios-admin__tipo-fijo {
+  display: flex;
+  align-items: center;
+  min-height: 36px;
+  padding: 0 12px;
+  font-weight: 400;
+  color: var(--text-gray);
+  background: var(--bg-subtle, #f5f6f8);
+  border: 1px solid var(--border);
+  border-radius: 6px;
+}

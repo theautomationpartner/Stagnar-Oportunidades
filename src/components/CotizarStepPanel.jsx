@@ -12,6 +12,8 @@ import { anioParaCotizar, esAnioAdelantado } from '../services/anioCotizacion'
 import UbicacionParaCotizar from './UbicacionParaCotizar'
 import { opcionesDeLocalidad } from '../services/localidades'
 import StepFooter from './StepFooter'
+import { findClientePorDocumento } from '../services/mondayApi'
+import { documentoDelTipoCliente, stripCi } from '../services/personaFields'
 import './CotizarStepPanel.css'
 
 // A pedido: "Editar" se partió en 2 popups separados (Datos personales / Vehículo, ver
@@ -244,6 +246,50 @@ export default function CotizarStepPanel({
   // apague apenas se completa, sin esperar a "Guardar cambios".
   const faltantesEnEdicion = new Set(getMissingCotizarFields(form).map((f) => f.key))
 
+  // A pedido: el CI/RUT editado no puede ser el de OTRO cliente — mismo criterio que el
+  // alta (CrearOportunidadForm): apenas el documento cambia y tiene buen formato se
+  // consulta Clientes, y "Guardar cambios" queda bloqueado mientras se verifica y si está
+  // repetido. Como se escribe en monday recién al guardar, si la página se cae antes,
+  // monday conserva el CI anterior. Si la consulta falla no se traba la edición (igual
+  // que en el alta: frenar por una consulta caída es peor que el duplicado).
+  // ciChequeo: 'sin' (nada que verificar) | 'buscando' | 'libre' | 'duplicado'.
+  const documento = documentoDelTipoCliente(esEmpresa ? 'Empresa' : 'Particular')
+  const ciEditado = stripCi(String(form.ci ?? ''))
+  const ciCambio = editingSection === 'personales' && ciEditado !== stripCi(String(opportunity.ci ?? ''))
+  const ciFormatoError = ciCambio && ciEditado ? documento.validar(ciEditado) : null
+  const [ciChequeo, setCiChequeo] = useState('sin')
+  const [ciDuplicado, setCiDuplicado] = useState(null)
+  useEffect(() => {
+    if (!ciCambio || !ciEditado || ciFormatoError) {
+      setCiChequeo('sin')
+      setCiDuplicado(null)
+      return undefined
+    }
+    let cancelado = false
+    setCiChequeo('buscando')
+    setCiDuplicado(null)
+    const timer = setTimeout(() => {
+      findClientePorDocumento(ciEditado, { tipoCliente: esEmpresa ? 'Empresa' : 'Particular' })
+        .then((encontrado) => {
+          if (cancelado) return
+          // El propio cliente de la oportunidad no es un duplicado.
+          const deOtro = encontrado && String(encontrado.cliente.id) !== String(opportunity.clienteId ?? '')
+          setCiDuplicado(deOtro ? encontrado.cliente : null)
+          setCiChequeo(deOtro ? 'duplicado' : 'libre')
+        })
+        .catch(() => {
+          if (cancelado) return
+          setCiDuplicado(null)
+          setCiChequeo('libre')
+        })
+    }, 500)
+    return () => {
+      cancelado = true
+      clearTimeout(timer)
+    }
+  }, [ciCambio, ciEditado, ciFormatoError, esEmpresa, opportunity.clienteId])
+  const ciBloquea = ciCambio && (Boolean(ciFormatoError) || ciChequeo === 'buscando' || ciChequeo === 'duplicado')
+
   // A pedido: antes de mandar a cotizar/recotizar se avisa en 2 pasos. 1) Si falta algún
   // dato base, un popup tipo "Faltan datos requeridos" (mismo patrón que
   // ConfirmarStepPanel) que bloquea de verdad — no deja ni un botón de "reintentar", el
@@ -370,6 +416,16 @@ export default function CotizarStepPanel({
     ]
     if (missing.length > 0) {
       setSaveError(`Completá estos campos antes de guardar: ${missing.join(', ')}.`)
+      return
+    }
+    // El CI/RUT nuevo tiene que estar verificado antes de escribir nada (ver ciChequeo).
+    if (ciBloquea) {
+      setSaveError(
+        ciFormatoError ||
+          (ciChequeo === 'buscando'
+            ? `Esperá a que se verifique el ${documento.label}.`
+            : `El ${documento.label} ya pertenece a otro cliente.`)
+      )
       return
     }
     setSaving(true)
@@ -651,6 +707,25 @@ export default function CotizarStepPanel({
                       tipo={form.tipo}
                       combustible={form.combustible}
                     />
+                    {f.key === 'ci' && ciCambio && (
+                      <span
+                        className={
+                          ciFormatoError || ciChequeo === 'duplicado'
+                            ? 'cotizar-step__ci-aviso cotizar-step__ci-aviso--error'
+                            : 'cotizar-step__ci-aviso'
+                        }
+                        role={ciChequeo === 'duplicado' ? 'alert' : undefined}
+                      >
+                        {ciFormatoError ||
+                          (ciChequeo === 'buscando'
+                            ? `Verificando que el ${documento.label} no sea de otro cliente…`
+                            : ciChequeo === 'duplicado'
+                              ? `Este ${documento.label} ya es de ${ciDuplicado?.name ?? 'otro cliente'}. Corregilo para poder guardar.`
+                              : ciChequeo === 'libre'
+                                ? `${documento.label} verificado: no es de otro cliente.`
+                                : '')}
+                      </span>
+                    )}
                   </label>
                 )
               })}
@@ -660,9 +735,10 @@ export default function CotizarStepPanel({
           <ModalFooter
             secondaryButton={{ text: 'Cancelar', onClick: () => setEditingSection(null), disabled: saving }}
             primaryButton={{
-              text: saving ? 'Guardando...' : 'Guardar cambios',
+              text: saving ? 'Guardando...' : ciChequeo === 'buscando' && ciCambio ? 'Verificando…' : 'Guardar cambios',
               onClick: handleSave,
-              disabled: saving,
+              // Bloqueado mientras el CI/RUT nuevo no está verificado (ver ciChequeo).
+              disabled: saving || ciBloquea,
             }}
           />
         </Modal>
