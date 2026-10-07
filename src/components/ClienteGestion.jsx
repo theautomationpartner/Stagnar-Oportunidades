@@ -38,6 +38,7 @@ import {
   splitNombreApellido,
   textoCrearDesdeBusqueda,
 } from '../services/personaFields'
+import { formatShortDate } from '../services/format'
 import './ClienteGestion.css'
 
 // Ficha de gestión de un Cliente: sus Contactos (vincular/crear/quitar), la Empresa
@@ -113,6 +114,44 @@ function BuscadorEnMonday({ placeholder, textoAccion, buscar: buscarOpciones, oc
       )}
     </div>
   )
+}
+
+// A pedido: los datos de identidad y ubicación del cliente, según su tipo. "—" si falta.
+function datosDelCliente(c) {
+  const ubicacion = [
+    ['Dirección', c.direccion],
+    ['Localidad', c.localidad],
+    ['Departamento', c.departamento],
+  ]
+  if (c.tipo === 'Empresa') {
+    return [['Razón social', c.razonSocial || c.name], ['RUT', c.rut], ...ubicacion]
+  }
+  const nacionalidad = c.extranjero === 'Si' ? [c.nacionalidad, 'extranjero'].filter(Boolean).join(' · ') : c.nacionalidad
+  return [
+    ['Nombre', c.nombre],
+    ['Apellido', c.apellido],
+    ['CI', c.ci],
+    ['Fecha de nacimiento', c.fechaNacimiento ? formatShortDate(c.fechaNacimiento) : ''],
+    ['Sexo', c.sexo],
+    ['Nacionalidad', nacionalidad],
+    ...ubicacion,
+  ]
+}
+
+// A pedido: los contactos agrupados por su "Tipo de contacto" (tablero Contactos), en
+// este orden; los que no tienen tipo van al final.
+const TIPOS_DE_CONTACTO = ['Familiar', 'Vinculo societario', 'Profesional externo', 'Dato adicional', 'Homónimo del cliente']
+const NOMBRE_TIPO_CONTACTO = { 'Vinculo societario': 'Vínculo societario' }
+function contactosPorTipo(contactos) {
+  const grupos = new Map()
+  for (const c of contactos) {
+    const tipo = TIPOS_DE_CONTACTO.includes(c.tipoContacto) ? c.tipoContacto : ''
+    if (!grupos.has(tipo)) grupos.set(tipo, [])
+    grupos.get(tipo).push(c)
+  }
+  return [...TIPOS_DE_CONTACTO, '']
+    .filter((t) => grupos.has(t))
+    .map((t) => ({ tipo: t, titulo: t ? NOMBRE_TIPO_CONTACTO[t] ?? t : 'Sin tipo', contactos: grupos.get(t) }))
 }
 
 export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
@@ -375,6 +414,19 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
         </p>
       )}
 
+      {/* ---- Datos del cliente (a pedido: los que corresponden a su tipo) ---- */}
+      <section className="gcli__card gcli__datos">
+        <h2>{esEmpresa ? 'Datos de la empresa' : 'Datos del cliente'}</h2>
+        <dl className="gcli__datos-grilla">
+          {datosDelCliente(cliente).map(([etiqueta, valor]) => (
+            <div key={etiqueta} className="gcli__dato">
+              <dt>{etiqueta}</dt>
+              <dd className={valor ? undefined : 'gcli__vacio'}>{valor || '—'}</dd>
+            </div>
+          ))}
+        </dl>
+      </section>
+
       {/* A pedido: en pantallas anchas los bloques van en 2 columnas (Contactos a la
           izquierda, que es el más alto; Empresa/Relaciones/Grupo apilados a la derecha)
           — todo apilado obligaba a scrollear para ver la ficha entera. */}
@@ -388,8 +440,14 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
         <p className="gcli__hint">Información de contacto.</p>
 
         {contactosDetalle.length === 0 && <p className="gcli__vacio">Este cliente no tiene contactos vinculados.</p>}
+        {/* Agrupados por Tipo de contacto (Familiar, Vínculo societario…). */}
+        {contactosPorTipo(contactosDetalle).map((grupo) => (
+        <div key={grupo.tipo || 'sin-tipo'} className="gcli__grupo-contactos">
+        <h3 className="gcli__grupo-titulo">
+          {grupo.titulo} <span>({grupo.contactos.length})</span>
+        </h3>
         <ul className="gcli__lista">
-          {contactosDetalle.map((c) => (
+          {grupo.contactos.map((c) => (
             <li key={c.id} className="gcli__fila">
               <div className="gcli__fila-datos">
                 <strong>{c.name}</strong>
@@ -414,6 +472,8 @@ export default function ClienteGestion({ clienteId, onBack, onOpenCliente }) {
             </li>
           ))}
         </ul>
+        </div>
+        ))}
 
         <div className="gcli__agregar">
           <div className="gcli__buscar">

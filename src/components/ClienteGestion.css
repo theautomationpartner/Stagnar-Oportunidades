@@ -342,3 +342,47 @@
 .gcli__crear-igual .gcli__hint {
   margin: 0;
 }
+
+/* Datos del cliente (a pedido): grilla de etiqueta + valor, según su tipo. */
+.gcli__datos {
+  margin-bottom: 16px;
+}
+
+.gcli__datos-grilla {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(190px, 1fr));
+  gap: 10px 20px;
+  margin: 10px 0 0;
+}
+
+.gcli__dato {
+  min-width: 0;
+}
+
+.gcli__dato dt {
+  font-size: 11px;
+  font-weight: 600;
+  color: var(--text-gray);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.gcli__dato dd {
+  margin: 2px 0 0;
+  font-size: 13px;
+  color: var(--text-dark);
+  overflow-wrap: anywhere;
+}
+
+/* Contactos agrupados por Tipo de contacto. */
+.gcli__grupo-titulo {
+  margin: 10px 0 6px;
+  font-size: 12px;
+  font-weight: 700;
+  color: var(--text-dark);
+}
+
+.gcli__grupo-titulo span {
+  font-weight: 400;
+  color: var(--text-gray);
+}

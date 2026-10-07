@@ -1784,11 +1784,14 @@ const CONTACTOS_BOARD_ID = 18420863016
 const CONTACTO_CRM_CLIENTE_COLUMN_ID = 'board_relation_mm4tdbm9'
 const CONTACTO_CRM_TELEFONO_COLUMN_ID = 'contact_phone'
 const CONTACTO_CRM_EMAIL_COLUMN_ID = 'contact_email'
+// Tipo de contacto (dropdown): Familiar, Vinculo societario, Profesional externo, Dato
+// adicional, Homónimo del cliente. La ficha del cliente agrupa sus contactos por esto.
+const CONTACTO_CRM_TIPO_COLUMN_ID = 'dropdown_mm7q3zhr'
 // Columna en el tablero OPORTUNIDADES: a qué Contacto se le mandó esta cotización.
 export const OPORTUNIDAD_CONTACTO_CRM_COLUMN_ID = 'board_relation_mm4t623x'
 
 const CONTACTO_CRM_COLUMN_VALUES_FRAGMENT = `
-  column_values(ids: ["${CONTACTO_CRM_TELEFONO_COLUMN_ID}", "${CONTACTO_CRM_EMAIL_COLUMN_ID}", "${CONTACTO_CRM_CLIENTE_COLUMN_ID}"]) {
+  column_values(ids: ["${CONTACTO_CRM_TELEFONO_COLUMN_ID}", "${CONTACTO_CRM_EMAIL_COLUMN_ID}", "${CONTACTO_CRM_CLIENTE_COLUMN_ID}", "${CONTACTO_CRM_TIPO_COLUMN_ID}"]) {
     id
     text
     value
@@ -1846,6 +1849,7 @@ function mapContactoCrmItem(item) {
     email: byId[CONTACTO_CRM_EMAIL_COLUMN_ID]?.text?.trim() || '',
     clienteIds: byId[CONTACTO_CRM_CLIENTE_COLUMN_ID]?.linked_item_ids?.map(String) ?? [],
     clienteNombre: byId[CONTACTO_CRM_CLIENTE_COLUMN_ID]?.display_value?.trim() || '',
+    tipoContacto: byId[CONTACTO_CRM_TIPO_COLUMN_ID]?.text?.trim() || '',
   }
 }
 
@@ -2291,6 +2295,7 @@ export const CLIENTE_RELACIONES_COLUMN_ID = 'board_relation_mm78csk7'
 export const CLIENTE_GRUPO_COLUMN_ID = 'board_relation_mm79x5fr'
 // CLIENTE_RUT_COLUMN_ID ya existe más arriba (búsqueda por RUT); acá solo falta la razón social.
 const CLIENTE_RAZON_SOCIAL_COLUMN_ID = 'text_mm51hysn'
+const CLIENTE_SEXO_COLUMN_ID = 'color_mm78g9qd'
 // Los labels reales de la columna Tipo Cliente. "Otro" existe en el tablero pero el
 // alta solo pregunta Empresa/Particular (a pedido) — desde la ficha se puede poner Otro.
 export const TIPOS_CLIENTE = ['Particular', 'Empresa', 'Otro']
@@ -2313,6 +2318,14 @@ export function rolesGrupoParaTipo(tipo) {
 }
 
 const CLIENTE_GESTION_COLUMN_IDS = [
+  // A pedido: identidad y ubicación del cliente para la ficha (según su tipo).
+  CONTACTO_FECHA_NACIMIENTO_COLUMN_ID,
+  CLIENTE_SEXO_COLUMN_ID,
+  CONTACTO_EXTRANJERO_COLUMN_ID,
+  CONTACTO_NACIONALIDAD_COLUMN_ID,
+  CONTACTO_DIRECCION_COLUMN_ID,
+  CONTACTO_LOCALIDAD_COLUMN_ID,
+  CONTACTO_DEPARTAMENTO_COLUMN_ID,
   CONTACTO_NOMBRE_COLUMN_ID,
   CONTACTO_APELLIDO_COLUMN_ID,
   CONTACTO_CI_COLUMN_ID,
@@ -2356,6 +2369,13 @@ function mapClienteGestion(item) {
     razonSocial: textOf(cv, CLIENTE_RAZON_SOCIAL_COLUMN_ID),
     tipo: textOf(cv, CLIENTE_TIPO_COLUMN_ID),
     estado: textOf(cv, CONTACTO_ESTADO_COLUMN_ID),
+    fechaNacimiento: textOf(cv, CONTACTO_FECHA_NACIMIENTO_COLUMN_ID),
+    sexo: textOf(cv, CLIENTE_SEXO_COLUMN_ID),
+    extranjero: textOf(cv, CONTACTO_EXTRANJERO_COLUMN_ID),
+    nacionalidad: textOf(cv, CONTACTO_NACIONALIDAD_COLUMN_ID),
+    direccion: textOf(cv, CONTACTO_DIRECCION_COLUMN_ID),
+    localidad: cv.find((c) => c.id === CONTACTO_LOCALIDAD_COLUMN_ID)?.display_value?.trim() || '',
+    departamento: cv.find((c) => c.id === CONTACTO_DEPARTAMENTO_COLUMN_ID)?.display_value?.trim() || '',
     contactos: rel(CLIENTE_CONTACTOS_COLUMN_ID),
     empresa: rel(CLIENTE_EMPRESA_COLUMN_ID)[0] ?? null,
     relaciones: rel(CLIENTE_RELACIONES_COLUMN_ID),
