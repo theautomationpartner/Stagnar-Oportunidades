@@ -1,5 +1,5 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
-import { MdSend, MdAutorenew, MdArrowBack } from 'react-icons/md'
+import { MdVisibility, MdAutorenew, MdArrowBack, MdContentCopy, MdPictureAsPdf } from 'react-icons/md'
 import { Button, EmptyState, AttentionBox, Loader } from '@vibe/core'
 import QuoteCard from './QuoteCard'
 import StatusBadge from './StatusBadge'
@@ -10,6 +10,10 @@ import ConfirmarStepPanel from './ConfirmarStepPanel'
 import EmitirStepPanel from './EmitirStepPanel'
 import RequisitoPreviaPanel from './RequisitoPreviaPanel'
 import WhatsAppSendModal from './WhatsAppSendModal'
+import DuplicarOportunidadModal from './DuplicarOportunidadModal'
+import VerCotizacionPdfModal from './VerCotizacionPdfModal'
+import AlertModal from './AlertModal'
+import { duplicarOportunidad } from '../services/duplicarOportunidad'
 import AsignadoSelect from './AsignadoSelect'
 import ErrorDetailBox from './ErrorDetailBox'
 import ClientContextBar from './ClientContextBar'
@@ -23,6 +27,10 @@ import {
   fetchColumnText,
   setItemName,
   renombrarCliente,
+  guardarDatosCliente,
+  crearCliente,
+  createContactoCrm,
+  vincularContactoACliente,
   setDropdownColumnValue,
   setConnectedColumnValue,
   setSubitemCheckboxValue,
@@ -141,7 +149,8 @@ function useFlipDeTarjetas(contenedorRef, idsEnOrden) {
 }
 import { nombreDeOportunidad } from '../services/nombreOportunidad'
 import { ANIO_COTIZACION_COLUMN_ID, anioParaCotizar } from '../services/anioCotizacion'
-import { CONSULTA_BONIF_PORTO_COLUMN_ID, zonasBonificacionPorto } from '../services/bonificacionPorto'
+import { zonasBonificacionPorto } from '../services/bonificacionPorto'
+import { buildMondayPhone } from '../services/personaFields'
 import {
   ESTADO_VALIDACION,
   ESTADO_GENERAL,
@@ -256,6 +265,8 @@ export default function OpportunityDetail({
   // que se deriva de deal_stage al montar (solo la primera vez).
   urlStep = null,
   onStepChange,
+  // A pedido (Duplicar oportunidad): abrir otra oportunidad (la copia recién creada).
+  onOpenOpportunity,
 }) {
   // `schema` por prop (compatibilidad) o del contexto global (ver AppContext).
   const ctxSchema = useSchema()
@@ -522,21 +533,14 @@ export default function OpportunityDetail({
   // arrancó un tick más nuevo para cuando esta respuesta vuelve, se descarta.
   const tickSeqRef = useRef(0)
 
-  // A pedido: la consulta de la bonificación del 30% de PORTO sale A LA PAR de la
-  // cotización — cuando el Estado Cotización pasa a "Cotizando" (el robot de WINK ya
-  // arrancó) —, así al terminar de cotizar ya se sabe si tiene bonificación. Una sola vez
-  // por cotización (bonifPortoPedidaRef). La consulta es por CI: sin CI no se pide. Va
-  // aparte y sin frenar: si falla, se cotiza igual y las tarjetas no muestran zonas.
-  const bonifPortoPedidaRef = useRef(false)
-  const pedirBonificacionPorto = (columnValues) => {
-    if (bonifPortoPedidaRef.current) return
-    bonifPortoPedidaRef.current = true
-    const ci = textOf(columnValues, 'numeric_mm51mb0s')
-    // Ya está en curso (por ejemplo, se recargó la página en medio de la cotización).
-    if (!ci || textOf(columnValues, CONSULTA_BONIF_PORTO_COLUMN_ID) === 'Consultando') return
-    // A pedido: se llama al escenario directo (su webhook, por el proxy del servidor; ver
-    // api/_make/escenarios.js) en vez de poner "Consultar" en la columna. El propio
-    // escenario la pasa a "Consultando" y escribe el resultado por zona.
+  // A pedido: la consulta de la bonificación del 30% de PORTO sale junto con la
+  // cotización — en el mismo momento en que se llama al escenario de Cotizar —, así al
+  // terminar de cotizar ya se sabe si tiene bonificación. Se llama al escenario directo (su
+  // webhook, por el proxy del servidor; ver api/_make/escenarios.js): él mismo pasa la
+  // columna a "Consultando" y escribe el resultado por zona. Usa el CI de la oportunidad
+  // (numeric_mm51mb0s, la copia del cliente), que Cotizar ya exige cargado. Va aparte y sin
+  // frenar: si falla, se cotiza igual y las tarjetas no muestran zonas.
+  const pedirBonificacionPorto = () => {
     dispararEscenario('bonificacion-porto', opportunityId).then((respuesta) => {
       if (respuesta?.error) console.warn('Bonificación PORTO:', respuesta.error)
     })
@@ -607,8 +611,6 @@ export default function OpportunityDetail({
       if (polling) {
         const estadoCotizacion = textOf(data.column_values, ESTADO_COTIZACION_COLUMN_ID)
         const estadoOportunidad = textOf(data.column_values, ESTADO_OPORTUNIDAD_COLUMN_ID)
-        // El robot arrancó: se pide la bonificación de PORTO a la par (ver arriba).
-        if (estadoCotizacion === 'Cotizando') pedirBonificacionPorto(data.column_values)
         const mapped = (data.subitems ?? []).map(mapSubitemToRawQuote)
         const raws = mapped
 
@@ -806,6 +808,8 @@ export default function OpportunityDetail({
       // circulación/Localidad) los necesitan así para armar la conexión real.
       departamentos: schema?.departamentos ?? [],
       localidades: schema?.localidades ?? [],
+      // Para editar los datos del cliente desde el paso Cotizar (EditarClienteModal).
+      nacionalidades: schema?.nacionalidades ?? [],
     }),
     [schema]
   )
@@ -1245,9 +1249,6 @@ export default function OpportunityDetail({
       if (edad) await setSimpleColumnValue(opportunityId, EDAD_COLUMN_ID, String(edad))
       await setSimpleColumnValue(opportunityId, AVANCE_COTIZACION_COLUMN_ID, '')
       await setSimpleColumnValue(opportunityId, ESTADO_COTIZACION_COLUMN_ID, 'Cotizar')
-      // La consulta de la bonificación de PORTO sale cuando el robot pasa a "Cotizando"
-      // (ver pedirBonificacionPorto en el polling): queda pendiente para esta cotización.
-      bonifPortoPedidaRef.current = false
       setItem((prev) => ({
         ...prev,
         column_values: prev.column_values.map((cv) => {
@@ -1272,6 +1273,8 @@ export default function OpportunityDetail({
         setMarkError('La cotización automática no se pudo iniciar.')
         setCotizarErrorDetail(error)
       })
+      // A la par, la bonificación de PORTO (ver pedirBonificacionPorto).
+      pedirBonificacionPorto()
       // Le llega el turno a Cotización: En Proceso mientras el robot corre (si venía
       // Completada de una vuelta anterior, vuelve acá) — recién se completa de nuevo si
       // ESTA corrida termina bien (ver el polling más abajo); si falla, queda en
@@ -1948,6 +1951,98 @@ export default function OpportunityDetail({
     }
   }
 
+  // A pedido: guardar los datos del CLIENTE (tablero Clientes) desde el paso Cotizar —
+  // ver EditarClienteModal. Si cambia el nombre, se renombra el cliente (y su contacto
+  // homónimo) y también la copia de esta oportunidad, igual que antes. Después se relee
+  // la oportunidad para que la ficha muestre lo nuevo (domicilio, nombre).
+  const handleSaveCliente = async (cambios) => {
+    if (!opportunity?.clienteId) return
+    onOpportunityAction?.()
+    const { nombre, apellido, ...resto } = cambios
+    if (nombre !== undefined) {
+      await renombrarCliente(opportunity.clienteId, { nombre, apellido: apellido ?? '' })
+      await setSimpleColumnValue(opportunityId, 'text_mm51b055', nombre)
+      await setSimpleColumnValue(opportunityId, 'text_mm51ez7e', apellido ?? '')
+      const nombreNuevo = nombreDeOportunidad({
+        nombre: [nombre, apellido].filter(Boolean).join(' '),
+        marca: opportunity.marca,
+        modelo: opportunity.modelo,
+        anio: opportunity.anio,
+        matricula: opportunity.matricula,
+        tipoRiesgo: opportunity.tipoRiesgo,
+      })
+      if (nombreNuevo !== item?.name) await setItemName(opportunityId, nombreNuevo).catch(() => {})
+    }
+    await guardarDatosCliente(opportunity.clienteId, resto)
+    const data = await fetchOpportunityDetail(opportunityId)
+    if (data) setItem(data)
+  }
+
+  // A pedido: "Duplicar oportunidad" — crea una nueva con el mismo vehículo y el
+  // cliente/contacto/zona elegidos (ver DuplicarOportunidadModal y duplicarOportunidad.js),
+  // y la abre en el paso Cotizar. Las dos quedan independientes.
+  const [duplicando, setDuplicando] = useState(false)
+  // A pedido: ver el PDF de la cotización (el más nuevo) en los pasos 1 y 2.
+  const [viendoCotizacionPdf, setViendoCotizacionPdf] = useState(false)
+  const [avisoDuplicada, setAvisoDuplicada] = useState(null)
+  const handleDuplicar = async (eleccion) => {
+    onOpportunityAction?.()
+    const { id, avisos } = await duplicarOportunidad(opportunity, eleccion)
+    setDuplicando(false)
+    // Si algo secundario no salió (la Carta del automóvil), se avisa antes de abrirla:
+    // al abrir la nueva, este detalle se desmonta y el aviso se perdería.
+    if (avisos.length) setAvisoDuplicada({ id, texto: avisos.join(' ') })
+    else onOpenOpportunity?.(id)
+  }
+
+  // A pedido (Enviar por WhatsApp): el teléfono que se quiso cargar ya era de otro
+  // contacto y es la misma persona → ese contacto pasa a ser el de la oportunidad, y se
+  // suma a los contactos del cliente (si ya estaba, no cambia nada ahí).
+  const handleCambiarContactoEnvio = async (contacto) => {
+    if (opportunity.clienteId) await vincularContactoACliente(contacto.id, opportunity.clienteId)
+    await setConnectedColumnValue(opportunityId, 'board_relation_mm4t623x', [Number(contacto.id)])
+    const data = await fetchOpportunityDetail(opportunityId).catch(() => null)
+    if (data) setItem(data)
+  }
+
+  // A pedido: una oportunidad SIN cliente vinculado puede vincular uno existente o crear
+  // uno nuevo desde el paso 1 (ver VincularClienteModal, que ya validó los repetidos).
+  // La conexión se escribe del lado de la Oportunidad, igual que el alta.
+  const OPORTUNIDAD_CLIENTE_COLUMN = 'board_relation_mm4qg1n2'
+  const OPORTUNIDAD_CONTACTO_COLUMN = 'board_relation_mm4t623x'
+  const handleVincularCliente = async (cliente) => {
+    onOpportunityAction?.()
+    await setConnectedColumnValue(opportunityId, OPORTUNIDAD_CLIENTE_COLUMN, [Number(cliente.id)])
+    const data = await fetchOpportunityDetail(opportunityId)
+    if (data) setItem(data)
+  }
+  // Crea el cliente y su contacto: si el teléfono ya era de un contacto, se usa ese
+  // (vinculándolo al cliente nuevo) en vez de crear uno repetido. El contacto queda como
+  // el de la oportunidad solo si la oportunidad todavía no tenía uno.
+  const handleCrearCliente = async (datos) => {
+    onOpportunityAction?.()
+    const nuevo = await crearCliente(datos)
+    let contactoId = null
+    if (datos.contactoExistente) {
+      await vincularContactoACliente(datos.contactoExistente.id, nuevo.id)
+      contactoId = datos.contactoExistente.id
+    } else if (datos.telefono) {
+      const creado = await createContactoCrm({
+        name: nuevo.name,
+        phone: buildMondayPhone(datos.codigoPais, datos.telefono),
+        clienteId: nuevo.id,
+        existingContactIds: [],
+      })
+      contactoId = creado.id
+    }
+    await setConnectedColumnValue(opportunityId, OPORTUNIDAD_CLIENTE_COLUMN, [Number(nuevo.id)])
+    if (contactoId && !opportunity?.contactoId) {
+      await setConnectedColumnValue(opportunityId, OPORTUNIDAD_CONTACTO_COLUMN, [Number(contactoId)])
+    }
+    const data = await fetchOpportunityDetail(opportunityId)
+    if (data) setItem(data)
+  }
+
   const handleSaveCotizarFields = async (formValues) => {
     onOpportunityAction?.()
     // LOG-04: si la última cotización terminó en "Error", corregir un dato acá (ej. el
@@ -2336,6 +2431,31 @@ export default function OpportunityDetail({
                 <span>Asignado</span>
                 <AsignadoSelect value={opportunity.asignadoId} onChange={handleAsignadoChange} />
               </label>
+              {/* A pedido: en los pasos 1 y 2, una vez cotizada (cuando ya está el PDF de la
+                  cotización en monday). Mientras se cotiza de nuevo no se ofrece: el que hay
+                  es el de la vuelta anterior. */}
+              {(activeStep === 'cotizar' || activeStep === 'comparar') && opportunity.cotizacionPdf && !polling && (
+                <Button
+                  kind="secondary"
+                  size="small"
+                  leftIcon={MdPictureAsPdf}
+                  className="opp-detail__recotizar-btn opp-detail__duplicar-btn"
+                  onClick={() => setViendoCotizacionPdf(true)}
+                >
+                  Ver cotización (PDF)
+                </Button>
+              )}
+              {/* A pedido: a la vista en los 4 pasos, pero lejos de "Editar" (que está en
+                  la barra del cliente) para que no se confunda: no toca esta oportunidad. */}
+              <Button
+                kind="secondary"
+                size="small"
+                leftIcon={MdContentCopy}
+                className="opp-detail__recotizar-btn opp-detail__duplicar-btn"
+                onClick={() => setDuplicando(true)}
+              >
+                Duplicar oportunidad
+              </Button>
             </div>
             {asignadoError && (
               <p className="opp-detail__asignado-error" role="alert">
@@ -2361,8 +2481,8 @@ export default function OpportunityDetail({
                 tag={opportunity.oppNumber}
                 actions={
                   (activeStep === 'comparar' || activeStep === 'confirmar') && hasQuotes ? (
-                    <Button kind="secondary" className="opp-detail__recotizar-btn" onClick={() => setActiveStep('cotizar')}>
-                      <MdAutorenew /> Recotizar
+                    <Button kind="secondary" leftIcon={MdAutorenew} className="opp-detail__recotizar-btn" onClick={() => setActiveStep('cotizar')}>
+                      Recotizar
                     </Button>
                   ) : null
                 }
@@ -2413,6 +2533,9 @@ export default function OpportunityDetail({
               markError={markError}
               dropdownOptions={dropdownOptions}
               onSave={handleSaveCotizarFields}
+              onSaveCliente={opportunity.clienteId ? handleSaveCliente : undefined}
+              onVincularCliente={opportunity.clienteId ? undefined : handleVincularCliente}
+              onCrearCliente={handleCrearCliente}
               estadoCotizacion={opportunity.estadoCotizacion}
               estadoCotizacionColor={opportunity.estadoCotizacionColor}
               polling={polling}
@@ -2604,7 +2727,7 @@ export default function OpportunityDetail({
                   disabled={selectableSelectedIds.size === 0 || preparingWaImages}
                   loading={preparingWaImages}
                 >
-                  <MdSend /> {preparingWaImages ? 'Preparando imágenes...' : 'Enviar seleccionadas por WhatsApp'}
+                  <MdVisibility /> {preparingWaImages ? 'Preparando imágenes...' : 'Visualizar seleccionadas'}
                 </Button>
               </StepFooter>
             </>
@@ -2720,6 +2843,29 @@ export default function OpportunityDetail({
         </>
       )}
 
+      {avisoDuplicada && (
+        <AlertModal
+          id="duplicada-aviso"
+          type="warning"
+          title="La oportunidad se duplicó"
+          description={`${avisoDuplicada.texto} Podés subirla a mano en la oportunidad nueva.`}
+          primaryButton={{ text: 'Abrir la oportunidad nueva', onClick: () => onOpenOpportunity?.(avisoDuplicada.id) }}
+          secondaryButton={{ text: 'Quedarme en esta', onClick: () => setAvisoDuplicada(null) }}
+          onClose={() => setAvisoDuplicada(null)}
+        />
+      )}
+      {viendoCotizacionPdf && (
+        <VerCotizacionPdfModal opportunityId={opportunityId} onClose={() => setViendoCotizacionPdf(false)} />
+      )}
+      {duplicando && (
+        <DuplicarOportunidadModal
+          opportunity={opportunity}
+          departamentos={dropdownOptions.departamentos ?? []}
+          localidades={dropdownOptions.localidades ?? []}
+          onDuplicar={handleDuplicar}
+          onClose={() => setDuplicando(false)}
+        />
+      )}
       {waModalImages && (
         <WhatsAppSendModal
           opportunity={opportunity}
@@ -2729,6 +2875,12 @@ export default function OpportunityDetail({
           onSendFailed={handleWhatsAppSendFailed}
           onSendSettled={handleWhatsAppSendSettled}
           onSent={handleWhatsAppSent}
+          onCambiarContacto={handleCambiarContactoEnvio}
+          onContactoEditado={() =>
+            fetchOpportunityDetail(opportunityId)
+              .then((data) => data && setItem(data))
+              .catch(() => {})
+          }
           sendPolling={sendPolling}
           envioErrorDetail={envioErrorDetail}
         />

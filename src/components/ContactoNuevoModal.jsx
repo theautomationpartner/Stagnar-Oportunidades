@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react'
 import { AttentionBox, Button, Modal, ModalContent, ModalFooter, TextField } from '@vibe/core'
 import { MdClear } from 'react-icons/md'
 import { Required, RequiredDropdown, codigoPaisDropdownProps } from './crear/FormPrimitives'
-import { CODIGO_PAIS_OPTIONS, emailError, telefonoError, telefonoParaMostrar } from '../services/personaFields'
+import { CODIGO_PAIS_OPTIONS, colaTelefono, ejemploTelefono, emailError, telefonoError, telefonoParaMostrar } from '../services/personaFields'
 import { normalizarParaMatch } from '../services/format'
 import { buscarContactosCrmLibre, fetchClienteContactos, searchContactos } from '../services/mondayApi'
 // Los estilos de campos/errores son los del wizard (crear-op__*) — el popup nació ahí y
@@ -30,7 +30,6 @@ import './ContactoNuevoModal.css'
 // con formatos mezclados (598099..., 099..., 99...) y un contains contra el texto crudo
 // dejaba pasar repetidos según cómo se tipeara.
 
-const colaTelefono = (s) => String(s ?? '').replace(/\D/g, '').slice(-8)
 export default function ContactoNuevoModal({
   // Pide elegir el cliente. Solo lo activa la sección Contactos, donde el contacto se
   // crea suelto y hay que decir a quién pertenece; en el wizard y en la ficha del cliente
@@ -124,7 +123,7 @@ export default function ContactoNuevoModal({
     setChequeo('buscando')
     setDupTelefono(null)
     const timer = setTimeout(() => {
-      const cola = colaTelefono(telefono)
+      const cola = colaTelefono(telefono, codigoPais)
       buscarContactosCrmLibre(cola)
         .then((encontrados) => {
           if (cancelado) return
@@ -366,7 +365,7 @@ export default function ContactoNuevoModal({
               <TextField
                 size="medium"
                 wrapperClassName="crear-op__phone-number"
-                placeholder="Ej: 099 123 456"
+                placeholder={ejemploTelefono(codigoPais)}
                 value={telefono}
                 onChange={setTelefono}
                 icon={MdClear}

@@ -1,0 +1,57 @@
+/* Popup "Duplicar oportunidad" (ver DuplicarOportunidadModal.jsx). */
+.duplicar-op__aviso {
+  margin-bottom: 12px;
+}
+
+.duplicar-op__bloque {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  padding: 12px 0;
+  border-top: 1px solid var(--ui-border-color, #d0d4e4);
+}
+
+.duplicar-op__titulo {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-gray, #676879);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.duplicar-op__candado {
+  font-size: 14px;
+}
+
+.duplicar-op__vehiculo {
+  padding: 12px;
+  border: 1px solid var(--ui-border-color, #d0d4e4);
+  border-radius: 8px;
+  background: var(--allgrey-background-color, #f6f7fb);
+}
+
+.duplicar-op__detalle {
+  display: block;
+  font-size: 13px;
+  color: var(--text-gray, #676879);
+}
+
+.duplicar-op__fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.duplicar-op__fila strong {
+  margin-right: 6px;
+}
+
+.duplicar-op__contacto {
+  flex: 1 1 280px;
+  max-width: 420px;
+}

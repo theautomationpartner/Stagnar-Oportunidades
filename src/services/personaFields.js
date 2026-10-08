@@ -13,20 +13,221 @@ export const NACIONALIDAD_URUGUAY = 'URUGUAY'
 // A pedido: código de país compacto con bandera (ver FlagIcon.jsx: SVG, porque los
 // emoji de banderas no se ven en Windows). `label` es el texto plano (búsqueda/lectores
 // de pantalla); lo visual lo arman valueRenderer/optionRenderer en ContactoFields.
-export const CODIGO_PAIS_OPTIONS = [
-  { value: '+598', label: '+598 Uruguay', iso: 'UY', pais: 'Uruguay' },
-  { value: '+54', label: '+54 Argentina', iso: 'AR', pais: 'Argentina' },
-  { value: '+55', label: '+55 Brasil', iso: 'BR', pais: 'Brasil' },
-  { value: '+595', label: '+595 Paraguay', iso: 'PY', pais: 'Paraguay' },
-  { value: '+56', label: '+56 Chile', iso: 'CL', pais: 'Chile' },
+//
+// A pedido (validación por país): cada país dice cómo se escribe un celular ahí y cómo
+// queda para WhatsApp. El escenario de Make que manda la cotización usa el número tal
+// cual ("+" + lo guardado), así que lo que se guarda tiene que ser ya el formato
+// internacional: código de país + número, SIN los agregados de marcación local.
+//   - `normalizar(digitos)`: recibe lo que se tipeó (solo dígitos, sin el código de
+//     país) y devuelve el número nacional como lo quiere WhatsApp, o null si no cierra.
+//     Saca lo que se marca adentro del país (el 0 de Uruguay/Paraguay/Ecuador, el 15 de
+//     Argentina) y agrega lo que WhatsApp exige (el 9 de los celulares argentinos).
+//   - `ayuda`: el mensaje de error, con el formato esperado.
+// Los cinco de siempre (Uruguay, Argentina, Brasil, Paraguay, Chile) tienen reglas
+// estrictas porque se conocen bien; el resto valida el largo del celular y que empiece
+// como empiezan los celulares de ese país.
+const sinCero = (d) => d.replace(/^0+/, '')
+
+// Argentina: el celular para WhatsApp es 9 + código de área + número (10 dígitos sin el
+// 9). Se acepta como se suele tipear: con o sin 0 adelante, con o sin el 9, y con el 15
+// después del código de área ("011 15 2345 6789"). El código de área es de 2 dígitos
+// solo para el 11 (AMBA); el resto, de 3 o 4.
+function normalizarArgentina(digitos) {
+  let d = sinCero(digitos)
+  if (d.length === 11 && d.startsWith('9')) d = d.slice(1)
+  if (d.length === 12) {
+    const largosArea = d.startsWith('11') ? [2] : [3, 4]
+    const area = largosArea.find((a) => d.slice(a, a + 2) === '15')
+    if (area) d = d.slice(0, area) + d.slice(area + 2)
+  }
+  // Sin código de área ("15 2345 6789") no se puede saber de dónde es: no cierra.
+  if (d.length !== 10 || d.startsWith('15')) return null
+  return `9${d}`
+}
+
+const PAISES_TELEFONO = [
+  {
+    value: '+598',
+    iso: 'UY',
+    pais: 'Uruguay',
+    ejemplo: '099 123 456',
+    // 09X XXX XXX: para WhatsApp va sin el 0 (598 9X XXX XXX).
+    normalizar: (d) => (/^9\d{7}$/.test(sinCero(d)) ? sinCero(d) : null),
+    ayuda: 'El celular uruguayo es 09X XXX XXX (9 dígitos con el 0, u 8 sin el 0).',
+  },
+  {
+    value: '+54',
+    iso: 'AR',
+    pais: 'Argentina',
+    ejemplo: '11 2345 6789',
+    normalizar: normalizarArgentina,
+    ayuda:
+      'El celular argentino es código de área + número: 10 dígitos (ej. 11 2345 6789). El 0, el 9 y el 15 se pueden poner o no.',
+  },
+  {
+    value: '+55',
+    iso: 'BR',
+    pais: 'Brasil',
+    ejemplo: '11 91234 5678',
+    // DDD (2) + número: 9 dígitos que empiezan con 9 los celulares; 8 los de antes.
+    normalizar: (d) => (/^[1-9]{2}9?\d{8}$/.test(sinCero(d)) ? sinCero(d) : null),
+    ayuda: 'El teléfono brasileño es DDD + número: 11 dígitos (ej. 11 91234 5678), o 10 los más viejos.',
+  },
+  {
+    value: '+595',
+    iso: 'PY',
+    pais: 'Paraguay',
+    ejemplo: '0981 123 456',
+    normalizar: (d) => (/^9\d{8}$/.test(sinCero(d)) ? sinCero(d) : null),
+    ayuda: 'El celular paraguayo es 09XX XXX XXX (10 dígitos con el 0, o 9 sin el 0).',
+  },
+  {
+    value: '+56',
+    iso: 'CL',
+    pais: 'Chile',
+    ejemplo: '9 1234 5678',
+    normalizar: (d) => (/^9\d{8}$/.test(sinCero(d)) ? sinCero(d) : null),
+    ayuda: 'El celular chileno es 9 XXXX XXXX (9 dígitos, empieza con 9).',
+  },
+  {
+    value: '+51',
+    iso: 'PE',
+    pais: 'Perú',
+    ejemplo: '912 345 678',
+    normalizar: (d) => (/^9\d{8}$/.test(d) ? d : null),
+    ayuda: 'El celular peruano es 9XX XXX XXX (9 dígitos, empieza con 9).',
+  },
+  {
+    value: '+591',
+    iso: 'BO',
+    pais: 'Bolivia',
+    ejemplo: '712 34567',
+    normalizar: (d) => (/^[67]\d{7}$/.test(d) ? d : null),
+    ayuda: 'El celular boliviano tiene 8 dígitos y empieza con 6 o 7.',
+  },
+  {
+    value: '+57',
+    iso: 'CO',
+    pais: 'Colombia',
+    ejemplo: '312 345 6789',
+    normalizar: (d) => (/^3\d{9}$/.test(d) ? d : null),
+    ayuda: 'El celular colombiano es 3XX XXX XXXX (10 dígitos, empieza con 3).',
+  },
+  {
+    value: '+593',
+    iso: 'EC',
+    pais: 'Ecuador',
+    ejemplo: '099 123 4567',
+    normalizar: (d) => (/^9\d{8}$/.test(sinCero(d)) ? sinCero(d) : null),
+    ayuda: 'El celular ecuatoriano es 09X XXX XXXX (10 dígitos con el 0, o 9 sin el 0).',
+  },
+  {
+    value: '+58',
+    iso: 'VE',
+    pais: 'Venezuela',
+    ejemplo: '0412 123 4567',
+    normalizar: (d) => (/^4\d{9}$/.test(sinCero(d)) ? sinCero(d) : null),
+    ayuda: 'El celular venezolano es 04XX XXX XXXX (11 dígitos con el 0, o 10 sin el 0).',
+  },
+  {
+    value: '+52',
+    iso: 'MX',
+    pais: 'México',
+    ejemplo: '55 1234 5678',
+    // 10 dígitos. El "1" que se usaba antes para los celulares (52 1 …) ya no va.
+    normalizar: (d) => {
+      const n = d.length === 11 && d.startsWith('1') ? d.slice(1) : d
+      return /^\d{10}$/.test(n) ? n : null
+    },
+    ayuda: 'El teléfono mexicano tiene 10 dígitos (ej. 55 1234 5678).',
+  },
+  {
+    value: '+506',
+    iso: 'CR',
+    pais: 'Costa Rica',
+    ejemplo: '8312 3456',
+    normalizar: (d) => (/^[5-8]\d{7}$/.test(d) ? d : null),
+    ayuda: 'El celular costarricense tiene 8 dígitos.',
+  },
+  {
+    value: '+507',
+    iso: 'PA',
+    pais: 'Panamá',
+    ejemplo: '6123 4567',
+    normalizar: (d) => (/^6\d{7}$/.test(d) ? d : null),
+    ayuda: 'El celular panameño tiene 8 dígitos y empieza con 6.',
+  },
+  {
+    value: '+502',
+    iso: 'GT',
+    pais: 'Guatemala',
+    ejemplo: '5123 4567',
+    normalizar: (d) => (/^\d{8}$/.test(d) ? d : null),
+    ayuda: 'El teléfono guatemalteco tiene 8 dígitos.',
+  },
+  {
+    value: '+503',
+    iso: 'SV',
+    pais: 'El Salvador',
+    ejemplo: '7012 3456',
+    normalizar: (d) => (/^\d{8}$/.test(d) ? d : null),
+    ayuda: 'El teléfono salvadoreño tiene 8 dígitos.',
+  },
+  {
+    value: '+504',
+    iso: 'HN',
+    pais: 'Honduras',
+    ejemplo: '9123 4567',
+    normalizar: (d) => (/^\d{8}$/.test(d) ? d : null),
+    ayuda: 'El teléfono hondureño tiene 8 dígitos.',
+  },
+  {
+    value: '+505',
+    iso: 'NI',
+    pais: 'Nicaragua',
+    ejemplo: '8123 4567',
+    normalizar: (d) => (/^\d{8}$/.test(d) ? d : null),
+    ayuda: 'El teléfono nicaragüense tiene 8 dígitos.',
+  },
+  {
+    value: '+53',
+    iso: 'CU',
+    pais: 'Cuba',
+    ejemplo: '5123 4567',
+    normalizar: (d) => (/^5\d{7}$/.test(d) ? d : null),
+    ayuda: 'El celular cubano tiene 8 dígitos y empieza con 5.',
+  },
 ]
 
-const COUNTRY_SHORT_NAMES = {
-  '+598': 'UY',
-  '+54': 'AR',
-  '+55': 'BR',
-  '+595': 'PY',
-  '+56': 'CL',
+const PAIS_POR_CODIGO = Object.fromEntries(PAISES_TELEFONO.map((p) => [p.value, p]))
+
+export const CODIGO_PAIS_OPTIONS = PAISES_TELEFONO.map(({ value, iso, pais }) => ({
+  value,
+  label: `${value} ${pais}`,
+  iso,
+  pais,
+}))
+
+const COUNTRY_SHORT_NAMES = Object.fromEntries(PAISES_TELEFONO.map((p) => [p.value, p.iso]))
+
+// Placeholder del campo según el país elegido.
+export function ejemploTelefono(codigoPais) {
+  return `Ej: ${PAIS_POR_CODIGO[codigoPais]?.ejemplo ?? PAIS_POR_CODIGO['+598'].ejemplo}`
+}
+
+// Lo tipeado → el número nacional listo para WhatsApp (sin el código de país), o null si
+// no tiene la forma de un celular de ese país. Si se pegó el número entero con el
+// código de país adelante ("+54 9 11 …" con +54 elegido), se le saca.
+export function normalizarTelefono(value, codigoPais) {
+  let d = String(value ?? '').replace(/\D/g, '')
+  if (!d) return null
+  const pais = PAIS_POR_CODIGO[codigoPais]
+  const prefijo = String(codigoPais ?? '').replace('+', '')
+  if (!pais) return d.length >= 6 && d.length <= 14 ? d : null
+  const directo = pais.normalizar(d)
+  if (directo) return directo
+  if (prefijo && d.startsWith(prefijo)) return pais.normalizar(d.slice(prefijo.length))
+  return null
 }
 
 // Sentido inverso de COUNTRY_SHORT_NAMES — para cuando se autocompleta el Teléfono a
@@ -122,23 +323,23 @@ export function maxFechaNacimiento() {
   return d.toISOString().slice(0, 10)
 }
 
-// Cantidad de dígitos esperada del número (sin el código de país) para cada país
-// soportado — Uruguay usa el formato "09X XXX XXX" (9 dígitos).
-export const PHONE_DIGIT_LENGTHS = {
-  '+598': 9,
-  '+54': 10,
-  '+55': 11,
-  '+595': 9,
-  '+56': 9,
+// Lo que se compara para detectar un teléfono repetido: los últimos 8 dígitos (monday
+// guarda números de antes con y sin el 0 de Uruguay, y así coinciden igual). Lo tipeado
+// se normaliza ANTES de cortar: un celular argentino tipeado con el 15 ("2281 15 58
+// 0112") se guarda sin el 15, y su cola cruda ("15580112") no coincidiría con la
+// guardada ("81580112"). Sin código de país (lo que viene de monday), los dígitos tal cual.
+export function colaTelefono(telefono, codigoPais) {
+  const d = (codigoPais && normalizarTelefono(telefono, codigoPais)) || String(telefono ?? '').replace(/\D/g, '')
+  return d.slice(-8)
 }
 
+// A pedido: ya no es un largo fijo por país (rechazaba el celular uruguayo sin el 0, o
+// el argentino con el 9 o el 15): se acepta si tiene la forma de un celular del país
+// elegido, se escriba como se escriba (ver normalizarTelefono).
 export function telefonoError(value, codigoPais) {
   if (!value) return null
-  const digits = value.replace(/\D/g, '')
-  const expected = PHONE_DIGIT_LENGTHS[codigoPais]
-  if (!expected) return null
-  if (digits.length !== expected) return `El teléfono debe tener ${expected} dígitos.`
-  return null
+  if (normalizarTelefono(value, codigoPais)) return null
+  return PAIS_POR_CODIGO[codigoPais]?.ayuda ?? 'El teléfono tiene que tener entre 6 y 14 dígitos.'
 }
 
 // Marca sutilmente el campo (borde verde/rojo) según su estado — sin tocar todavía, ni
@@ -226,11 +427,34 @@ export function normalizeFechaIA(raw) {
 // MON-14 el teléfono es del Contacto, no del Cliente— y phone_mm519m27 en Oportunidades,
 // donde queda la copia de a qué número se cotizó): código de país + número, solo dígitos,
 // y el countryShortName. Antes estaba copiado 3 veces en CrearOportunidadForm.jsx.
+// A pedido: el número va ya en formato WhatsApp (ver normalizarTelefono): "59899123456",
+// no "598099123456". Si no se pudo normalizar, los dígitos tal cual (como antes).
 export function buildMondayPhone(codigoPais, telefono) {
+  const numero = normalizarTelefono(telefono, codigoPais) ?? (telefono ?? '').replace(/\D/g, '')
   return {
-    phone: `${(codigoPais ?? '').replace('+', '')}${(telefono ?? '').replace(/\D/g, '')}`,
+    phone: `${(codigoPais ?? '').replace('+', '')}${numero}`,
     countryShortName: COUNTRY_SHORT_NAMES[codigoPais] ?? 'UY',
   }
+}
+
+// El número con el que se manda por WhatsApp (sin "+"). Lo guardado puede venir de
+// antes, con el 0 de marcación local adentro ("598099…") o sin código de país si se
+// tipeó a mano en el envío ("099…"): se reconoce el país por el prefijo (Uruguay si no
+// tiene) y se normaliza. Si no se reconoce la forma, los dígitos tal cual.
+export function telefonoParaWhatsApp(raw) {
+  const d = String(raw ?? '').replace(/\D/g, '')
+  if (!d) return ''
+  const pais = [...PAISES_TELEFONO]
+    .sort((a, b) => b.value.length - a.value.length)
+    .find((p) => d.startsWith(p.value.replace('+', '')))
+  if (pais) {
+    const prefijo = pais.value.replace('+', '')
+    const nacional = pais.normalizar(d.slice(prefijo.length))
+    if (nacional) return prefijo + nacional
+  }
+  const uruguayo = PAIS_POR_CODIGO['+598'].normalizar(d)
+  if (uruguayo) return `598${uruguayo}`
+  return d
 }
 
 // Iniciales para avatares: primera letra del primer y del último "token" (ej. "Santiago

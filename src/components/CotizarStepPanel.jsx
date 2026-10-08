@@ -12,7 +12,9 @@ import { anioParaCotizar, esAnioAdelantado } from '../services/anioCotizacion'
 import UbicacionParaCotizar from './UbicacionParaCotizar'
 import { opcionesDeLocalidad } from '../services/localidades'
 import StepFooter from './StepFooter'
-import { findClientePorDocumento } from '../services/mondayApi'
+import { fetchClienteGestion, findClientePorDocumento } from '../services/mondayApi'
+import EditarClienteModal from './EditarClienteModal'
+import VincularClienteModal from './VincularClienteModal'
 import { documentoDelTipoCliente, stripCi } from '../services/personaFields'
 import './CotizarStepPanel.css'
 
@@ -163,11 +165,37 @@ export default function CotizarStepPanel({
   errorDetail,
   onGoToComparar,
   onBack,
+  // A pedido: guardar los datos del CLIENTE (tablero Clientes) desde este paso.
+  onSaveCliente,
+  // Sin cliente vinculado: vincular uno existente o crear uno nuevo (ver VincularClienteModal).
+  onVincularCliente,
+  onCrearCliente,
 }) {
   // null | 'personales' | 'vehiculo' — qué popup de "Editar" está abierto (ver
   // startEditing/ClientFicha onEdit/onEditVehiculo más abajo). Antes era un solo
   // booleano para un único popup con las 2 secciones juntas.
   const [editingSection, setEditingSection] = useState(null)
+  // Ficha del cliente vinculado (tablero Clientes): null mientras carga, undefined sin
+  // cliente. Se edita con su propio popup, con un aviso previo (cambia la ficha del
+  // cliente para todas sus oportunidades, no solo esta).
+  const [clienteFicha, setClienteFicha] = useState(opportunity.clienteId ? null : undefined)
+  const [avisoEditarCliente, setAvisoEditarCliente] = useState(false)
+  const [editandoCliente, setEditandoCliente] = useState(false)
+  const [vinculandoCliente, setVinculandoCliente] = useState(false)
+  const recargarCliente = () => {
+    if (!opportunity.clienteId) {
+      setClienteFicha(undefined)
+      return Promise.resolve()
+    }
+    return fetchClienteGestion(opportunity.clienteId)
+      .then((c) => setClienteFicha(c ?? undefined))
+      .catch(() => setClienteFicha(undefined))
+  }
+  useEffect(() => {
+    setClienteFicha(opportunity.clienteId ? null : undefined)
+    recargarCliente()
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [opportunity.clienteId])
   // A pedido: con una Empresa el documento es el RUT, no la cédula — se rotula así en la
   // ficha, el checklist, el popup de editar y los avisos de "falta completar".
   const esEmpresa = opportunity.clienteTipo === 'Empresa'
@@ -411,13 +439,7 @@ export default function CotizarStepPanel({
     const sectionKeys = new Set(
       (editingSection === 'vehiculo' ? VEHICULO_FIELD_LAYOUT : PERSONAL_FIELD_LAYOUT).map((f) => f.key)
     )
-    // El nombre no es de COTIZAR_FIELDS (no lo necesita el robot), pero vacío no puede quedar.
-    const personales = editingSection === 'personales'
-    const missing = [
-      ...(personales && !form.nombre?.trim() ? [esEmpresa ? 'Razón social' : 'Nombre'] : []),
-      ...(personales && !esEmpresa && !form.apellido?.trim() ? ['Apellido'] : []),
-      ...getMissingCotizarFields(form).filter((f) => sectionKeys.has(f.key)).map(etiqueta),
-    ]
+    const missing = getMissingCotizarFields(form).filter((f) => sectionKeys.has(f.key)).map(etiqueta)
     if (missing.length > 0) {
       setSaveError(`Completá estos campos antes de guardar: ${missing.join(', ')}.`)
       return
@@ -521,6 +543,9 @@ export default function CotizarStepPanel({
             oportunidad, no solo acá. */}
         <ClientFicha
           opportunity={opportunity}
+          cliente={clienteFicha}
+          onEditCliente={onSaveCliente ? () => setAvisoEditarCliente(true) : undefined}
+          onVincularCliente={onVincularCliente ? () => setVinculandoCliente(true) : undefined}
           onEdit={() => startEditing('personales')}
           onEditVehiculo={() => startEditing('vehiculo')}
         />
@@ -584,41 +609,67 @@ export default function CotizarStepPanel({
           ModalFooter) en vez de reemplazar toda la sección de arriba por una grilla de
           edición — la ficha y el checklist quedan visibles de fondo, no hace falta
           "volver" a ninguna pantalla vieja para salir de editar. */}
+      {/* A pedido: antes de tocar los datos del CLIENTE se aclara qué se está haciendo. */}
+      {avisoEditarCliente && clienteFicha && (
+        <AlertModal
+          id="cotizar-aviso-editar-cliente"
+          type="warning"
+          title={`Vas a modificar la ficha de ${clienteFicha.name}`}
+          description="Los datos del cliente se guardan en el tablero Clientes y se ven en todas sus oportunidades, no solo en esta. Si solo querés cambiar los datos con los que se cotiza, usá «Datos de esta oportunidad»."
+          primaryButton={{
+            text: 'Editar datos del cliente',
+            onClick: () => {
+              setAvisoEditarCliente(false)
+              setEditandoCliente(true)
+            },
+          }}
+          secondaryButton={{ text: 'Cancelar', onClick: () => setAvisoEditarCliente(false) }}
+          onClose={() => setAvisoEditarCliente(false)}
+        />
+      )}
+      {vinculandoCliente && (
+        <VincularClienteModal
+          opportunity={opportunity}
+          onClose={() => setVinculandoCliente(false)}
+          onVincular={async (cliente) => {
+            await onVincularCliente(cliente)
+            setVinculandoCliente(false)
+          }}
+          onCrear={async (datos) => {
+            await onCrearCliente(datos)
+            setVinculandoCliente(false)
+          }}
+        />
+      )}
+      {editandoCliente && clienteFicha && (
+        <EditarClienteModal
+          cliente={clienteFicha}
+          departamentos={dropdownOptions.departamentos ?? []}
+          localidades={dropdownOptions.localidades ?? []}
+          nacionalidades={dropdownOptions.nacionalidades ?? []}
+          onClose={() => setEditandoCliente(false)}
+          onGuardar={async (cambios) => {
+            await onSaveCliente(cambios)
+            await recargarCliente()
+            setEditandoCliente(false)
+          }}
+        />
+      )}
+
       {editingSection && (
         <Modal id="cotizar-editar-modal" show onClose={() => setEditingSection(null)} size="large">
           <ModalContent className="cotizar-step__editar-content">
             <h2 className="cotizar-step__editar-title">
-              {editingSection === 'vehiculo' ? 'Editar vehículo' : 'Editar datos personales'}
+              {editingSection === 'vehiculo' ? 'Editar vehículo' : 'Editar datos de esta oportunidad'}
             </h2>
             <div className="cotizar-step__grid">
-              {/* A pedido: el nombre del cliente también se puede cambiar acá. Una Empresa
-                  lleva solo la razón social. Se guarda en la oportunidad y en el cliente
-                  (y en su contacto homónimo, ver mondayApi.js#renombrarCliente). */}
+              {/* A pedido: lo de este popup es solo de ESTA cotización (la copia de CI y
+                  nacimiento con la que se cotiza, y la zona de circulación). Los datos del
+                  cliente —nombre incluido— se editan en su propio bloque. */}
               {editingSection === 'personales' && (
-                <>
-                  <label
-                    className={`cotizar-step__field cotizar-step__field--edit${!form.nombre?.trim() ? ' cotizar-step__field--missing' : ''}`}
-                    style={{ gridColumn: `span ${esEmpresa ? 6 : 3}` }}
-                  >
-                    <span className="cotizar-step__field-label">{esEmpresa ? 'Razón social' : 'Nombre'}</span>
-                    <TextField size="small" value={form.nombre} onChange={(v) => handleFieldChange('nombre', v)} />
-                  </label>
-                  {!esEmpresa && (
-                    <label
-                      className={`cotizar-step__field cotizar-step__field--edit${!form.apellido?.trim() ? ' cotizar-step__field--missing' : ''}`}
-                      style={{ gridColumn: 'span 3' }}
-                    >
-                      <span className="cotizar-step__field-label">Apellido</span>
-                      <TextField size="small" value={form.apellido} onChange={(v) => handleFieldChange('apellido', v)} />
-                    </label>
-                  )}
-                  {opportunity.clienteId && (
-                    <p className="cotizar-step__editar-nota" style={{ gridColumn: 'span 6' }}>
-                      Si cambiás el nombre, se cambia también en la ficha del cliente y en su contacto con el mismo
-                      nombre.
-                    </p>
-                  )}
-                </>
+                <p className="cotizar-step__editar-nota" style={{ gridColumn: 'span 6' }}>
+                  Estos datos son solo de esta oportunidad (con ellos se cotiza): no cambian la ficha del cliente.
+                </p>
               )}
               {/* A pedido: orden propio (no el de COTIZAR_FIELDS) — de a 2 por
                   renglón cuando tiene sentido agruparlos (CI/Fecha, Departamento/

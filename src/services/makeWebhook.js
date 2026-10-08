@@ -30,6 +30,7 @@
 // Ver /logica-monday-vibe.md.
 import { fetchProtegido } from '../auth/fetchProtegido'
 import { coberturaGroupOf } from './coberturaGroups'
+import { telefonoParaWhatsApp } from './personaFields'
 
 // Se decodifica a mano, y NO con fetch(dataUrl) como antes: en producción el CSP
 // (ver vercel.json) limita connect-src a 'self' y monday.com, y para el navegador un
@@ -163,7 +164,10 @@ export async function sendQuotesToWhatsApp({ phone, opportunity, images, formato
 
 async function postearTanda({ phone, opportunity, formato, telefonoEnvio, tanda, parte, totalPartes }) {
   const formData = new FormData()
-  formData.append('phone', phone)
+  // A pedido: el escenario manda a '+' + este número tal cual, así que va ya en formato
+  // WhatsApp (sin el 0 de Uruguay, con el 9 de Argentina…, ver telefonoParaWhatsApp):
+  // los teléfonos guardados antes de la validación por país pueden traer el 0 adentro.
+  formData.append('phone', telefonoParaWhatsApp(phone))
   formData.append('opportunityId', opportunity.id)
   formData.append('oppNumber', opportunity.oppNumber)
   formData.append('clienteNombre', opportunity.clienteNombre)

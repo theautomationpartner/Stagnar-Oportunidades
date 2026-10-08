@@ -13,6 +13,7 @@ import { Modal, ModalContent, ModalFooter } from '@vibe/core'
 import { documentoDelTipoCliente, fechaError, fieldStateClass, maxFechaNacimiento, NACIONALIDAD_URUGUAY, stripCi } from '../../services/personaFields'
 import { ExtranjeroFields, FechaTexto, Required, RequiredDropdown } from './FormPrimitives'
 import { opcionesDeLocalidad } from '../../services/localidades'
+import ConfirmarCambioModal from '../ConfirmarCambioModal'
 
 // Localidades filtradas por el departamento elegido (antes copiado en los 2 popups y en
 // otros 2 lugares del formulario) — mismo criterio: sin departamento, todas.
@@ -140,6 +141,9 @@ export function EditarContactoModal({ form, departamentoOptions, localidades, na
   const fechaErr = fechaError(fechaNacimiento)
   // Dirección opcional (a pedido: se pide en el paso 3 de la oportunidad).
   const canSave = !fechaErr && departamentoId && localidadId && nacionalidad
+  // A pedido: esto escribe directo en la ficha del cliente, así que antes se confirma.
+  const [confirmando, setConfirmando] = useState(false)
+  const nombreCliente = [form.nombre, form.apellido].filter(Boolean).join(' ')
 
   return (
     <Modal id="editar-contacto-modal" show onClose={onClose} size="medium">
@@ -176,7 +180,16 @@ export function EditarContactoModal({ form, departamentoOptions, localidades, na
         primaryButton={{
           text: saving ? 'Guardando...' : 'Guardar',
           disabled: !canSave || saving,
-          onClick: () =>
+          onClick: () => setConfirmando(true),
+        }}
+      />
+      {confirmando && (
+        <ConfirmarCambioModal
+          entidad="cliente"
+          nombre={nombreCliente}
+          onCancelar={() => setConfirmando(false)}
+          onConfirmar={() => {
+            setConfirmando(false)
             onSave({
               fechaNacimiento,
               departamentoId,
@@ -184,9 +197,10 @@ export function EditarContactoModal({ form, departamentoOptions, localidades, na
               direccion,
               extranjero,
               nacionalidad,
-            }),
-        }}
-      />
+            })
+          }}
+        />
+      )}
     </Modal>
   )
 }

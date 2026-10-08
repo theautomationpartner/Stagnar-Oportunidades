@@ -157,6 +157,15 @@
   background-color: #fff !important;
 }
 
+/* A pedido: al pasar el mouse, el azul de la app (mismo criterio que .accion-bar__selbox
+   y las solapas activas): borde y texto azules sobre el celeste de lo seleccionado. El
+   fondo blanco de arriba pisaba el hover de @vibe y el botón no cambiaba. */
+.opp-detail__recotizar-btn:hover:not(:disabled) {
+  border-color: var(--primary-blue) !important;
+  color: var(--primary-blue) !important;
+  background-color: var(--tint-info) !important;
+}
+
 @media (max-width: 640px) {
   .opp-detail__recotizar-btn {
     width: 100%;
@@ -405,11 +414,23 @@
   margin-left: auto;
 }
 
+.opp-detail__duplicar-btn {
+  flex-shrink: 0;
+  white-space: nowrap;
+}
+
 .opp-detail__asignado > span:first-child {
   font-size: 12px;
   font-weight: 600;
   color: var(--text-gray);
   white-space: nowrap;
+}
+
+/* A pedido: el selector de Asignado en azul al pasar el mouse y mientras está desplegado
+   (@vibe dibuja el borde con un box-shadow: al pasar el mouse lo ponía casi negro). */
+.opp-detail__asignado > div:hover > div,
+.opp-detail__asignado > div:focus-within > div {
+  box-shadow: inset 0 0 0 1px var(--primary-blue) !important;
 }
 
 .opp-detail__asignado > div {

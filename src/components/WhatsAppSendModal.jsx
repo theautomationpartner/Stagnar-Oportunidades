@@ -11,12 +11,14 @@ import {
   MdClose,
   MdChevronLeft,
   MdChevronRight,
+  MdEdit,
 } from 'react-icons/md'
-import { Modal, ModalHeader, ModalContent, ModalFooter, AttentionBox, TextField, Dropdown } from '@vibe/core'
+import { Modal, ModalHeader, ModalContent, ModalFooter, AttentionBox, TextField, Dropdown, Button } from '@vibe/core'
 import { sendQuotesToWhatsApp } from '../services/makeWebhook'
 import { fetchClienteContactos, fetchContactosCrm, fetchTelefonosEnvioHabilitados } from '../services/mondayApi'
 import { splitTelefono } from '../services/personaFields'
 import GradientSpinner from './GradientSpinner'
+import EditarTelefonoContacto from './EditarTelefonoContacto'
 import ErrorDetailBox from './ErrorDetailBox'
 import ProgressBar from './ProgressBar'
 import { coberturaParaMostrar } from '../services/coberturaGroups'
@@ -113,6 +115,8 @@ export default function WhatsAppSendModal({
   onSent,
   sendPolling,
   envioErrorDetail,
+  onContactoEditado,
+  onCambiarContacto,
 }) {
   // MON-14: se manda al CONTACTO. Se propone su número vigente (tablero Contactos) y,
   // solo si la oportunidad no tiene contacto vinculado (las anteriores a MON-14), la copia
@@ -161,6 +165,7 @@ export default function WhatsAppSendModal({
   const opcionesContacto = (contactosCliente ?? []).map((c) => ({
     value: c.id,
     label: c.telefono ? `${c.name} — ${c.telefono}` : `${c.name} — sin teléfono`,
+    nombre: c.name,
     telefono: c.telefono,
     disabled: !c.telefono,
   }))
@@ -175,10 +180,47 @@ export default function WhatsAppSendModal({
   // Preseleccionado: el contacto de la oportunidad. Si no está entre los del cliente
   // —quedó desvinculado, o la oportunidad es vieja— se cae al que tenga el mismo número
   // que se venía proponiendo, para no cambiarle el destinatario a nadie sin avisar.
+  // El que se eligió a mano en el desplegable (null = todavía el preseleccionado).
+  const [contactoElegidoId, setContactoElegidoId] = useState(null)
   const contactoSeleccionado =
+    (contactoElegidoId != null ? opcionesContacto.find((o) => o.value === contactoElegidoId) : null) ??
     opcionesContacto.find((o) => o.value === opportunity.contactoId) ??
     opcionesContacto.find((o) => o.telefono.replace(/\D/g, '') === String(phone).replace(/\D/g, '')) ??
     null
+  // A pedido: "Editar teléfono del contacto". Se edita el contacto elegido en el
+  // desplegable; sin desplegable (ningún contacto con teléfono), el de la oportunidad.
+  const contactoAEditar = contactoSeleccionado
+    ? { id: contactoSeleccionado.value, name: contactoSeleccionado.nombre, telefono: contactoSeleccionado.telefono }
+    : !cargandoContactos && !hayContactos && opportunity.contactoId
+      ? { id: opportunity.contactoId, name: opportunity.contactoNombre || 'el contacto', telefono: phone }
+      : null
+  const [editandoTelefono, setEditandoTelefono] = useState(false)
+  const alGuardarTelefono = (telefonoMonday) => {
+    const id = contactoAEditar.id
+    setContactosCliente((prev) => {
+      if (!prev) return prev
+      const lista = prev.map((c) => (String(c.id) === String(id) ? { ...c, telefono: telefonoMonday } : c))
+      // El de la oportunidad puede no estar entre los del cliente: se suma para que quede elegido.
+      return lista.some((c) => String(c.id) === String(id)) ? lista : [...lista, { id, name: contactoAEditar.name, telefono: telefonoMonday }]
+    })
+    setContactoElegidoId(id)
+    setPhone(telefonoMonday)
+    setEditandoTelefono(false)
+    // Para que la oportunidad de atrás deje de mostrar el número viejo.
+    onContactoEditado?.()
+  }
+  // A pedido: el número cargado ya era de otro contacto → se usa ESE (lo suma al cliente
+  // y lo pone en la oportunidad, ver handleCambiarContactoEnvio en OpportunityDetail).
+  const alUsarContacto = async (repetido) => {
+    await onCambiarContacto(repetido)
+    const id = String(repetido.id)
+    setContactosCliente((prev) =>
+      prev && !prev.some((c) => String(c.id) === id) ? [...prev, { ...repetido, id }] : prev
+    )
+    setContactoElegidoId(id)
+    setPhone(repetido.telefono || '')
+    setEditandoTelefono(false)
+  }
   // 'imagen' es el default de siempre, salvo que NINGUNA cotización haya podido
   // dibujarse (ver openWhatsAppModalWith: una que falla llega con imageDataUrl null).
   // En ese caso arrancar en "Imagen" mostraría una previsualización vacía y el envío no
@@ -387,7 +429,11 @@ export default function WhatsAppSendModal({
                     clearable={false}
                     searchable={opcionesContacto.length > 6}
                     placeholder="Elegí el contacto"
-                    onChange={(opcion) => setPhone(opcion?.telefono ?? '')}
+                    onChange={(opcion) => {
+                      setContactoElegidoId(opcion?.value ?? null)
+                      setPhone(opcion?.telefono ?? '')
+                      setEditandoTelefono(false)
+                    }}
                   />
                 </label>
               ) : (
@@ -399,6 +445,23 @@ export default function WhatsAppSendModal({
                   placeholder="Ej: 099 123 456"
                   value={phone}
                   onChange={(value) => setPhone(value)}
+                />
+              )}
+              {contactoAEditar && !editandoTelefono && (
+                <div>
+                  <Button kind="tertiary" size="small" leftIcon={MdEdit} onClick={() => setEditandoTelefono(true)}>
+                    Editar teléfono del contacto
+                  </Button>
+                </div>
+              )}
+              {contactoAEditar && editandoTelefono && (
+                <EditarTelefonoContacto
+                  key={contactoAEditar.id}
+                  contacto={contactoAEditar}
+                  tieneCliente={Boolean(opportunity.clienteId)}
+                  onGuardado={alGuardarTelefono}
+                  onUsarContacto={onCambiarContacto ? alUsarContacto : undefined}
+                  onCancelar={() => setEditandoTelefono(false)}
                 />
               )}
               {telefonosEnvio.length === 1 && telefonoEnvioFormateado && (
@@ -515,7 +578,7 @@ export default function WhatsAppSendModal({
           primaryButton={{
             text: sending ? 'Enviando...' : 'Enviar',
             onClick: handleSend,
-            disabled: sending || !phone,
+            disabled: sending || !phone || editandoTelefono,
             leftIcon: MdSend,
           }}
           secondaryButton={{ text: 'Cancelar', onClick: onClose }}

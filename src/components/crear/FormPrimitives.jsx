@@ -5,6 +5,7 @@ import { Button, Dropdown, TextField } from '@vibe/core'
 import { MdCall, MdClear, MdEdit, MdInfoOutline, MdPersonAdd, MdPersonSearch } from 'react-icons/md'
 import {
   CODIGO_PAIS_OPTIONS,
+  ejemploTelefono,
   busquedaYaRegistrada,
   contactoDesdeBusqueda,
   emailError,
@@ -580,7 +581,7 @@ export function ContactoFields({
               size="medium"
               key={`telefono-${resetKey}`}
               wrapperClassName="crear-op__phone-number"
-              placeholder="Ej: 099 123 456"
+              placeholder={ejemploTelefono(form.codigoPais)}
               value={form.telefono}
               onChange={(value) => handleChange('telefono', value)}
               icon={MdClear}

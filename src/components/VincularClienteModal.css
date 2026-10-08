@@ -1,0 +1,51 @@
+/* Popup "Cliente de esta oportunidad" (VincularClienteModal): buscar o crear. */
+.vincular-cliente__solapas {
+  margin: 0 0 14px;
+}
+
+.vincular-cliente__buscar {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.vincular-cliente__input {
+  flex: 1;
+  height: 40px;
+  padding: 0 12px;
+  font: inherit;
+  font-size: 14px;
+  border: 1px solid var(--border-input);
+  border-radius: 6px;
+}
+
+.vincular-cliente__lista {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.vincular-cliente__fila {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.vincular-cliente__fila div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.vincular-cliente__fila span {
+  font-size: 12px;
+  color: var(--text-gray);
+}

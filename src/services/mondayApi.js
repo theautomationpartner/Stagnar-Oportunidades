@@ -4,6 +4,7 @@ import { fetchProtegido } from '../auth/fetchProtegido'
 import { COLUMNAS_VALIDACION_POLIZA } from './validacionPoliza'
 import { textOf } from './mondayColumns'
 import { prepararArchivoParaSubir } from './subidaArchivos'
+import { colaTelefono } from './personaFields'
 
 // SDK cliente de monday (no confundir con `callMondayApi` de acá abajo, que pega
 // contra /api/monday con la API key del servidor) — se usa solo para lo que hace
@@ -66,6 +67,9 @@ const OPPORTUNITY_COLUMN_IDS = [
   'file_mm51jy06', // Libreta de Conducir / Carta Automovil
   'file_mm5pc008', // Cedula
   'file_mm5bzdd4', // Poliza
+  // A pedido: el PDF de la cotización (lo sube el escenario al cotizar; uno por vuelta).
+  // En el detalle solo se usa para saber si hay alguno: el archivo se pide al abrirlo.
+  'file_mm54css0', // Cotizacion
   'color_mm5ejysv', // Crear Poliza (estado)
   'color_mm51n4j', // Posee Vehiculo?
   'color_mm5rzrhk', // Leer Cedula y Archivo Automovil
@@ -1046,6 +1050,19 @@ export async function fetchFileColumnAsset(itemId, columnId) {
   return { assetId: file.assetId, name: file.name }
 }
 
+// A pedido (ver el PDF de la cotización): el archivo MÁS NUEVO de una columna de
+// archivos de la oportunidad — cada recotización suma uno. monday da assetIds crecientes,
+// así que el más nuevo es el de id más alto. null si la columna está vacía.
+export async function fetchUltimoArchivoDeColumna(itemId, columnId) {
+  const data = await callMondayApi(FILE_COLUMN_VALUE_QUERY, { itemId, columnId: [columnId] })
+  const raw = data.items?.[0]?.column_values?.[0]?.value
+  if (!raw) return null
+  const archivos = (JSON.parse(raw).files ?? []).filter((f) => f.assetId)
+  if (!archivos.length) return null
+  const ultimo = archivos.reduce((a, b) => (Number(b.assetId) > Number(a.assetId) ? b : a))
+  return { assetId: String(ultimo.assetId), name: ultimo.name, cantidad: archivos.length }
+}
+
 // Descarga el archivo real y lo devuelve como File (mismo tipo que entrega
 // <input type="file">) — así encaja tal cual en el resto del flujo de FileField/
 // handleCedulaIdentidadChange, sin tocar esa lógica. El assetId se resuelve del lado del
@@ -1307,6 +1324,47 @@ export function fetchMondayUsers() {
       })
   }
   return usuariosMondayPromesa
+}
+
+// Foto de perfil de cada persona de monday, por nombre — para mostrar el avatar real del
+// "Asignado" en el listado (ahí la columna people llega solo como texto, sin el id). A
+// diferencia de fetchMondayUsers incluye invitados y deshabilitados: una oportunidad
+// puede seguir asignada a alguien que ya no se ofrece en el selector.
+let fotosUsuariosPromesa = null
+export function fetchFotosUsuariosMonday() {
+  if (!fotosUsuariosPromesa) {
+    fotosUsuariosPromesa = callMondayApi(MONDAY_USERS_QUERY, {})
+      .then((data) => new Map((data.users ?? []).filter((u) => u.photo_thumb_small).map((u) => [normalizarNombreUsuario(u.name), u.photo_thumb_small])))
+      .catch((err) => {
+        fotosUsuariosPromesa = null
+        throw err
+      })
+  }
+  return fotosUsuariosPromesa
+}
+
+export function normalizarNombreUsuario(nombre) {
+  return String(nombre ?? '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase()
+}
+
+// A pedido (Duplicar oportunidad): los ítems vinculados en una connect-boards de una
+// oportunidad, por id — p. ej. el Modelo de AUTODATA (board_relation_mm5422v9), que el
+// detalle solo trae como texto. [] si está vacía.
+const ITEMS_VINCULADOS_QUERY = `
+  query ItemsVinculados($itemId: [ID!], $columnId: [String!]) {
+    items(ids: $itemId) {
+      column_values(ids: $columnId) {
+        ... on BoardRelationValue {
+          linked_item_ids
+        }
+      }
+    }
+  }
+`
+
+export async function fetchItemsVinculados(itemId, columnId) {
+  const data = await callMondayApi(ITEMS_VINCULADOS_QUERY, { itemId: [String(itemId)], columnId: [columnId] })
+  return (data.items?.[0]?.column_values?.[0]?.linked_item_ids ?? []).map(String)
 }
 
 // Deja una columna connect-boards de la Oportunidad con exactamente estos ítems
@@ -1641,12 +1699,13 @@ async function clienteDelContactoCrm(contacto) {
 export async function findContactoByTelefono(codigoPais, telefono) {
   const localDigits = (telefono ?? '').replace(/\D/g, '')
   if (localDigits.length < 6) return null
-  const fullDigits = `${(codigoPais ?? '').replace(/\D/g, '')}${localDigits}`
-  const contactos = await searchContactosCrm({ columnId: CONTACTO_CRM_TELEFONO_COLUMN_ID, value: localDigits })
-  const hit = contactos.find((c) => {
-    const stored = (c.telefono ?? '').replace(/\D/g, '')
-    return stored === fullDigits || stored === localDigits
-  })
+  // Se compara por los últimos 8 dígitos: monday guarda el número con el código de país y
+  // sin el 0 ("59894991425"), así que "094991425" (con el 0) no aparecía ni coincidía, y
+  // un teléfono repetido pasaba como nuevo.
+  // Normalizado con el país antes de cortar (ver colaTelefono: el 15 argentino).
+  const cola = colaTelefono(telefono, codigoPais)
+  const contactos = await searchContactosCrm({ columnId: CONTACTO_CRM_TELEFONO_COLUMN_ID, value: cola })
+  const hit = contactos.find((c) => (c.telefono ?? '').replace(/\D/g, '').slice(-8) === cola)
   if (!hit) return null
   return { contactoCrm: hit, cliente: await clienteDelContactoCrm(hit) }
 }
@@ -2426,6 +2485,46 @@ export async function renombrarCliente(clienteId, { nombre, apellido = '' }) {
 // minuto en abrir. Se busca en monday recién cuando se escribe y se aprieta Buscar, con
 // el mismo buscador del alta (nombre, CI, RUT o celular del contacto, ver
 // searchContactos), y de lo encontrado se trae la ficha de gestión.
+// A pedido: crear el cliente de una oportunidad que no tiene uno vinculado (paso 1, ver
+// VincularClienteModal). Mismas columnas que el alta (CrearOportunidadForm#ensureContactoId):
+// entra como Lead, con su Tipo Cliente y cada documento en su columna (CI o RUT). Quien
+// llama ya verificó que el documento no fuera de otro cliente.
+export async function crearCliente({ tipo, nombre, apellido = '', documento, fechaNacimiento }) {
+  const esEmpresa = tipo === 'Empresa'
+  const nombreCompleto = (esEmpresa ? nombre : `${nombre} ${apellido}`).trim()
+  const { id } = await createContactoItem(nombreCompleto, {
+    [CONTACTO_ESTADO_COLUMN_ID]: 'Lead',
+    [CLIENTE_TIPO_COLUMN_ID]: esEmpresa ? 'Empresa' : 'Particular',
+    [CONTACTO_NOMBRE_COLUMN_ID]: nombre.trim(),
+    ...(esEmpresa ? { [CLIENTE_RAZON_SOCIAL_COLUMN_ID]: nombre.trim() } : { [CONTACTO_APELLIDO_COLUMN_ID]: apellido.trim() }),
+    ...(documento ? { [esEmpresa ? CLIENTE_RUT_COLUMN_ID : CONTACTO_CI_COLUMN_ID]: documento } : {}),
+    ...(!esEmpresa && fechaNacimiento ? { [CONTACTO_FECHA_NACIMIENTO_COLUMN_ID]: fechaNacimiento } : {}),
+  })
+  return { id: String(id), name: nombreCompleto }
+}
+
+// A pedido: editar los datos de identidad y domicilio del CLIENTE desde el paso 1 de la
+// oportunidad (ver EditarClienteModal). Recibe solo lo que cambió; el nombre no va acá
+// (se cambia con renombrarCliente, que también renombra su contacto homónimo).
+//   ci, rut, fechaNacimiento (aaaa-mm-dd), sexo ('M'|'F'), extranjero ('Si'|'No'),
+//   nacionalidad, direccion, localidadId, departamentoId, razonSocial
+export async function guardarDatosCliente(clienteId, cambios) {
+  const columnas = {}
+  if ('ci' in cambios) columnas[CONTACTO_CI_COLUMN_ID] = cambios.ci
+  if ('rut' in cambios) columnas[CLIENTE_RUT_COLUMN_ID] = cambios.rut
+  if ('razonSocial' in cambios) columnas[CLIENTE_RAZON_SOCIAL_COLUMN_ID] = cambios.razonSocial
+  if ('fechaNacimiento' in cambios) columnas[CONTACTO_FECHA_NACIMIENTO_COLUMN_ID] = cambios.fechaNacimiento ? { date: cambios.fechaNacimiento } : {}
+  if ('sexo' in cambios) columnas[CLIENTE_SEXO_COLUMN_ID] = cambios.sexo ? { label: cambios.sexo } : {}
+  if ('extranjero' in cambios) columnas[CONTACTO_EXTRANJERO_COLUMN_ID] = { label: cambios.extranjero }
+  if ('nacionalidad' in cambios) columnas[CONTACTO_NACIONALIDAD_COLUMN_ID] = cambios.nacionalidad ? { labels: [cambios.nacionalidad] } : {}
+  if ('direccion' in cambios) columnas[CONTACTO_DIRECCION_COLUMN_ID] = { text: cambios.direccion }
+  if ('localidadId' in cambios) columnas[CONTACTO_LOCALIDAD_COLUMN_ID] = { item_ids: cambios.localidadId ? [Number(cambios.localidadId)] : [] }
+  if ('departamentoId' in cambios) {
+    columnas[CONTACTO_DEPARTAMENTO_COLUMN_ID] = { item_ids: cambios.departamentoId ? [Number(cambios.departamentoId)] : [] }
+  }
+  if (Object.keys(columnas).length) await setContactoColumnValues(clienteId, columnas)
+}
+
 // Fichas de gestión de clientes puntuales (los miembros de un grupo, ver GrupoDetalle).
 export async function fetchClientesGestionPorIds(ids) {
   const lista = [...new Set((ids ?? []).filter(Boolean).map(String))]

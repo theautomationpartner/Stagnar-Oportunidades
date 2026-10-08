@@ -1,9 +1,11 @@
+import { useEffect, useState } from 'react'
 import { MdChevronLeft, MdChevronRight } from 'react-icons/md'
 import { Table, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell, EmptyState, Dropdown } from '@vibe/core'
 import Avatar from './Avatar'
 import StatusBadge from './StatusBadge'
 import './OpportunitiesTable.css'
 import { initialsOf } from '../services/personaFields'
+import { fetchFotosUsuariosMonday, normalizarNombreUsuario } from '../services/mondayApi'
 
 // A pedido: anchos explícitos en vez del reparto parejo por defecto (7 columnas a
 // ancho igual) — "Bien" y "Cliente" traen 2 líneas de texto y quedaban muy angostas
@@ -14,13 +16,15 @@ import { initialsOf } from '../services/personaFields'
 // a Marca Modelo (Año), y Cliente y Contacto en columnas SEPARADAS — son dos entidades
 // distintas (a quién se le cotiza vs. con quién se habla) y venían mezcladas en una celda.
 const COLUMNS = [
-  { id: 'oportunidad', title: 'Oportunidad', width: '13%' },
-  { id: 'cliente', title: 'Cliente', width: '19%' },
+  { id: 'oportunidad', title: 'Oportunidad', width: '12%' },
+  { id: 'cliente', title: 'Cliente', width: '17%' },
   { id: 'contacto', title: 'Contacto', width: '15%' },
-  { id: 'bien', title: 'Bien', width: '19%' },
-  { id: 'estado', title: 'Estado', width: '14%' },
+  { id: 'bien', title: 'Bien', width: '17%' },
+  { id: 'estado', title: 'Estado', width: '13%' },
   { id: 'ultimaCotizacion', title: 'Última cotización', width: '11%' },
-  { id: 'asignado', title: 'Asignado a', width: '9%' },
+  // A pedido: la foto real de monday y el nombre completo (había personas con las
+  // mismas iniciales y el avatar solo no alcanzaba para distinguirlas).
+  { id: 'asignado', title: 'Asignado a', width: '15%' },
 ]
 
 function handleRowKeyDown(event, onOpen) {
@@ -85,6 +89,13 @@ export default function OpportunitiesTable({
   onPageSizeChange,
   onOpenOpportunity,
 }) {
+  // Fotos de monday por nombre (en el listado el "Asignado" llega solo como texto). Si
+  // no cargan, o la persona no tiene foto, queda el avatar con las iniciales.
+  const [fotos, setFotos] = useState(null)
+  useEffect(() => {
+    fetchFotosUsuariosMonday().then(setFotos).catch(() => {})
+  }, [])
+
   // `opportunities` acá es solo la página actual (ver `pageSize`, elegible desde el pie
   // de la tabla) — `totalFiltered` es el total de resultados de la búsqueda/filtros
   // (sobre TODO lo traído, no solo esta página) y boardTotalCount el total REAL del
@@ -198,7 +209,16 @@ export default function OpportunitiesTable({
                 </TableCell>
                 <TableCell>
                   <ClickableCell onOpen={openThisOpportunity} className="opps-table__asignado-cell">
-                    <Avatar label={opp.asignadoIniciales} />
+                    {opp.asignado ? (
+                      <span className="opps-table__asignado">
+                        <Avatar label={opp.asignadoIniciales} foto={fotos?.get(normalizarNombreUsuario(opp.asignado.split(',')[0]))} />
+                        <span className="opps-table__asignado-nombre" title={opp.asignado}>
+                          {opp.asignado}
+                        </span>
+                      </span>
+                    ) : (
+                      <Avatar label={opp.asignadoIniciales} />
+                    )}
                   </ClickableCell>
                 </TableCell>
               </TableRow>

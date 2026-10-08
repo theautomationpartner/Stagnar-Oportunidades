@@ -197,3 +197,45 @@
     align-items: stretch;
   }
 }
+
+/* Bloques del paso 1 (a pedido): del cliente / de esta cotización / vehículo. */
+.client-ficha__bloque {
+  gap: 6px;
+}
+
+.client-ficha__datos {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+  gap: 6px 16px;
+  margin: 0;
+}
+
+.client-ficha__dato {
+  min-width: 0;
+}
+
+.client-ficha__dato dt {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.client-ficha__dato dd {
+  margin: 1px 0 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-dark);
+  overflow-wrap: anywhere;
+}
+
+.client-ficha__dato--vacio {
+  font-weight: 400 !important;
+  color: var(--text-muted) !important;
+}
+
+/* Sin cliente vinculado: el aviso y el botón para elegir o crear uno. */
+.client-ficha__sin-cliente {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px 12px;
+}

@@ -4,7 +4,6 @@ import {
   MdCheckCircle,
   MdCompareArrows,
   MdErrorOutline,
-  MdEvent,
   MdExpandLess,
   MdExpandMore,
   MdFiberNew,
@@ -14,8 +13,8 @@ import {
   MdSend,
   MdSync,
 } from 'react-icons/md'
-import { fetchEstadosOportunidad, fetchOportunidadesDashboard, fetchPolizas } from '../services/mondayApi'
-import { conversion, polizasPorVencer, resumir } from '../services/dashboardOportunidades'
+import { fetchEstadosOportunidad, fetchOportunidadesDashboard } from '../services/mondayApi'
+import { conversion, resumir } from '../services/dashboardOportunidades'
 import { CONCRETADAS_TODAS, PROBLEMAS, tieneProblema } from '../services/filtrosOportunidades'
 import './OportunidadesResumen.css'
 
@@ -48,10 +47,9 @@ function Tarjeta({ tono, Icono, valor, titulo, detalle, onClick }) {
   )
 }
 
-export default function OportunidadesResumen({ onFiltrar, onVerPolizasPorVencer }) {
+export default function OportunidadesResumen({ onFiltrar }) {
   const [oportunidades, setOportunidades] = useState(null)
   const [estados, setEstados] = useState([])
-  const [polizas, setPolizas] = useState([])
   const [error, setError] = useState(null)
   const [cargando, setCargando] = useState(false)
   const [actualizadoEn, setActualizadoEn] = useState(null)
@@ -61,13 +59,8 @@ export default function OportunidadesResumen({ onFiltrar, onVerPolizasPorVencer 
   const cargar = useCallback(async () => {
     setCargando(true)
     try {
-      const [ops, lista, pols] = await Promise.all([
-        fetchOportunidadesDashboard(),
-        fetchEstadosOportunidad().catch(() => []),
-        fetchPolizas().catch(() => []),
-      ])
+      const [ops, lista] = await Promise.all([fetchOportunidadesDashboard(), fetchEstadosOportunidad().catch(() => [])])
       setEstados(lista)
-      setPolizas(pols)
       setOportunidades(ops)
       setActualizadoEn(new Date())
       setError(null)
@@ -93,7 +86,6 @@ export default function OportunidadesResumen({ onFiltrar, onVerPolizasPorVencer 
     const conEstado = oportunidades.map((o) => ({ ...o, estadoOportunidad: o.estado }))
     return Object.fromEntries(Object.keys(PROBLEMAS).map((k) => [k, conEstado.filter((o) => tieneProblema(o, k)).length]))
   }, [oportunidades])
-  const porVencer = useMemo(() => polizasPorVencer(polizas), [polizas])
 
   const plegar = () => {
     setOculto((v) => {
@@ -207,14 +199,7 @@ export default function OportunidadesResumen({ onFiltrar, onVerPolizasPorVencer 
               detalle="La emisión falló · en Concretada"
               onClick={ver(PROBLEMAS.emision)}
             />
-            <Tarjeta
-              tono="verdeagua"
-              Icono={MdEvent}
-              valor={porVencer.cantidad}
-              titulo="Vencimientos"
-              detalle="Pólizas que vencen en los próximos 30 días"
-              onClick={() => onVerPolizasPorVencer?.({ desde: porVencer.mesDesde, hasta: porVencer.mesHasta })}
-            />
+            {/* A pedido: sin la tarjeta "Vencimientos" (pólizas que vencen en 30 días). */}
           </div>
         </>
       )}

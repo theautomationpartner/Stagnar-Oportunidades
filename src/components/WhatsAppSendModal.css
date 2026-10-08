@@ -55,6 +55,30 @@
   margin-bottom: 0;
 }
 
+/* Panel "Editar teléfono del contacto" (ver EditarTelefonoContacto). */
+.wa-modal__editar-telefono {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  max-width: 480px;
+  padding: 12px;
+  border: 1px solid var(--ui-border-color, #d0d4e4);
+  border-radius: 8px;
+}
+
+.wa-modal__editar-telefono-repetido {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+}
+
+.wa-modal__editar-telefono-acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: 8px;
+}
+
 .wa-modal__telefono-envio {
   margin: 0;
   font-size: 13px;

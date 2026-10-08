@@ -221,8 +221,23 @@
    contra el borde izquierdo de su columna (que quedaba con un hueco raro al lado del
    divisor de "Última cotización"). */
 .opps-table__asignado-cell {
-  justify-content: flex-end;
   padding-right: 12px;
+}
+
+.opps-table__asignado {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+/* Hasta 2 líneas, como el resto de las celdas (en pantallas chicas no entra en una). */
+.opps-table__asignado-nombre {
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  overflow-wrap: anywhere;
 }
 
 /* Auditoría WCAG 2.5.8: en celular los botones de paginación (32px) pasan a 44px de

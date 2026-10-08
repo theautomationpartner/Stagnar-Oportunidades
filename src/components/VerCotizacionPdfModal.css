@@ -1,0 +1,65 @@
+/* Visor del PDF de la cotización (ver VerCotizacionPdfModal.jsx). Mismo look que el
+   visor del PDF de la póliza (.poliza__visor en PolizasSection.css). */
+/* Lugar a la derecha para la X del popup, que no se pise con "Abrir en otra pestaña". */
+.ver-cot-pdf .ver-cot-pdf__barra {
+  padding-right: 40px;
+}
+
+.ver-cot-pdf__barra {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 12px;
+}
+
+.ver-cot-pdf__titulo {
+  margin: 0;
+  font-size: 18px;
+}
+
+.ver-cot-pdf__detalle {
+  font-size: 12px;
+  color: var(--text-gray);
+}
+
+.ver-cot-pdf__abrir {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary-blue);
+  text-decoration: none;
+  white-space: nowrap;
+}
+
+.ver-cot-pdf__abrir:hover {
+  text-decoration: underline;
+}
+
+.ver-cot-pdf__marco {
+  height: clamp(320px, 62vh, 680px);
+  overflow: hidden;
+  background: var(--bg-subtle);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+}
+
+.ver-cot-pdf__pdf {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: none;
+}
+
+.ver-cot-pdf__mensaje {
+  margin: 0;
+  padding: 24px;
+  font-size: 14px;
+  color: var(--text-gray);
+}
+
+.ver-cot-pdf__mensaje--error {
+  color: var(--negative-color, #d83a52);
+}

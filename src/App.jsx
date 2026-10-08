@@ -186,8 +186,6 @@ export default function App() {
     setPage(1)
     go('oportunidades')
   }
-  // Y a la lista de pólizas con un rango de vencimiento ya puesto (tarjeta "Vencimientos").
-  const [polizasVenceInicial, setPolizasVenceInicial] = useState(null)
 
   // La búsqueda y los estados los resuelve el servidor (ver mondayApi.js). Acá queda
   // solo lo que la API no sabe filtrar: "Tipo de Sujeto" es una columna mirror y la
@@ -358,6 +356,7 @@ export default function App() {
           opportunityId={route.id}
           urlStep={route.step}
           onStepChange={(step) => go('oportunidades', route.id, step, { replace: true })}
+          onOpenOpportunity={(id) => go('oportunidades', id, 'cotizar')}
           onBack={() => closeDetail(openedFromCrearFlow ? 'crear' : 'oportunidades')}
           onGoToList={() => closeDetail('oportunidades')}
           showReturnToCrearFlow={openedFromCrearFlow}
@@ -429,8 +428,6 @@ export default function App() {
     main = (
       <Suspense fallback={<LoadingScreen title="Cargando pólizas" message="Un momento, estamos trayendo las pólizas desde monday." />}>
         <PolizasSection
-          venceInicial={polizasVenceInicial}
-          onVenceInicialUsado={() => setPolizasVenceInicial(null)}
           onOpenPoliza={(id) => go('polizas', id)}
         />
       </Suspense>
@@ -495,10 +492,6 @@ export default function App() {
             búsqueda; cada tarjeta filtra la tabla de abajo. */}
         <OportunidadesResumen
           onFiltrar={irAOportunidadesFiltradas}
-          onVerPolizasPorVencer={(rango) => {
-            setPolizasVenceInicial(rango)
-            go('polizas')
-          }}
         />
         <FilterPanel
           searchTerm={searchTerm}

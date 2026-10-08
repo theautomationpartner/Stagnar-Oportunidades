@@ -201,6 +201,8 @@ export function mapOpportunityItem(item, statusColors = {}) {
     libretaConducir: textOf(cv, 'file_mm51jy06'),
     cedula: textOf(cv, 'file_mm5pc008'),
     poliza: textOf(cv, 'file_mm5bzdd4'),
+    // El PDF de la cotización (ver VerCotizacionPdfModal): acá solo si hay alguno.
+    cotizacionPdf: textOf(cv, 'file_mm54css0'),
     bienLinea1,
     bienLinea2: bienLinea2 || (coberturas.length ? coberturas.join(' / ') : ''),
     companias: companias.length ? companias.join(', ') : '—',

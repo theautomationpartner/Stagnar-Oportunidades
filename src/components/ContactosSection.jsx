@@ -12,7 +12,9 @@ import {
 import {
   buildMondayPhone,
   CODIGO_PAIS_OPTIONS,
+  colaTelefono,
   busquedaYaRegistrada,
+  ejemploTelefono,
   contactoDesdeBusqueda,
   emailError,
   initialsOf,
@@ -89,7 +91,6 @@ function separarTelefono(digits) {
   return { codigoPais: '+598', numero: limpio }
 }
 
-const colaTelefono = (s) => String(s ?? '').replace(/\D/g, '').slice(-8)
 
 // Card con la ficha del contacto (a pedido): se abre al clickear la fila. La tabla ya
 // sabe nombre/teléfono/email — con eso se pinta al instante — y por atrás se pide lo que
@@ -144,7 +145,7 @@ function ContactoFichaModal({ contacto, onOpenCliente, onActualizado, onClose })
     setChequeo('buscando')
     setDupTelefono(null)
     const timer = setTimeout(() => {
-      const cola = colaTelefono(telefono)
+      const cola = colaTelefono(telefono, codigoPais)
       buscarContactosCrmLibre(cola)
         .then((encontrados) => {
           if (cancelado) return
@@ -291,7 +292,7 @@ function ContactoFichaModal({ contacto, onOpenCliente, onActualizado, onClose })
                   <TextField
                     size="medium"
                     wrapperClassName="crear-op__phone-number"
-                    placeholder="Ej: 099 123 456"
+                    placeholder={ejemploTelefono(codigoPais)}
                     value={telefono}
                     onChange={setTelefono}
                     icon={MdClear}
