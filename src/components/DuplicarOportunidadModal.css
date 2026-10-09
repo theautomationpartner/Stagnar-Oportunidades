@@ -55,3 +55,11 @@
   flex: 1 1 280px;
   max-width: 420px;
 }
+
+/* "Cambiar cliente" / "Cambiar contacto": al pasar el mouse, el azul de la app (mismo
+   criterio que los botones del encabezado de la oportunidad, ver .opp-detail__recotizar-btn). */
+.duplicar-op__cambiar:hover:not(:disabled) {
+  border-color: var(--primary-blue) !important;
+  color: var(--primary-blue) !important;
+  background-color: var(--tint-info) !important;
+}

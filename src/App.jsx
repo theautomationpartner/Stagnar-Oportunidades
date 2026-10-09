@@ -23,6 +23,8 @@ const ClientesSection = lazy(() => importarConReintento(() => import('./componen
 // Tabla del tablero Contactos. Va lazy por lo mismo que las otras secciones: no se abre
 // en el camino normal de cotizar, y no tiene por qué pesar en el bundle inicial.
 const ContactosSection = lazy(() => importarConReintento(() => import('./components/ContactosSection')))
+// A pedido: duplicar una oportunidad desde su fila de la tabla (ver OpportunitiesTable).
+const DuplicarOportunidad = lazy(() => importarConReintento(() => import('./components/DuplicarOportunidad')))
 const ClienteGestion = lazy(() => importarConReintento(() => import('./components/ClienteGestion')))
 const GruposSection = lazy(() => importarConReintento(() => import('./components/GruposSection')))
 const GrupoDetalle = lazy(() => importarConReintento(() => import('./components/GrupoDetalle')))
@@ -180,6 +182,9 @@ export default function App() {
 
   // Desde el resumen de arriba de la tabla (a pedido: "clickeás acá y te la filtra"): con exactamente
   // estos filtros y sin texto de búsqueda. El cambio de filtros ya recarga la lista.
+  // Id de la oportunidad que se está duplicando desde la tabla (null = ninguna).
+  const [duplicandoDesdeLista, setDuplicandoDesdeLista] = useState(null)
+
   const irAOportunidadesFiltradas = (filtros) => {
     setSearchTerm('')
     setFilters({ ...EMPTY_FILTERS, ...filtros })
@@ -522,11 +527,28 @@ export default function App() {
           pageSize={pageSize}
           pageSizeOptions={PAGE_SIZE_OPTIONS}
           onPageSizeChange={setPageSize}
+          onDuplicateOpportunity={setDuplicandoDesdeLista}
           onOpenOpportunity={(id) => {
             setOpenedFromCrearFlow(false)
             nav.openOpportunity(id)
           }}
         />
+        {duplicandoDesdeLista && (
+          <Suspense fallback={null}>
+            <DuplicarOportunidad
+              opportunityId={duplicandoDesdeLista}
+              departamentos={schema?.departamentos}
+              localidades={schema?.localidades}
+              onAbrir={(id) => {
+                setDuplicandoDesdeLista(null)
+                setOpenedFromCrearFlow(false)
+                // La copia arranca en el paso Cotizar, como desde el detalle.
+                go('oportunidades', id, 'cotizar')
+              }}
+              onClose={() => setDuplicandoDesdeLista(null)}
+            />
+          </Suspense>
+        )}
       </div>
     )
   }

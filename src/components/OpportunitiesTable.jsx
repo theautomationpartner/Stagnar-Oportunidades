@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
-import { MdChevronLeft, MdChevronRight } from 'react-icons/md'
-import { Table, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell, EmptyState, Dropdown } from '@vibe/core'
+import { MdChevronLeft, MdChevronRight, MdContentCopy } from 'react-icons/md'
+import { Table, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell, EmptyState, Dropdown, IconButton } from '@vibe/core'
 import Avatar from './Avatar'
 import StatusBadge from './StatusBadge'
 import './OpportunitiesTable.css'
@@ -17,14 +17,17 @@ import { fetchFotosUsuariosMonday, normalizarNombreUsuario } from '../services/m
 // distintas (a quién se le cotiza vs. con quién se habla) y venían mezcladas en una celda.
 const COLUMNS = [
   { id: 'oportunidad', title: 'Oportunidad', width: '12%' },
-  { id: 'cliente', title: 'Cliente', width: '17%' },
-  { id: 'contacto', title: 'Contacto', width: '15%' },
-  { id: 'bien', title: 'Bien', width: '17%' },
+  { id: 'cliente', title: 'Cliente', width: '16%' },
+  { id: 'contacto', title: 'Contacto', width: '14%' },
+  { id: 'bien', title: 'Bien', width: '16%' },
   { id: 'estado', title: 'Estado', width: '13%' },
-  { id: 'ultimaCotizacion', title: 'Última cotización', width: '11%' },
+  { id: 'ultimaCotizacion', title: 'Última cotización', width: '10%' },
   // A pedido: la foto real de monday y el nombre completo (había personas con las
   // mismas iniciales y el avatar solo no alcanzaba para distinguirlas).
   { id: 'asignado', title: 'Asignado a', width: '15%' },
+  // A pedido: duplicar la oportunidad desde la fila, sin entrar (solo el ícono; el texto
+  // sale al pasar el mouse). Sin título: es una columna de acción.
+  { id: 'acciones', title: '', width: '4%' },
 ]
 
 function handleRowKeyDown(event, onOpen) {
@@ -88,6 +91,7 @@ export default function OpportunitiesTable({
   pageSizeOptions = PAGE_SIZE_DROPDOWN_OPTIONS_DEFAULT,
   onPageSizeChange,
   onOpenOpportunity,
+  onDuplicateOpportunity,
 }) {
   // Fotos de monday por nombre (en el listado el "Asignado" llega solo como texto). Si
   // no cargan, o la persona no tiene foto, queda el avatar con las iniciales.
@@ -220,6 +224,22 @@ export default function OpportunitiesTable({
                       <Avatar label={opp.asignadoIniciales} />
                     )}
                   </ClickableCell>
+                </TableCell>
+                <TableCell>
+                  <div className="opps-table__acciones">
+                    <IconButton
+                      kind="tertiary"
+                      size="small"
+                      icon={MdContentCopy}
+                      ariaLabel={`Duplicar oportunidad ${opp.oppNumber}`}
+                      tooltipContent="Duplicar oportunidad"
+                      onClick={(e) => {
+                        // Que no abra la oportunidad (el clic de la fila).
+                        e.stopPropagation()
+                        onDuplicateOpportunity?.(opp.id)
+                      }}
+                    />
+                  </div>
                 </TableCell>
               </TableRow>
             )

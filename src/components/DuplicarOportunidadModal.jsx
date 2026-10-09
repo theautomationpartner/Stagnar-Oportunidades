@@ -196,7 +196,7 @@ export default function DuplicarOportunidadModal({ opportunity, departamentos, l
                 <span className="duplicar-op__detalle">Sin cliente elegido.</span>
               )}
             </div>
-            <Button kind="secondary" size="small" onClick={() => setEligiendoCliente(true)} disabled={guardando}>
+            <Button kind="secondary" size="small" className="duplicar-op__cambiar" onClick={() => setEligiendoCliente(true)} disabled={guardando}>
               {hayCliente ? 'Cambiar cliente' : 'Elegir o crear cliente'}
             </Button>
           </div>
@@ -241,7 +241,7 @@ export default function DuplicarOportunidadModal({ opportunity, departamentos, l
                   <span className="duplicar-op__detalle">Sin contacto elegido.</span>
                 )}
               </div>
-              <Button kind="secondary" size="small" onClick={() => setEligiendoContacto(true)} disabled={contactos === null || guardando}>
+              <Button kind="secondary" size="small" className="duplicar-op__cambiar" onClick={() => setEligiendoContacto(true)} disabled={contactos === null || guardando}>
                 {contacto || contactoNuevo ? 'Cambiar contacto' : 'Elegir o crear contacto'}
               </Button>
             </div>

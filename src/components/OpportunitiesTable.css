@@ -220,6 +220,18 @@
 /* A pedido: el avatar de "Asignado a" pegado al borde derecho de la tabla en vez de
    contra el borde izquierdo de su columna (que quedaba con un hueco raro al lado del
    divisor de "Última cotización"). */
+/* Columna de acción (duplicar): el ícono centrado, en el azul de la app al pasar el mouse. */
+.opps-table__acciones {
+  display: flex;
+  justify-content: center;
+  width: 100%;
+}
+
+.opps-table__acciones button:hover:not(:disabled) {
+  color: var(--primary-blue) !important;
+  background-color: var(--tint-info) !important;
+}
+
 .opps-table__asignado-cell {
   padding-right: 12px;
 }

@@ -1,6 +1,6 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react'
 import { MdVisibility, MdAutorenew, MdArrowBack, MdContentCopy, MdPictureAsPdf } from 'react-icons/md'
-import { Button, EmptyState, AttentionBox, Loader } from '@vibe/core'
+import { Button, EmptyState, AttentionBox, IconButton, Loader } from '@vibe/core'
 import QuoteCard from './QuoteCard'
 import StatusBadge from './StatusBadge'
 import Stepper from './Stepper'
@@ -10,10 +10,8 @@ import ConfirmarStepPanel from './ConfirmarStepPanel'
 import EmitirStepPanel from './EmitirStepPanel'
 import RequisitoPreviaPanel from './RequisitoPreviaPanel'
 import WhatsAppSendModal from './WhatsAppSendModal'
-import DuplicarOportunidadModal from './DuplicarOportunidadModal'
+import DuplicarOportunidad from './DuplicarOportunidad'
 import VerCotizacionPdfModal from './VerCotizacionPdfModal'
-import AlertModal from './AlertModal'
-import { duplicarOportunidad } from '../services/duplicarOportunidad'
 import AsignadoSelect from './AsignadoSelect'
 import ErrorDetailBox from './ErrorDetailBox'
 import ClientContextBar from './ClientContextBar'
@@ -1979,21 +1977,11 @@ export default function OpportunityDetail({
   }
 
   // A pedido: "Duplicar oportunidad" — crea una nueva con el mismo vehículo y el
-  // cliente/contacto/zona elegidos (ver DuplicarOportunidadModal y duplicarOportunidad.js),
-  // y la abre en el paso Cotizar. Las dos quedan independientes.
+  // cliente/contacto/zona elegidos (ver DuplicarOportunidad), y la abre en el paso
+  // Cotizar. Las dos quedan independientes.
   const [duplicando, setDuplicando] = useState(false)
   // A pedido: ver el PDF de la cotización (el más nuevo) en los pasos 1 y 2.
   const [viendoCotizacionPdf, setViendoCotizacionPdf] = useState(false)
-  const [avisoDuplicada, setAvisoDuplicada] = useState(null)
-  const handleDuplicar = async (eleccion) => {
-    onOpportunityAction?.()
-    const { id, avisos } = await duplicarOportunidad(opportunity, eleccion)
-    setDuplicando(false)
-    // Si algo secundario no salió (la Carta del automóvil), se avisa antes de abrirla:
-    // al abrir la nueva, este detalle se desmonta y el aviso se perdería.
-    if (avisos.length) setAvisoDuplicada({ id, texto: avisos.join(' ') })
-    else onOpenOpportunity?.(id)
-  }
 
   // A pedido (Enviar por WhatsApp): el teléfono que se quiso cargar ya era de otro
   // contacto y es la misma persona → ese contacto pasa a ser el de la oportunidad, y se
@@ -2447,15 +2435,16 @@ export default function OpportunityDetail({
               )}
               {/* A pedido: a la vista en los 4 pasos, pero lejos de "Editar" (que está en
                   la barra del cliente) para que no se confunda: no toca esta oportunidad. */}
-              <Button
+              {/* Solo el ícono; "Duplicar oportunidad" sale al pasar el mouse (tooltip). */}
+              <IconButton
                 kind="secondary"
                 size="small"
-                leftIcon={MdContentCopy}
+                icon={MdContentCopy}
+                ariaLabel="Duplicar oportunidad"
+                tooltipContent="Duplicar oportunidad"
                 className="opp-detail__recotizar-btn opp-detail__duplicar-btn"
                 onClick={() => setDuplicando(true)}
-              >
-                Duplicar oportunidad
-              </Button>
+              />
             </div>
             {asignadoError && (
               <p className="opp-detail__asignado-error" role="alert">
@@ -2843,26 +2832,19 @@ export default function OpportunityDetail({
         </>
       )}
 
-      {avisoDuplicada && (
-        <AlertModal
-          id="duplicada-aviso"
-          type="warning"
-          title="La oportunidad se duplicó"
-          description={`${avisoDuplicada.texto} Podés subirla a mano en la oportunidad nueva.`}
-          primaryButton={{ text: 'Abrir la oportunidad nueva', onClick: () => onOpenOpportunity?.(avisoDuplicada.id) }}
-          secondaryButton={{ text: 'Quedarme en esta', onClick: () => setAvisoDuplicada(null) }}
-          onClose={() => setAvisoDuplicada(null)}
-        />
-      )}
       {viendoCotizacionPdf && (
         <VerCotizacionPdfModal opportunityId={opportunityId} onClose={() => setViendoCotizacionPdf(false)} />
       )}
       {duplicando && (
-        <DuplicarOportunidadModal
+        <DuplicarOportunidad
           opportunity={opportunity}
-          departamentos={dropdownOptions.departamentos ?? []}
-          localidades={dropdownOptions.localidades ?? []}
-          onDuplicar={handleDuplicar}
+          departamentos={dropdownOptions.departamentos}
+          localidades={dropdownOptions.localidades}
+          onAbrir={(id) => {
+            onOpportunityAction?.()
+            setDuplicando(false)
+            onOpenOpportunity?.(id)
+          }}
           onClose={() => setDuplicando(false)}
         />
       )}
