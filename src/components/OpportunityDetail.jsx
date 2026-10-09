@@ -28,6 +28,7 @@ import {
   guardarDatosCliente,
   crearCliente,
   createContactoCrm,
+  fetchClienteContactos,
   vincularContactoACliente,
   setDropdownColumnValue,
   setConnectedColumnValue,
@@ -148,7 +149,7 @@ function useFlipDeTarjetas(contenedorRef, idsEnOrden) {
 import { nombreDeOportunidad } from '../services/nombreOportunidad'
 import { ANIO_COTIZACION_COLUMN_ID, anioParaCotizar } from '../services/anioCotizacion'
 import { zonasBonificacionPorto } from '../services/bonificacionPorto'
-import { buildMondayPhone } from '../services/personaFields'
+import { buildMondayEmail, buildMondayPhone } from '../services/personaFields'
 import {
   ESTADO_VALIDACION,
   ESTADO_GENERAL,
@@ -1993,6 +1994,24 @@ export default function OpportunityDetail({
     if (data) setItem(data)
   }
 
+  // A pedido (paso 1): un contacto NUEVO para esta oportunidad (ver ElegirContactoModal,
+  // que ya validó teléfono y nombre repetidos): se crea vinculado al cliente —sin
+  // desvincular los que ya tenía— y pasa a ser el contacto de la oportunidad.
+  const handleCrearContactoOportunidad = async (datos) => {
+    onOpportunityAction?.()
+    const existentes = await fetchClienteContactos(opportunity.clienteId).catch(() => [])
+    const creado = await createContactoCrm({
+      name: datos.mismoCliente ? opportunity.clienteNombre : datos.nombre,
+      phone: datos.telefono?.trim() ? buildMondayPhone(datos.codigoPais, datos.telefono) : null,
+      email: datos.email?.trim() ? buildMondayEmail(datos.email) : null,
+      clienteId: opportunity.clienteId,
+      existingContactIds: existentes.map((c) => c.id),
+    })
+    await setConnectedColumnValue(opportunityId, 'board_relation_mm4t623x', [Number(creado.id)])
+    const data = await fetchOpportunityDetail(opportunityId).catch(() => null)
+    if (data) setItem(data)
+  }
+
   // A pedido: una oportunidad SIN cliente vinculado puede vincular uno existente o crear
   // uno nuevo desde el paso 1 (ver VincularClienteModal, que ya validó los repetidos).
   // La conexión se escribe del lado de la Oportunidad, igual que el alta.
@@ -2529,6 +2548,8 @@ export default function OpportunityDetail({
               onSaveCliente={opportunity.clienteId ? handleSaveCliente : undefined}
               onVincularCliente={opportunity.clienteId ? undefined : handleVincularCliente}
               onCrearCliente={handleCrearCliente}
+              onCambiarContacto={opportunity.clienteId ? handleCambiarContactoEnvio : undefined}
+              onCrearContacto={opportunity.clienteId ? handleCrearContactoOportunidad : undefined}
               estadoCotizacion={opportunity.estadoCotizacion}
               estadoCotizacionColor={opportunity.estadoCotizacionColor}
               polling={polling}

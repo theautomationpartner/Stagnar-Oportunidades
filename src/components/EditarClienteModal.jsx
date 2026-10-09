@@ -150,7 +150,7 @@ export default function EditarClienteModal({ cliente, departamentos, localidades
         <AttentionBox type="warning" className="editar-cliente__aviso">
           Estás modificando la ficha del cliente <strong>{cliente.name}</strong>: los cambios se guardan en el tablero
           Clientes y se ven en todas sus oportunidades, no solo en esta. Para cambiar solo los datos con los que se cotiza,
-          usá «Datos de esta oportunidad».
+          usá «Editar» en «Datos obligatorios para cotizar».
         </AttentionBox>
         {error && (
           <p className="crear-op__error" role="alert">

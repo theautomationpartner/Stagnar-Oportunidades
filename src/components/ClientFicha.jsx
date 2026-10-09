@@ -1,8 +1,9 @@
-import { MdEdit, MdSmartphone, MdHome } from 'react-icons/md'
+import { MdBadge, MdCake, MdEdit, MdHome, MdPerson } from 'react-icons/md'
 import { Button } from '@vibe/core'
 import ClienteArchivos from './ClienteArchivos'
-import { formatShortDate, modeloSinMarca, sinCodigoPostal } from '../services/format'
-import { initialsOf } from '../services/personaFields'
+import { formatShortDate, modeloSinMarca } from '../services/format'
+import { initialsOf, telefonoParaMostrar } from '../services/personaFields'
+import { edadDesde } from '../services/edad'
 import './ClientFicha.css'
 
 // Ficha del cliente/Lead de la oportunidad — antes solo vivía en el paso "Cotizar" (ver
@@ -26,13 +27,10 @@ import './ClientFicha.css'
 // A pedido: el paso 1 separa lo que es del CLIENTE (tablero Clientes, se edita con aviso
 // porque cambia su ficha para todas sus oportunidades) de lo que es de ESTA cotización
 // (la copia de CI/nacimiento con la que se cotiza y la zona de circulación).
+// A pedido: sin Dirección, Localidad y Departamento — el domicilio ya se ve arriba, en la
+// fila de datos clave (ver DatosClave).
 function datosDelCliente(c) {
-  const ubicacion = [
-    ['Dirección', c.direccion],
-    ['Localidad', sinCodigoPostal(c.localidad)],
-    ['Departamento', c.departamento],
-  ]
-  if (c.tipo === 'Empresa') return [['Razón social', c.razonSocial || c.name], ['RUT', c.rut], ...ubicacion]
+  if (c.tipo === 'Empresa') return [['Razón social', c.razonSocial || c.name], ['RUT', c.rut]]
   const nacionalidad = c.extranjero === 'Si' ? [c.nacionalidad, 'extranjero'].filter(Boolean).join(' · ') : c.nacionalidad
   return [
     ['Nombre', [c.nombre, c.apellido].filter(Boolean).join(' ') || c.name],
@@ -40,8 +38,53 @@ function datosDelCliente(c) {
     ['Nacimiento', c.fechaNacimiento ? formatShortDate(c.fechaNacimiento) : ''],
     ['Sexo', c.sexo],
     ['Nacionalidad', nacionalidad],
-    ...ubicacion,
   ]
+}
+
+// A pedido: lo importante arriba, debajo del nombre, cada dato con un ícono que lo
+// identifica — domicilio, CI/RUT, nacimiento (con la edad) y el contacto. Lo que falta no
+// se muestra (salvo el domicilio y el contacto, que avisan que no hay).
+// El celular es SOLO el del contacto vinculado (a pedido, para que se entienda de dónde
+// sale): ya no se cae a la copia guardada en la oportunidad, que puede estar vieja.
+function DatosClave({ opportunity, cliente, onCambiarContacto }) {
+  const esEmpresa = (cliente?.tipo || opportunity.clienteTipo) === 'Empresa'
+  const documento = esEmpresa ? cliente?.rut : cliente?.ci || opportunity.ci
+  const nacimiento = esEmpresa ? '' : cliente?.fechaNacimiento || opportunity.fechaNacimiento
+  const edad = nacimiento ? edadDesde(nacimiento) : null
+  const contacto = opportunity.contactoId
+    ? [opportunity.contactoNombre || 'Contacto', opportunity.contactoTelefono ? telefonoParaMostrar(opportunity.contactoTelefono) : 'sin celular']
+        .join(' · ')
+    : 'Sin contacto vinculado'
+  const items = [
+    { icono: MdHome, titulo: 'Domicilio principal', texto: opportunity.clienteDomicilio || 'Sin domicilio cargado' },
+    documento && { icono: MdBadge, titulo: esEmpresa ? 'RUT' : 'Cédula de identidad', texto: (esEmpresa ? 'RUT ' : 'CI ') + documento },
+    nacimiento && {
+      icono: MdCake,
+      titulo: 'Fecha de nacimiento',
+      texto: formatShortDate(nacimiento) + (edad != null ? ` · ${edad} años` : ''),
+    },
+  ].filter(Boolean)
+  return (
+    <div className="client-ficha__clave">
+      {items.map(({ icono: Icono, titulo, texto }) => (
+        <span key={titulo} className="client-ficha__address" title={titulo}>
+          <Icono aria-hidden="true" />
+          <span className="client-ficha__clave-texto">{texto}</span>
+        </span>
+      ))}
+      <span className="client-ficha__address client-ficha__clave-contacto" title="Contacto vinculado a la oportunidad">
+        <MdPerson aria-hidden="true" />
+        <span className="client-ficha__clave-texto">
+          <span className="client-ficha__clave-etiqueta">Contacto:</span> {contacto}
+        </span>
+        {onCambiarContacto && (
+          <button type="button" className="client-ficha__clave-accion" onClick={onCambiarContacto}>
+            {opportunity.contactoId ? 'Cambiar contacto' : 'Agregar contacto'}
+          </button>
+        )}
+      </span>
+    </div>
+  )
 }
 
 function Datos({ filas }) {
@@ -65,7 +108,8 @@ export default function ClientFicha({
   onEditCliente,
   // A pedido: sin cliente vinculado, elegir uno existente o crear uno nuevo.
   onVincularCliente,
-  onEdit,
+  // A pedido: cambiar el contacto de la oportunidad (buscar uno o crearlo).
+  onCambiarContacto,
   onEditVehiculo,
   tag,
   actions,
@@ -97,10 +141,7 @@ export default function ClientFicha({
                 Montevideo - CP11100", que es donde circula el auto.
                 La zona de circulación no se pierde: se ve en "Datos obligatorios para
                 cotizar" y en el bloque de ubicación, que es donde corresponde. */}
-            <span className="client-ficha__address" title="Domicilio principal">
-              <MdHome />
-              {opportunity.clienteDomicilio || 'Sin domicilio cargado'}
-            </span>
+            <DatosClave opportunity={opportunity} cliente={cliente} onCambiarContacto={onCambiarContacto} />
           </div>
         </div>
         <div className="client-ficha__header-actions">
@@ -132,38 +173,9 @@ export default function ClientFicha({
         )}
       </div>
 
-      {/* ---- De esta oportunidad (sus propias columnas) ---- */}
-      <div className="client-ficha__vehiculo client-ficha__bloque">
-        <div className="client-ficha__vehiculo-head">
-          <span className="client-ficha__vehiculo-label">Datos de esta oportunidad</span>
-          {onEdit && (
-            <Button kind="tertiary" className="client-ficha__edit-link" onClick={onEdit}>
-              <MdEdit /> Editar
-            </Button>
-          )}
-        </div>
-        <Datos
-          filas={[
-            [opportunity.clienteTipo === 'Empresa' ? 'RUT para cotizar' : 'CI para cotizar', opportunity.ci],
-            ['Nacimiento para cotizar', opportunity.fechaNacimiento ? formatShortDate(opportunity.fechaNacimiento) : ''],
-            [
-              'Zona de circulación',
-              [opportunity.departamento, sinCodigoPostal(opportunity.zonaCirculacion)].filter(Boolean).join(' — '),
-            ],
-          ]}
-        />
-        <div className="client-ficha__badges">
-          {/* MON-14: el teléfono es del Contacto de la oportunidad; las anteriores a MON-14
-              no tienen contacto y caen a la copia guardada en la propia oportunidad. */}
-          <span className="client-ficha__badge">
-            <MdSmartphone />
-            {opportunity.contactoTelefono || opportunity.telefono || '—'}
-          </span>
-          {/* Id real del ítem en monday, para ir a buscarlo directo si hace falta. */}
-          <span className="client-ficha__badge">ID: {opportunity.id}</span>
-        </div>
-      </div>
-
+      {/* A pedido: sin el bloque "Datos de esta oportunidad" (CI y nacimiento para cotizar,
+          zona, teléfono e ID). Los datos con los que se cotiza se ven —y se editan— en
+          "Datos obligatorios para cotizar" (ver CotizarStepPanel). */}
       <div className="client-ficha__vehiculo">
         <div className="client-ficha__vehiculo-head">
           <span className="client-ficha__vehiculo-label">Vehículo</span>

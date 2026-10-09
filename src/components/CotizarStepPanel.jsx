@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MdAutorenew, MdArrowForward, MdCheckCircle, MdWarningAmber } from 'react-icons/md'
+import { MdAutorenew, MdArrowForward, MdCheckCircle, MdEdit, MdWarningAmber } from 'react-icons/md'
 import { Button, Dropdown, AttentionBox, TextField, NumberField, Modal, ModalContent, ModalFooter } from '@vibe/core'
 import { COTIZAR_FIELDS, getInvalidCotizarFields, getMissingCotizarFields } from '../services/cotizarFields'
 import { fetchAutodataModelosByAnioMarca } from '../services/mondayApi'
@@ -12,7 +12,8 @@ import { anioParaCotizar, esAnioAdelantado } from '../services/anioCotizacion'
 import UbicacionParaCotizar from './UbicacionParaCotizar'
 import { opcionesDeLocalidad } from '../services/localidades'
 import StepFooter from './StepFooter'
-import { fetchClienteGestion, findClientePorDocumento } from '../services/mondayApi'
+import { fetchClienteGestion, fetchContactosCrm, findClientePorDocumento } from '../services/mondayApi'
+import ElegirContactoModal from './ElegirContactoModal'
 import EditarClienteModal from './EditarClienteModal'
 import VincularClienteModal from './VincularClienteModal'
 import { documentoDelTipoCliente, stripCi } from '../services/personaFields'
@@ -170,6 +171,10 @@ export default function CotizarStepPanel({
   // Sin cliente vinculado: vincular uno existente o crear uno nuevo (ver VincularClienteModal).
   onVincularCliente,
   onCrearCliente,
+  // A pedido: el contacto de la oportunidad — uno existente (onCambiarContacto) o uno
+  // nuevo (onCrearContacto). La escritura la hace OpportunityDetail.
+  onCambiarContacto,
+  onCrearContacto,
 }) {
   // null | 'personales' | 'vehiculo' — qué popup de "Editar" está abierto (ver
   // startEditing/ClientFicha onEdit/onEditVehiculo más abajo). Antes era un solo
@@ -182,6 +187,26 @@ export default function CotizarStepPanel({
   const [avisoEditarCliente, setAvisoEditarCliente] = useState(false)
   const [editandoCliente, setEditandoCliente] = useState(false)
   const [vinculandoCliente, setVinculandoCliente] = useState(false)
+  // Popup "Contacto de esta oportunidad" (ver ElegirContactoModal): null = cerrado; si no,
+  // los contactos del cliente (con su teléfono) para listarlos primero.
+  const [contactosParaElegir, setContactosParaElegir] = useState(null)
+  const [errorContacto, setErrorContacto] = useState(null)
+  const abrirElegirContacto = async () => {
+    setErrorContacto(null)
+    const ids = (clienteFicha?.contactos ?? []).map((c) => c.id)
+    setContactosParaElegir(ids.length ? await fetchContactosCrm(ids).catch(() => []) : [])
+  }
+  const usarContacto = async (accion) => {
+    try {
+      await accion()
+      setContactosParaElegir(null)
+      recargarCliente()
+    } catch (err) {
+      setContactosParaElegir(null)
+      setErrorContacto(err.message)
+    }
+  }
+
   const recargarCliente = () => {
     if (!opportunity.clienteId) {
       setClienteFicha(undefined)
@@ -546,12 +571,21 @@ export default function CotizarStepPanel({
           cliente={clienteFicha}
           onEditCliente={onSaveCliente ? () => setAvisoEditarCliente(true) : undefined}
           onVincularCliente={onVincularCliente ? () => setVinculandoCliente(true) : undefined}
-          onEdit={() => startEditing('personales')}
+          onCambiarContacto={onCambiarContacto && clienteFicha ? abrirElegirContacto : undefined}
           onEditVehiculo={() => startEditing('vehiculo')}
         />
 
         <div className="cotizar-step__checklist">
-          <h3 className="cotizar-step__checklist-title">Datos obligatorios para cotizar</h3>
+          {/* A pedido, sin "Datos de esta oportunidad" en la ficha: su "Editar" (CI y
+              nacimiento con los que se cotiza) queda acá, junto a los datos que muestra. */}
+          <div className="cotizar-step__checklist-head">
+            <h3 className="cotizar-step__checklist-title">Datos obligatorios para cotizar</h3>
+            {!editingSection && (
+              <Button kind="tertiary" size="small" leftIcon={MdEdit} onClick={() => startEditing('personales')}>
+                Editar
+              </Button>
+            )}
+          </div>
           <div className="cotizar-step__checklist-items">
             {checklistItems.map((item) => {
               // LOG-09: 3 estados en vez de 2 — completo, falta, o cargado con un valor
@@ -610,12 +644,31 @@ export default function CotizarStepPanel({
           edición — la ficha y el checklist quedan visibles de fondo, no hace falta
           "volver" a ninguna pantalla vieja para salir de editar. */}
       {/* A pedido: antes de tocar los datos del CLIENTE se aclara qué se está haciendo. */}
+      {errorContacto && (
+        <AlertModal
+          id="cotizar-error-contacto"
+          type="error"
+          title="No se pudo cambiar el contacto"
+          description={errorContacto}
+          primaryButton={{ text: 'Entendido', onClick: () => setErrorContacto(null) }}
+          onClose={() => setErrorContacto(null)}
+        />
+      )}
+      {contactosParaElegir && clienteFicha && (
+        <ElegirContactoModal
+          nombreCliente={clienteFicha.name}
+          contactosDelCliente={contactosParaElegir}
+          onClose={() => setContactosParaElegir(null)}
+          onElegir={(c) => usarContacto(() => onCambiarContacto(c))}
+          onCrear={(datos) => usarContacto(() => onCrearContacto(datos))}
+        />
+      )}
       {avisoEditarCliente && clienteFicha && (
         <AlertModal
           id="cotizar-aviso-editar-cliente"
           type="warning"
           title={`Vas a modificar la ficha de ${clienteFicha.name}`}
-          description="Los datos del cliente se guardan en el tablero Clientes y se ven en todas sus oportunidades, no solo en esta. Si solo querés cambiar los datos con los que se cotiza, usá «Datos de esta oportunidad»."
+          description="Los datos del cliente se guardan en el tablero Clientes y se ven en todas sus oportunidades, no solo en esta. Si solo querés cambiar los datos con los que se cotiza, usá «Editar» en «Datos obligatorios para cotizar»."
           primaryButton={{
             text: 'Editar datos del cliente',
             onClick: () => {

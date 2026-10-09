@@ -102,6 +102,35 @@
   border-radius: 10px;
 }
 
+/* Fila de datos clave debajo del nombre (domicilio, CI/RUT, nacimiento, celular). */
+.client-ficha__clave {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 18px;
+  margin-top: 2px;
+}
+
+.client-ficha__clave-etiqueta {
+  font-weight: 600;
+}
+
+/* "Cambiar contacto": link chico al lado del contacto, en el azul de la app. */
+.client-ficha__clave-accion {
+  margin-left: 4px;
+  padding: 0;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--primary-blue);
+  background: none;
+  border: none;
+  cursor: pointer;
+}
+
+.client-ficha__clave-accion:hover {
+  text-decoration: underline;
+}
+
 .client-ficha__address {
   display: flex;
   align-items: center;
