@@ -2427,17 +2427,17 @@ export default function CrearOportunidadForm({
                       se le manda al escenario de Make que lo lee. */}
                   {!form.cartaAutomovil ? (
                     <FileUploadField
-                      label="Cédula/Carta Automóvil"
+                      label="Libreta de propiedad"
                       required={false}
                       file={form.cartaAutomovil}
                       onUpload={handleCartaAutomovilChange}
                       prominent
                       helperText="Opcional: si la subís, completamos los datos del vehículo solos."
-                      buttonLabel="Adjuntar Cédula/Carta Automóvil"
+                      buttonLabel="Adjuntar Libreta de propiedad"
                     />
                   ) : (
                     <FileUploadField
-                      label="Cédula/Carta Automóvil"
+                      label="Libreta de propiedad"
                       required={false}
                       file={form.cartaAutomovil}
                       onDelete={() => handleCartaAutomovilChange(null)}
