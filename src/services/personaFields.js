@@ -267,6 +267,10 @@ export function ciError(value) {
   if (!value) return null
   const digits = stripCi(value)
   if (!/^\d+$/.test(digits)) return 'El CI debe contener solo números (podés incluir puntos y guion).'
+  // A pedido: una cédula uruguaya tiene 7 u 8 dígitos (con el verificador). Sin esto, un
+  // RUT de 12 dígitos pasaba como CI al cambiar el tipo de Empresa a Particular, y el
+  // chequeo de duplicados lo buscaba como CI, no lo encontraba y dejaba seguir.
+  if (digits.length < 7 || digits.length > 8) return 'El CI tiene 7 u 8 dígitos (con el dígito verificador).'
   return null
 }
 

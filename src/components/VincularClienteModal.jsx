@@ -7,6 +7,8 @@
 // No escribe nada: devuelve la elección y la escritura la hace quien llama.
 //   onVincular(cliente)
 //   onCrear({ tipo, nombre, apellido, documento, fechaNacimiento, codigoPais, telefono, contactoExistente })
+// pedirTelefono (default true): el "Celular del contacto" del cliente nuevo. Duplicar
+// oportunidad lo apaga — ahí el contacto se elige aparte (ver DuplicarOportunidadModal).
 import { useEffect, useState } from 'react'
 import { AttentionBox, Button, Modal, ModalContent, ModalFooter } from '@vibe/core'
 import { MdSearch } from 'react-icons/md'
@@ -47,7 +49,7 @@ function useVerificacion(clave, consultar) {
   return estado
 }
 
-export default function VincularClienteModal({ opportunity, onVincular, onCrear, onClose }) {
+export default function VincularClienteModal({ opportunity, onVincular, onCrear, onClose, pedirTelefono = true }) {
   const [solapa, setSolapa] = useState('buscar')
   const [error, setError] = useState(null)
   const [guardando, setGuardando] = useState(false)
@@ -76,6 +78,7 @@ export default function VincularClienteModal({ opportunity, onVincular, onCrear,
   const [doc, setDoc] = useState(opportunity.ci || '')
   const [fecha, setFecha] = useState(opportunity.fechaNacimiento || '')
   const [telefono, setTelefono] = useState(() => {
+    if (!pedirTelefono) return ''
     // La copia de la oportunidad viene con el código de país adelante, con o sin el 0
     // ("59897…" o "598097…"): se pasa al formato local de siempre, "097…".
     const t = String(opportunity.contactoTelefono || opportunity.telefono || '').replace(/\D/g, '')
@@ -94,7 +97,7 @@ export default function VincularClienteModal({ opportunity, onVincular, onCrear,
   const docDuplicado = docCheck.fase === 'listo' ? docCheck.resultado?.cliente ?? null : null
   const contactoExistente = telCheck.fase === 'listo' ? telCheck.resultado?.contactoCrm ?? null : null
 
-  const fechaErr = !esEmpresa && fecha ? fechaError(fecha) : null
+  const fechaErr = fecha ? fechaError(fecha) : null
   const puedeCrear =
     nombre.trim() &&
     (esEmpresa || apellido.trim()) &&
@@ -124,7 +127,9 @@ export default function VincularClienteModal({ opportunity, onVincular, onCrear,
         nombre: nombre.trim(),
         apellido: esEmpresa ? '' : apellido.trim(),
         documento: docLimpio,
-        fechaNacimiento: esEmpresa ? '' : fecha,
+        // En una empresa es la del conductor: no se guarda en el cliente (no es suya),
+        // quien llama la lleva a la oportunidad (ver crearCliente).
+        fechaNacimiento: fecha,
         codigoPais,
         telefono: telefono.trim(),
         contactoExistente,
@@ -228,21 +233,26 @@ export default function VincularClienteModal({ opportunity, onVincular, onCrear,
                 <span className="crear-op__section-hint">Verificando que no exista otro cliente con ese {documento.label}…</span>
               )}
             </label>
-            {!esEmpresa && (
+            {/* A pedido: en una empresa también, como la del conductor. */}
+            <label className="crear-op__field">
+              <span>{esEmpresa ? 'Fecha de nacimiento (conductor)' : 'Fecha de nacimiento'}</span>
+              <div className="crear-op__date-wrap">
+                <FechaTexto
+                  ariaLabel={esEmpresa ? 'Fecha de nacimiento del conductor' : 'Fecha de nacimiento'}
+                  value={fecha}
+                  onChange={setFecha}
+                />
+              </div>
+              {fechaErr && <span className="crear-op__field-error">{fechaErr}</span>}
+            </label>
+            {pedirTelefono && (
               <label className="crear-op__field">
-                <span>Fecha de nacimiento</span>
-                <div className="crear-op__date-wrap">
-                  <FechaTexto ariaLabel="Fecha de nacimiento" value={fecha} onChange={setFecha} />
-                </div>
-                {fechaErr && <span className="crear-op__field-error">{fechaErr}</span>}
+                <span>Celular del contacto</span>
+                <input type="tel" placeholder="Ej: 099 123 456" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
+                {telError && <span className="crear-op__field-error">{telError}</span>}
+                {!telError && telCheck.fase === 'buscando' && <span className="crear-op__section-hint">Buscando ese teléfono en Contactos…</span>}
               </label>
             )}
-            <label className="crear-op__field">
-              <span>Celular del contacto</span>
-              <input type="tel" placeholder="Ej: 099 123 456" value={telefono} onChange={(e) => setTelefono(e.target.value)} />
-              {telError && <span className="crear-op__field-error">{telError}</span>}
-              {!telError && telCheck.fase === 'buscando' && <span className="crear-op__section-hint">Buscando ese teléfono en Contactos…</span>}
-            </label>
 
             {docDuplicado && (
               <AttentionBox type="warning" className="crear-op__field--full">

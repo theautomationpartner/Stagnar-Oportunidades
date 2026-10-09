@@ -63,7 +63,9 @@ export default function EditarClienteModal({ cliente, departamentos, localidades
   // verifica antes de dejar guardar. Si la consulta falla, no se traba.
   const docNuevo = stripCi(String(form.documento ?? ''))
   const docCambio = docNuevo !== stripCi(String(inicial.documento ?? ''))
-  const docError = docNuevo ? documento.validar(docNuevo) : null
+  // Solo si se cambió: un cliente viejo con un CI fuera de formato tiene que poder
+  // guardar el resto de su ficha sin que se lo trabe un dato que nadie tocó.
+  const docError = docNuevo && docCambio ? documento.validar(docNuevo) : null
   const [docChequeo, setDocChequeo] = useState('sin') // 'sin' | 'buscando' | 'libre' | 'duplicado'
   const [docDuplicado, setDocDuplicado] = useState(null)
   useEffect(() => {

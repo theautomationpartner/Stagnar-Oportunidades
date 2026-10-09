@@ -2010,6 +2010,10 @@ export default function OpportunityDetail({
   const handleCrearCliente = async (datos) => {
     onOpportunityAction?.()
     const nuevo = await crearCliente(datos)
+    // La de una empresa es la fecha de nacimiento del conductor: vive en la oportunidad.
+    if (datos.tipo === 'Empresa' && datos.fechaNacimiento) {
+      await setSimpleColumnValue(opportunityId, 'date_mm516agw', datos.fechaNacimiento)
+    }
     let contactoId = null
     if (datos.contactoExistente) {
       await vincularContactoACliente(datos.contactoExistente.id, nuevo.id)

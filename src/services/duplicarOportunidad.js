@@ -23,7 +23,7 @@ import {
   uploadFileToColumn,
   vincularContactoACliente,
 } from './mondayApi'
-import { buildMondayEmail, buildMondayPhone, countryShortNameFromDigits, telefonoParaWhatsApp } from './personaFields'
+import { buildMondayEmail, buildMondayPhone } from './personaFields'
 import { ANIO_COTIZACION_COLUMN_ID, anioParaCotizar } from './anioCotizacion'
 import { nombreDeOportunidad } from './nombreOportunidad'
 
@@ -36,7 +36,16 @@ const CARTA_AUTOMOVIL_COLUMN_ID = 'file_mm51jy06'
 // vino con el alta del cliente (si se cargó un teléfono).
 async function resolverCliente(eleccion, creados) {
   if (eleccion.clienteNuevo) {
-    const datos = eleccion.clienteNuevo
+    // Con lo que quedó en "Datos para cotizar" (se puede haber corregido después de
+    // elegir crearlo; el CI/RUT ya se verificó libre ahí).
+    const c = eleccion.datosCotizar ?? {}
+    const datos = {
+      ...eleccion.clienteNuevo,
+      ...(c.nombre ? { nombre: c.nombre } : {}),
+      ...(c.apellido != null ? { apellido: c.apellido } : {}),
+      ...(c.documento ? { documento: c.documento } : {}),
+      ...(c.fechaNacimiento != null ? { fechaNacimiento: c.fechaNacimiento } : {}),
+    }
     const nuevo = await crearCliente(datos)
     creados.push(nuevo.id)
     let contacto = null
@@ -93,7 +102,9 @@ async function resolverContacto(eleccion, ficha, contactoDelAlta, creados) {
 }
 
 // original: la oportunidad mapeada (opportunityMapper). eleccion: lo del popup —
-//   { cliente | clienteNuevo, contacto | contactoNuevo, departamentoId, localidadId }
+//   { cliente | clienteNuevo, contacto | contactoNuevo, datosCotizar, departamentoId, localidadId }
+// datosCotizar: los básicos del cliente que se copian a la oportunidad (tipo, nombre,
+// apellido, documento, fechaNacimiento). A pedido, el teléfono NO se copia.
 // Devuelve { id, avisos } — avisos: lo que no salió pero no impide usar la nueva.
 export async function duplicarOportunidad(original, eleccion) {
   const creados = [] // clientes/contactos creados en esta corrida, para el rollback
@@ -102,15 +113,15 @@ export async function duplicarOportunidad(original, eleccion) {
   try {
     const { ficha, contactoDelAlta } = await resolverCliente(eleccion, creados)
     const contacto = await resolverContacto(eleccion, ficha, contactoDelAlta, creados)
-    const esEmpresa = ficha.tipo === 'Empresa'
+    const datos = eleccion.datosCotizar ?? {}
+    const esEmpresa = (datos.tipo || ficha.tipo) === 'Empresa'
     nombreCliente = ficha.name
-    const mismoCliente = String(ficha.id) === String(original.clienteId ?? '')
 
     nuevaId = (
       await createOpportunityItem(
         nombreDeOportunidad({
-          nombre: esEmpresa ? ficha.razonSocial || ficha.nombre || ficha.name : ficha.nombre,
-          apellido: esEmpresa ? '' : ficha.apellido,
+          nombre: datos.nombre || ficha.name,
+          apellido: esEmpresa ? '' : datos.apellido,
           marca: original.marca,
           modelo: original.modelo,
           anio: original.anio,
@@ -119,19 +130,15 @@ export async function duplicarOportunidad(original, eleccion) {
       )
     ).id
 
-    const documento = String((esEmpresa ? ficha.rut : ficha.ci) ?? '').replace(/\D/g, '')
-    // La fecha con la que se cotiza: la del cliente; a una empresa se le pide aparte y
-    // vive en la oportunidad, así que solo se arrastra si el cliente es el mismo.
-    const fechaNacimiento = esEmpresa ? (mismoCliente ? original.fechaNacimiento : '') : ficha.fechaNacimiento
-    // En el formato de WhatsApp (los contactos viejos pueden tener el 0 adentro).
-    const telefono = telefonoParaWhatsApp(contacto?.telefono)
+    const documento = String(datos.documento ?? '').replace(/\D/g, '')
     const columnValues = {
       deal_stage: 'Nueva',
-      text_mm51b055: esEmpresa ? ficha.razonSocial || ficha.nombre || ficha.name : ficha.nombre || ficha.name,
-      ...(esEmpresa ? {} : { text_mm51ez7e: ficha.apellido ?? '' }),
+      text_mm51b055: datos.nombre || ficha.name,
+      // Una empresa no lleva apellido (mismo criterio que el alta).
+      ...(esEmpresa ? {} : { text_mm51ez7e: datos.apellido ?? '' }),
       ...(documento ? { numeric_mm51mb0s: documento } : {}),
-      ...(fechaNacimiento ? { date_mm516agw: fechaNacimiento } : {}),
-      ...(telefono ? { phone_mm519m27: { phone: telefono, countryShortName: countryShortNameFromDigits(telefono) } } : {}),
+      // En una empresa es la fecha de nacimiento del conductor (vive en la oportunidad).
+      ...(datos.fechaNacimiento ? { date_mm516agw: datos.fechaNacimiento } : {}),
       [OPORTUNIDAD_CLIENTE_COLUMN_ID]: { item_ids: [Number(ficha.id)] },
       ...(contacto ? { [OPORTUNIDAD_CONTACTO_CRM_COLUMN_ID]: { item_ids: [Number(contacto.id)] } } : {}),
       board_relation_mm54tq30: { item_ids: [Number(eleccion.departamentoId)] },
