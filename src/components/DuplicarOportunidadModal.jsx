@@ -3,18 +3,18 @@
 //   - Cliente: el mismo de la original, u otro (buscarlo o crearlo, ver VincularClienteModal).
 //   - Contacto: igual que el cliente — se muestra el elegido y "Cambiar contacto" abre
 //     un popup para buscarlo o crearlo (ver ElegirContactoModal), validando repetidos.
-//   - Datos para cotizar: solo los básicos del cliente (tipo, nombre, apellido si es
-//     particular, CI/RUT y fecha de nacimiento — la del conductor si es empresa),
-//     precargados y editables. El teléfono NO se copia (a pedido).
+//   - Datos con los que se cotiza: a pedido, NO se muestran ni se editan acá — salen del
+//     cliente elegido (nombre, apellido si es particular, CI/RUT y fecha de nacimiento;
+//     la del conductor si es empresa, ver más abajo). El teléfono NO se copia.
 //   - Zona de circulación: departamento y localidad.
 // No escribe nada: "Duplicar" le pasa la elección a onDuplicar (ver duplicarOportunidad.js).
 import { useEffect, useState } from 'react'
 import { AttentionBox, Button, Modal, ModalContent, ModalFooter } from '@vibe/core'
 import { MdDirectionsCar, MdLock } from 'react-icons/md'
-import { fetchClienteGestion, fetchContactosCrm, findClientePorDocumento } from '../services/mondayApi'
+import { fetchClienteGestion, fetchContactosCrm } from '../services/mondayApi'
 import { matchOption, modeloSinMarca } from '../services/format'
-import { documentoDelTipoCliente, fechaError, stripCi, telefonoParaMostrar } from '../services/personaFields'
-import { FechaTexto, RequiredDropdown } from './crear/FormPrimitives'
+import { stripCi, telefonoParaMostrar } from '../services/personaFields'
+import { RequiredDropdown } from './crear/FormPrimitives'
 import { useLocalidadOptions } from './crear/EditarPersonaModals'
 import VincularClienteModal from './VincularClienteModal'
 import ElegirContactoModal from './ElegirContactoModal'
@@ -46,12 +46,11 @@ export default function DuplicarOportunidadModal({ opportunity, departamentos, l
   const [eligiendoContacto, setEligiendoContacto] = useState(false)
   const [nombreClienteFicha, setNombreClienteFicha] = useState('')
 
-  // ---- Datos para cotizar ----
+  // ---- Datos con los que se cotiza (del cliente elegido) ----
   // { tipo, nombre, apellido, documento, fechaNacimiento } del cliente elegido; null
   // mientras se trae su ficha. La fecha de una empresa (la del conductor) no está en el
   // cliente: se arrastra de la original solo si el cliente es el mismo.
   const [datos, setDatos] = useState(null)
-  const cambiarDato = (clave, valor) => setDatos((prev) => ({ ...prev, [clave]: valor }))
 
   useEffect(() => {
     setContactoNuevo(null)
@@ -109,45 +108,9 @@ export default function DuplicarOportunidadModal({ opportunity, departamentos, l
 
   const hayCliente = Boolean(cliente || clienteNuevo)
   const esEmpresa = datos?.tipo === 'Empresa'
-  const documento = documentoDelTipoCliente(esEmpresa ? 'Empresa' : 'Particular')
   const docLimpio = stripCi(String(datos?.documento ?? ''))
-  // Se valida si se cargó o cambió acá; el que ya traía el cliente no frena (mismo criterio
-  // que la ficha del cliente).
-  const docError =
-    docLimpio && docLimpio !== stripCi(String(datos?.documentoDelCliente ?? '')) ? documento.validar(docLimpio) : null
-  const fechaErr = datos?.fechaNacimiento ? fechaError(datos.fechaNacimiento) : null
-
-  // A pedido: un CI/RUT cargado o cambiado acá no puede ser de OTRO cliente (mismo
-  // criterio que el alta y el paso 1). Si es el mismo con el que vino el cliente, no se
-  // consulta. Hasta saberlo no se deja duplicar; si monday no responde, no se traba.
-  const docCambiado = Boolean(docLimpio) && docLimpio !== stripCi(String(datos?.documentoDelCliente ?? ''))
-  const [docChequeo, setDocChequeo] = useState({ fase: 'sin', duplicado: null }) // 'sin' | 'buscando' | 'listo'
-  useEffect(() => {
-    if (!docCambiado || docError) {
-      setDocChequeo({ fase: 'sin', duplicado: null })
-      return undefined
-    }
-    let vivo = true
-    setDocChequeo({ fase: 'buscando', duplicado: null })
-    const timer = setTimeout(() => {
-      findClientePorDocumento(docLimpio, { tipoCliente: esEmpresa ? 'Empresa' : 'Particular' })
-        .then((r) => {
-          if (!vivo) return
-          // Con un cliente que ya existe, encontrarse a sí mismo no es un duplicado.
-          const otro = r?.cliente && (!cliente || String(r.cliente.id) !== String(cliente.id)) ? r.cliente : null
-          setDocChequeo({ fase: 'listo', duplicado: otro })
-        })
-        .catch(() => vivo && setDocChequeo({ fase: 'listo', duplicado: null }))
-    }, 500)
-    return () => {
-      vivo = false
-      clearTimeout(timer)
-    }
-  }, [docCambiado, docLimpio, docError, esEmpresa, cliente])
-  const docDuplicado = docChequeo.duplicado
-  const docPendiente = docCambiado && !docError && docChequeo.fase !== 'listo'
-
-  const datosOk = Boolean(datos) && Boolean(datos.nombre?.trim()) && !docError && !fechaErr && !docDuplicado && !docPendiente
+  // Sin edición acá, alcanza con tener los datos del cliente ya traídos.
+  const datosOk = Boolean(datos)
   const puedeDuplicar =
     hayCliente && datosOk && departamentoId && localidadId && (clienteNuevo || contactos !== null) && !guardando
 
@@ -321,62 +284,6 @@ export default function DuplicarOportunidadModal({ opportunity, departamentos, l
             </div>
           ) : (
             <span className="duplicar-op__detalle">Elegí primero el cliente.</span>
-          )}
-        </section>
-
-        <section className="duplicar-op__bloque">
-          <span className="duplicar-op__titulo">Datos para cotizar</span>
-          {!hayCliente ? (
-            <span className="duplicar-op__detalle">Elegí primero el cliente.</span>
-          ) : !datos ? (
-            <span className="duplicar-op__detalle">Trayendo los datos del cliente…</span>
-          ) : (
-            <>
-              <span className="duplicar-op__detalle">
-                {esEmpresa ? 'Empresa' : 'Particular'} · solo estos datos se copian a la oportunidad nueva (el teléfono no).
-              </span>
-              <div className="crear-op__fields--grid">
-                <label className="crear-op__field">
-                  <span>{esEmpresa ? 'Razón social' : 'Nombre'}</span>
-                  <input type="text" value={datos.nombre} onChange={(e) => cambiarDato('nombre', e.target.value)} />
-                </label>
-                {!esEmpresa && (
-                  <label className="crear-op__field">
-                    <span>Apellido</span>
-                    <input type="text" value={datos.apellido} onChange={(e) => cambiarDato('apellido', e.target.value)} />
-                  </label>
-                )}
-                <label className="crear-op__field">
-                  <span>{documento.label}</span>
-                  <input
-                    type="text"
-                    placeholder={documento.placeholder}
-                    value={datos.documento}
-                    onChange={(e) => cambiarDato('documento', e.target.value)}
-                  />
-                  {docError && <span className="crear-op__field-error">{docError}</span>}
-                  {!docError && docPendiente && (
-                    <span className="crear-op__section-hint">Verificando que el {documento.label} no sea de otro cliente…</span>
-                  )}
-                  {docDuplicado && (
-                    <span className="crear-op__field-error" role="alert">
-                      Este {documento.label} ya es de {docDuplicado.name}. Si es esa persona, elegila con «Cambiar cliente».
-                    </span>
-                  )}
-                </label>
-                <label className="crear-op__field">
-                  <span>{esEmpresa ? 'Fecha de nacimiento (conductor)' : 'Fecha de nacimiento'}</span>
-                  <div className="crear-op__date-wrap">
-                    <FechaTexto
-                      ariaLabel={esEmpresa ? 'Fecha de nacimiento del conductor' : 'Fecha de nacimiento'}
-                      value={datos.fechaNacimiento}
-                      onChange={(v) => cambiarDato('fechaNacimiento', v)}
-                    />
-                  </div>
-                  {fechaErr && <span className="crear-op__field-error">{fechaErr}</span>}
-                </label>
-              </div>
-            </>
           )}
         </section>
 

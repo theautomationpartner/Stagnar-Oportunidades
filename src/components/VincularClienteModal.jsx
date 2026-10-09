@@ -1,6 +1,7 @@
 // A pedido: en el paso 1, una oportunidad SIN cliente vinculado puede elegir uno que ya
 // exista o crear uno nuevo. Dos solapas:
-//   - Buscar: en monday (nombre, CI, RUT o celular, ver buscarClientesGestion) → Vincular.
+//   - Buscar: en monday (nombre, CI o RUT, ver buscarClientesGestion) → Vincular. A pedido,
+//     el texto no dice "celular": un cliente no tiene celular (lo tiene su contacto).
 //   - Crear: precargado con lo que ya tiene la oportunidad. El CI/RUT no puede ser de otro
 //     cliente (si lo es, se ofrece vincular ese), y el contacto se busca por teléfono: si
 //     ya existe se usa ese contacto en vez de crear uno repetido.
@@ -169,7 +170,7 @@ export default function VincularClienteModal({ opportunity, onVincular, onCrear,
               <input
                 className="vincular-cliente__input"
                 type="text"
-                placeholder="Nombre, CI, RUT o celular"
+                placeholder="Nombre, CI o RUT"
                 value={busqueda}
                 onChange={(e) => {
                   setBusqueda(e.target.value)
