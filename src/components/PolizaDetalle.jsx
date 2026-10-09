@@ -6,6 +6,7 @@ import { formatImporte, formatShortDate } from '../services/format'
 import { coberturaParaMostrar } from '../services/coberturaGroups'
 import LoadingScreen from './LoadingScreen'
 import './PolizasSection.css'
+import PdfCanvas from './PdfCanvas'
 
 // Ficha de una póliza (a pedido): todos sus datos, agrupados por lo que significan, y de
 // solo lectura — no hay ningún campo editable ni nada que escriba en monday. Los datos del
@@ -85,6 +86,7 @@ function VisorPdf({ archivos }) {
   const pdfs = archivos.filter(esPdf)
   const [actual, setActual] = useState(pdfs[0]?.assetId ?? null)
   const [url, setUrl] = useState(null)
+  const [blob, setBlob] = useState(null)
   const [error, setError] = useState(null)
   const [plegado, setPlegado] = useState(false)
   const archivo = pdfs.find((a) => a.assetId === actual)
@@ -101,8 +103,9 @@ function VisorPdf({ archivos }) {
         if (!f) throw new Error('monday no devolvió el archivo')
         // Algunos proxies lo devuelven sin tipo: sin "application/pdf" el navegador lo
         // descargaría en vez de mostrarlo.
-        const blob = f.type === 'application/pdf' ? f : new Blob([f], { type: 'application/pdf' })
-        creada = URL.createObjectURL(blob)
+        const pdf = f.type === 'application/pdf' ? f : new Blob([f], { type: 'application/pdf' })
+        creada = URL.createObjectURL(pdf)
+        setBlob(pdf)
         setUrl(creada)
       })
       .catch((err) => vivo && setError(err.message))
@@ -155,7 +158,9 @@ function VisorPdf({ archivos }) {
           ) : !url ? (
             <p className="poliza__visor-mensaje">Trayendo el PDF de la póliza...</p>
           ) : (
-            <iframe title={'PDF de la póliza: ' + archivo?.nombre} src={url + '#view=FitH'} className="poliza__visor-pdf" />
+            // pdf.js y no un <iframe>: adentro de monday Chrome y Brave bloquean el visor del
+            // navegador en un frame (ver PdfCanvas).
+            <PdfCanvas archivo={blob} titulo={'PDF de la póliza: ' + archivo?.nombre} />
           )}
         </div>
       )}

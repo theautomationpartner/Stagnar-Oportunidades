@@ -1,13 +1,14 @@
 // A pedido: en los pasos 1 y 2 de la oportunidad, una vez cotizada, se puede ver el PDF
 // de la cotización (columna "Cotizacion", file_mm54css0). Cada recotización suma uno: se
-// muestra el MÁS NUEVO (ver fetchUltimoArchivoDeColumna). Mismo visor que el PDF de la
-// póliza (ver PolizaDetalle#VisorPdf): el archivo se baja por el proxy del servidor y se
-// muestra en un iframe — adentro de monday (iframe) abrir el link directo lo bloquea.
+// muestra el MÁS NUEVO (ver fetchUltimoArchivoDeColumna). El archivo se baja por el proxy
+// del servidor y se dibuja con pdf.js (ver PdfCanvas): en un <iframe>, adentro de monday,
+// Chrome y Brave lo bloquean. "Abrir en otra pestaña" sí usa el visor del navegador.
 // Solo lectura.
 import { useEffect, useState } from 'react'
 import { Modal, ModalContent, ModalFooter } from '@vibe/core'
 import { MdOpenInNew } from 'react-icons/md'
 import { fetchAssetAsFile, fetchUltimoArchivoDeColumna } from '../services/mondayApi'
+import PdfCanvas from './PdfCanvas'
 import './CrearOportunidadForm.css'
 import './VerCotizacionPdfModal.css'
 
@@ -16,6 +17,7 @@ const COTIZACION_PDF_COLUMN_ID = 'file_mm54css0'
 export default function VerCotizacionPdfModal({ opportunityId, onClose }) {
   const [archivo, setArchivo] = useState(null)
   const [url, setUrl] = useState(null)
+  const [blob, setBlob] = useState(null)
   const [error, setError] = useState(null)
 
   useEffect(() => {
@@ -29,8 +31,9 @@ export default function VerCotizacionPdfModal({ opportunityId, onClose }) {
         if (!f) throw new Error('monday no devolvió el archivo')
         if (!vivo) return
         // Sin "application/pdf" el navegador lo descargaría en vez de mostrarlo.
-        const blob = f.type === 'application/pdf' ? f : new Blob([f], { type: 'application/pdf' })
-        creada = URL.createObjectURL(blob)
+        const pdf = f.type === 'application/pdf' ? f : new Blob([f], { type: 'application/pdf' })
+        creada = URL.createObjectURL(pdf)
+        setBlob(pdf)
         setUrl(creada)
       })
       .catch((err) => vivo && setError(err.message))
@@ -65,7 +68,7 @@ export default function VerCotizacionPdfModal({ opportunityId, onClose }) {
           ) : !url ? (
             <p className="ver-cot-pdf__mensaje">Trayendo el PDF de la cotización...</p>
           ) : (
-            <iframe title={'PDF de la cotización: ' + (archivo?.name ?? '')} src={url + '#view=FitH'} className="ver-cot-pdf__pdf" />
+            <PdfCanvas archivo={blob} titulo={'PDF de la cotización: ' + (archivo?.name ?? '')} />
           )}
         </div>
       </ModalContent>

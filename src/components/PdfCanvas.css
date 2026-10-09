@@ -1,0 +1,42 @@
+/* Visor de PDF con pdf.js (ver PdfCanvas.jsx): las páginas una debajo de la otra, con
+   scroll adentro del marco que lo contiene. */
+.pdf-canvas {
+  height: 100%;
+  overflow: auto;
+  background: var(--bg-subtle, #f5f6f8);
+}
+
+.pdf-canvas__paginas {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 12px;
+}
+
+.pdf-canvas__pagina {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  background: #fff;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.18);
+}
+
+.pdf-canvas__mensaje {
+  margin: 0;
+  padding: 24px;
+  font-size: 14px;
+  color: var(--text-gray);
+}
+
+.pdf-canvas__mensaje--error {
+  color: var(--negative-color, #d83a52);
+}
+
+.pdf-canvas__pie {
+  margin: 0;
+  padding: 0 12px 12px;
+  font-size: 12px;
+  color: var(--text-gray);
+  text-align: center;
+}
