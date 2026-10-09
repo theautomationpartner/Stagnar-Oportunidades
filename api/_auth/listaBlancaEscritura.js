@@ -18,6 +18,7 @@
 
 import { config } from './env.js'
 import { rolDesdeEtiqueta } from './permisos.js'
+import { ErrorDeFlujo } from './errors.js'
 
 // Etiquetas reales de las columnas Rol y Estado Usuario del tablero.
 export const ETIQUETA_ROL = { admin: 'Admin', usuario: 'Vendedor', invitado: 'Invitado' }
@@ -219,16 +220,42 @@ export async function activarEnMonday(userId) {
 //
 // Después de invitar se busca el ID por email, igual que en la investigación: cubre al
 // recién invitado (queda "pendiente" hasta que acepte) y al que ya existía.
+//
+// A qué producto se invita: el de la cuenta. Usuarios_Teams.md usa work_management (era
+// otra cuenta), pero la de Stagnari es solo monday CRM (`crm`): invitar a un producto que
+// la cuenta no tiene lo rechaza monday, y eso salía como un 500 sin motivo.
+let productoPromesa = null
+async function productoDeLaCuenta() {
+  if (!productoPromesa) {
+    productoPromesa = gql(`{ account { products { kind } } }`)
+      .then((d) => {
+        const kinds = (d.account?.products ?? []).map((p) => p.kind).filter(Boolean)
+        return kinds.includes('work_management') ? 'work_management' : kinds[0] || 'work_management'
+      })
+      .catch((err) => {
+        productoPromesa = null
+        throw err
+      })
+  }
+  return productoPromesa
+}
+
 export async function invitarAMonday(email, tipo) {
-  const data = await gql(
-    `mutation ($emails: [String!]!, $rol: UserRole) {
-       invite_users(emails: $emails, product: work_management, user_role: $rol) {
-         invited_users { id email }
-         errors { message code email }
-       }
-     }`,
-    { emails: [email], rol: tipo }
-  )
+  let data
+  try {
+    data = await gql(
+      `mutation ($emails: [String!]!, $rol: UserRole, $producto: Product) {
+         invite_users(emails: $emails, product: $producto, user_role: $rol) {
+           invited_users { id email }
+           errors { message code email }
+         }
+       }`,
+      { emails: [email], rol: tipo, producto: await productoDeLaCuenta() }
+    )
+  } catch (err) {
+    // Que se vea por qué no se pudo (en vez de un 500 genérico).
+    throw new ErrorDeFlujo('MONDAY_INVITACION', 'monday no aceptó la invitación: ' + err.message, 502)
+  }
   const invitado = data.invite_users?.invited_users?.[0]
   if (invitado?.id) return { id: String(invitado.id), yaExistia: false }
 
@@ -242,8 +269,10 @@ export async function invitarAMonday(email, tipo) {
   const existente = buscado.users?.[0]
   if (existente?.id) return { id: String(existente.id), yaExistia: true }
 
+  // monday contestó pero no invitó (ej. email inválido o de un dominio no permitido): se
+  // muestra su motivo tal cual.
   const error = data.invite_users?.errors?.[0]
-  throw new Error(error?.message || 'monday no pudo invitar a ' + email)
+  throw new ErrorDeFlujo('MONDAY_INVITACION', 'monday no invitó a ' + email + ': ' + (error?.message || 'sin motivo'), 502)
 }
 
 // ---- Sincronización con los teams de monday -----------------------------------------
