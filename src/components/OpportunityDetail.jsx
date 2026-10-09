@@ -2550,6 +2550,11 @@ export default function OpportunityDetail({
               onCrearCliente={handleCrearCliente}
               onCambiarContacto={opportunity.clienteId ? handleCambiarContactoEnvio : undefined}
               onCrearContacto={opportunity.clienteId ? handleCrearContactoOportunidad : undefined}
+              onContactoEditado={() =>
+                fetchOpportunityDetail(opportunityId)
+                  .then((data) => data && setItem(data))
+                  .catch(() => {})
+              }
               estadoCotizacion={opportunity.estadoCotizacion}
               estadoCotizacionColor={opportunity.estadoCotizacionColor}
               polling={polling}

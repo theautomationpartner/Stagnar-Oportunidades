@@ -46,7 +46,7 @@ function datosDelCliente(c) {
 // se muestra (salvo el domicilio y el contacto, que avisan que no hay).
 // El celular es SOLO el del contacto vinculado (a pedido, para que se entienda de dónde
 // sale): ya no se cae a la copia guardada en la oportunidad, que puede estar vieja.
-function DatosClave({ opportunity, cliente, onCambiarContacto }) {
+function DatosClave({ opportunity, cliente, onCambiarContacto, onEditarContacto }) {
   const esEmpresa = (cliente?.tipo || opportunity.clienteTipo) === 'Empresa'
   const documento = esEmpresa ? cliente?.rut : cliente?.ci || opportunity.ci
   const nacimiento = esEmpresa ? '' : cliente?.fechaNacimiento || opportunity.fechaNacimiento
@@ -77,6 +77,11 @@ function DatosClave({ opportunity, cliente, onCambiarContacto }) {
         <span className="client-ficha__clave-texto">
           <span className="client-ficha__clave-etiqueta">Contacto:</span> {contacto}
         </span>
+        {onEditarContacto && opportunity.contactoId && (
+          <button type="button" className="client-ficha__clave-accion" onClick={onEditarContacto}>
+            Editar contacto
+          </button>
+        )}
         {onCambiarContacto && (
           <button type="button" className="client-ficha__clave-accion" onClick={onCambiarContacto}>
             {opportunity.contactoId ? 'Cambiar contacto' : 'Agregar contacto'}
@@ -110,6 +115,8 @@ export default function ClientFicha({
   onVincularCliente,
   // A pedido: cambiar el contacto de la oportunidad (buscar uno o crearlo).
   onCambiarContacto,
+  // A pedido: editar los datos del contacto vinculado (nombre, celular, email, notas).
+  onEditarContacto,
   onEditVehiculo,
   tag,
   actions,
@@ -141,7 +148,12 @@ export default function ClientFicha({
                 Montevideo - CP11100", que es donde circula el auto.
                 La zona de circulación no se pierde: se ve en "Datos obligatorios para
                 cotizar" y en el bloque de ubicación, que es donde corresponde. */}
-            <DatosClave opportunity={opportunity} cliente={cliente} onCambiarContacto={onCambiarContacto} />
+            <DatosClave
+              opportunity={opportunity}
+              cliente={cliente}
+              onCambiarContacto={onCambiarContacto}
+              onEditarContacto={onEditarContacto}
+            />
           </div>
         </div>
         <div className="client-ficha__header-actions">

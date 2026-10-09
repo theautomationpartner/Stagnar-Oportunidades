@@ -3,11 +3,13 @@ import { MdChevronLeft, MdChevronRight, MdClear, MdContactPhone, MdGroups, MdPeo
 import { AttentionBox, Button, EmptyState, Modal, ModalContent, ModalFooter, Table, TableBody, TableCell, TableHeader, TableHeaderCell, TableRow, TextField } from '@vibe/core'
 import Avatar from './Avatar'
 import ContactoNuevoModal from './ContactoNuevoModal'
+import ConfirmarCambioModal from './ConfirmarCambioModal'
 import {
   createContactoCrm,
   fetchContactoFicha,
   updateContactoCrmFicha,
   buscarContactosCrmLibre,
+  findContactoByEmail,
 } from '../services/mondayApi'
 import {
   buildMondayPhone,
@@ -100,8 +102,13 @@ function separarTelefono(digits) {
 // "Editar" (a pedido) transforma los textos en inputs EN EL MISMO lugar: nombre,
 // teléfono (con código de país), email y notas. El teléfono editado se verifica contra
 // Contactos igual que en el alta (debounce, excluyéndose a sí mismo): repetido, no se
-// puede guardar.
-function ContactoFichaModal({ contacto, onOpenCliente, onActualizado, onClose }) {
+// puede guardar. El email editado también (a pedido): uno que ya es de otro contacto no
+// se puede guardar.
+//
+// Se reusa desde el paso 1 de la oportunidad para editar su contacto vinculado (ver
+// CotizarStepPanel): ahí abre directo en edición (abrirEditando) y, como cambia la ficha
+// del contacto para todo el sistema, pide confirmar antes de guardar (confirmarAntes).
+export function ContactoFichaModal({ contacto, onOpenCliente, onActualizado, onClose, abrirEditando = false, confirmarAntes = false }) {
   const [ficha, setFicha] = useState(null)
   const [editando, setEditando] = useState(false)
   const [nombre, setNombre] = useState('')
@@ -114,6 +121,10 @@ function ContactoFichaModal({ contacto, onOpenCliente, onActualizado, onClose })
   // Verificación del teléfono editado: 'sin' | 'buscando' | 'libre' | 'duplicado'.
   const [chequeo, setChequeo] = useState('sin')
   const [dupTelefono, setDupTelefono] = useState(null)
+  // Lo mismo para el email: 'sin' | 'buscando' | 'libre' | 'duplicado'.
+  const [chequeoMail, setChequeoMail] = useState('sin')
+  const [dupEmail, setDupEmail] = useState(null)
+  const [confirmando, setConfirmando] = useState(false)
 
   useEffect(() => {
     let vivo = true
@@ -167,6 +178,34 @@ function ContactoFichaModal({ contacto, onOpenCliente, onActualizado, onClose })
     }
   }, [editando, telefono, codigoPais, telErr, telefonoCambio, contacto.id])
 
+  // Email: si se cambió por uno válido, se consulta Contactos (sin contarse a sí mismo).
+  const emailCambio = editando && email.trim().toLowerCase() !== (datos.email ?? '').trim().toLowerCase()
+  useEffect(() => {
+    if (!editando || !email.trim() || mailErr || !emailCambio) {
+      setChequeoMail('sin')
+      setDupEmail(null)
+      return undefined
+    }
+    let cancelado = false
+    setChequeoMail('buscando')
+    setDupEmail(null)
+    const timer = setTimeout(() => {
+      findContactoByEmail(email)
+        .then((r) => {
+          if (cancelado) return
+          const otro = r?.contactoCrm && String(r.contactoCrm.id) !== String(contacto.id) ? r.contactoCrm : null
+          setDupEmail(otro)
+          setChequeoMail(otro ? 'duplicado' : 'libre')
+        })
+        // monday no respondió: no se traba la edición por una consulta caída
+        .catch(() => !cancelado && setChequeoMail('libre'))
+    }, 500)
+    return () => {
+      cancelado = true
+      clearTimeout(timer)
+    }
+  }, [editando, email, mailErr, emailCambio, contacto.id])
+
   const entrarEdicion = () => {
     const { codigoPais: cp, numero } = separarTelefono(datos.telefono)
     setNombre(datos.name)
@@ -192,9 +231,22 @@ function ContactoFichaModal({ contacto, onOpenCliente, onActualizado, onClose })
   // no guarda nada malo. Si se edita, se valida y se chequea duplicado como siempre.
   const telefonoBloquea = telefonoCambio && (Boolean(telErr) || (Boolean(telefono.trim()) && chequeo !== 'libre'))
 
-  const puedeGuardar = Boolean(nombre.trim()) && !mailErr && !telefonoBloquea && !guardando
+  const emailBloquea = emailCambio && Boolean(email.trim()) && chequeoMail !== 'libre'
+  const puedeGuardar = Boolean(nombre.trim()) && !mailErr && !telefonoBloquea && !emailBloquea && !guardando
+
+  // Abrir directo en edición (paso 1 de la oportunidad): apenas llega la ficha completa,
+  // para no editar sobre datos a medias (ver "Editar" más abajo).
+  const yaAbrioEdicion = useRef(false)
+  useEffect(() => {
+    if (abrirEditando && ficha && !yaAbrioEdicion.current) {
+      yaAbrioEdicion.current = true
+      entrarEdicion()
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [abrirEditando, ficha])
 
   const guardar = async () => {
+    setConfirmando(false)
     if (!puedeGuardar) return
     setGuardando(true)
     setErrorGuardar(null)
@@ -212,6 +264,7 @@ function ContactoFichaModal({ contacto, onOpenCliente, onActualizado, onClose })
         onActualizado?.(f)
       }
       setEditando(false)
+      if (abrirEditando) onClose()
     } catch (err) {
       setErrorGuardar(err.message)
     } finally {
@@ -255,6 +308,17 @@ function ContactoFichaModal({ contacto, onOpenCliente, onActualizado, onClose })
           </AttentionBox>
         )}
 
+        {/* A pedido: que quede claro, mientras se edita, que esto cambia el CONTACTO (tablero
+            Contactos) y no solo la oportunidad o el cliente desde donde se abrió. */}
+        {editando && (
+          <AttentionBox type="warning" title="Estás editando los datos del contacto" className="contactos__ficha-aviso">
+            Los cambios se guardan en la ficha de <strong>{datos.name}</strong> (tablero Contactos) y se ven en todas las
+            oportunidades
+            {datos.clientes?.length > 1 ? ` y en los ${datos.clientes.length} clientes` : ' y clientes'} donde está este
+            contacto, no solo acá.
+          </AttentionBox>
+        )}
+
         {editando && chequeo === 'duplicado' && dupTelefono && (
           <AttentionBox type="danger" title="Ese teléfono ya está cargado" className="contactos__ficha-aviso">
             <strong>{dupTelefono.name}</strong>
@@ -263,6 +327,15 @@ function ContactoFichaModal({ contacto, onOpenCliente, onActualizado, onClose })
             {/* Acá no se ofrece "utilizar el existente": se está EDITANDO un contacto
                 que ya existe, no eligiendo cuál usar. */}
             Si corresponde a la misma persona, ya está cargada. De lo contrario, ingrese otro número.
+          </AttentionBox>
+        )}
+
+        {editando && chequeoMail === 'duplicado' && dupEmail && (
+          <AttentionBox type="danger" title="Ese email ya está cargado" className="contactos__ficha-aviso">
+            <strong>{dupEmail.name}</strong>
+            {dupEmail.clienteNombre ? ` (cliente: ${dupEmail.clienteNombre})` : ''}.
+            <br />
+            Si corresponde a la misma persona, ya está cargada. De lo contrario, ingrese otro email.
           </AttentionBox>
         )}
 
@@ -329,7 +402,13 @@ function ContactoFichaModal({ contacto, onOpenCliente, onActualizado, onClose })
                     onChange={setEmail}
                     icon={MdClear}
                     onIconClick={() => setEmail('')}
-                    validation={mailErr ? { status: 'error' } : email.trim() ? { status: 'success' } : undefined}
+                    validation={
+                      mailErr || chequeoMail === 'duplicado'
+                        ? { status: 'error' }
+                        : email.trim() && (!emailCambio || chequeoMail === 'libre')
+                          ? { status: 'success' }
+                          : undefined
+                    }
                   />
                   {mailErr && (
                     <span className="crear-op__field-error" role="alert">
@@ -383,16 +462,19 @@ function ContactoFichaModal({ contacto, onOpenCliente, onActualizado, onClose })
       </ModalContent>
       {editando ? (
         <ModalFooter
-          secondaryButton={{ text: 'Cancelar', onClick: () => setEditando(false) }}
+          // Abierto directo en edición, "Cancelar" cierra (no hay ficha detrás que mirar).
+          secondaryButton={{ text: 'Cancelar', onClick: () => (abrirEditando ? onClose() : setEditando(false)) }}
           primaryButton={{
             text:
               chequeo === 'buscando'
                 ? 'Verificando teléfono...'
-                : guardando
-                  ? 'Guardando...'
-                  : 'Guardar cambios',
+                : chequeoMail === 'buscando'
+                  ? 'Verificando email...'
+                  : guardando
+                    ? 'Guardando...'
+                    : 'Guardar cambios',
             disabled: !puedeGuardar,
-            onClick: guardar,
+            onClick: () => (confirmarAntes ? setConfirmando(true) : guardar()),
           }}
         />
       ) : (
@@ -402,6 +484,9 @@ function ContactoFichaModal({ contacto, onOpenCliente, onActualizado, onClose })
           secondaryButton={{ text: 'Editar', disabled: !ficha, onClick: entrarEdicion }}
           primaryButton={{ text: 'Cerrar', onClick: onClose }}
         />
+      )}
+      {confirmando && (
+        <ConfirmarCambioModal entidad="contacto" nombre={datos.name} onCancelar={() => setConfirmando(false)} onConfirmar={guardar} />
       )}
     </Modal>
   )

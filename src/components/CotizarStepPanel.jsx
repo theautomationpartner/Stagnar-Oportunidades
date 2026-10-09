@@ -14,6 +14,7 @@ import { opcionesDeLocalidad } from '../services/localidades'
 import StepFooter from './StepFooter'
 import { fetchClienteGestion, fetchContactosCrm, findClientePorDocumento } from '../services/mondayApi'
 import ElegirContactoModal from './ElegirContactoModal'
+import { ContactoFichaModal } from './ContactosSection'
 import EditarClienteModal from './EditarClienteModal'
 import VincularClienteModal from './VincularClienteModal'
 import { documentoDelTipoCliente, stripCi } from '../services/personaFields'
@@ -175,6 +176,8 @@ export default function CotizarStepPanel({
   // nuevo (onCrearContacto). La escritura la hace OpportunityDetail.
   onCambiarContacto,
   onCrearContacto,
+  // Después de editar los datos del contacto vinculado, para releer la oportunidad.
+  onContactoEditado,
 }) {
   // null | 'personales' | 'vehiculo' — qué popup de "Editar" está abierto (ver
   // startEditing/ClientFicha onEdit/onEditVehiculo más abajo). Antes era un solo
@@ -191,6 +194,7 @@ export default function CotizarStepPanel({
   // los contactos del cliente (con su teléfono) para listarlos primero.
   const [contactosParaElegir, setContactosParaElegir] = useState(null)
   const [errorContacto, setErrorContacto] = useState(null)
+  const [editandoContacto, setEditandoContacto] = useState(false)
   const abrirElegirContacto = async () => {
     setErrorContacto(null)
     const ids = (clienteFicha?.contactos ?? []).map((c) => c.id)
@@ -572,6 +576,7 @@ export default function CotizarStepPanel({
           onEditCliente={onSaveCliente ? () => setAvisoEditarCliente(true) : undefined}
           onVincularCliente={onVincularCliente ? () => setVinculandoCliente(true) : undefined}
           onCambiarContacto={onCambiarContacto && clienteFicha ? abrirElegirContacto : undefined}
+          onEditarContacto={opportunity.contactoId ? () => setEditandoContacto(true) : undefined}
           onEditVehiculo={() => startEditing('vehiculo')}
         />
 
@@ -644,6 +649,20 @@ export default function CotizarStepPanel({
           edición — la ficha y el checklist quedan visibles de fondo, no hace falta
           "volver" a ninguna pantalla vieja para salir de editar. */}
       {/* A pedido: antes de tocar los datos del CLIENTE se aclara qué se está haciendo. */}
+      {editandoContacto && opportunity.contactoId && (
+        <ContactoFichaModal
+          contacto={{
+            id: String(opportunity.contactoId),
+            name: opportunity.contactoNombre,
+            telefono: opportunity.contactoTelefono,
+            email: opportunity.contactoEmail,
+          }}
+          abrirEditando
+          confirmarAntes
+          onActualizado={() => onContactoEditado?.()}
+          onClose={() => setEditandoContacto(false)}
+        />
+      )}
       {errorContacto && (
         <AlertModal
           id="cotizar-error-contacto"

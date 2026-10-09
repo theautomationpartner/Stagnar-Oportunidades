@@ -12,6 +12,7 @@ import { Button, Modal, ModalContent, ModalFooter } from '@vibe/core'
 import { MdSearch } from 'react-icons/md'
 import { buscarContactosCrmLibre } from '../services/mondayApi'
 import { telefonoParaMostrar } from '../services/personaFields'
+import { normalizarParaMatch } from '../services/format'
 import ContactoNuevoModal from './ContactoNuevoModal'
 import './CrearOportunidadForm.css'
 import './PillTabs.css'
@@ -39,14 +40,26 @@ export default function ElegirContactoModal({ nombreCliente, contactosDelCliente
   const idsDelCliente = new Set(contactosDelCliente.map((c) => String(c.id)))
   const lista = resultados ?? contactosDelCliente
 
+  // A pedido: si el cliente YA tiene su propio contacto (uno con su mismo nombre, o marcado
+  // "Homónimo del cliente" en Tipo de contacto), no se deja crear otro como "el mismo
+  // cliente": ContactoNuevoModal apaga ese tilde y ofrece usar el que ya existe.
+  const homonimo =
+    contactosDelCliente.find(
+      (c) =>
+        normalizarParaMatch(c.tipoContacto ?? '') === normalizarParaMatch('Homónimo del cliente') ||
+        (nombreCliente && normalizarParaMatch(c.name) === normalizarParaMatch(nombreCliente))
+    ) ?? null
+
   if (solapa === 'crear') {
     return (
       <ContactoNuevoModal
         nombreCliente={nombreCliente}
-        mismoClienteInicial={!contactosDelCliente.length}
+        mismoClienteInicial={!contactosDelCliente.length && !homonimo}
         inicial={{}}
+        homonimo={homonimo}
         contactosDelCliente={contactosDelCliente}
-        onElegirHomonimo={() => setSolapa('buscar')}
+        // "Usar ese contacto": se elige el contacto propio que ya tiene el cliente.
+        onElegirHomonimo={() => (homonimo ? onElegir(homonimo) : setSolapa('buscar'))}
         onUsarExistente={onElegir}
         onGuardar={onCrear}
         onClose={() => setSolapa('buscar')}
