@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MdAutorenew, MdArrowForward, MdCheckCircle, MdEdit, MdWarningAmber } from 'react-icons/md'
+import { MdAutorenew, MdArrowForward, MdCheckCircle, MdWarningAmber } from 'react-icons/md'
 import { Button, Dropdown, AttentionBox, TextField, NumberField, Modal, ModalContent, ModalFooter } from '@vibe/core'
 import { COTIZAR_FIELDS, getInvalidCotizarFields, getMissingCotizarFields } from '../services/cotizarFields'
 import { fetchAutodataModelosByAnioMarca } from '../services/mondayApi'
@@ -581,16 +581,9 @@ export default function CotizarStepPanel({
         />
 
         <div className="cotizar-step__checklist">
-          {/* A pedido, sin "Datos de esta oportunidad" en la ficha: su "Editar" (CI y
-              nacimiento con los que se cotiza) queda acá, junto a los datos que muestra. */}
-          <div className="cotizar-step__checklist-head">
-            <h3 className="cotizar-step__checklist-title">Datos obligatorios para cotizar</h3>
-            {!editingSection && (
-              <Button kind="tertiary" size="small" leftIcon={MdEdit} onClick={() => startEditing('personales')}>
-                Editar
-              </Button>
-            )}
-          </div>
+          {/* A pedido: sin "Editar" acá. Lo que falta o es inválido se completa desde el aviso
+              "Faltan datos requeridos" al cotizar. */}
+          <h3 className="cotizar-step__checklist-title">Datos obligatorios para cotizar</h3>
           <div className="cotizar-step__checklist-items">
             {checklistItems.map((item) => {
               // LOG-09: 3 estados en vez de 2 — completo, falta, o cargado con un valor
@@ -687,7 +680,7 @@ export default function CotizarStepPanel({
           id="cotizar-aviso-editar-cliente"
           type="warning"
           title={`Vas a modificar la ficha de ${clienteFicha.name}`}
-          description="Los datos del cliente se guardan en el tablero Clientes y se ven en todas sus oportunidades, no solo en esta. Si solo querés cambiar los datos con los que se cotiza, usá «Editar» en «Datos obligatorios para cotizar»."
+          description="Los datos del cliente se guardan en el tablero Clientes y se ven en todas sus oportunidades, no solo en esta."
           primaryButton={{
             text: 'Editar datos del cliente',
             onClick: () => {

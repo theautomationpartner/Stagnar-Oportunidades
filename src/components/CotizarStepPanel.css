@@ -70,13 +70,6 @@
 /* A pedido: más grande y destacado — antes (13px) competía en peso visual con las
    propias filas del checklist de abajo; ahora se nota de entrada que es el título de
    toda la sección, no un renglón más. */
-.cotizar-step__checklist-head {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-}
-
 .cotizar-step__checklist-title {
   font-size: 18px;
   font-weight: 700;
