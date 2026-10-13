@@ -4,6 +4,7 @@ import { Table, TableHeader, TableHeaderCell, TableBody, TableRow, TableCell, Em
 import Avatar from './Avatar'
 import StatusBadge from './StatusBadge'
 import './OpportunitiesTable.css'
+import CompartirOportunidadBoton from './CompartirOportunidadBoton'
 import { initialsOf } from '../services/personaFields'
 import { fetchFotosUsuariosMonday, normalizarNombreUsuario } from '../services/mondayApi'
 
@@ -24,10 +25,10 @@ const COLUMNS = [
   { id: 'ultimaCotizacion', title: 'Última cotización', width: '10%' },
   // A pedido: la foto real de monday y el nombre completo (había personas con las
   // mismas iniciales y el avatar solo no alcanzaba para distinguirlas).
-  { id: 'asignado', title: 'Asignado a', width: '15%' },
-  // A pedido: duplicar la oportunidad desde la fila, sin entrar (solo el ícono; el texto
-  // sale al pasar el mouse). Sin título: es una columna de acción.
-  { id: 'acciones', title: '', width: '4%' },
+  { id: 'asignado', title: 'Asignado a', width: '13%' },
+  // A pedido: copiar el link y duplicar la oportunidad desde la fila, sin entrar (solo los
+  // íconos; el texto sale al pasar el mouse). Sin título: es una columna de acción.
+  { id: 'acciones', title: '', width: '6%' },
 ]
 
 function handleRowKeyDown(event, onOpen) {
@@ -227,6 +228,7 @@ export default function OpportunitiesTable({
                 </TableCell>
                 <TableCell>
                   <div className="opps-table__acciones">
+                    <CompartirOportunidadBoton opportunityId={opp.id} oppNumber={opp.oppNumber} />
                     <IconButton
                       kind="tertiary"
                       size="small"

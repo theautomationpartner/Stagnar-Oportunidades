@@ -50,6 +50,7 @@ import { mapOpportunities } from './services/opportunityMapper'
 import { fetchFilterAndStatusSchema } from './services/boardSchema'
 import { fetchPanelData } from './services/recargoPanel'
 import './App.css'
+import { oportunidadDelLink } from './services/compartirOportunidad'
 
 // A pedido: la app arranca con las 10 oportunidades más nuevas y el resto se pide a
 // medida que se necesita —al pasar de página o al buscar—, en vez de bajar el tablero
@@ -89,6 +90,19 @@ export default function App() {
   const generacionRef = useRef(0)
   const trayendoMasRef = useRef(false)
   const [route, go] = useHashRoute()
+  // A pedido (compartir oportunidad): si la página de monday se abrió con
+  // ?oportunidad=<id> (el link que copia "Copiar link de la oportunidad"), se va directo a
+  // esa oportunidad. Una sola vez, al entrar.
+  useEffect(() => {
+    let vivo = true
+    oportunidadDelLink().then((id) => {
+      if (vivo && id) go('oportunidades', id)
+    })
+    return () => {
+      vivo = false
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
   // A pedido: el botón "Volver a Persona Seleccionada" de arriba de la Oportunidad (ver
   // OpportunityDetail.jsx) solo aparece cuando se llegó ahí apretando "Ir a esta
   // oportunidad" en el historial de Crear Oportunidad (paso 1) — no si se abrió desde la

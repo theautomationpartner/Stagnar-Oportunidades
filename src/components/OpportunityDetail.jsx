@@ -11,6 +11,7 @@ import EmitirStepPanel from './EmitirStepPanel'
 import RequisitoPreviaPanel from './RequisitoPreviaPanel'
 import WhatsAppSendModal from './WhatsAppSendModal'
 import DuplicarOportunidad from './DuplicarOportunidad'
+import CompartirOportunidadBoton from './CompartirOportunidadBoton'
 import AlertModal from './AlertModal'
 import AsignadoSelect from './AsignadoSelect'
 import ErrorDetailBox from './ErrorDetailBox'
@@ -2496,6 +2497,14 @@ export default function OpportunityDetail({
               )}
               {/* A pedido: a la vista en los 4 pasos, pero lejos de "Editar" (que está en
                   la barra del cliente) para que no se confunda: no toca esta oportunidad. */}
+              {/* A pedido: copiar el link de la oportunidad para compartirla (ver
+                  compartirOportunidad.js). Mismo look que el de duplicar. */}
+              <CompartirOportunidadBoton
+                opportunityId={opportunityId}
+                oppNumber={opportunity.oppNumber}
+                kind="secondary"
+                className="opp-detail__recotizar-btn opp-detail__duplicar-btn"
+              />
               {/* Solo el ícono; "Duplicar oportunidad" sale al pasar el mouse (tooltip). */}
               <IconButton
                 kind="secondary"
