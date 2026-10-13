@@ -80,9 +80,23 @@ export async function oportunidadDelLink() {
     return directo
   }
   const u = await ubicacionPromesa
-  const candidatos = [u?.href, u?.search && '?' + String(u.search).replace(/^\?/, ''), window.location.href]
+  // Además de href y search, el SDK puede mandar otros campos (el hash, por ejemplo: en
+  // monday la barra del navegador conserva #oportunidad=… pero href llega sin él). Se
+  // revisan todos los textos que mande.
+  const extras = Object.values(u ?? {})
+    .filter((v) => typeof v === 'string' && v.includes(PARAMETRO))
+    .map((v) => (/^[a-z]+:/i.test(v) ? v : 'https://x.invalid/' + (/^[#?]/.test(v) ? v : '#' + v)))
+  const candidatos = [
+    u?.href,
+    u?.search && '?' + String(u.search).replace(/^\?/, ''),
+    u?.hash && '#' + String(u.hash).replace(/^#/, ''),
+    ...extras,
+    window.location.href,
+  ]
   const id = candidatos.map(idEn).find(Boolean) ?? null
-  console.info('[compartir] ubicación de monday:', u?.href ?? '(sin respuesta)', '· iframe:', window.location.href, '· oportunidad:', id ?? '(ninguna)')
+  // La respuesta completa de monday, para ver qué campos manda (sin la URL del iframe: lleva
+  // el sessionToken, que no hace falta mostrar).
+  console.info('[compartir] respuesta de monday:', JSON.stringify(u ?? null), '· oportunidad:', id ?? '(ninguna)')
   return id
 }
 
