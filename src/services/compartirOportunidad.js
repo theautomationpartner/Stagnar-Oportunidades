@@ -51,9 +51,12 @@ function idEn(texto) {
   if (!texto) return null
   try {
     const url = new URL(texto, 'https://x.invalid')
+    const hash = url.hash.replace(/^#\/?/, '')
+    // ?oportunidad=…, #oportunidad=… o #/algo?oportunidad=…
     const id =
       url.searchParams.get(PARAMETRO) ||
-      new URLSearchParams(url.hash.replace(/^#/, '').split('?')[1] || '').get(PARAMETRO)
+      new URLSearchParams(hash).get(PARAMETRO) ||
+      new URLSearchParams(hash.split('?')[1] || '').get(PARAMETRO)
     return id && /^\d+$/.test(id) ? id : null
   } catch {
     const m = String(texto).match(new RegExp(`[?&#]${PARAMETRO}=(\\d+)`))
