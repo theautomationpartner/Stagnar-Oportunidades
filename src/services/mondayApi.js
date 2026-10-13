@@ -91,6 +91,10 @@ const OPPORTUNITY_COLUMN_IDS = [
   'color_mm7whw7r', // Bonificacion Porto (Con respuesta/Sin Respuesta)
   'color_mm7w9q1a', // Bonificacion CANELONES SUR/MONTEVIDEO
   'color_mm7wftck', // Bonificacion RESTO DEL PAIS
+  // Carga en Jira de la oportunidad concretada (escenario "crear-jira"): el estado lo
+  // escribe el escenario y el link a la incidencia también.
+  'color_mm83ybd0', // Crear Incidencia Jira (Crear/Creando/Creada/Error/Sin crear)
+  'link_mm83vpa3', // Jira Link
 ]
 
 // Los campos de cada fila de la tabla, una sola vez: los usan la primera página y las
@@ -234,6 +238,12 @@ const OPPORTUNITY_DETAIL_QUERY = `
             id
             kind
           }
+        }
+        # "Jira Link" (link_mm83vpa3): la URL de la incidencia por separado del texto (la
+        # clave), para abrirla tal cual sin partir el "text" de monday.
+        ... on LinkValue {
+          url
+          url_text
         }
         ... on BoardRelationValue {
           display_value

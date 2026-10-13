@@ -1,0 +1,27 @@
+/* Azul de Jira (#0052CC) y su tono de hover (#0747A6), los de la marca de Atlassian. */
+.jira-button {
+  background-color: #0052cc !important;
+  border-color: #0052cc !important;
+  color: #fff !important;
+}
+
+.jira-button:hover:not(:disabled):not([aria-disabled='true']) {
+  background-color: #0747a6 !important;
+  border-color: #0747a6 !important;
+}
+
+.jira-button__logo {
+  font-size: 16px;
+  flex-shrink: 0;
+  /* El espacio del JSX se pierde dentro del Button de @vibe/core: la separación va acá. */
+  margin-right: 8px;
+}
+
+.jira-button:disabled,
+.jira-button[aria-disabled='true'] {
+  opacity: 1;
+  pointer-events: none;
+  background-color: #b3c8ef !important;
+  border-color: #b3c8ef !important;
+  color: #fff !important;
+}

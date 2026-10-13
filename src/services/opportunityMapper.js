@@ -127,6 +127,13 @@ export function mapOpportunityItem(item, statusColors = {}) {
       }
     : null
 
+  // Carga en Jira (escenario "crear-jira"): el escenario deja el estado y el link a la
+  // incidencia. La URL llega aparte en el detalle (LinkValue); en el listado solo está el
+  // text de monday ("AUTO-17001 - https://…"), de donde se saca.
+  const jiraLinkCv = cv.find((c) => c.id === 'link_mm83vpa3')
+  const jiraUrl = jiraLinkCv?.url || textOf(cv, 'link_mm83vpa3').match(/https?:\/\/\S+/)?.[0] || ''
+  const jiraClave = jiraLinkCv?.url_text || jiraUrl.split('/browse/')[1] || ''
+
   return {
     id: item.id,
     oppNumber: `ID-${item.id}`,
@@ -203,6 +210,9 @@ export function mapOpportunityItem(item, statusColors = {}) {
     poliza: textOf(cv, 'file_mm5bzdd4'),
     // El PDF de la cotización (se abre en otra pestaña, ver abrirCotizacionPdf en OpportunityDetail): acá solo si hay alguno.
     cotizacionPdf: textOf(cv, 'file_mm54css0'),
+    jiraEstado: textOf(cv, 'color_mm83ybd0'),
+    jiraUrl,
+    jiraClave,
     bienLinea1,
     bienLinea2: bienLinea2 || (coberturas.length ? coberturas.join(' / ') : ''),
     companias: companias.length ? companias.join(', ') : '—',

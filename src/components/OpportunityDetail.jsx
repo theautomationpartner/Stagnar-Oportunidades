@@ -189,6 +189,9 @@ const ESTADO_COTIZACION_COLUMN_ID = 'color_mm51n7aa'
 const AVANCE_COTIZACION_COLUMN_ID = 'text_mm7v1vg6'
 const ESTADO_ENVIO_COLUMN_ID = 'color_mm4wr1t4'
 const ESTADO_CREACION_COLUMN_ID = 'color_mm5ejysv'
+// Carga de la oportunidad concretada en Jira (escenario "crear-jira", ver
+// api/_make/escenarios.js). El escenario escribe el estado y el link a la incidencia.
+const JIRA_ESTADO_COLUMN_ID = 'color_mm83ybd0'
 const POSEE_VEHICULO_COLUMN_ID = 'color_mm51n4j'
 const ESTADO_LECTURA_COLUMN_ID = 'color_mm5rzrhk'
 const INCLUIR_PROPUESTA_COLUMN_ID = 'boolean_mm4wjdnw'
@@ -251,6 +254,11 @@ const POLL_CREANDO_TIMEOUT_MS = 5 * 60 * 1000
 const ERROR_UPDATE_TAG_COTIZAR = '[COTIZAR]'
 const ERROR_UPDATE_TAG_ENVIO = '[ENVIO]'
 const ERROR_UPDATE_TAG_CREAR_POLIZA = '[CREAR_POLIZA]'
+// El escenario de Jira deja su error en un Update sin prefijo, así que no se puede ir a
+// buscar por tag como los de arriba: se usa lo que contestó el webhook y, si no hubo
+// respuesta, este texto.
+const ERROR_JIRA_SIN_DETALLE =
+  'La carga en Jira terminó con error. El motivo quedó en las actualizaciones de la oportunidad en monday.'
 
 export default function OpportunityDetail({
   opportunityId,
@@ -363,6 +371,15 @@ export default function OpportunityDetail({
   useEffect(() => {
     polizaPollStartRef.current = polizaPolling ? Date.now() : null
   }, [polizaPolling])
+  // Carga en Jira: mismo esquema que la creación de la póliza (polling hasta "Creada" o
+  // "Error", con corte a los POLL_CREANDO_TIMEOUT_MS sin tocar monday).
+  const [jiraPolling, setJiraPolling] = useState(false)
+  const [cargandoJira, setCargandoJira] = useState(false)
+  const [jiraErrorDetail, setJiraErrorDetail] = useState(null)
+  const jiraPollStartRef = useRef(null)
+  useEffect(() => {
+    jiraPollStartRef.current = jiraPolling ? Date.now() : null
+  }, [jiraPolling])
 
   // El robot que genera la cotización (o el escenario de Make.com que la envía) postea
   // el detalle del error como un Update nativo de monday sobre el ítem cuando algo falla
@@ -407,6 +424,8 @@ export default function OpportunityDetail({
     setCotizarErrorDetail(null)
     setEnvioErrorDetail(null)
     setPolizaErrorDetail(null)
+    setJiraPolling(false)
+    setJiraErrorDetail(null)
 
     fetchOpportunityDetail(opportunityId)
       .then(async (data) => {
@@ -467,6 +486,14 @@ export default function OpportunityDetail({
         if (estadoCreacion === 'Creando') {
           setPolizaPolling(true)
         }
+        // Mismo criterio para una carga en Jira a mitad de camino ("Crear" lo escribe la
+        // app al apretar, "Creando" el escenario).
+        const estadoJira = data.column_values.find((cv) => cv.id === JIRA_ESTADO_COLUMN_ID)?.text?.trim()
+        if (estadoJira === 'Crear' || estadoJira === 'Creando') {
+          setJiraPolling(true)
+        } else if (estadoJira === 'Error') {
+          setJiraErrorDetail(ERROR_JIRA_SIN_DETALLE)
+        }
         // Mismo criterio para una lectura de Cédula/Archivo Automóvil que quedó
         // "Leer" (en cola, todavía no la tomó el robot) o "Leyendo" (en curso) a mitad
         // de camino — solo si aplica (Posee Vehículo === "Si"). Ojo: si acá solo se
@@ -523,7 +550,7 @@ export default function OpportunityDetail({
   // así arranca sola cuando él la pone en "Validando" y se corta sola cuando la deja en
   // un estado terminal, sin que la app tenga que adivinar cuánto tarda.
   const validacionPolling = estaValidando(textOf(item?.column_values ?? [], VALIDACION_POLIZA_COLUMN_ID))
-  const anyPolling = polling || sendPolling || polizaPolling || lecturaPolling || validacionPolling
+  const anyPolling = polling || sendPolling || polizaPolling || lecturaPolling || validacionPolling || jiraPolling
   const pollFailsRef = useRef(0)
   const lastItemSigRef = useRef('')
   const stalledFlagsRef = useRef(null)
@@ -585,11 +612,12 @@ export default function OpportunityDetail({
         // sean POLL_MAX_FAILS seguidos, ahí cortamos y avisamos.
         pollFailsRef.current += 1
         if (!cancelled && pollFailsRef.current >= POLL_MAX_FAILS) {
-          stalledFlagsRef.current = { polling, sendPolling, polizaPolling, lecturaPolling }
+          stalledFlagsRef.current = { polling, sendPolling, polizaPolling, lecturaPolling, jiraPolling }
           setPolling(false)
           setSendPolling(false)
           setPolizaPolling(false)
           setLecturaPolling(false)
+          setJiraPolling(false)
           setPollStalled(true)
         }
         return
@@ -725,6 +753,27 @@ export default function OpportunityDetail({
         }
       }
 
+      // --- Carga en Jira (color_mm83ybd0): corta en "Creada" o "Error". El link a la
+      // incidencia llega en el mismo ítem (setItem de arriba), que es lo que cambia el
+      // botón a "Ver en Jira".
+      if (jiraPolling) {
+        const estadoJira = textOf(data.column_values, JIRA_ESTADO_COLUMN_ID)
+        if (estadoJira === 'Creada' || estadoJira === 'Error') {
+          setJiraPolling(false)
+          if (estadoJira === 'Error') {
+            setJiraErrorDetail(errorRespondidoRef.current['crear-jira'] || ERROR_JIRA_SIN_DETALLE)
+          }
+        } else if (jiraPollStartRef.current && Date.now() - jiraPollStartRef.current > POLL_CREANDO_TIMEOUT_MS) {
+          jiraPollStartRef.current = null
+          setJiraPolling(false)
+          setJiraErrorDetail(
+            `La carga en Jira lleva más de 5 minutos en "${estadoJira || 'Crear'}" sin terminar. ` +
+              'Es posible que la automatización se haya interrumpido. Antes de volver a intentar, ' +
+              'revisá en Jira si la incidencia ya se creó, para no cargarla dos veces.'
+          )
+        }
+      }
+
       // --- Leer Cédula y Archivo Automóvil (color_mm5rzrhk): corta en "Leidos" o
       // "Error". Solo se prende cuando aplica (ver mount effect — Posee Vehículo === "Si").
       if (lecturaPolling) {
@@ -752,7 +801,7 @@ export default function OpportunityDetail({
       document.removeEventListener('visibilitychange', handleVisibility)
       window.removeEventListener('focus', handleVisibility)
     }
-  }, [anyPolling, polling, sendPolling, polizaPolling, lecturaPolling, validacionPolling, opportunityId, schema])
+  }, [anyPolling, polling, sendPolling, polizaPolling, lecturaPolling, validacionPolling, jiraPolling, opportunityId, schema])
 
   // Refleja el paso activo en la URL (solo después de cargar, para no pisar el paso
   // pedido en la URL con el 'cotizar' inicial del useState).
@@ -785,6 +834,7 @@ export default function OpportunityDetail({
     if (flags.sendPolling) setSendPolling(true)
     if (flags.polizaPolling) setPolizaPolling(true)
     if (flags.lecturaPolling) setLecturaPolling(true)
+    if (flags.jiraPolling) setJiraPolling(true)
   }
 
   const statusColors = useMemo(
@@ -1694,6 +1744,39 @@ export default function OpportunityDetail({
       setConfirmarEmisionError(err.message)
     } finally {
       setConfirmandoEmision(false)
+    }
+  }
+
+  // "Cargar en Jira" (oportunidad concretada): mismo mecanismo que Concretar — se escribe
+  // "Crear" en la columna (así el polling no confunde un "Error" de un intento anterior con
+  // el de este), se prende el seguimiento y se llama al escenario, que contesta enseguida
+  // si no pudo (falta el Asignado, la cotización elegida, etc.). No hay automatización de
+  // monday sobre esta columna: la dispara solo la app.
+  const handleCargarEnJira = async () => {
+    onOpportunityAction?.()
+    setCargandoJira(true)
+    setJiraErrorDetail(null)
+    try {
+      await setSimpleColumnValue(opportunityId, JIRA_ESTADO_COLUMN_ID, 'Crear')
+      setItem((prev) => ({
+        ...prev,
+        column_values: prev.column_values.map((cv) =>
+          cv.id === JIRA_ESTADO_COLUMN_ID ? { ...cv, text: 'Crear' } : cv
+        ),
+      }))
+      setJiraPolling(true)
+      avisarAlEscenario('crear-jira', ({ error }) => {
+        if (!error) {
+          tickAhoraRef.current?.()
+          return
+        }
+        setJiraPolling(false)
+        setJiraErrorDetail(error)
+      })
+    } catch (err) {
+      setJiraErrorDetail(err.message)
+    } finally {
+      setCargandoJira(false)
     }
   }
 
@@ -2900,6 +2983,9 @@ export default function OpportunityDetail({
               revisandoValidacion={revisandoValidacion}
               confirmandoEmision={confirmandoEmision}
               confirmarEmisionError={confirmarEmisionError}
+              onCargarEnJira={handleCargarEnJira}
+              cargandoJira={cargandoJira || jiraPolling}
+              jiraErrorDetail={jiraErrorDetail}
               onBack={() => setActiveStep('confirmar')}
               onGoHome={onGoHome}
             />

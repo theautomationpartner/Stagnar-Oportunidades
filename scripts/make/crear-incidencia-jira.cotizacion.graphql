@@ -1,0 +1,37 @@
+# Query 1 del escenario "[TAP] Crear Incidencia en Jira": la cotización elegida, y nada
+# más. La Oportunidad ya la trae el módulo "Get Oportunidad" (Get Item).
+#
+# monday no deja filtrar los subitems de un ítem por columna, así que se pide al tablero
+# de subitems (18420863061) entre los subitems de esta oportunidad, con "Propuesta
+# elegida" tildada. Si vuelven 0 o más de 1, el Run Code corta con el error.
+#
+# En Make, reemplazar SUBITEM_IDS por:
+#   {{join(map(2.mappable_column_values.subtasks_mm4pakjh.linkedPulseIds; "linkedPulseId"); ",")}}
+query {
+  boards(ids: [18420863061]) {
+    items_page(
+      limit: 50
+      query_params: {
+        ids: [SUBITEM_IDS]
+        rules: [{ column_id: "boolean_mm5bn41n", compare_value: [], operator: is_not_empty }]
+      }
+    ) {
+      items {
+        id
+        name
+        column_values(ids: [
+          "boolean_mm5bn41n", "dropdown_mm51f4va", "dropdown_mm4w8n8p", "numeric_mm4pc2y1",
+          "numeric_mm519my9", "numeric_mm59qzvf", "numeric_mm592zyk", "dropdown_mm52dm1j",
+          "dropdown_mm5fb4y0", "numeric_mm52ey7f", "numeric_mm7nrezs", "numeric_mm7nmnk0",
+          "dropdown_mm52p7yx", "dropdown_mm5954ma", "numeric_mm52qx0e", "numeric_mm529754",
+          "numeric_mm52xw0m", "numeric_mm52bnpa", "boolean_mm5fsr46", "boolean_mm5fqazp",
+          "boolean_mm5fxd9x", "boolean_mm6z3j9j", "boolean_mm6zhfhd", "boolean_mm6zzwq5",
+          "color_mm6zpx3j"
+        ]) {
+          id
+          text
+        }
+      }
+    }
+  }
+}

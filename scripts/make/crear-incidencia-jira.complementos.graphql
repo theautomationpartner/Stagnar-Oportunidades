@@ -1,0 +1,49 @@
+# Query 2 del escenario "[TAP] Crear Incidencia en Jira": lo que el Get Item de la
+# Oportunidad no trae y el Run Code necesita.
+#
+#  - contacto / cliente: el Get Item solo trae el nombre de los ítems vinculados. Del
+#    Contacto sale el celular, el mail y si es el mismo cliente; del Cliente, la CI, la
+#    dirección, su localidad y la foto de la CI (respaldo si la oportunidad no la tiene;
+#    su assetId sale del value de la columna).
+#  - users: el Asignado viene como id de monday; hace falta su email para buscarlo en Jira.
+#  - panel: recargos por cuota, bonificación por defecto y precio de los opcionales. Con
+#    eso se calcula el precio que vio el cliente. Se puede sacar cuando la app mande el
+#    precio en el disparo.
+#
+# En Make, reemplazar (con ifempty, porque monday rechaza ids: [] y con 0 devuelve vacío):
+#   CONTACTO_ID → {{ifempty(2.mappable_column_values.board_relation_mm4t623x.linkedPulseIds[1].linkedPulseId; 0)}}
+#   CLIENTE_ID  → {{ifempty(2.mappable_column_values.board_relation_mm4qg1n2.linkedPulseIds[1].linkedPulseId; 0)}}
+query {
+  contacto: items(ids: [CONTACTO_ID]) {
+    id
+    name
+    column_values(ids: ["contact_phone", "contact_email", "dropdown_mm7q3zhr"]) {
+      id
+      text
+    }
+  }
+  cliente: items(ids: [CLIENTE_ID]) {
+    id
+    name
+    column_values(ids: ["text_mm4vk9aq", "long_text_mm6m7d8c", "file_mm65486d", "board_relation_mm65e7he"]) {
+      id
+      text
+      value
+      ... on BoardRelationValue { linked_items { id name } }
+    }
+  }
+  users(limit: 200) { id name email }
+  panel: boards(ids: [18421072511]) {
+    items_page(limit: 500) {
+      items {
+        name
+        column_values(ids: [
+          "color_mm5fdknw", "dropdown_mm52feqr", "numeric_mm52f3n3", "numeric_mm52yezv", "numeric_mm5fmjh0"
+        ]) {
+          id
+          text
+        }
+      }
+    }
+  }
+}

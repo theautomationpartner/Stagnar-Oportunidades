@@ -16,6 +16,10 @@ export const ESCENARIOS = {
   // "[TAP] Se cotiza una oportunidad -> se valida si tiene bonificacion en PORTO": lo
   // dispara la app cuando la cotización pasa a "Cotizando" (ver OpportunityDetail).
   'bonificacion-porto': 'MAKE_BONIFICACION_PORTO_WEBHOOK_URL',
+  // "[TAP] Crear Incidencia en Jira": carga la oportunidad concretada como SEGURO NUEVO en
+  // el proyecto AUTO (ver scripts/make/crear-incidencia-jira.run-code.js). No tiene
+  // automatización de monday: solo lo dispara la app.
+  'crear-jira': 'MAKE_CREAR_JIRA_WEBHOOK_URL',
 }
 
 // Devuelve { status, body } para reenviarle tal cual al navegador. Un escenario o un

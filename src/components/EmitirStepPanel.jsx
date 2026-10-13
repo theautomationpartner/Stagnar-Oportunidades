@@ -9,6 +9,7 @@ import { compararPoliza } from '../services/polizaCheck'
 import {
   VALIDACIONES_POLIZA,
   ESTADO_VALIDACION,
+  ESTADO_GENERAL,
   estaValidando,
   hayValidacion,
   validacionesQueBloquean,
@@ -23,6 +24,7 @@ import ErrorDetailBox from './ErrorDetailBox'
 import AlertModal from './AlertModal'
 import ClientContextBar from './ClientContextBar'
 import CrearContactoCard from './CrearContactoCard'
+import JiraButton from './JiraButton'
 import { coberturaParaMostrar } from '../services/coberturaGroups'
 import './EmitirStepPanel.css'
 
@@ -59,6 +61,9 @@ export default function EmitirStepPanel({
   revisandoValidacion,
   confirmandoEmision,
   confirmarEmisionError,
+  onCargarEnJira,
+  cargandoJira,
+  jiraErrorDetail,
   onBack,
   onGoHome,
 }) {
@@ -94,6 +99,12 @@ export default function EmitirStepPanel({
   // camino ya existente es revisarlos uno a uno; sin rojos, el botón de acá abajo.
   const conDiferencias = generalConDiferencias(opportunity.validacionPolizaEstado)
   const difSinRojo = conDiferencias && bloqueantes.length === 0 && !validandoPoliza
+  // "Cargar en Jira" ya concretada o, antes, apenas la validación de la póliza terminó
+  // bien ("Datos válidos" sin nada en rojo; marcarlas como revisadas también lleva a
+  // "Datos válidos"). Antes de eso los datos que irían a Jira todavía pueden cambiar.
+  const validacionOk =
+    polizaSubida && opportunity.validacionPolizaEstado === ESTADO_GENERAL.validos && bloqueantes.length === 0
+  const mostrarJira = Boolean(onCargarEnJira) && (concretada || validacionOk)
 
   // Red distinta de la de arriba: acá no se comparan los dos lados, se mira si cada valor
   // PUEDE ser lo que dice ser (un chasis de 5 caracteres no es un chasis). Un dato mal
@@ -136,6 +147,8 @@ export default function EmitirStepPanel({
   // (antes se ejecutaban al primer click). La lógica de negocio no cambia: el
   // onConfirmarEmision/onDeletePoliza que se llama es exactamente el mismo.
   const [confirmConcretar, setConfirmConcretar] = useState(false)
+  // "Cargar en Jira" crea una incidencia real en el proyecto AUTO: también pide confirmar.
+  const [confirmJira, setConfirmJira] = useState(false)
   const [confirmDeletePoliza, setConfirmDeletePoliza] = useState(false)
 
   const handleConcretarAttempt = () => {
@@ -382,6 +395,12 @@ export default function EmitirStepPanel({
         {!polling && <ErrorDetailBox detail={errorDetail} className="emitir-step__error-detail-spacing" />}
       </div>
 
+      {/* El error de la carga en Jira (si lo hubo): el botón queda habilitado para
+          reintentar. */}
+      {mostrarJira && !cargandoJira && !opportunity.jiraUrl && (
+        <ErrorDetailBox detail={jiraErrorDetail} className="emitir-step__error-detail-spacing" />
+      )}
+
       {/* A pedido: mismo footer pegado abajo del todo que los otros 3 pasos de la
           Oportunidad (ver StepFooter) — "Volver" vuelve a Confirmar. A la derecha,
           "Concretar Oportunidad" mientras corresponde (showConfirmarAction: subida y
@@ -389,6 +408,19 @@ export default function EmitirStepPanel({
           lugar pasa a tener "Inicio" — a pedido, en vez de un redirect automático al
           Inicio (se sacó), queda a mano de la persona cuándo salir. */}
       <StepFooter onBack={onBack}>
+        {/* "Cargar en Jira" mientras no hay incidencia; una vez creada, el mismo lugar
+            pasa a "Ver en Jira" y abre el link de la oportunidad en otra pestaña. Va
+            antes de "Concretar Oportunidad"/"Inicio", que siguen siendo el paso final. */}
+        {mostrarJira &&
+          (opportunity.jiraUrl ? (
+            <JiraButton onClick={() => window.open(opportunity.jiraUrl, '_blank', 'noopener')}>
+              Ver en Jira
+            </JiraButton>
+          ) : (
+            <JiraButton onClick={() => setConfirmJira(true)} disabled={cargandoJira}>
+              {cargandoJira ? 'Cargando en Jira...' : 'Cargar en Jira'}
+            </JiraButton>
+          ))}
         {showConfirmarAction && (
           <Button
             kind="primary"
@@ -419,6 +451,24 @@ export default function EmitirStepPanel({
             onClick: () => {
               setConfirmConcretar(false)
               onConfirmarEmision()
+            },
+          }}
+        />
+      )}
+
+      {confirmJira && (
+        <AlertModal
+          id="emitir-confirmar-jira-modal"
+          type="warning"
+          title="¿Cargar la oportunidad en Jira?"
+          description="Se va a crear la incidencia SEGURO NUEVO en el proyecto AUTO con los datos de la oportunidad, la propuesta elegida y sus archivos. La forma de pago y el inicio de vigencia se completan después en Jira."
+          onClose={() => setConfirmJira(false)}
+          secondaryButton={{ text: 'Cancelar', onClick: () => setConfirmJira(false) }}
+          primaryButton={{
+            text: 'Cargar en Jira',
+            onClick: () => {
+              setConfirmJira(false)
+              onCargarEnJira()
             },
           }}
         />
