@@ -32,8 +32,12 @@ const ubicacionPromesa = conLimite(
 
 function armarLink(id, u) {
   if (u?.href) {
+    // En el hash (#oportunidad=…) y no como parámetro (?oportunidad=…): monday borra los
+    // parámetros de la URL de un custom object antes de cargar la app (visto en la consola
+    // en monday), y el hash es lo que se prueba que conserve.
     const url = new URL(u.href)
-    url.searchParams.set(PARAMETRO, String(id))
+    url.searchParams.delete(PARAMETRO)
+    url.hash = `${PARAMETRO}=${id}`
     return url.toString()
   }
   return `${window.location.origin}${window.location.pathname}#/oportunidades/${id}`
