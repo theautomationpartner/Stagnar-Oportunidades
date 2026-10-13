@@ -11,7 +11,7 @@ import EmitirStepPanel from './EmitirStepPanel'
 import RequisitoPreviaPanel from './RequisitoPreviaPanel'
 import WhatsAppSendModal from './WhatsAppSendModal'
 import DuplicarOportunidad from './DuplicarOportunidad'
-import VerCotizacionPdfModal from './VerCotizacionPdfModal'
+import AlertModal from './AlertModal'
 import AsignadoSelect from './AsignadoSelect'
 import ErrorDetailBox from './ErrorDetailBox'
 import ClientContextBar from './ClientContextBar'
@@ -20,6 +20,8 @@ import LoadingScreen from './LoadingScreen'
 import './PillTabs.css'
 import {
   fetchOpportunityDetail,
+  fetchAssetAsFile,
+  fetchUltimoArchivoDeColumna,
   setSimpleColumnValue,
   setBoardRelationItems,
   fetchColumnText,
@@ -1981,8 +1983,43 @@ export default function OpportunityDetail({
   // cliente/contacto/zona elegidos (ver DuplicarOportunidad), y la abre en el paso
   // Cotizar. Las dos quedan independientes.
   const [duplicando, setDuplicando] = useState(false)
-  // A pedido: ver el PDF de la cotización (el más nuevo) en los pasos 1 y 2.
-  const [viendoCotizacionPdf, setViendoCotizacionPdf] = useState(false)
+  // A pedido: "Ver cotización (PDF)" abre el PDF más nuevo de la columna "Cotizacion"
+  // (file_mm54css0) DIRECTO en otra pestaña, con el visor del navegador — sin popup
+  // intermedio. La pestaña se abre en el mismo clic (si se abriera después de bajar el
+  // archivo, el navegador la trataría como ventana emergente y la bloquearía) y se carga
+  // cuando el PDF llega por el proxy del servidor.
+  const [abriendoPdf, setAbriendoPdf] = useState(false)
+  const [errorPdf, setErrorPdf] = useState(null)
+  const abrirCotizacionPdf = () => {
+    const pestana = window.open('', '_blank')
+    if (pestana) {
+      pestana.document.title = 'Cotización en PDF'
+      pestana.document.body.style.cssText = 'font-family: sans-serif; color: #676879; padding: 24px'
+      pestana.document.body.textContent = 'Abriendo el PDF de la cotización…'
+    }
+    setAbriendoPdf(true)
+    setErrorPdf(null)
+    ;(async () => {
+      try {
+        const ultimo = await fetchUltimoArchivoDeColumna(opportunityId, 'file_mm54css0')
+        if (!ultimo) throw new Error('Esta oportunidad todavía no tiene el PDF de la cotización.')
+        const archivo = await fetchAssetAsFile(ultimo.assetId, ultimo.name)
+        if (!archivo) throw new Error('monday no devolvió el archivo.')
+        // Sin "application/pdf" el navegador lo descargaría en vez de mostrarlo.
+        const pdf = archivo.type === 'application/pdf' ? archivo : new Blob([archivo], { type: 'application/pdf' })
+        const url = URL.createObjectURL(pdf)
+        if (pestana && !pestana.closed) pestana.location.href = url
+        else window.open(url, '_blank')
+        // La pestaña ya lo tiene cargado; se libera la memoria un rato después.
+        setTimeout(() => URL.revokeObjectURL(url), 60000)
+      } catch (err) {
+        if (pestana && !pestana.closed) pestana.close()
+        setErrorPdf(err.message)
+      } finally {
+        setAbriendoPdf(false)
+      }
+    })()
+  }
 
   // A pedido (Enviar por WhatsApp): el teléfono que se quiso cargar ya era de otro
   // contacto y es la misma persona → ese contacto pasa a ser el de la oportunidad, y se
@@ -2451,7 +2488,8 @@ export default function OpportunityDetail({
                   size="small"
                   leftIcon={MdPictureAsPdf}
                   className="opp-detail__recotizar-btn opp-detail__duplicar-btn"
-                  onClick={() => setViendoCotizacionPdf(true)}
+                  onClick={abrirCotizacionPdf}
+                  loading={abriendoPdf}
                 >
                   Ver cotización (PDF)
                 </Button>
@@ -2862,8 +2900,15 @@ export default function OpportunityDetail({
         </>
       )}
 
-      {viendoCotizacionPdf && (
-        <VerCotizacionPdfModal opportunityId={opportunityId} onClose={() => setViendoCotizacionPdf(false)} />
+      {errorPdf && (
+        <AlertModal
+          id="cotizacion-pdf-error"
+          type="error"
+          title="No se pudo abrir el PDF de la cotización"
+          description={errorPdf}
+          primaryButton={{ text: 'Entendido', onClick: () => setErrorPdf(null) }}
+          onClose={() => setErrorPdf(null)}
+        />
       )}
       {duplicando && (
         <DuplicarOportunidad
