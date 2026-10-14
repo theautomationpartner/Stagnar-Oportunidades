@@ -3214,3 +3214,102 @@ export async function fetchPolizaDetalle(id) {
       : null,
   }
 }
+
+// ───────────────────────── Comentarios de la oportunidad ─────────────────────────
+// A pedido: un lugar para ir dejando comentarios del trámite ("va a evaluar la compra",
+// "confirma cuándo lo retira") y subir fotos/archivos en cualquier momento. Se guardan
+// como Updates del ítem que arrancan con [COMENTARIO], así también se ven en monday.
+//
+// Los Updates que crea la app quedan a nombre de la cuenta del token (siempre la misma),
+// así que el autor real va escrito en el propio Update: "[COMENTARIO] Por <b>Nombre</b>
+// (usuario monday 123)". De ahí la app saca el id para mostrar su foto. Si alguien
+// escribe un [COMENTARIO] directo en monday, el autor es el que firmó el Update.
+export const COMENTARIO_TAG = '[COMENTARIO]'
+
+const COMENTARIOS_QUERY = `
+  query GetComentarios($itemId: ID!) {
+    items(ids: [$itemId]) {
+      updates(limit: 100) {
+        id
+        body
+        text_body
+        created_at
+        creator { id name photo_thumb_small }
+        assets { id name file_extension public_url url_thumbnail }
+      }
+    }
+  }
+`
+
+const escaparHtml = (t) =>
+  String(t ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;')
+
+const AUTOR_RE = /^Por\s+<b>(.*?)<\/b>\s*\(usuario monday (\d+)\)\s*(?:<br\s*\/?>)?/i
+
+// HTML del Update → texto plano con sus saltos de línea.
+function htmlATexto(html) {
+  const conSaltos = String(html ?? '')
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>\s*<p>/gi, '\n')
+    .replace(/<\/?p>/gi, '')
+  const doc = new DOMParser().parseFromString(`<div>${conSaltos}</div>`, 'text/html')
+  return (doc.body.textContent ?? '').trim()
+}
+
+export async function fetchComentarios(itemId) {
+  const data = await callMondayApi(COMENTARIOS_QUERY, { itemId })
+  const updates = data.items?.[0]?.updates ?? []
+  return updates
+    .filter((u) => (u.text_body ?? '').trim().startsWith(COMENTARIO_TAG))
+    .map((u) => {
+      // El body puede venir envuelto en <p>; se trabaja sobre el HTML sin ese envoltorio.
+      let html = String(u.body ?? '').trim().replace(/^<p>/i, '').replace(/<\/p>$/i, '')
+      html = html.replace(/^\s*\[COMENTARIO\]\s*/i, '')
+      const m = html.match(AUTOR_RE)
+      const autor = m
+        ? { id: m[2], name: htmlATexto(m[1]), photo: null }
+        : { id: u.creator?.id ? String(u.creator.id) : null, name: u.creator?.name ?? 'monday', photo: u.creator?.photo_thumb_small || null }
+      if (m) html = html.slice(m[0].length)
+      return {
+        id: String(u.id),
+        fecha: u.created_at,
+        autor,
+        texto: htmlATexto(html),
+        archivos: (u.assets ?? []).map((a) => ({
+          id: String(a.id),
+          nombre: a.name,
+          extension: String(a.file_extension ?? '').replace(/^\./, '').toLowerCase(),
+          url: a.public_url,
+          miniatura: a.url_thumbnail || null,
+        })),
+      }
+    })
+    .sort((a, b) => String(b.fecha).localeCompare(String(a.fecha)))
+}
+
+// Crea el comentario y le adjunta los archivos (uno por uno: add_file_to_update recibe
+// uno por pedido). Si falla un archivo, el comentario ya quedó creado: se avisa cuáles
+// no subieron para que se puedan reintentar.
+export async function crearComentario(itemId, { texto, autor, archivos = [] }) {
+  const firma = autor?.id
+    ? `Por <b>${escaparHtml(autor.name || 'Usuario')}</b> (usuario monday ${autor.id})`
+    : `Por <b>${escaparHtml(autor?.name || 'Usuario de la app')}</b>`
+  const cuerpo = escaparHtml(texto).trim().replace(/\n/g, '<br>')
+  const body = `${COMENTARIO_TAG} ${firma}<br>${cuerpo || (archivos.length ? '<i>Adjuntó archivos</i>' : '')}`
+  const data = await callMondayApi(CREATE_UPDATE_MUTATION, { itemId: String(itemId), body })
+  const updateId = data.create_update?.id
+  const fallidos = []
+  for (const file of archivos) {
+    try {
+      const archivo = await prepararArchivoParaSubir(file)
+      const formData = new FormData()
+      formData.append('query', `mutation ($file: File!) { add_file_to_update (update_id: ${Number(updateId)}, file: $file) { id } }`)
+      formData.append('variables[file]', archivo, archivo.name)
+      const response = await fetchProtegido('/api/monday-file', { method: 'POST', body: formData })
+      await leerRespuestaMonday(response)
+    } catch (err) {
+      fallidos.push(`${file.name} (${err.message})`)
+    }
+  }
+  return { updateId, fallidos }
+}

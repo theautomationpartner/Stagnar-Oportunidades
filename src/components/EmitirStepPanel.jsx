@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MdCheckCircle, MdHome } from 'react-icons/md'
+import { MdCancel, MdCheck, MdCheckCircle, MdHome, MdRefresh } from 'react-icons/md'
 import { AttentionBox, Button, Modal, ModalContent } from '@vibe/core'
 import { formatMoney } from '../services/format'
 import { badgeForCompania } from '../services/companyColors'
@@ -14,6 +14,7 @@ import {
   hayValidacion,
   validacionesQueBloquean,
   generalConDiferencias,
+  requisitosParaValidar,
 } from '../services/validacionPoliza'
 import { revisarCampo, revisarIdentificacion } from '../services/vehiculoIdentificacion'
 import FileUploadField from './FileUploadField'
@@ -59,6 +60,10 @@ export default function EmitirStepPanel({
   onConfirmarEmision,
   onRevisarValidacion,
   revisandoValidacion,
+  onValidarPoliza,
+  validacionVencida,
+  validacionErrorRespondido,
+  validarPolizaError,
   confirmandoEmision,
   confirmarEmisionError,
   onCargarEnJira,
@@ -91,7 +96,10 @@ export default function EmitirStepPanel({
   // leer el PDF) y acá se muestra lo que dejó, en vivo. No se emite con algo en rojo sin
   // que alguien lo revise — ver validacionPoliza.js.
   const validaciones = opportunity.validacionesPoliza ?? {}
-  const validandoPoliza = estaValidando(opportunity.validacionPolizaEstado)
+  const validandoPoliza = estaValidando(opportunity.validacionPolizaEstado) && !validacionVencida
+  // El escenario contestó que no pudo validar (ver validacionErrorRespuesta en
+  // OpportunityDetail): se muestra el motivo y se ofrece volver a validar.
+  const validacionConError = Boolean(validacionErrorRespondido) && !validandoPoliza
   const tieneValidacion = hayValidacion(validaciones, opportunity.validacionPolizaEstado)
   const bloqueantes = validacionesQueBloquean(validaciones)
   // A pedido: "Con diferencias" bloquea aunque no haya veredictos en rojo (el escenario
@@ -109,6 +117,15 @@ export default function EmitirStepPanel({
   // Red distinta de la de arriba: acá no se comparan los dos lados, se mira si cada valor
   // PUEDE ser lo que dice ser (un chasis de 5 caracteres no es un chasis). Un dato mal
   // leído de origen coincide con sí mismo y por eso el contraste no lo ve — esto sí.
+  // A pedido: qué hace falta para poder validar (ver requisitosParaValidar). Se muestra
+  // mientras la póliza no se validó todavía o la validación quedó cortada, junto con el
+  // botón "Validar póliza", que solo se habilita con todo en orden.
+  const requisitos = requisitosParaValidar(opportunity, { polizaFileName, hayElegida: Boolean(elegida) })
+  const faltanRequisitos = requisitos.some((r) => !r.ok)
+  const mostrarRequisitos =
+    polizaSubida && !concretada && !validandoPoliza && (!tieneValidacion || validacionVencida || validacionConError || faltanRequisitos)
+  const puedeRevalidar = polizaSubida && !concretada && !validandoPoliza && !faltanRequisitos && Boolean(onValidarPoliza)
+
   const reparosFormato = [
     ...revisarIdentificacion(opportunity, opportunity.anio).map((r) => ({ ...r, lado: 'lo cotizado' })),
     ...revisarIdentificacion(opportunity.vehiculoAsegurado ?? {}, opportunity.anio).map((r) => ({
@@ -173,12 +190,64 @@ export default function EmitirStepPanel({
           falta es que la diferencia se vea, no impedir el paso: se muestran los dos
           valores enfrentados para que la persona decida en el momento, que es cuando
           todavía es barato corregirlo. */}
-      {(tieneValidacion || validandoPoliza) && (
+      {validacionVencida && !validacionConError && (
+        <AttentionBox type="warning" title="La validación no terminó">
+          La validación de la póliza lleva más de 4 minutos sin terminar: es posible que la
+          automatización se haya cortado. Revisá que el archivo sea la póliza en PDF y volvé a validar.
+        </AttentionBox>
+      )}
+
+      {validacionConError && (
+        <AttentionBox type="negative" title="No se pudo validar la póliza">
+          {validacionErrorRespondido}
+        </AttentionBox>
+      )}
+
+      {mostrarRequisitos && (
+        <section className="emitir-step__validacion emitir-step__requisitos">
+          <div className="emitir-step__validacion-head">
+            <h3 className="emitir-step__validacion-titulo">
+              {faltanRequisitos ? 'Para validar la póliza falta' : 'La póliza está lista para validar'}
+            </h3>
+            {onValidarPoliza && (
+              <Button kind="primary" size="small" disabled={faltanRequisitos} onClick={onValidarPoliza}>
+                <MdCheckCircle /> {validacionVencida || validacionConError ? 'Volver a validar' : 'Validar póliza'}
+              </Button>
+            )}
+          </div>
+          <ul className="emitir-step__requisitos-lista">
+            {requisitos.map((r) => (
+              <li
+                key={r.key}
+                className={r.ok ? 'emitir-step__requisito emitir-step__requisito--ok' : 'emitir-step__requisito emitir-step__requisito--falta'}
+              >
+                {r.ok ? <MdCheckCircle aria-hidden="true" /> : <MdCancel aria-hidden="true" />}
+                <span>
+                  <strong>{r.label}</strong>
+                  {!r.ok && <> — {r.falta}</>}
+                </span>
+              </li>
+            ))}
+          </ul>
+          {validarPolizaError && <p className="emitir-step__error" role="alert">{validarPolizaError}</p>}
+        </section>
+      )}
+
+      {(tieneValidacion || validandoPoliza) && !validacionVencida && !validacionConError && (
         <section className="emitir-step__validacion">
-          <h3 className="emitir-step__validacion-titulo">
-            Validación de los datos de la póliza
-            {validandoPoliza && <span className="emitir-step__validacion-corriendo">validando…</span>}
-          </h3>
+          <div className="emitir-step__validacion-head">
+            <h3 className="emitir-step__validacion-titulo">
+              Validación de los datos de la póliza
+              {validandoPoliza && <span className="emitir-step__validacion-corriendo">validando…</span>}
+            </h3>
+            {/* A pedido: volver a validar a mano (ej. después de corregir un dato o
+                reemplazar el archivo), sin tener que volver a subir la póliza. */}
+            {puedeRevalidar && (
+              <Button kind="secondary" size="small" className="opp-detail__recotizar-btn" onClick={onValidarPoliza}>
+                <MdRefresh /> Volver a validar
+              </Button>
+            )}
+          </div>
           <ul className="emitir-step__validacion-lista">
             {VALIDACIONES_POLIZA.map((v) => {
               const r = validaciones[v.key] ?? {}
@@ -200,13 +269,16 @@ export default function EmitirStepPanel({
                       compara esa validación, que al menos dice qué se miró. */}
                   <p className="emitir-step__validacion-motivo">{r.motivo || v.detalle}</p>
                   {mal && onRevisarValidacion && (
+                    // A pedido: antes era un botón "terciario" (texto suelto) y no se notaba
+                    // que era un botón. Ahora tiene el mismo estilo que el resto de la app.
                     <Button
-                      kind="tertiary"
+                      kind="secondary"
                       size="small"
+                      className="opp-detail__recotizar-btn emitir-step__revisar-btn"
                       disabled={revisandoValidacion === v.key}
                       onClick={() => onRevisarValidacion(v)}
                     >
-                      {revisandoValidacion === v.key ? 'Marcando...' : 'Lo revisé, está bien'}
+                      <MdCheck /> {revisandoValidacion === v.key ? 'Marcando...' : 'Lo revisé, está bien'}
                     </Button>
                   )}
                 </li>
@@ -227,11 +299,11 @@ export default function EmitirStepPanel({
                 <Button
                   kind="secondary"
                   size="small"
-                  className="emitir-step__revisar-dif"
+                  className="opp-detail__recotizar-btn emitir-step__revisar-dif"
                   disabled={revisandoValidacion === 'cotizacion'}
                   onClick={() => onRevisarValidacion(VALIDACIONES_POLIZA.find((v) => v.key === 'cotizacion'))}
                 >
-                  {revisandoValidacion === 'cotizacion' ? 'Marcando...' : 'Lo revisé, marcar como revisadas'}
+                  <MdCheck /> {revisandoValidacion === 'cotizacion' ? 'Marcando...' : 'Lo revisé, marcar como revisadas'}
                 </Button>
               )}
             </div>
@@ -426,7 +498,7 @@ export default function EmitirStepPanel({
             kind="primary"
             className="emitir-step__confirmar-btn"
             onClick={handleConcretarAttempt}
-            disabled={confirmandoEmision || polling || validandoPoliza || bloqueantes.length > 0 || conDiferencias}
+            disabled={confirmandoEmision || polling || validandoPoliza || validacionVencida || validacionConError || bloqueantes.length > 0 || conDiferencias}
           >
             <MdCheckCircle /> {confirmandoEmision ? 'Confirmando...' : 'Concretar Oportunidad'}
           </Button>

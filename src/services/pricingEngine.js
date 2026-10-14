@@ -128,15 +128,24 @@ const OPCIONALES = {
     { field: 'suraTeLleva', precioKey: 'SURA te lleva', label: 'SURA TE LLEVA', labelCorto: 'SURA te lleva' },
     { field: 'ap', precioKey: 'AP', label: 'ACCIDENTES PERSONALES', labelCorto: 'Accidentes Personales' },
   ],
+  // A pedido: SANCOR no tiene opcionales para tildar, solo el auto cortesía (ver
+  // AUTO_EXTRA_DIAS y autoExtraDisponible).
+  SANCOR: [],
 }
 
 // "Auto extra" es el único opcional que no se tilda: se elige la duración. PORTO ofrece
 // las 3, SURA solo 15 días (a pedido: "Coche Cortesía" de SURA = auto extra 15 días).
-const AUTO_EXTRA_DIAS = { PORTO: ['7 días', '15 días', '30 días'], SURA: ['15 días'] }
+// A pedido: SANCOR, "auto cortesía" de 15 o 30 días (precios en PANEL: "Auto extra 15
+// días" / "Auto extra 30 días", compañía SANCOR).
+const AUTO_EXTRA_DIAS = { PORTO: ['7 días', '15 días', '30 días'], SURA: ['15 días'], SANCOR: ['15 días', '30 días'] }
 
 // "Auto extra" no es un tilde sino una duración elegida (7/15/30 días en PORTO, solo 15
 // en SURA): cada opción tiene su propia fila de precio en PANEL.
 const AUTO_EXTRA_LABEL = 'AUTO EXTRA'
+// En SANCOR se llama "auto cortesía".
+const autoExtraLabel = (eff) => (eff.compania === 'SANCOR' ? 'AUTO CORTESÍA' : AUTO_EXTRA_LABEL)
+// Destinos (Uso) en los que SANCOR ofrece el auto cortesía.
+const USOS_PARTICULARES = new Set(['PARTICULAR', 'PARTICULAR Y TRABAJO'])
 const autoExtraPrecioKey = (dias) => `Auto extra ${dias}`
 
 function preciosDe(eff, preciosOpcionales) {
@@ -167,6 +176,11 @@ function opcionalesDisponibles(eff) {
 function autoExtraDisponible(eff) {
   if (todosIncluidos(eff) || !OPCIONALES[eff.compania]) return false
   if (eff.compania === 'SURA') return eff.cobertura === 'TOTAL'
+  // A pedido: SANCOR solo en coberturas Totales y con destino particular (o particular y
+  // trabajo); en las parciales no.
+  if (eff.compania === 'SANCOR') {
+    return coberturaGroupOf(eff.cobertura) === 'GLOBAL' && USOS_PARTICULARES.has(String(eff.uso ?? '').trim().toUpperCase())
+  }
   const familia = coberturaGroupOf(eff.cobertura)
   return familia === 'GLOBAL' || familia === 'TRIPLE'
 }
@@ -275,7 +289,7 @@ function buildOpcionales(eff, preciosOpcionales) {
   }
   if (eff.autoExtra && autoExtraDisponible(eff)) {
     items.push({
-      label: `${AUTO_EXTRA_LABEL} (${eff.autoExtra.toUpperCase()})`,
+      label: `${autoExtraLabel(eff)} (${eff.autoExtra.toUpperCase()})`,
       contratado: true,
       precio: null,
       desde: false,
@@ -286,7 +300,7 @@ function buildOpcionales(eff, preciosOpcionales) {
       .map((k) => num(precios[k]))
       .filter(Boolean)
     if (preciosAutoExtra.length) {
-      items.push({ label: AUTO_EXTRA_LABEL, contratado: false, precio: Math.min(...preciosAutoExtra), desde: true })
+      items.push({ label: autoExtraLabel(eff), contratado: false, precio: Math.min(...preciosAutoExtra), desde: true })
     }
   }
   return items
@@ -603,6 +617,9 @@ function computeWarning(eff) {
     return {
       short: edad < 25 ? 'Edad del titular no cumple el mínimo requerido' : 'Edad del titular supera el máximo permitido',
       full: `Edad del titular ${motivo}: no se aplica bonificación. Cotización orientativa.`,
+      // A pedido: es para el vendedor. Se ve en la app, pero no va en la imagen ni en el
+      // texto que se le mandan al cliente (ver whatsappImage.js y whatsappText.js).
+      soloInterno: true,
     }
   }
   return null

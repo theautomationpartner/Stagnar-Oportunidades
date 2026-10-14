@@ -335,3 +335,73 @@
   border-color: #b3d1f2 !important;
   color: #114b8f !important;
 }
+
+/* A pedido: título de la validación con su botón ("Validar póliza" / "Volver a
+   validar") a la derecha. */
+.emitir-step__validacion-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin: 0 0 10px;
+}
+
+.emitir-step__validacion-head .emitir-step__validacion-titulo {
+  margin: 0;
+}
+
+/* Qué hace falta para poder validar (ver requisitosParaValidar). */
+.emitir-step__requisitos-lista {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px 16px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+@media (max-width: 720px) {
+  .emitir-step__requisitos-lista {
+    grid-template-columns: 1fr;
+  }
+}
+
+.emitir-step__requisito {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.emitir-step__requisito svg {
+  flex: none;
+  margin-top: 1px;
+  font-size: 16px;
+}
+
+.emitir-step__requisito--ok svg {
+  color: #00854d;
+}
+
+.emitir-step__requisito--falta {
+  color: #b42d43;
+}
+
+.emitir-step__requisito--falta svg {
+  color: #d83a52;
+}
+
+/* "Lo revisé, está bien": botón de verdad, con ícono. */
+.emitir-step__revisar-btn {
+  margin-top: 2px;
+}
+
+/* Mismo motivo que .emitir-step__confirmar-btn svg: el espacio del JSX se pierde
+   dentro del Button. */
+.emitir-step__validacion-head button svg,
+.emitir-step__revisar-btn svg,
+.emitir-step__revisar-dif svg {
+  margin-right: 6px;
+  flex-shrink: 0;
+}

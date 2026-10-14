@@ -120,3 +120,44 @@ export function hayValidacion(validaciones, general) {
     return estado && estado !== ESTADO_VALIDACION.sinValidar
   })
 }
+
+// A pedido: avisar ANTES de validar si están dadas las condiciones, en vez de mandar al
+// escenario algo que no puede validar. Son las mismas condiciones que el escenario
+// necesita para llegar al final; sin alguna, hoy se queda callado y la pantalla quedaba
+// "validando" para siempre:
+// - la póliza en PDF (el escenario la lee como documento PDF, una foto no la puede leer),
+// - el Cliente vinculado (contra él compara la persona),
+// - la cotización elegida (contra ella compara compañía, cobertura y premio),
+// - matrícula o chasis en la oportunidad (contra ellos compara el vehículo).
+export function requisitosParaValidar(opportunity, { polizaFileName, hayElegida }) {
+  const nombre = String(polizaFileName ?? '')
+  const esPdf = /\.pdf$/i.test(nombre.trim())
+  return [
+    {
+      key: 'poliza',
+      label: 'Póliza en PDF',
+      ok: Boolean(nombre) && esPdf,
+      falta: nombre
+        ? `El archivo cargado («${nombre}») no es un PDF. Subí la póliza en PDF.`
+        : 'Falta subir la póliza.',
+    },
+    {
+      key: 'cliente',
+      label: 'Cliente vinculado',
+      ok: Boolean(opportunity?.clienteId),
+      falta: 'La oportunidad no tiene un Cliente vinculado.',
+    },
+    {
+      key: 'elegida',
+      label: 'Cotización elegida',
+      ok: Boolean(hayElegida),
+      falta: 'No hay una cotización elegida (se marca en el paso "Confirmar").',
+    },
+    {
+      key: 'vehiculo',
+      label: 'Matrícula o chasis',
+      ok: Boolean(String(opportunity?.matricula ?? '').trim() || String(opportunity?.chasis ?? '').trim()),
+      falta: 'La oportunidad no tiene matrícula ni chasis cargados.',
+    },
+  ]
+}

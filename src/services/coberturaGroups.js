@@ -63,6 +63,13 @@ const SUBTITULO_POR_COBERTURA = {
   'PARCIAL PLUS': 'RESPONSABILIDAD CIVIL, HURTO, INCENDIO Y PÉRDIDA TOTAL',
 }
 
+// A pedido: coberturas que en el título (imagen y texto de WhatsApp) llevan su propio
+// nombre y no el de la familia — SANCOR "PARCIAL PLUS" no es la Parcial común.
+const TITULO_POR_COBERTURA = { 'PARCIAL PLUS': 'PARCIAL PLUS' }
+export function tituloPropioDeCobertura(cobertura) {
+  return TITULO_POR_COBERTURA[(cobertura ?? '').trim().toUpperCase()] ?? null
+}
+
 // El detalle de una cobertura puntual: el propio si lo tiene, si no el de su familia, y
 // null si no cae en ninguna (quien lo muestre arma un texto genérico con su nombre).
 export function subtituloDeCobertura(cobertura) {

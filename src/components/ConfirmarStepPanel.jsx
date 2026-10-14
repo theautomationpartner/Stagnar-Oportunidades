@@ -1,10 +1,11 @@
 import { useEffect, useRef, useState } from 'react'
-import { MdCheckCircle, MdChatBubbleOutline } from 'react-icons/md'
+import { MdAdd, MdCheckCircle, MdChatBubbleOutline, MdRadioButtonChecked, MdRemove } from 'react-icons/md'
 import { FaWhatsapp } from 'react-icons/fa'
-import { Button, Checkbox, Dropdown, NumberField, TextField } from '@vibe/core'
-import { formatMoney, CUOTA_COUNTS, toPercentString } from '../services/format'
+import { Button, Checkbox, Dropdown, TextField } from '@vibe/core'
+import { formatMoney } from '../services/format'
 import {
   autoExtraOpciones,
+  BONIF_MAX,
   CUOTAS_SIN_CONFIRMAR,
   esBse3x2,
   isQuoteSelectable,
@@ -20,6 +21,7 @@ import AlertModal from './AlertModal'
 import { fetchFileColumnAsFile } from '../services/mondayApi'
 import { getMissingLabels } from '../services/requiredFields'
 import './PillTabs.css'
+import './QuoteCard.css'
 import './ConfirmarStepPanel.css'
 
 // Los datos que el paso 3 exige verificar antes de emitir viven en
@@ -96,47 +98,12 @@ function QuoteChoiceCard({ entry, selected, onSelect, selecting }) {
         </div>
       </div>
 
-      {!quote.blocked && (
-        <div className="confirmar-step__card-cuotas">
-          <table className="confirmar-step__card-cuotas-table">
-            <thead>
-              <tr>
-                <th>Cuotas</th>
-                <th>Valor cuota</th>
-                <th>Recargo</th>
-              </tr>
-            </thead>
-            <tbody>
-              {CUOTA_COUNTS.map((n) => (
-                <tr key={n}>
-                  <td>{n}x</td>
-                  <td>{formatMoney(quote.cuotas[n].valor)}</td>
-                  <td>{toPercentString(raw[`recargo${n}`])}%</td>
-                </tr>
-              ))}
-            </tbody>
-          </table>
-          {/* EST-06: mismo destacado que en el paso 2 (ver .quote-card__promo), con la
-              condición de BSE/SURA a la vista — acá se elige la cobertura que se va a
-              emitir, así que la forma de pago que se prometió tiene que estar dicha con
-              todas las letras también en esta pantalla. */}
-          {quote.promo && (
-            <div className="confirmar-step__card-promo">
-              <span className="confirmar-step__card-promo-main">
-                {quote.promo.count} cuotas de {formatMoney(quote.promo.valor)}
-                <strong className="confirmar-step__card-promo-flag">SIN RECARGO</strong>
-              </span>
-              {quote.promo.condicion && (
-                <span className="confirmar-step__card-promo-condicion">{quote.promo.condicion}</span>
-              )}
-            </div>
-          )}
-        </div>
-      )}
-
+      {/* A pedido: sin la tabla de cuotas en cada tarjeta (achicaba todo y repetía lo de
+          "Forma de pago elegida", que es donde se eligen y la única que queda). */}
       <Button
         kind={selected ? 'primary' : 'secondary'}
-        className="confirmar-step__card-btn"
+        // A pedido: mismo botón que el resto de la app (blanco con hover azul) cuando no es la elegida.
+        className={selected ? 'confirmar-step__card-btn' : 'confirmar-step__card-btn opp-detail__recotizar-btn'}
         onClick={selectable ? onSelect : undefined}
         disabled={selecting || !selectable}
       >
@@ -180,6 +147,7 @@ function AjustesElegida({ entry, onSetBonif, onToggleOpcional, onAutoExtraChange
   const opcionales = opcionalesDeCompania(raw)
   const autoExtraDias = autoExtraOpciones(raw)
   const bonifDirty = bonifDraft.trim() !== bonifReal.trim()
+  const bonifNum = Number(bonifDraft) || 0
 
   const correr = async (clave, accion) => {
     setSavingOpcional(clave)
@@ -207,26 +175,97 @@ function AjustesElegida({ entry, onSetBonif, onToggleOpcional, onAutoExtraChange
 
   return (
     <div className="confirmar-step__ajustes">
-      <div className="confirmar-step__ajustes-head">
-        <h3 className="confirmar-step__ajustes-title">Ajustes finales</h3>
-        <p className="confirmar-step__ajustes-subtitle">
-          Se guardan en la cotización de monday y son los que se usan para emitir.
-        </p>
+      {/* A pedido: dos columnas que aprovechan el ancho — a la izquierda la forma de
+          pago (lo primero que se elige), a la derecha los ajustes de la cotización. */}
+      <div className="confirmar-step__ajustes-col confirmar-step__ajustes-col--pago">
+        <div className="confirmar-step__ajustes-head">
+          <h3 className="confirmar-step__ajustes-title">Forma de pago</h3>
+          <p className="confirmar-step__ajustes-subtitle">Elegí con cuántas cuotas cierra el cliente.</p>
+        </div>
+
+      {/* A pedido: arriba de todo, como lo primero que se hace en esta sección.
+          LOG-13: con cuántas cuotas se cierra. Se guarda en la Oportunidad (no en la
+          cotización): es una decisión de la venta, no un dato de la tarifa. Las opciones
+          salen de ESTA cotización, así que cada una muestra su monto real y la promo sin
+          recargo aparece solo si la compañía la tiene — con su condición, que es la que
+          la hace válida (LOG-16). */}
+      {pagos.length > 0 && (
+          <div className="confirmar-step__pagos">
+            {pagos.map((p) => {
+              const elegida = p.label === cuotasElegidas
+              return (
+                <button
+                  key={p.label}
+                  type="button"
+                  aria-pressed={elegida}
+                  disabled={savingOpcional === 'cuotas'}
+                  className={elegida ? 'confirmar-step__pago confirmar-step__pago--activo' : 'confirmar-step__pago'}
+                  onClick={() => correr('cuotas', () => onSetCuotas(elegida ? CUOTAS_SIN_CONFIRMAR : p.label))}
+                >
+                  <span className="confirmar-step__pago-label">{p.label}</span>
+                  <strong>{formatMoney(p.valor)}</strong>
+                  {p.condicion && <em className="confirmar-step__pago-condicion">{p.condicion}</em>}
+                </button>
+              )
+            })}
+          </div>
+      )}
       </div>
+
+      <div className="confirmar-step__ajustes-col">
+        <div className="confirmar-step__ajustes-head">
+          <h3 className="confirmar-step__ajustes-title">Ajustes</h3>
+          <p className="confirmar-step__ajustes-subtitle">
+            Se guardan en la cotización de monday y son los que se usan para emitir.
+          </p>
+        </div>
 
       <div className="confirmar-step__ajustes-grid">
         {/* El BSE 3x2 no lleva bonificación comercial (ver pricingEngine.js#esBse3x2). */}
         {!esBse3x2(raw) && (
-        <label className="confirmar-step__ajustes-field">
-          <span>Bonificación (%)</span>
+        <div className="confirmar-step__ajustes-field">
           <div className="confirmar-step__ajustes-bonif">
-            <NumberField
-              size="small"
-              value={bonifDraft === '' ? null : Number(bonifDraft)}
-              onChange={(value) => setBonifDraft(value == null ? '' : String(value))}
-            />
+            {/* A pedido: la misma pastilla con − / + que la tarjeta del paso 2 (ver
+                QuoteCard.jsx); acá sigue haciendo falta "Guardar" porque escribe en monday. */}
+            <div className="quote-card__bonif" title="Bonificación comercial sobre el contado">
+              <span className="quote-card__bonif-label">Bonif.</span>
+              <button
+                type="button"
+                className="quote-card__bonif-paso"
+                aria-label="Bajar bonificación"
+                disabled={bonifNum <= 0}
+                onClick={() => setBonifDraft(String(Math.max(0, bonifNum - 1)))}
+              >
+                <MdRemove aria-hidden="true" />
+              </button>
+              <input
+                className="quote-card__bonif-input"
+                type="number"
+                inputMode="decimal"
+                min="0"
+                max={BONIF_MAX}
+                aria-label="Bonificación (%)"
+                value={bonifDraft}
+                onKeyDown={(e) => (e.key === '-' || e.key === 'e') && e.preventDefault()}
+                onChange={(e) => {
+                  const valor = e.target.value.replace('-', '')
+                  setBonifDraft(valor === '' ? '' : String(Math.min(BONIF_MAX, Number(valor))))
+                }}
+              />
+              <span className="quote-card__bonif-pct">%</span>
+              <button
+                type="button"
+                className="quote-card__bonif-paso"
+                aria-label="Subir bonificación"
+                disabled={bonifNum >= BONIF_MAX}
+                onClick={() => setBonifDraft(String(Math.min(BONIF_MAX, bonifNum + 1)))}
+              >
+                <MdAdd aria-hidden="true" />
+              </button>
+            </div>
             <Button
               kind={bonifDirty ? 'primary' : 'secondary'}
+              className={bonifDirty ? undefined : 'opp-detail__recotizar-btn'}
               size="small"
               onClick={handleGuardarBonif}
               disabled={!bonifDirty || savingBonif}
@@ -234,17 +273,18 @@ function AjustesElegida({ entry, onSetBonif, onToggleOpcional, onAutoExtraChange
               {savingBonif ? 'Guardando...' : 'Guardar'}
             </Button>
           </div>
-        </label>
+        </div>
         )}
 
         {autoExtraDias.length > 0 && (
           <label className="confirmar-step__ajustes-field">
-            <span>Auto extra</span>
+            {/* En SANCOR se llama "auto cortesía". */}
+            <span>{raw.compania === 'SANCOR' ? 'Auto cortesía' : 'Auto extra'}</span>
             <Dropdown
               size="small"
               options={autoExtraDias.map((d) => ({ value: d, label: d }))}
               value={raw.autoExtra ? { value: raw.autoExtra, label: raw.autoExtra } : null}
-              placeholder="Sin auto extra"
+              placeholder={raw.compania === 'SANCOR' ? 'Sin auto cortesía' : 'Sin auto extra'}
               clearable
               onClear={() => correr('autoExtra', () => onAutoExtraChange(raw.id, ''))}
               onChange={(option) => correr('autoExtra', () => onAutoExtraChange(raw.id, option?.value ?? ''))}
@@ -275,39 +315,10 @@ function AjustesElegida({ entry, onSetBonif, onToggleOpcional, onAutoExtraChange
           Esta cobertura no tiene adicionales para ajustar.
         </p>
       )}
-
-      {/* LOG-13: con cuántas cuotas se cierra. Se guarda en la Oportunidad (no en la
-          cotización): es una decisión de la venta, no un dato de la tarifa. Las opciones
-          salen de ESTA cotización, así que cada una muestra su monto real y la promo sin
-          recargo aparece solo si la compañía la tiene — con su condición, que es la que
-          la hace válida (LOG-16). */}
-      {pagos.length > 0 && (
-        <div className="confirmar-step__ajustes-opcionales">
-          <span className="confirmar-step__ajustes-label">Forma de pago elegida</span>
-          <div className="confirmar-step__pagos">
-            {pagos.map((p) => {
-              const elegida = p.label === cuotasElegidas
-              return (
-                <button
-                  key={p.label}
-                  type="button"
-                  aria-pressed={elegida}
-                  disabled={savingOpcional === 'cuotas'}
-                  className={elegida ? 'confirmar-step__pago confirmar-step__pago--activo' : 'confirmar-step__pago'}
-                  onClick={() => correr('cuotas', () => onSetCuotas(elegida ? CUOTAS_SIN_CONFIRMAR : p.label))}
-                >
-                  <span className="confirmar-step__pago-label">{p.label}</span>
-                  <strong>{formatMoney(p.valor)}</strong>
-                  {p.condicion && <em className="confirmar-step__pago-condicion">{p.condicion}</em>}
-                </button>
-              )
-            })}
-          </div>
-        </div>
-      )}
+      </div>
 
       {error && (
-        <p className="confirmar-step__error" role="alert">
+        <p className="confirmar-step__error confirmar-step__ajustes-error" role="alert">
           Error: {error}
         </p>
       )}
@@ -359,49 +370,39 @@ function ChosenProposal({ elegida, onSetBonif, onToggleOpcional, onAutoExtraChan
   const cobertura = transitioning ? dash : coberturaParaMostrar(shown.raw)
   const deducible = transitioning ? dash : shown.quote.deducibleDisplay
   const contado = transitioning ? dash : formatMoney(Number(shown.raw.contado) || 0)
-  const cuota = (n) => (transitioning ? dash : formatMoney(shown.quote.cuotas[n].valor))
   const total = transitioning ? dash : formatMoney(shown.quote.total)
 
   return (
     <div className="confirmar-step__section">
-      <h2 className="confirmar-step__title">Cotización elegida</h2>
+      {/* A pedido: el nombre de la cotización a la izquierda y sus cifras a la derecha.
+          "Contado" y "Total" se confundían: el primero es el precio de WINK y el segundo
+          el que paga el cliente (con bonificación y adicionales), que es el que se destaca. */}
       <div
         className={
           transitioning ? 'confirmar-step__chosen confirmar-step__chosen--updating' : 'confirmar-step__chosen'
         }
       >
-        <div className="confirmar-step__chosen-head">
-          <span className="confirmar-step__chosen-compania">{compania}</span>
-          <span className="confirmar-step__chosen-cobertura">{cobertura}</span>
-        </div>
-        <div className="confirmar-step__chosen-grid">
+        <div className="confirmar-step__chosen-top">
           <div>
-            <span>Deducible</span>
-            <strong>{deducible}</strong>
+            <h2 className="confirmar-step__title">Cotización elegida</h2>
+            <div className="confirmar-step__chosen-head">
+              <span className="confirmar-step__chosen-compania">{compania}</span>
+              <span className="confirmar-step__chosen-cobertura">{cobertura}</span>
+            </div>
           </div>
-          <div>
-            <span>Contado</span>
-            <strong>{contado}</strong>
-          </div>
-          <div>
-            <span>3 cuotas</span>
-            <strong>{cuota(3)}</strong>
-          </div>
-          <div>
-            <span>6 cuotas</span>
-            <strong>{cuota(6)}</strong>
-          </div>
-          <div>
-            <span>8 cuotas</span>
-            <strong>{cuota(8)}</strong>
-          </div>
-          <div>
-            <span>10 cuotas</span>
-            <strong>{cuota(10)}</strong>
-          </div>
-          <div>
-            <span>Total</span>
-            <strong>{total}</strong>
+          <div className="confirmar-step__chosen-grid">
+            <div>
+              <span>Deducible</span>
+              <strong>{deducible}</strong>
+            </div>
+            <div>
+              <span>Precio WINK</span>
+              <strong>{contado}</strong>
+            </div>
+            <div className="confirmar-step__chosen-total">
+              <span>Total contado</span>
+              <strong>{total}</strong>
+            </div>
           </div>
         </div>
       </div>
@@ -451,6 +452,8 @@ export default function ConfirmarStepPanel({
   confirmError,
   onConfirmar,
   onBack,
+  // Ids de las cotizaciones tildadas para enviar en "Comparar y enviar" (paso 2).
+  seleccionadasIds,
 }) {
   const [validationError, setValidationError] = useState(null)
   const [direccionDraft, setDireccionDraft] = useState(opportunity.clienteDireccion || '')
@@ -465,13 +468,19 @@ export default function ConfirmarStepPanel({
   // del borde izquierdo (accentForCompania) ya identifica de qué compañía es cada una.
   const sortedEntries = [...entries].sort((a, b) => a.raw.compania.localeCompare(b.raw.compania))
   const sentEntries = sortedEntries.filter((e) => e.raw.incluirPropuesta)
+  // A pedido: "Seleccionadas para enviar" (las tildadas en el paso 2) separada de
+  // "Enviadas por WhatsApp" (las que de verdad salieron, incluirPropuesta).
+  const selectedEntries = sortedEntries.filter((e) => seleccionadasIds?.has(e.raw.id))
   // A pedido, estética tipo mockup: solapa "Enviadas por WhatsApp"/"Todas las
   // cotizaciones" para no tener que scrollear entre TODAS las cotizadas (hasta 19, ver
   // EXPECTED_QUOTE_COUNT_BY_COMPANIA) cuando lo que casi siempre hace falta acá es elegir
   // entre las 1-2 que ya se le mandaron al cliente. Arranca en "Enviadas" si hay alguna
   // — si todavía no se mandó ninguna, no tiene sentido arrancar en una grilla vacía.
-  const [filterTab, setFilterTab] = useState(() => (sentEntries.length > 0 ? 'sent' : 'all'))
-  const visibleEntries = filterTab === 'sent' ? sentEntries : sortedEntries
+  const [filterTab, setFilterTab] = useState(() =>
+    selectedEntries.length > 0 ? 'selected' : sentEntries.length > 0 ? 'sent' : 'all'
+  )
+  const visibleEntries =
+    filterTab === 'selected' ? selectedEntries : filterTab === 'sent' ? sentEntries : sortedEntries
 
   // El botón "Confirmar" verifica los datos del cliente (CHECKLIST_FIELDS, ya no se
   // muestran como checklist visual, a pedido) + documentación cargada + que haya una
@@ -524,6 +533,93 @@ export default function ConfirmarStepPanel({
 
   return (
     <div className="confirmar-step">
+      {/* A pedido: primero elegir la cotización y la forma de pago (lo que se decide en
+          este paso); el domicilio y los documentos, después. */}
+      <div className="confirmar-step__section">
+        <div className="confirmar-step__props-head">
+          <div>
+            <h2 className="confirmar-step__title">Cotizaciones</h2>
+            <p className="confirmar-step__subtitle">
+              Marcá cuál es la cotización elegida por el cliente. El color identifica la compañía y
+              el ícono de WhatsApp indica cuáles ya se enviaron.
+            </p>
+          </div>
+          {/* Control segmentado a mano (no Tab/TabList de @vibe/core) — mismo criterio que
+              .opp-detail__cobertura-tabs (paso "Comparar y enviar"): sus estilos internos
+              vienen de clases hasheadas inyectadas en runtime, no hay hook confiable para
+              un look propio. */}
+          <div className="pill-tabs confirmar-step__filter-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={filterTab === 'selected'}
+              className={
+                filterTab === 'selected' ? 'pill-tabs__tab pill-tabs__tab--active' : 'pill-tabs__tab'
+              }
+              onClick={() => setFilterTab('selected')}
+            >
+              <MdRadioButtonChecked /> Seleccionadas para enviar ({selectedEntries.length})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={filterTab === 'sent'}
+              className={
+                filterTab === 'sent' ? 'pill-tabs__tab pill-tabs__tab--active' : 'pill-tabs__tab'
+              }
+              onClick={() => setFilterTab('sent')}
+            >
+              <MdChatBubbleOutline /> Enviadas por WhatsApp ({sentEntries.length})
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={filterTab === 'all'}
+              className={
+                filterTab === 'all' ? 'pill-tabs__tab pill-tabs__tab--active' : 'pill-tabs__tab'
+              }
+              onClick={() => setFilterTab('all')}
+            >
+              Todas las cotizaciones ({sortedEntries.length})
+            </button>
+          </div>
+        </div>
+        {elegidaError && <p className="confirmar-step__error" role="alert">Error: {elegidaError}</p>}
+        {visibleEntries.length === 0 ? (
+          <p className="confirmar-step__empty">
+            {filterTab === 'selected'
+              ? 'No hay cotizaciones seleccionadas para enviar. Se tildan en "Comparar y enviar".'
+              : filterTab === 'sent'
+                ? 'Todavía no se envió ninguna cotización por WhatsApp.'
+                : 'No hay cotizaciones cargadas.'}
+          </p>
+        ) : (
+          <div className="confirmar-step__grid">
+            {visibleEntries.map((e) => (
+              <QuoteChoiceCard
+                key={e.raw.id}
+                entry={e}
+                selected={e.raw.id === elegida?.raw.id}
+                onSelect={() => onSetElegida(e.raw.id)}
+                selecting={settingElegidaId === e.raw.id}
+              />
+            ))}
+          </div>
+        )}
+      </div>
+
+      <ChosenProposal
+        elegida={elegida}
+        onSetBonif={onSetBonif}
+        onToggleOpcional={onToggleOpcional}
+        onAutoExtraChange={onAutoExtraChange}
+        onSetCuotas={onSetCuotas}
+        cuotasElegidas={opportunity.cuotasElegidas}
+      />
+
+      {/* A pedido: Domicilio y Documentos uno al lado del otro, para aprovechar el ancho
+          (en pantallas angostas se apilan). */}
+      <div className="confirmar-step__datos">
       {/* A pedido: la Dirección del Cliente/Lead se pide en este paso, como sección
           propia (es un dato de la persona, no un documento). */}
       {opportunity.clienteId && (
@@ -548,6 +644,7 @@ export default function ConfirmarStepPanel({
               />
               <Button
                 kind={direccionDirty ? 'primary' : 'secondary'}
+                className={direccionDirty ? undefined : 'opp-detail__recotizar-btn'}
                 onClick={() => onSaveDireccion?.(direccionDraft)}
                 disabled={!direccionDirty || !direccionDraft.trim() || savingDireccion}
                 loading={savingDireccion}
@@ -594,74 +691,7 @@ export default function ConfirmarStepPanel({
         </div>
       </div>
 
-      <div className="confirmar-step__section">
-        <div className="confirmar-step__props-head">
-          <div>
-            <h2 className="confirmar-step__title">Cotizaciones</h2>
-            <p className="confirmar-step__subtitle">
-              Marcá cuál es la cotización elegida por el cliente. El color identifica la compañía y
-              el ícono de WhatsApp indica cuáles ya se enviaron.
-            </p>
-          </div>
-          {/* Control segmentado a mano (no Tab/TabList de @vibe/core) — mismo criterio que
-              .opp-detail__cobertura-tabs (paso "Comparar y enviar"): sus estilos internos
-              vienen de clases hasheadas inyectadas en runtime, no hay hook confiable para
-              un look propio. */}
-          <div className="pill-tabs confirmar-step__filter-tabs" role="tablist">
-            <button
-              type="button"
-              role="tab"
-              aria-selected={filterTab === 'sent'}
-              className={
-                filterTab === 'sent' ? 'pill-tabs__tab pill-tabs__tab--active' : 'pill-tabs__tab'
-              }
-              onClick={() => setFilterTab('sent')}
-            >
-              <MdChatBubbleOutline /> Enviadas por WhatsApp
-            </button>
-            <button
-              type="button"
-              role="tab"
-              aria-selected={filterTab === 'all'}
-              className={
-                filterTab === 'all' ? 'pill-tabs__tab pill-tabs__tab--active' : 'pill-tabs__tab'
-              }
-              onClick={() => setFilterTab('all')}
-            >
-              Todas las cotizaciones
-            </button>
-          </div>
-        </div>
-        {elegidaError && <p className="confirmar-step__error" role="alert">Error: {elegidaError}</p>}
-        {visibleEntries.length === 0 ? (
-          <p className="confirmar-step__empty">
-            {filterTab === 'sent'
-              ? 'Todavía no se envió ninguna cotización por WhatsApp.'
-              : 'No hay cotizaciones cargadas.'}
-          </p>
-        ) : (
-          <div className="confirmar-step__grid">
-            {visibleEntries.map((e) => (
-              <QuoteChoiceCard
-                key={e.raw.id}
-                entry={e}
-                selected={e.raw.id === elegida?.raw.id}
-                onSelect={() => onSetElegida(e.raw.id)}
-                selecting={settingElegidaId === e.raw.id}
-              />
-            ))}
-          </div>
-        )}
       </div>
-
-      <ChosenProposal
-        elegida={elegida}
-        onSetBonif={onSetBonif}
-        onToggleOpcional={onToggleOpcional}
-        onAutoExtraChange={onAutoExtraChange}
-        onSetCuotas={onSetCuotas}
-        cuotasElegidas={opportunity.cuotasElegidas}
-      />
 
       {/* A pedido: se saca el texto fijo de acá (se repetía siempre, complete o no) —
           ahora esa misma explicación solo aparece como advertencia puntual, si falta

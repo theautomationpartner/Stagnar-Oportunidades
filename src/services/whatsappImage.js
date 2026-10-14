@@ -10,7 +10,7 @@
 // incluye, warning. Devuelve un data URL PNG listo para previsualizar o mandar a Make.
 import { formatMoney, modeloSinMarca, zonaParaMostrar } from './format'
 import { BRAND_COLORS } from './companyColors'
-import { coberturaGroupOf, coberturaParaMostrar, FAMILIA_LABEL, subtituloDeCobertura } from './coberturaGroups'
+import { coberturaGroupOf, coberturaParaMostrar, FAMILIA_LABEL, subtituloDeCobertura, tituloPropioDeCobertura } from './coberturaGroups'
 import { iconoUrlParaBeneficio } from './beneficiosIconos'
 import { esBse3x2 } from './pricingEngine'
 import { edadDesde } from './edad'
@@ -358,7 +358,7 @@ function drawCoverTitle(ctx, raw, y) {
   // imagen sin título.
   // A pedido: en el BSE 3x2 se aclara que es 3x2 ("TOTAL 3X2" / "PARCIAL 3X2") — el precio
   // es por los 3 años y no se puede confundir con la anual.
-  const familia = FAMILIA_LABEL[group]
+  const familia = tituloPropioDeCobertura(raw.cobertura) ?? FAMILIA_LABEL[group]
   const title = ((familia && esBse3x2(raw) ? `${familia} 3x2` : familia) || coberturaParaMostrar(raw) || 'COTIZACIÓN').toUpperCase()
   // Detalle de lo que cubre, en mayúsculas (texto definido por Stagnari, compartido con la
   // versión en texto — ver coberturaGroups.js#subtituloDeCobertura). Es descriptivo, no
@@ -836,7 +836,8 @@ function drawContent(ctx, opportunity, raw, quote, canvasHeight, logos, layout =
   if (quote.opcionales?.length) {
     y = drawOpcionales(ctx, quote.opcionales, y + 14, { fontSize: layout.benefitsFont })
   }
-  if (quote.warning) y = drawWarning(ctx, quote.warning, y + 16)
+  // Los avisos solo para el vendedor (soloInterno, ej. SANCOR por edad) no van al cliente.
+  if (quote.warning && !quote.warning.soloInterno) y = drawWarning(ctx, quote.warning, y + 16)
   return y + 22
 }
 

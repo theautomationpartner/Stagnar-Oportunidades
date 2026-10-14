@@ -307,14 +307,10 @@ const elegida = elegidaItem
 const yaSeLeyo = normalizar(op.estadoLectura) === 'leidos'
 const faltaIdentificacion = !codigo(op.chasis) && !codigo(op.matricula)
 
-if (faltaIdentificacion && op.tieneCarta && !yaSeLeyo) {
-  return {
-    accion: 'leer-documentos',
-    general: GENERAL.validando,
-    faltantes: ['chasis', 'matrícula'],
-    mensaje: 'La oportunidad no tiene chasis ni matrícula y hay una Carta Automóvil sin leer: se pide la lectura antes de validar.',
-  }
-}
+// Antes, con la Carta sin leer, se devolvía accion 'leer-documentos' con el general en
+// "Validando" — pero en este escenario nadie hace esa lectura, así que la oportunidad
+// quedaba "Validando" para siempre. Ahora se sigue de largo: el veredicto de Vehículo
+// (más abajo) queda en "Incorrecto" con el motivo, y el general en "Con diferencias".
 
 // ───────────── 2) veredictos ─────────────
 const faltantes = []

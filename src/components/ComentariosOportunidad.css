@@ -1,0 +1,260 @@
+/* Comentarios y archivos de la oportunidad (ver ComentariosOportunidad.jsx). */
+.comentarios {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.comentarios__titulo {
+  padding-right: 32px; /* la cruz de cerrar del Modal */
+}
+
+.comentarios__titulo h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.comentarios__titulo p {
+  margin: 4px 0 0;
+  font-size: 13px;
+  color: var(--texto-suave, #676879);
+}
+
+.comentarios__nuevo {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding: 14px;
+  border: 1px solid var(--border, #d0d4e4);
+  border-radius: 10px;
+  background: #f7f9fc;
+}
+
+.comentarios__nuevo-autor {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.comentarios__texto {
+  width: 100%;
+  box-sizing: border-box;
+  min-height: 72px;
+  padding: 10px 12px;
+  font: inherit;
+  font-size: 14px;
+  resize: vertical;
+  border: 1px solid var(--border, #d0d4e4);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.comentarios__texto:focus {
+  outline: none;
+  border-color: var(--primary-color, #0073ea);
+}
+
+.comentarios__adjuntos-nuevos {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.comentarios__adjuntos-nuevos li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  padding: 4px 6px 4px 10px;
+  font-size: 12px;
+  background: #fff;
+  border: 1px solid var(--border, #d0d4e4);
+  border-radius: 999px;
+}
+
+.comentarios__adjuntos-nuevos span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.comentarios__adjuntos-nuevos button {
+  display: inline-flex;
+  padding: 2px;
+  color: inherit;
+  background: none;
+  border: none;
+  border-radius: 50%;
+  cursor: pointer;
+}
+
+.comentarios__adjuntos-nuevos button:hover:not(:disabled) {
+  background: #eceff8;
+}
+
+.comentarios__acciones {
+  display: flex;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.comentarios__error {
+  margin: 0;
+  font-size: 13px;
+  color: #d83a52;
+}
+
+.comentarios__vacio {
+  margin: 0;
+  font-size: 13px;
+  color: var(--texto-suave, #676879);
+}
+
+.comentarios__lista {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.comentarios__item {
+  display: flex;
+  gap: 10px;
+}
+
+.comentarios__cuerpo {
+  flex: 1;
+  min-width: 0;
+  padding: 10px 12px;
+  border: 1px solid var(--border, #d0d4e4);
+  border-radius: 10px;
+  background: #fff;
+}
+
+.comentarios__cabecera {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 8px;
+  font-size: 13px;
+}
+
+.comentarios__cabecera span {
+  font-size: 12px;
+  color: var(--texto-suave, #676879);
+  white-space: nowrap;
+}
+
+.comentarios__mensaje {
+  margin: 6px 0 0;
+  font-size: 14px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.comentarios__archivos {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.comentarios__foto {
+  display: block;
+  padding: 0;
+  background: none;
+  cursor: zoom-in;
+  width: 96px;
+  height: 96px;
+  overflow: hidden;
+  border: 1px solid var(--border, #d0d4e4);
+  border-radius: 8px;
+}
+
+.comentarios__foto:hover {
+  border-color: var(--primary-color, #0073ea);
+}
+
+.comentarios__foto img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.comentarios__archivo {
+  display: inline-flex;
+  font: inherit;
+  background: #fff;
+  cursor: pointer;
+  align-items: center;
+  gap: 6px;
+  max-width: 260px;
+  padding: 6px 10px;
+  font-size: 12px;
+  color: var(--primary-color, #0073ea);
+  text-decoration: none;
+  border: 1px solid var(--border, #d0d4e4);
+  border-radius: 8px;
+}
+
+.comentarios__archivo:hover {
+  border-color: var(--primary-color, #0073ea);
+  background: #eef4fd;
+}
+
+.comentarios__archivo span {
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+/* A pedido: el popup ocupa casi toda la pantalla. El Modal de Vibe corta lo que no entra
+   (overflow hidden, alto máximo 80%) sin dar scroll: acá el título y el formulario quedan
+   fijos arriba y la lista de comentarios scrollea adentro. */
+#comentarios-oportunidad-modal {
+  width: min(1040px, 94vw) !important;
+  max-width: none !important;
+  height: 90vh !important;
+  max-height: 90vh !important;
+  display: flex;
+  flex-direction: column;
+}
+
+#comentarios-oportunidad-modal > * {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+}
+
+#comentarios-oportunidad-modal .comentarios {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding-bottom: 16px;
+}
+
+#comentarios-oportunidad-modal .comentarios__nuevo,
+#comentarios-oportunidad-modal .comentarios__titulo {
+  flex: none;
+}
+
+#comentarios-oportunidad-modal .comentarios__lista,
+#comentarios-oportunidad-modal .comentarios__vacio {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+#comentarios-oportunidad-modal .comentarios {
+  padding: 24px 28px 20px;
+  box-sizing: border-box;
+}

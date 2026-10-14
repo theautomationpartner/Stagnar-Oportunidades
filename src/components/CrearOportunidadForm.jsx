@@ -904,15 +904,15 @@ export default function CrearOportunidadForm({
 
   // A pedido: apenas carga el schema, el formulario arranca con Tipo de Riesgo =
   // Automóvil (el único con "Datos del riesgo" definidos hasta ahora), Departamento/
-  // Localidad = Montevideo y Uso = Particular (los casos más comunes) — se puede cambiar
-  // libremente, esto solo evita elegirlos a mano en el caso típico. El guard de abajo
+  // Localidad = Montevideo (el caso más común) — se puede cambiar libremente, esto solo
+  // evita elegirlos a mano en el caso típico. A pedido, el Uso (destino) ya NO arranca en
+  // "Particular": queda vacío y obligatorio, para que lo elijan a mano. El guard de abajo
   // evita pisar algo que el usuario ya haya tocado (ej. si el schema tarda en llegar y
   // mientras tanto ya eligió un departamento distinto a mano).
   useEffect(() => {
     if (!schema) return
     setForm((prev) => {
       if (prev.tipoRiesgo || prev.departamentoId || prev.localidadId) return prev
-      const defaultUso = (schema.uso?.options ?? []).find((o) => o.toLowerCase() === 'particular')
       const ubicacion = defaultUbicacion(schema)
       return {
         ...prev,
@@ -921,7 +921,6 @@ export default function CrearOportunidadForm({
         // elijan a mano (siguen siendo obligatorios, ver isStepValid).
         departamentoId: prev.extranjero === 'Si' ? '' : ubicacion.departamentoId,
         localidadId: prev.extranjero === 'Si' ? '' : ubicacion.localidadId,
-        uso: defaultUso ?? prev.uso,
       }
     })
   }, [schema])

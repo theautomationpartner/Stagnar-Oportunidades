@@ -12,6 +12,7 @@ import RequisitoPreviaPanel from './RequisitoPreviaPanel'
 import WhatsAppSendModal from './WhatsAppSendModal'
 import DuplicarOportunidad from './DuplicarOportunidad'
 import CompartirOportunidadBoton from './CompartirOportunidadBoton'
+import ComentariosOportunidad from './ComentariosOportunidad'
 import AlertModal from './AlertModal'
 import AsignadoSelect from './AsignadoSelect'
 import ErrorDetailBox from './ErrorDetailBox'
@@ -59,7 +60,7 @@ import {
 import { mapOpportunityItem } from '../services/opportunityMapper'
 import { textOf } from '../services/mondayColumns'
 import { useSchema } from '../context/AppContext'
-import { mapSubitemToRawQuote, groupQuotesByCompania } from '../services/quoteMapper'
+import { mapSubitemToRawQuote, groupQuotesByCompania, sinParcialPortoMasCara } from '../services/quoteMapper'
 import { renderQuoteText } from '../services/whatsappText'
 import { esChunkCaido } from '../services/cargaDiferida'
 import { computeQuote, isQuoteSelectable } from '../services/pricingEngine'
@@ -150,6 +151,7 @@ function useFlipDeTarjetas(contenedorRef, idsEnOrden) {
   })
 }
 import { nombreDeOportunidad } from '../services/nombreOportunidad'
+import { limpiarPdf } from '../services/archivoPdf'
 import { ANIO_COTIZACION_COLUMN_ID, anioParaCotizar } from '../services/anioCotizacion'
 import { zonasBonificacionPorto } from '../services/bonificacionPorto'
 import { buildMondayEmail, buildMondayPhone } from '../services/personaFields'
@@ -159,6 +161,7 @@ import {
   VALIDACIONES_POLIZA,
   VALIDACION_POLIZA_COLUMN_ID,
   estaValidando,
+  requisitosParaValidar,
 } from '../services/validacionPoliza'
 import { dispararEscenario } from '../services/makeEscenarios'
 import { EDAD_COLUMN_ID, edadDesde } from '../services/edad'
@@ -242,6 +245,11 @@ const POLL_COTIZANDO_TIMEOUT_MS = 5 * 60 * 1000
 // pisarle el estado o invitar a concretar de nuevo podría crear la póliza dos veces.
 // Solo se deja de esperar y se avisa.
 const POLL_CREANDO_TIMEOUT_MS = 5 * 60 * 1000
+// A pedido ("quedó mucho tiempo verificando y no terminó más"): la validación de la
+// póliza también tiene corte. El escenario tarda menos de un minuto; si a los 4 sigue en
+// "Validar"/"Validando" se da por cortado de este lado — no se toca monday — y se ofrece
+// volver a validar.
+const POLL_VALIDANDO_TIMEOUT_MS = 4 * 60 * 1000
 // Prefijo que cada automatización debe agregar al principio del texto del Update que
 // postea sobre el ítem cuando falla (configurar así del lado del robot de cotización y
 // del escenario de Make.com de envío por WhatsApp) — ver fetchLatestUpdate en mondayApi.js.
@@ -432,7 +440,8 @@ export default function OpportunityDetail({
         if (cancelled || !data) return
         setItem(data)
         const mapped = (data.subitems ?? []).map(mapSubitemToRawQuote)
-        const raws = mapped
+        // A pedido: sin la parcial de PORTO más cara (ver sinParcialPortoMasCara).
+        const raws = sinParcialPortoMasCara(mapped)
         setRawQuotes(raws)
         setSelectedIds(new Set(raws.filter((r) => r.incluirPropuesta).map((r) => r.id)))
 
@@ -549,7 +558,22 @@ export default function OpportunityDetail({
   // ya se apagó. No lleva estado propio: se deriva de la columna que escribe el escenario,
   // así arranca sola cuando él la pone en "Validando" y se corta sola cuando la deja en
   // un estado terminal, sin que la app tenga que adivinar cuánto tarda.
-  const validacionPolling = estaValidando(textOf(item?.column_values ?? [], VALIDACION_POLIZA_COLUMN_ID))
+  const [validacionVencida, setValidacionVencida] = useState(false)
+  const validacionPolling =
+    estaValidando(textOf(item?.column_values ?? [], VALIDACION_POLIZA_COLUMN_ID)) && !validacionVencida
+  const validacionPollStartRef = useRef(null)
+  // A pedido: cuando el escenario no puede validar (la IA no lee el archivo, falla la
+  // descarga, faltan datos) vuelve la columna a "Sin validar" —y si el archivo no se
+  // pudo leer, lo borra— y contesta el motivo por el webhook: {"error": "..."}. Ese
+  // motivo se muestra apenas llega; sin él, al vendedor se le borraba la póliza sin
+  // ninguna explicación.
+  const [validacionErrorRespuesta, setValidacionErrorRespuesta] = useState(null)
+  useEffect(() => {
+    setValidacionErrorRespuesta(null)
+  }, [opportunityId])
+  useEffect(() => {
+    validacionPollStartRef.current = validacionPolling ? Date.now() : null
+  }, [validacionPolling])
   const anyPolling = polling || sendPolling || polizaPolling || lecturaPolling || validacionPolling || jiraPolling
   const pollFailsRef = useRef(0)
   const lastItemSigRef = useRef('')
@@ -642,7 +666,8 @@ export default function OpportunityDetail({
         const estadoCotizacion = textOf(data.column_values, ESTADO_COTIZACION_COLUMN_ID)
         const estadoOportunidad = textOf(data.column_values, ESTADO_OPORTUNIDAD_COLUMN_ID)
         const mapped = (data.subitems ?? []).map(mapSubitemToRawQuote)
-        const raws = mapped
+        // A pedido: sin la parcial de PORTO más cara (ver sinParcialPortoMasCara).
+        const raws = sinParcialPortoMasCara(mapped)
 
         // Progreso en vivo por compañía (ver CotizandoModal) — se actualiza en CADA
         // tick. Se excluyen los subitems que YA existían antes de arrancar
@@ -772,6 +797,18 @@ export default function OpportunityDetail({
               'revisá en Jira si la incidencia ya se creó, para no cargarla dos veces.'
           )
         }
+      }
+
+      // --- Validación de la póliza: se corta sola al llegar a un estado terminal (es
+      // derivada de la columna); acá solo el corte por tiempo, ver POLL_VALIDANDO_TIMEOUT_MS.
+      if (
+        validacionPolling &&
+        estaValidando(textOf(data.column_values, VALIDACION_POLIZA_COLUMN_ID)) &&
+        validacionPollStartRef.current &&
+        Date.now() - validacionPollStartRef.current > POLL_VALIDANDO_TIMEOUT_MS
+      ) {
+        validacionPollStartRef.current = null
+        setValidacionVencida(true)
       }
 
       // --- Leer Cédula y Archivo Automóvil (color_mm5rzrhk): corta en "Leidos" o
@@ -1575,8 +1612,31 @@ export default function OpportunityDetail({
   // El escenario no contesta errores propios: cuando responde, ya dejó los veredictos
   // escritos, así que alcanza con adelantar el tick para verlos.
   const pedirValidacionPoliza = async () => {
+    setValidacionVencida(false)
+    setValidacionErrorRespuesta(null)
     await limpiarValidacionPoliza(ESTADO_GENERAL.validar)
-    avisarAlEscenario('validar-poliza', () => tickAhoraRef.current?.())
+    avisarAlEscenario('validar-poliza', (respuesta) => {
+      if (respuesta?.error) setValidacionErrorRespuesta(respuesta.error)
+      tickAhoraRef.current?.()
+    })
+  }
+
+  // A pedido: se valida solo si están dadas las condiciones (ver requisitosParaValidar).
+  // Si falta algo no se le pide al escenario —quedaría "validando" sin terminar— y el
+  // paso Emitir muestra qué falta y el botón "Validar póliza" para cuando esté.
+  const hayElegida = groups.some((g) => g.entries.some((e) => e.raw.propuestaElegida))
+  const faltaParaValidar = (polizaFileName) =>
+    requisitosParaValidar(opportunity, { polizaFileName, hayElegida }).filter((r) => !r.ok)
+
+  const [validarPolizaError, setValidarPolizaError] = useState(null)
+  const handleValidarPoliza = async () => {
+    onOpportunityAction?.()
+    setValidarPolizaError(null)
+    try {
+      await pedirValidacionPoliza()
+    } catch (err) {
+      setValidarPolizaError(`No se pudo pedir la validación (${err.message}).`)
+    }
   }
 
   // A pedido: eliminar la póliza también limpia la validación. Solo si el borrado salió
@@ -1595,11 +1655,15 @@ export default function OpportunityDetail({
     }
   }
 
-  const handleUploadPoliza = async (file) => {
+  const handleUploadPoliza = async (archivo) => {
     onOpportunityAction?.()
     setUploadingDoc((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: true }))
     setDocUploadError((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: null }))
     try {
+      // Antes de tocar nada: si el PDF viene envuelto en un envío de formulario (pasa con
+      // alguna compañía) se recorta al PDF real, que es lo único que la IA de la
+      // validación puede leer — ver archivoPdf.js. Si no es un PDF, se avisa y no se sube.
+      const file = await limpiarPdf(archivo)
       // A pedido: que nunca quede más de 1 archivo cargado en Póliza — add_file_to_column
       // (uploadFileToColumn) SUMA el archivo a la columna en vez de reemplazar el que ya
       // hubiera, así que si ya había uno se limpia primero (mismo helper que usa
@@ -1644,7 +1708,12 @@ export default function OpportunityDetail({
       // Los veredictos anteriores se limpian junto con el pedido: son de la póliza que se
       // acaba de reemplazar, y dejarlos a la vista mientras corre la validación nueva
       // haría creer que ya se validó esta.
-      await pedirValidacionPoliza()
+      if (faltaParaValidar(file.name).length === 0) {
+        await pedirValidacionPoliza()
+      } else {
+        setValidacionVencida(false)
+        await limpiarValidacionPoliza(ESTADO_GENERAL.sinValidar)
+      }
     } catch (err) {
       setDocUploadError((prev) => ({ ...prev, [POLIZA_COLUMN_ID]: err.message }))
     } finally {
@@ -2580,6 +2649,13 @@ export default function OpportunityDetail({
               )}
               {/* A pedido: a la vista en los 4 pasos, pero lejos de "Editar" (que está en
                   la barra del cliente) para que no se confunda: no toca esta oportunidad. */}
+              {/* A pedido: comentarios del trámite y archivos, a mano en los 4 pasos (ver
+                  ComentariosOportunidad.jsx). */}
+              <ComentariosOportunidad
+                opportunityId={opportunityId}
+                usuarioSesion={usuarioSesion}
+                className="opp-detail__recotizar-btn opp-detail__duplicar-btn"
+              />
               {/* A pedido: copiar el link de la oportunidad para compartirla (ver
                   compartirOportunidad.js). Mismo look que el de duplicar. */}
               <CompartirOportunidadBoton
@@ -2905,6 +2981,7 @@ export default function OpportunityDetail({
               onToggleOpcional={handleToggleOpcional}
               onAutoExtraChange={handleAutoExtraChange}
               onSetCuotas={handleSetCuotas}
+              seleccionadasIds={selectedIds}
               documentos={[
                 {
                   key: 'libretaConducir',
@@ -2981,6 +3058,10 @@ export default function OpportunityDetail({
               onConfirmarEmision={handleConfirmarEmision}
               onRevisarValidacion={handleRevisarValidacion}
               revisandoValidacion={revisandoValidacion}
+              onValidarPoliza={handleValidarPoliza}
+              validacionVencida={validacionVencida}
+              validacionErrorRespondido={validacionErrorRespuesta}
+              validarPolizaError={validarPolizaError}
               confirmandoEmision={confirmandoEmision}
               confirmarEmisionError={confirmarEmisionError}
               onCargarEnJira={handleCargarEnJira}

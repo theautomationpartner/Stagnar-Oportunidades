@@ -3,6 +3,7 @@
 import { textOf } from './mondayColumns'
 import { deducibleSancorPorDefecto } from './pricingEngine'
 import { rcPorDefecto } from './rcPorCompania'
+import { coberturaGroupOf } from './coberturaGroups'
 
 
 function boolOf(columnValues, columnId) {
@@ -79,4 +80,21 @@ export function groupQuotesByCompania(rawQuotes) {
     groups.get(key).push(q)
   }
   return [...groups.entries()].map(([compania, quotes]) => ({ compania, quotes }))
+}
+
+// A pedido: PORTO siempre cotiza DOS coberturas parciales (las dos llegan como "TRIPLE")
+// y la más cara no se usa nunca. Se oculta en la app la de precio contado más alto; en
+// monday quedan las dos. Si la más cara ya se mandó o se eligió (incluirPropuesta /
+// propuestaElegida) se deja a la vista: esconderla haría desaparecer algo que ya se usó.
+export function sinParcialPortoMasCara(raws) {
+  const parcialesPorto = raws.filter(
+    (r) => String(r.compania ?? '').toUpperCase().includes('PORTO') && coberturaGroupOf(r.cobertura) === 'TRIPLE'
+  )
+  if (parcialesPorto.length < 2) return raws
+  const contado = (r) => Number(String(r.contado ?? '').replace(/[^\d.-]/g, '')) || 0
+  const masBarata = parcialesPorto.reduce((a, b) => (contado(b) > 0 && (contado(a) <= 0 || contado(b) < contado(a)) ? b : a))
+  const ocultas = new Set(
+    parcialesPorto.filter((r) => r !== masBarata && !r.incluirPropuesta && !r.propuestaElegida).map((r) => r.id)
+  )
+  return raws.filter((r) => !ocultas.has(r.id))
 }

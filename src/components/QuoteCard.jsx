@@ -840,12 +840,15 @@ function QuoteCard({
             </>
           )}
 
-          {opcionalesDeLaCompania.length > 0 && (
+          {/* SANCOR no tiene opcionales para tildar, solo el auto cortesía: la sección se
+              muestra igual si hay alguna de las dos cosas. */}
+          {(opcionalesDeLaCompania.length > 0 || autoExtraDias.length > 0) && (
             <>
               <div className="quote-card__params-subtitle">Opcionales {raw.compania}</div>
               {/* Los tildes van juntos en una línea y Auto extra (que tiene etiqueta y
                   selector, y por eso es más alto) en su propia fila: mezclados en la
                   grilla, la fila de Auto extra quedaba más alta y los tildes desparejos. */}
+              {opcionalesDeLaCompania.length > 0 && (
               <div className="quote-card__opcionales-checks">
                 {opcionalesDeLaCompania.map((opt) => (
                   <Checkbox
@@ -857,15 +860,17 @@ function QuoteCard({
                   />
                 ))}
               </div>
+              )}
               {autoExtraDias.length > 0 && (
                 <div className="quote-card__opcionales-extra">
                   <label className="quote-card__params-field">
-                    <span>Auto extra</span>
+                    {/* En SANCOR se llama "auto cortesía". */}
+                    <span>{raw.compania === 'SANCOR' ? 'Auto cortesía' : 'Auto extra'}</span>
                     <Dropdown
                       size="small"
                       options={autoExtraDias.map((d) => ({ value: d, label: d }))}
                       value={raw.autoExtra ? { value: raw.autoExtra, label: raw.autoExtra } : null}
-                      placeholder="Sin auto extra"
+                      placeholder={raw.compania === 'SANCOR' ? 'Sin auto cortesía' : 'Sin auto extra'}
                       clearable
                       onClear={() => handleAutoExtraChange('')}
                       onChange={(option) => handleAutoExtraChange(option?.value ?? '')}

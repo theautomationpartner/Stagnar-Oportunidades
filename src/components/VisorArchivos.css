@@ -1,0 +1,161 @@
+/* Visor de archivos de los comentarios (ver VisorArchivos.jsx). Va por encima del Modal de
+   comentarios. */
+.visor {
+  position: fixed;
+  inset: 0;
+  z-index: 20000;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  background: rgba(15, 18, 30, 0.88);
+}
+
+.visor__barra {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  box-sizing: border-box;
+  padding: 12px 20px;
+  color: #fff;
+}
+
+.visor__nombre {
+  flex: 1;
+  min-width: 0;
+  overflow: hidden;
+  font-size: 14px;
+  font-weight: 600;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.visor__contador {
+  font-size: 13px;
+  opacity: 0.8;
+}
+
+.visor__boton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 7px 12px;
+  font: inherit;
+  font-size: 13px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 6px;
+  cursor: pointer;
+}
+
+.visor__boton:hover:not(:disabled) {
+  background: var(--primary-color, #0073ea);
+  border-color: var(--primary-color, #0073ea);
+}
+
+.visor__boton:disabled {
+  opacity: 0.6;
+  cursor: default;
+}
+
+.visor__boton svg {
+  font-size: 18px;
+}
+
+.visor__boton--icono {
+  padding: 7px;
+}
+
+.visor__error {
+  margin: 0 0 8px;
+  padding: 6px 12px;
+  font-size: 13px;
+  color: #fff;
+  background: #d83a52;
+  border-radius: 6px;
+}
+
+.visor__contenido {
+  display: flex;
+  flex: 1;
+  align-items: center;
+  justify-content: center;
+  width: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+  padding: 0 72px 24px;
+}
+
+.visor__imagen {
+  max-width: 100%;
+  max-height: 100%;
+  object-fit: contain;
+  border-radius: 6px;
+  box-shadow: 0 8px 30px rgba(0, 0, 0, 0.4);
+}
+
+.visor__pdf {
+  width: min(900px, 100%);
+  height: 100%;
+  overflow: auto;
+  background: #fff;
+  border-radius: 6px;
+}
+
+.visor__mensaje {
+  margin: 0;
+  padding: 24px;
+  font-size: 14px;
+  color: var(--texto-suave, #676879);
+}
+
+.visor__otro {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+  padding: 32px 40px;
+  color: #fff;
+  text-align: center;
+}
+
+.visor__otro > svg {
+  font-size: 56px;
+  opacity: 0.8;
+}
+
+.visor__otro p {
+  margin: 0;
+  font-size: 14px;
+}
+
+.visor__flecha {
+  position: absolute;
+  top: 50%;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  font-size: 30px;
+  color: #fff;
+  background: rgba(255, 255, 255, 0.12);
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  border-radius: 50%;
+  transform: translateY(-50%);
+  cursor: pointer;
+}
+
+.visor__flecha:hover {
+  background: var(--primary-color, #0073ea);
+  border-color: var(--primary-color, #0073ea);
+}
+
+.visor__flecha--izq {
+  left: 16px;
+}
+
+.visor__flecha--der {
+  right: 16px;
+}

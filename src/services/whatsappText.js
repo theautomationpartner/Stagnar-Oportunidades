@@ -8,7 +8,7 @@
 // El formato usa los marcadores de WhatsApp: *negrita* y viñetas con "•". A propósito no
 // se arma con emojis ni cajas ASCII — en un chat real se ven distinto en cada teléfono.
 import { formatMoney, CUOTA_COUNTS, modeloSinMarca, zonaParaMostrar } from './format'
-import { coberturaGroupOf, coberturaParaMostrar, FAMILIA_LABEL, subtituloDeCobertura } from './coberturaGroups'
+import { coberturaGroupOf, coberturaParaMostrar, FAMILIA_LABEL, subtituloDeCobertura, tituloPropioDeCobertura } from './coberturaGroups'
 
 // Mismo criterio que splitVehicleName en whatsappImage.js: el modelo de Autodata ya trae
 // la marca adelante, no se repite.
@@ -42,7 +42,7 @@ export function renderQuoteText(opportunity, raw, quote) {
   // Sin familia queda el nombre de la cobertura.
   const coberturaReal = raw.cobertura || raw.name || ''
   const familia = coberturaGroupOf(coberturaReal)
-  const cobertura = FAMILIA_LABEL[familia]?.toUpperCase() || coberturaParaMostrar(raw)
+  const cobertura = tituloPropioDeCobertura(coberturaReal) ?? (FAMILIA_LABEL[familia]?.toUpperCase() || coberturaParaMostrar(raw))
   const subtitulo = subtituloDeCobertura(coberturaReal) ?? (cobertura ? `Cobertura ${cobertura}.` : '')
   const anio = raw.anioVehiculo || opportunity.anio || ''
   const combustible = raw.combustibleVehiculo || opportunity.combustible || ''
@@ -89,7 +89,8 @@ export function renderQuoteText(opportunity, raw, quote) {
     bloques.push(['*OPCIONALES (SE COTIZAN APARTE)*', ...quote.opcionales.map(lineaOpcional)].join('\n'))
   }
 
-  if (quote.warning) bloques.push(`⚠ ${quote.warning.full}`)
+  // Los avisos solo para el vendedor (soloInterno, ej. SANCOR por edad) no van al cliente.
+  if (quote.warning && !quote.warning.soloInterno) bloques.push(`⚠ ${quote.warning.full}`)
 
   return bloques.join('\n\n')
 }
