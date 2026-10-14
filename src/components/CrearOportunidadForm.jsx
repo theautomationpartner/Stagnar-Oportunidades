@@ -335,6 +335,9 @@ export default function CrearOportunidadForm({
   const [cedulaLeadFile, setCedulaLeadFile] = useState(null)
   const [leyendoCedulaLead, setLeyendoCedulaLead] = useState(false)
   const [cedulaLeadError, setCedulaLeadError] = useState(null)
+  // La IA no pudo separar con seguridad nombres de apellidos (cédula vieja, todo de
+  // corrido): se avisa para que lo revisen.
+  const [cedulaNombresDudosos, setCedulaNombresDudosos] = useState(false)
 
   const handleChange = (key, value) => setForm((prev) => ({ ...prev, [key]: value }))
 
@@ -1322,6 +1325,7 @@ export default function CrearOportunidadForm({
   const handleCedulaLeadChange = async (file) => {
     setCedulaLeadFile(file)
     setCedulaLeadError(null)
+    setCedulaNombresDudosos(false)
     if (!file) {
       // Sacar la Cédula del recuadro la saca también de la Documentación, si había
       // entrado sola desde acá. Lo ya completado queda: son campos editables.
@@ -1331,7 +1335,16 @@ export default function CrearOportunidadForm({
     setLeyendoCedulaLead(true)
     try {
       const data = await leerCedula(file)
-      const { nombre, apellido } = splitNombreApellido(data.nombre_completo || '')
+      // A pedido: el escenario devuelve nombres y apellidos por separado (la cédula nueva
+      // los trae rotulados; en la vieja los separa la IA). Partir nombre_completo por la
+      // primera palabra mandaba el segundo nombre al apellido: queda solo como respaldo
+      // para una respuesta sin esos campos.
+      const nombresIA = String(data.nombres ?? '').trim()
+      const apellidosIA = String(data.apellidos ?? '').trim()
+      const { nombre, apellido } =
+        nombresIA || apellidosIA
+          ? { nombre: nombresIA, apellido: apellidosIA }
+          : splitNombreApellido(data.nombre_completo || '')
       const departamentoNombre = (data.departametno || data.departamento || '').trim()
       const departamentoMatch = (schema?.departamentos ?? []).find(
         (d) => d.name.toLowerCase() === departamentoNombre.toLowerCase()
@@ -1363,6 +1376,7 @@ export default function CrearOportunidadForm({
         nacionalidad: departamentoMatch ? NACIONALIDAD_URUGUAY : prev.nacionalidad,
         extranjero: departamentoMatch ? 'No' : prev.extranjero,
       }))
+      setCedulaNombresDudosos(data.nombres_dudoso === true || data.nombres_dudoso === 'true')
       handleCedulaIdentidadChange(file, true)
     } catch (err) {
       setCedulaLeadError(err.message)
@@ -2070,6 +2084,12 @@ export default function CrearOportunidadForm({
                             <AttentionBox type="warning" className="crear-op__lead-error">
                               No pudimos leer los datos automáticamente. Completá los datos a mano,
                               o eliminá el archivo para probar con otro documento.
+                            </AttentionBox>
+                          )}
+                          {!cedulaLeadError && cedulaNombresDudosos && !leyendoCedulaLead && (
+                            <AttentionBox type="warning" className="crear-op__lead-error">
+                              En este documento el nombre está todo junto: revisá que los nombres y
+                              los apellidos hayan quedado bien separados.
                             </AttentionBox>
                           )}
                         </div>

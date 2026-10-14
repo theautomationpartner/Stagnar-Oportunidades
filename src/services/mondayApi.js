@@ -970,7 +970,8 @@ export async function leerCartaAutomovil(file) {
 // leerCartaAutomovil de acá arriba: va a nuestro propio proxy (/api/leer-cedula, ver
 // vite.config.js / api/leer-cedula.js), NO directo a la URL de Make (queda solo en
 // MAKE_LEER_CEDULA_WEBHOOK_URL del lado del servidor, ver .env). El escenario responde
-// con { nombre_completo, ci, fecha_nacimineto, departametno, localidad } — esos 2
+// con { nombres, apellidos, nombres_dudoso, nombre_completo, ci, fecha_nacimineto,
+// departametno, localidad } (nombres/apellidos/nombres_dudoso desde el 14/10) — esos 2
 // nombres de campo (fecha_nacimineto/departametno) están así, con el typo y todo, en el
 // escenario real de Make; CrearOportunidadForm.jsx los lee tal cual llegan.
 export async function leerCedula(file) {
