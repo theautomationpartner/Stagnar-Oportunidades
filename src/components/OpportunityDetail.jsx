@@ -41,8 +41,10 @@ import {
   setCostoManual,
   vaciarCostoManual,
   uploadFileToColumn,
+  leerCartaAutomovil,
   clearFileColumn,
   fetchLatestUpdate,
+  fetchUltimoUpdateConTag,
   setContactoColumnValues,
   setAsignado,
   fetchMondayUsers,
@@ -162,6 +164,8 @@ import {
   VALIDACION_POLIZA_COLUMN_ID,
   estaValidando,
   requisitosParaValidar,
+  DIFERENCIAS_POLIZA_TAG,
+  leerDiferenciasPoliza,
 } from '../services/validacionPoliza'
 import { dispararEscenario } from '../services/makeEscenarios'
 import { EDAD_COLUMN_ID, edadDesde } from '../services/edad'
@@ -285,6 +289,8 @@ export default function OpportunityDetail({
   onStepChange,
   // A pedido (Duplicar oportunidad): abrir otra oportunidad (la copia recién creada).
   onOpenOpportunity,
+  // A pedido (validación de la póliza): si el vehículo no coincide, ir a crear otra.
+  onCrearOportunidad,
 }) {
   // `schema` por prop (compatibilidad) o del contexto global (ver AppContext).
   const ctxSchema = useSchema()
@@ -295,7 +301,7 @@ export default function OpportunityDetail({
   const [error, setError] = useState(null)
   const [overridesByQuoteId, setOverridesByQuoteId] = useState({})
   const [selectedIds, setSelectedIds] = useState(new Set())
-  // Para dejar constancia de quién revisa una validación a mano (ver handleRevisarValidacion).
+  // Quién está usando la app (lo usan los comentarios para firmar, ver ComentariosOportunidad).
   const { usuario: usuarioSesion } = useAuth()
   const [activeStep, setActiveStep] = useState('cotizar')
   // Solapas "Total / Parcial / General" del paso "Comparar y enviar" — índice de
@@ -571,6 +577,24 @@ export default function OpportunityDetail({
   useEffect(() => {
     setValidacionErrorRespuesta(null)
   }, [opportunityId])
+
+  // A pedido: las diferencias puntuales de la última validación (los dos valores, ver
+  // leerDiferenciasPoliza). Se traen cuando la validación terminó.
+  const validacionGeneral = textOf(item?.column_values ?? [], VALIDACION_POLIZA_COLUMN_ID)
+  const [diferenciasPoliza, setDiferenciasPoliza] = useState([])
+  useEffect(() => {
+    setDiferenciasPoliza([])
+    if (!validacionGeneral || estaValidando(validacionGeneral) || validacionGeneral === ESTADO_GENERAL.sinValidar) {
+      return undefined
+    }
+    let cancelado = false
+    fetchUltimoUpdateConTag(opportunityId, DIFERENCIAS_POLIZA_TAG)
+      .then((u) => !cancelado && setDiferenciasPoliza(leerDiferenciasPoliza(u?.text_body)))
+      .catch(() => {})
+    return () => {
+      cancelado = true
+    }
+  }, [validacionGeneral, opportunityId])
   useEffect(() => {
     validacionPollStartRef.current = validacionPolling ? Date.now() : null
   }, [validacionPolling])
@@ -1521,6 +1545,53 @@ export default function OpportunityDetail({
   // oportunidad) directo a monday. El check visual del paso 3 depende de que el `text`
   // de la columna deje de estar vacío, así que actualizamos el `item` en memoria con el
   // nombre del archivo apenas la mutation confirma el upload (sin esperar a un refetch).
+  // A pedido: si la Carta Automóvil se sube recién en el paso 3 y a la oportunidad le
+  // falta la matrícula o el chasis (no se leyó en el alta), se manda a leer con el mismo
+  // escenario del alta (leerCartaAutomovil) y se completan SOLO los campos vacíos.
+  // Marca/año/modelo no se tocan: con esos ya se cotizó. Si la lectura falla, el archivo
+  // queda subido igual y se avisa.
+  const CAMPOS_CARTA = [
+    { key: 'matricula', etiqueta: 'Matrícula', columnId: 'text_mm71dyf0', claves: ['matricula', 'Matricula', 'Matrícula'] },
+    { key: 'chasis', etiqueta: 'Chasis', columnId: 'text_mm711jjs', claves: ['chasis', 'Chasis'] },
+    { key: 'motor', etiqueta: 'Motor', columnId: 'text_mm711cng', claves: ['motor', 'Motor'] },
+  ]
+  const [lecturaCarta, setLecturaCarta] = useState(null) // { estado, completados?, mensaje? }
+  useEffect(() => {
+    setLecturaCarta(null)
+  }, [opportunityId])
+  const leerCartaEnPaso3 = async (file) => {
+    setLecturaCarta({ estado: 'leyendo' })
+    try {
+      const extraido = await leerCartaAutomovil(file)
+      const pick = (claves) => {
+        for (const k of claves) {
+          const v = extraido?.[k]
+          if (v != null && String(v).trim()) return String(v).trim()
+        }
+        return ''
+      }
+      const error = pick(['error', 'Error'])
+      if (error) {
+        setLecturaCarta({ estado: 'error', mensaje: error })
+        return
+      }
+      const completados = []
+      for (const campo of CAMPOS_CARTA) {
+        const valor = pick(campo.claves)
+        if (!valor || String(opportunity?.[campo.key] ?? '').trim()) continue
+        await setSimpleColumnValue(opportunityId, campo.columnId, valor)
+        setItem((prev) => ({
+          ...prev,
+          column_values: prev.column_values.map((cv) => (cv.id === campo.columnId ? { ...cv, text: valor } : cv)),
+        }))
+        completados.push({ etiqueta: campo.etiqueta, valor })
+      }
+      setLecturaCarta(completados.length ? { estado: 'ok', completados } : { estado: 'nada' })
+    } catch (err) {
+      setLecturaCarta({ estado: 'error', mensaje: err.message })
+    }
+  }
+
   const handleUploadDocument = async (columnId, file) => {
     onOpportunityAction?.()
     setUploadingDoc((prev) => ({ ...prev, [columnId]: true }))
@@ -1533,6 +1604,13 @@ export default function OpportunityDetail({
           cv.id === columnId ? { ...cv, text: file.name } : cv
         ),
       }))
+      if (
+        columnId === LIBRETA_CONDUCIR_COLUMN_ID &&
+        (!String(opportunity?.matricula ?? '').trim() || !String(opportunity?.chasis ?? '').trim())
+      ) {
+        // Sin await: el archivo ya está subido; la lectura muestra su propio estado.
+        leerCartaEnPaso3(file)
+      }
     } catch (err) {
       setDocUploadError((prev) => ({ ...prev, [columnId]: err.message }))
     } finally {
@@ -1728,62 +1806,9 @@ export default function OpportunityDetail({
   // manos de la automatización real de monday, el polling de acá abajo ya refresca el
   // ítem completo en cada tick (ver el useEffect de polizaPolling) y va a reflejar solo
   // cuando de verdad haya pasado en monday, no antes.
-  // A pedido: si una validación de la póliza da mal, se puede emitir igual marcándola
-  // como revisada a mano. Pasa seguido que el dato correcto sea el de la póliza y el que
-  // haya que corregir sea el de la oportunidad.
-  //
-  // Queda constancia de quién la pasó dentro del propio motivo: la escritura en monday va
-  // con el usuario de la integración, así que el historial de la columna diría siempre lo
-  // mismo. El motivo que dejó el escenario no se pisa, se le agrega.
-  const [revisandoValidacion, setRevisandoValidacion] = useState(null)
-  const handleRevisarValidacion = async (validacion) => {
-    setRevisandoValidacion(validacion.key)
-    try {
-      const quien = usuarioSesion?.nombre || usuarioSesion?.email || 'un usuario de la app'
-      const nota = `Revisado manualmente por ${quien} el ${new Date().toLocaleDateString('es-UY')}.`
-      const motivoActual = opportunity?.validacionesPoliza?.[validacion.key]?.motivo ?? ''
-      const motivoNuevo = motivoActual ? `${motivoActual} — ${nota}` : nota
-      // crearLabelSiFalta: el tablero puede seguir con la etiqueta vieja "Revisado a
-      // mano" (monday no deja renombrarlas por API, ver validacionPoliza.js) — sin esto,
-      // la primera revisión real rebotaría con "label not found".
-      await setSimpleColumnValue(opportunityId, validacion.estadoColumnId, ESTADO_VALIDACION.revisado, {
-        crearLabelSiFalta: true,
-      })
-      await setSimpleColumnValue(opportunityId, validacion.motivoColumnId, motivoNuevo)
-      setItem((prev) => ({
-        ...prev,
-        column_values: prev.column_values.map((cv) => {
-          if (cv.id === validacion.estadoColumnId) return { ...cv, text: ESTADO_VALIDACION.revisado }
-          if (cv.id === validacion.motivoColumnId) return { ...cv, text: motivoNuevo }
-          return cv
-        }),
-      }))
-      // A pedido: si con esta revisión ya no queda NINGÚN veredicto en rojo y el estado
-      // general sigue en "Con diferencias", se promueve a "Datos válidos" — el general
-      // también bloquea Concretar (ver EmitirStepPanel), y con todo revisado a mano su
-      // única salida es esta. Cubre además el caso de una corrida vieja del escenario
-      // que dejó la diferencia (típicamente el premio) solo en la nota, con los cuatro
-      // veredictos en "Válido".
-      const quedanRojas = VALIDACIONES_POLIZA.some(
-        (v) =>
-          v.key !== validacion.key &&
-          opportunity?.validacionesPoliza?.[v.key]?.estado === ESTADO_VALIDACION.incorrecto
-      )
-      if (!quedanRojas && opportunity?.validacionPolizaEstado === ESTADO_GENERAL.conDiferencias) {
-        await setSimpleColumnValue(opportunityId, VALIDACION_POLIZA_COLUMN_ID, ESTADO_GENERAL.validos)
-        setItem((prev) => ({
-          ...prev,
-          column_values: prev.column_values.map((cv) =>
-            cv.id === VALIDACION_POLIZA_COLUMN_ID ? { ...cv, text: ESTADO_GENERAL.validos } : cv
-          ),
-        }))
-      }
-    } catch (err) {
-      console.warn('No se pudo marcar la validación como revisada', err)
-    } finally {
-      setRevisandoValidacion(null)
-    }
-  }
+  // A pedido: ya NO hay salida manual para una validación en rojo ("Lo revisé, está
+  // bien"): con diferencias solo se sigue resolviéndolas y volviendo a validar —o
+  // duplicando / creando otra oportunidad, según qué no coincida (ver EmitirStepPanel).
 
   const handleConfirmarEmision = async () => {
     onOpportunityAction?.()
@@ -3001,6 +3026,7 @@ export default function OpportunityDetail({
               docUploadError={docUploadError}
               onUploadDocument={handleUploadDocument}
               onDeleteDocument={handleDeleteDocument}
+              lecturaCarta={lecturaCarta}
               onSaveDireccion={handleSaveDireccion}
               savingDireccion={savingDireccion}
               direccionError={direccionError}
@@ -3056,8 +3082,10 @@ export default function OpportunityDetail({
               polling={polizaPolling}
               errorDetail={polizaErrorDetail}
               onConfirmarEmision={handleConfirmarEmision}
-              onRevisarValidacion={handleRevisarValidacion}
-              revisandoValidacion={revisandoValidacion}
+              diferenciasValidacion={diferenciasPoliza}
+              onDuplicarOportunidad={() => setDuplicando(true)}
+              onVolverAConfirmar={() => setActiveStep('confirmar')}
+              onCrearOportunidad={onCrearOportunidad}
               onValidarPoliza={handleValidarPoliza}
               validacionVencida={validacionVencida}
               validacionErrorRespondido={validacionErrorRespuesta}

@@ -443,6 +443,8 @@ export default function ConfirmarStepPanel({
   docUploadError,
   onUploadDocument,
   onDeleteDocument,
+  // Lectura de la Carta Automóvil subida en este paso (ver leerCartaEnPaso3).
+  lecturaCarta,
   // A pedido: la Dirección del Cliente/Lead se pide acá (paso 3) junto con los
   // documentos — antes era obligatoria al crear la oportunidad.
   onSaveDireccion,
@@ -689,6 +691,19 @@ export default function ConfirmarStepPanel({
             />
           ))}
         </div>
+        {lecturaCarta && (
+          <p
+            className={`confirmar-step__lectura-carta confirmar-step__lectura-carta--${lecturaCarta.estado}`}
+            role={lecturaCarta.estado === 'error' ? 'alert' : 'status'}
+          >
+            {lecturaCarta.estado === 'leyendo' && 'Leyendo la Carta Automóvil para completar matrícula, chasis y motor...'}
+            {lecturaCarta.estado === 'ok' &&
+              `Se completó con la Carta Automóvil: ${lecturaCarta.completados.map((c) => `${c.etiqueta} ${c.valor}`).join(' · ')}. Revisá que estén bien.`}
+            {lecturaCarta.estado === 'nada' && 'Se leyó la Carta Automóvil, pero no trajo datos nuevos para completar.'}
+            {lecturaCarta.estado === 'error' &&
+              `No se pudo leer la Carta Automóvil (${lecturaCarta.mensaje}). El archivo quedó subido; cargá la matrícula y el chasis a mano.`}
+          </p>
+        )}
       </div>
 
       </div>

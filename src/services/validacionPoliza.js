@@ -161,3 +161,31 @@ export function requisitosParaValidar(opportunity, { polizaFileName, hayElegida 
     },
   ]
 }
+
+// A pedido: ante una diferencia, mostrar los dos valores (oportunidad y póliza) y qué
+// hacer según la validación (ver EmitirStepPanel). No se corrige nada desde la app. El
+// escenario deja cada corrida en un Update
+// "[DIFERENCIAS_POLIZA] [ {validacion, campo, etiqueta, oportunidad, poliza} ]"
+// (ver diferenciasJson en scripts/make/validacion-poliza.run-code.js).
+export const DIFERENCIAS_POLIZA_TAG = '[DIFERENCIAS_POLIZA]'
+
+export function leerDiferenciasPoliza(textoUpdate) {
+  const texto = String(textoUpdate ?? '').trim()
+  if (!texto.startsWith(DIFERENCIAS_POLIZA_TAG)) return []
+  try {
+    const lista = JSON.parse(texto.slice(DIFERENCIAS_POLIZA_TAG.length).trim())
+    if (!Array.isArray(lista)) return []
+    return lista
+      .filter((d) => d && VALIDACIONES_POLIZA.some((v) => v.key === d.validacion) && d.oportunidad && d.poliza)
+      .map((d, i) => ({
+        clave: `${d.validacion}-${d.campo}-${i}`,
+        validacion: d.validacion,
+        campo: String(d.campo ?? ''),
+        etiqueta: String(d.etiqueta || d.campo || 'Dato'),
+        oportunidad: String(d.oportunidad),
+        poliza: String(d.poliza),
+      }))
+  } catch {
+    return []
+  }
+}

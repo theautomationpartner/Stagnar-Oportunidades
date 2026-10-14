@@ -26,7 +26,10 @@
 //                       coberturas ni normaliza documentos. Eso se resuelve acá.
 //
 // SALIDA:
-//   { accion, general, persona, vehiculo, compania, cotizacion, faltantes }
+//   { accion, general, persona, vehiculo, compania, cotizacion, faltantes, diferenciasJson }
+//   diferenciasJson = las diferencias puntuales, como texto JSON, para que la app muestre
+//            los dos valores y qué hacer (ver "diferencias" al final). El
+//            escenario lo deja en un Update "[DIFERENCIAS_POLIZA] <json>".
 //   accion = 'leer-documentos' cuando falta un dato que está en un archivo sin leer;
 //            'validar' cuando ya se puede (o no se puede y hay que avisar).
 
@@ -433,6 +436,10 @@ if (!elegida) {
 // Civil") y exigir el nombre del catálogo daría "no coincide" en casi todas. Lo que
 // importa es que no se haya emitido una parcial cuando se cotizó una total.
 let cotizacion
+// Para "diferencias" (al final): el premio de la póliza contra el esperado.
+let premioPoliza = null
+let premioEsperado = null
+let premioFueraDeTolerancia = false
 const familiaCot = elegida ? familiaDeCatalogo(elegida.cobertura) : null
 const familiaPol = familiaDeTextoPoliza(poliza.cobertura, poliza.compania)
 const etiqueta = (familia) => (familia === 'TOTAL' ? 'cobertura total' : 'cobertura parcial')
@@ -479,6 +486,7 @@ if (!elegida) {
   }
   const premio = numero(poliza.premio)
   const contado = numero(elegida.contado)
+  premioPoliza = premio
   if (premio && contado) {
     // El precio que vio el cliente no es el contado pelado: es el contado con la
     // Bonificación de la cotización aplicada — misma fórmula que la app,
@@ -486,7 +494,9 @@ if (!elegida) {
     // recargos por cuotas y los opcionales quedan cubiertos por la tolerancia).
     const bonifPct = numero(elegida.bonif) || 0
     const esperado = Math.round(contado * (1 - bonifPct / 100) * 100) / 100
+    premioEsperado = esperado
     const diferencia = Math.abs(premio - esperado) / esperado
+    premioFueraDeTolerancia = diferencia > TOLERANCIA_PREMIO
     if (diferencia > TOLERANCIA_PREMIO) {
       // A pedido: el monto fuera de tolerancia deja Cotización en "Incorrecto" — no se
       // puede concretar hasta que alguien lo mire y lo pase a "Revisado manualmente".
@@ -520,6 +530,34 @@ if (notaLectura) cotizacion.motivo = `${cotizacion.motivo} Nota de la lectura: $
 
 const hayDiferencias = [persona, vehiculo, compania, cotizacion].some((v) => v.estado === ESTADO.incorrecto)
 
+// ───────────── 3) diferencias puntuales ─────────────
+// A pedido: ante una diferencia, la app muestra los dos valores (el de la oportunidad y
+// el de la póliza) junto con qué hacer según la validación: persona → duplicar la
+// oportunidad con el cliente de la póliza; compañía/cotización → volver al paso anterior,
+// hacer coincidir y revalidar; vehículo → oportunidad nueva. No se corrige nada desde acá.
+const diferencias = []
+const agregar = (validacion, campo, etiquetaCampo, valorOp, valorPol) => {
+  if (!String(valorOp ?? '').trim() || !String(valorPol ?? '').trim()) return
+  diferencias.push({ validacion, campo, etiqueta: etiquetaCampo, oportunidad: String(valorOp).trim(), poliza: String(valorPol).trim() })
+}
+if (docPoliza && docNuestro && docPoliza !== docNuestro && !(esEmpresa && docNuestro.length <= 9)) {
+  agregar('persona', 'ci', 'CI / RUT', op.cedula || docNuestro, docPoliza)
+}
+if (titular && nombreNuestro && nombreComparable(titular) !== nombreComparable(nombreNuestro)) {
+  agregar('persona', 'titular', 'Titular', nombreNuestro, titular)
+}
+if (chasisOp && chasisPol && chasisOp !== chasisPol) agregar('vehiculo', 'chasis', 'Chasis', op.chasis, poliza.chasis)
+if (matOp && matPol && matOp !== matPol) agregar('vehiculo', 'matricula', 'Matrícula', op.matricula, poliza.matricula)
+if (elegida && poliza.compania && normalizar(poliza.compania) !== normalizar(elegida.compania)) {
+  agregar('compania', 'compania', 'Compañía', elegida.compania, poliza.compania)
+}
+if (elegida && poliza.cobertura && cotizacion.estado === ESTADO.incorrecto && normalizar(poliza.cobertura) !== normalizar(elegida.cobertura)) {
+  agregar('cotizacion', 'cobertura', 'Cobertura', elegida.cobertura, poliza.cobertura)
+}
+if (premioFueraDeTolerancia && premioPoliza && premioEsperado) {
+  agregar('cotizacion', 'premio', 'Premio', premioEsperado, premioPoliza)
+}
+
 return {
   accion: 'validar',
   general: hayDiferencias ? GENERAL.conDiferencias : GENERAL.validos,
@@ -528,4 +566,5 @@ return {
   compania,
   cotizacion,
   faltantes,
+  diferenciasJson: JSON.stringify(diferencias),
 }

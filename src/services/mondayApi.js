@@ -3314,3 +3314,22 @@ export async function crearComentario(itemId, { texto, autor, archivos = [] }) {
   }
   return { updateId, fallidos }
 }
+
+// El Update más nuevo del ítem que arranca con `tag`, mirando más atrás que
+// fetchLatestUpdate (15): con comentarios de por medio, el de la validación puede quedar
+// más abajo.
+const UPDATES_CON_TAG_QUERY = `
+  query GetUpdatesConTag($itemId: ID!) {
+    items(ids: [$itemId]) {
+      updates(limit: 60) {
+        text_body
+        created_at
+      }
+    }
+  }
+`
+export async function fetchUltimoUpdateConTag(itemId, tag) {
+  const data = await callMondayApi(UPDATES_CON_TAG_QUERY, { itemId })
+  const updates = data.items?.[0]?.updates ?? []
+  return updates.find((u) => (u.text_body ?? '').trim().startsWith(tag)) ?? null
+}

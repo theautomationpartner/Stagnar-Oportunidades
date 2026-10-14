@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react'
-import { MdCancel, MdCheck, MdCheckCircle, MdHome, MdRefresh } from 'react-icons/md'
+import { MdAdd, MdArrowBack, MdCancel, MdCheckCircle, MdContentCopy, MdHome, MdRefresh } from 'react-icons/md'
 import { AttentionBox, Button, Modal, ModalContent } from '@vibe/core'
 import { formatMoney } from '../services/format'
 import { badgeForCompania } from '../services/companyColors'
@@ -58,9 +58,11 @@ export default function EmitirStepPanel({
   polling,
   errorDetail,
   onConfirmarEmision,
-  onRevisarValidacion,
-  revisandoValidacion,
   onValidarPoliza,
+  diferenciasValidacion = [],
+  onDuplicarOportunidad,
+  onVolverAConfirmar,
+  onCrearOportunidad,
   validacionVencida,
   validacionErrorRespondido,
   validarPolizaError,
@@ -102,6 +104,19 @@ export default function EmitirStepPanel({
   const validacionConError = Boolean(validacionErrorRespondido) && !validandoPoliza
   const tieneValidacion = hayValidacion(validaciones, opportunity.validacionPolizaEstado)
   const bloqueantes = validacionesQueBloquean(validaciones)
+  // A pedido: qué hay que hacer ante las diferencias, de lo más fuerte a lo más leve. Si
+  // hay que crear una oportunidad nueva (otro vehículo) o duplicarla (otra persona), no
+  // se manda a corregir nada en el paso anterior: las demás diferencias se muestran, pero
+  // se resuelven en la oportunidad nueva.
+  const enRojo = (key) => validaciones[key]?.estado === ESTADO_VALIDACION.incorrecto
+  const accionPrincipal = enRojo('vehiculo')
+    ? 'nueva'
+    : enRojo('persona')
+      ? 'duplicar'
+      : enRojo('compania') || enRojo('cotizacion')
+        ? 'corregir'
+        : null
+  const ciDeLaPoliza = diferenciasValidacion.find((d) => d.validacion === 'persona' && d.campo === 'ci')?.poliza
   // A pedido: "Con diferencias" bloquea aunque no haya veredictos en rojo (el escenario
   // pudo dejar la diferencia — típicamente el premio — solo en la nota). Con rojos, el
   // camino ya existente es revisarlos uno a uno; sin rojos, el botón de acá abajo.
@@ -268,18 +283,91 @@ export default function EmitirStepPanel({
                       sabe qué no coincidió. Sin motivo queda la descripción de qué
                       compara esa validación, que al menos dice qué se miró. */}
                   <p className="emitir-step__validacion-motivo">{r.motivo || v.detalle}</p>
-                  {mal && onRevisarValidacion && (
-                    // A pedido: antes era un botón "terciario" (texto suelto) y no se notaba
-                    // que era un botón. Ahora tiene el mismo estilo que el resto de la app.
-                    <Button
-                      kind="secondary"
-                      size="small"
-                      className="opp-detail__recotizar-btn emitir-step__revisar-btn"
-                      disabled={revisandoValidacion === v.key}
-                      onClick={() => onRevisarValidacion(v)}
-                    >
-                      <MdCheck /> {revisandoValidacion === v.key ? 'Marcando...' : 'Lo revisé, está bien'}
-                    </Button>
+                  {/* A pedido: los dos valores de cada diferencia, solo para leer y en un
+                      renglón chico (dato · oportunidad · póliza) para ver toda la sección
+                      sin scrollear. */}
+                  {!validandoPoliza && estado !== ESTADO_VALIDACION.revisado && diferenciasValidacion.some((d) => d.validacion === v.key) && (
+                    <table className="emitir-step__difs">
+                      <thead>
+                        <tr>
+                          <th />
+                          <th>Oportunidad</th>
+                          <th>Póliza</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {diferenciasValidacion
+                          .filter((d) => d.validacion === v.key)
+                          .map((d) => (
+                            <tr key={d.clave}>
+                              <th scope="row">{d.etiqueta}</th>
+                              <td>{d.oportunidad}</td>
+                              <td>{d.poliza}</td>
+                            </tr>
+                          ))}
+                      </tbody>
+                    </table>
+                  )}
+                  {mal && !validandoPoliza && (
+                    <div className="emitir-step__accion">
+                      {v.key === 'vehiculo' && (
+                        <>
+                          <p>
+                            El vehículo de la póliza no es el de esta oportunidad: creá una oportunidad nueva para ese vehículo
+                            {enRojo('persona') && (
+                              <>
+                                , con el cliente de la CI que figura en la póliza
+                                {ciDeLaPoliza && <> (<strong>{ciDeLaPoliza}</strong>)</>}
+                              </>
+                            )}
+                            .
+                          </p>
+                          {onCrearOportunidad && (
+                            <Button kind="primary" size="small" onClick={onCrearOportunidad}>
+                              <MdAdd /> Crear oportunidad nueva
+                            </Button>
+                          )}
+                        </>
+                      )}
+                      {v.key === 'persona' &&
+                        (accionPrincipal === 'nueva' ? (
+                          <p className="emitir-step__accion-secundaria">
+                            También es otra persona: la oportunidad nueva va con el cliente de la CI de la póliza
+                            {ciDeLaPoliza && <> (<strong>{ciDeLaPoliza}</strong>)</>}.
+                          </p>
+                        ) : (
+                          <>
+                            <p>
+                              Duplicá la oportunidad y vinculá al cliente con la CI que figura en la póliza
+                              {ciDeLaPoliza && <> (<strong>{ciDeLaPoliza}</strong>)</>}.
+                            </p>
+                            {onDuplicarOportunidad && (
+                              <Button kind="primary" size="small" onClick={onDuplicarOportunidad}>
+                                <MdContentCopy /> Duplicar oportunidad
+                              </Button>
+                            )}
+                          </>
+                        ))}
+                      {(v.key === 'compania' || v.key === 'cotizacion') &&
+                        (accionPrincipal === 'nueva' || accionPrincipal === 'duplicar' ? (
+                          <p className="emitir-step__accion-secundaria">
+                            También hay diferencia acá, pero no hace falta corregirla en esta oportunidad: hacé
+                            coincidir la cotización en la oportunidad {accionPrincipal === 'nueva' ? 'nueva' : 'duplicada'}.
+                          </p>
+                        ) : (
+                          <>
+                            <p>
+                              Volvé al paso anterior y hacé coincidir la información con la póliza (cotización elegida,
+                              compañía, cobertura o premio). Después revalidá para poder concretar la oportunidad.
+                            </p>
+                            {onVolverAConfirmar && (
+                              <Button kind="primary" size="small" onClick={onVolverAConfirmar}>
+                                <MdArrowBack /> Volver a Confirmar
+                              </Button>
+                            )}
+                          </>
+                        ))}
+                    </div>
                   )}
                 </li>
               )
@@ -287,26 +375,22 @@ export default function EmitirStepPanel({
           </ul>
           {bloqueantes.length > 0 && (
             <p className="emitir-step__validacion-aviso">
-              No se puede concretar hasta corregir {bloqueantes.map((v) => v.label.toLowerCase()).join(', ')} o
-              marcarlo como revisado.
+              {accionPrincipal === 'nueva'
+                ? 'Esta oportunidad no se puede concretar con esta póliza: creá una oportunidad nueva.'
+                : accionPrincipal === 'duplicar'
+                  ? 'Esta oportunidad no se puede concretar con esta póliza: duplicala con el cliente de la póliza.'
+                  : `No se puede concretar hasta resolver ${new Intl.ListFormat('es', { type: 'conjunction' }).format(
+                      bloqueantes.map((v) => v.label.toLowerCase())
+                    )} como se indica arriba y volver a validar.`}
             </p>
           )}
+          {/* A pedido: sin salida manual ("Lo revisé"): con diferencias solo se sigue
+              resolviéndolas y volviendo a validar, o creando otra oportunidad. */}
           {difSinRojo && (
-            <div className="emitir-step__validacion-aviso">
+            <p className="emitir-step__validacion-aviso">
               La validación terminó <strong>con diferencias</strong> — el detalle está en las notas de arriba.
-              No se puede concretar hasta que alguien las revise y las marque a mano.
-              {onRevisarValidacion && (
-                <Button
-                  kind="secondary"
-                  size="small"
-                  className="opp-detail__recotizar-btn emitir-step__revisar-dif"
-                  disabled={revisandoValidacion === 'cotizacion'}
-                  onClick={() => onRevisarValidacion(VALIDACIONES_POLIZA.find((v) => v.key === 'cotizacion'))}
-                >
-                  <MdCheck /> {revisandoValidacion === 'cotizacion' ? 'Marcando...' : 'Lo revisé, marcar como revisadas'}
-                </Button>
-              )}
-            </div>
+              Hacé coincidir la información y volvé a validar para poder concretar.
+            </p>
           )}
         </section>
       )}

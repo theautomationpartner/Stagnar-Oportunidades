@@ -714,3 +714,23 @@
 .confirmar-step__pago--activo {
   box-shadow: inset 0 0 0 1px var(--primary-blue);
 }
+
+/* Resultado de leer la Carta Automóvil subida en el paso 3 (ver leerCartaEnPaso3). */
+.confirmar-step__lectura-carta {
+  margin: 10px 0 0;
+  padding: 8px 12px;
+  font-size: 13px;
+  border-radius: 8px;
+  background: var(--color-tint-info, #eef4fd);
+  color: var(--color-tint-info-text, #1f4e8c);
+}
+
+.confirmar-step__lectura-carta--ok {
+  background: #e6f6ee;
+  color: #0b6b3a;
+}
+
+.confirmar-step__lectura-carta--error {
+  background: #fdecee;
+  color: #b42d43;
+}

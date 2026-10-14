@@ -405,3 +405,72 @@
   margin-right: 6px;
   flex-shrink: 0;
 }
+
+/* A pedido: diferencias en un renglón chico (dato · oportunidad · póliza). */
+.emitir-step__difs {
+  width: 100%;
+  margin: 6px 0 2px;
+  border-collapse: collapse;
+  table-layout: fixed;
+  font-size: 12px;
+}
+
+.emitir-step__difs th,
+.emitir-step__difs td {
+  padding: 3px 6px;
+  text-align: left;
+  vertical-align: top;
+  overflow-wrap: anywhere;
+  border-bottom: 1px solid var(--border, #e6e9ef);
+}
+
+.emitir-step__difs thead th {
+  font-size: 10px;
+  font-weight: 600;
+  text-transform: uppercase;
+  color: var(--texto-suave, #676879);
+}
+
+.emitir-step__difs thead th:first-child,
+.emitir-step__difs tbody th {
+  width: 28%;
+}
+
+.emitir-step__difs tbody th {
+  font-weight: 600;
+}
+
+.emitir-step__difs tbody td {
+  font-weight: 600;
+}
+
+/* Qué hacer ante una validación en rojo (persona / compañía-cotización / vehículo). */
+.emitir-step__accion {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 6px;
+  margin: 6px 0 2px;
+  padding: 8px 10px;
+  background: #fdf3f4;
+  border-radius: 8px;
+}
+
+.emitir-step__accion p {
+  margin: 0;
+  font-size: 12px;
+}
+
+/* Diferencia que se resuelve en la oportunidad nueva/duplicada: aviso sin botón. */
+.emitir-step__accion:has(.emitir-step__accion-secundaria) {
+  background: #f5f6f8;
+}
+
+.emitir-step__accion-secundaria {
+  color: var(--texto-suave, #676879);
+}
+
+.emitir-step__accion button svg {
+  margin-right: 6px;
+  flex-shrink: 0;
+}

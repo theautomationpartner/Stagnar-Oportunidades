@@ -376,6 +376,7 @@ export default function App() {
           urlStep={route.step}
           onStepChange={(step) => go('oportunidades', route.id, step, { replace: true })}
           onOpenOpportunity={(id) => go('oportunidades', id, 'cotizar')}
+          onCrearOportunidad={() => go('crear')}
           onBack={() => closeDetail(openedFromCrearFlow ? 'crear' : 'oportunidades')}
           onGoToList={() => closeDetail('oportunidades')}
           showReturnToCrearFlow={openedFromCrearFlow}
