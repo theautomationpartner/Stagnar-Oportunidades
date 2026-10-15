@@ -3292,15 +3292,51 @@ export async function fetchComentarios(itemId) {
 // Crea el comentario y le adjunta los archivos (uno por uno: add_file_to_update recibe
 // uno por pedido). Si falla un archivo, el comentario ya quedó creado: se avisa cuáles
 // no subieron para que se puedan reintentar.
-export async function crearComentario(itemId, { texto, autor, archivos = [] }) {
+// A pedido: @menciones. No se usa mentions_list de create_update: monday le AGREGA al
+// final del texto su propia mención, y el "@Nombre" quedaba dos veces (probado). En su
+// lugar, el "@Nombre" del texto se escribe como la mención de monday (el link a la
+// persona, en el lugar donde se escribió) y el aviso va aparte con create_notification,
+// apuntando al Update (target_type Post): le llega a la persona en la campanita con el
+// link al comentario.
+const CREATE_NOTIFICATION_MUTATION = `
+  mutation AvisarMencion($userId: ID!, $targetId: ID!, $text: String!) {
+    create_notification(user_id: $userId, target_id: $targetId, text: $text, target_type: Post) {
+      text
+    }
+  }
+`
+const CUENTA_MONDAY = 'stagnariseguros'
+
+export async function crearComentario(itemId, { texto, autor, archivos = [], menciones = [] }) {
   const firma = autor?.id
     ? `Por <b>${escaparHtml(autor.name || 'Usuario')}</b> (usuario monday ${autor.id})`
     : `Por <b>${escaparHtml(autor?.name || 'Usuario de la app')}</b>`
-  const cuerpo = escaparHtml(texto).trim().replace(/\n/g, '<br>')
+  let cuerpo = escaparHtml(texto).trim().replace(/\n/g, '<br>')
+  const mencionesValidas = menciones.filter((m) => /^\d+$/.test(String(m.id)))
+  // "@Nombre" → la mención de monday, en el mismo lugar del texto.
+  for (const m of mencionesValidas) {
+    const nombre = escaparHtml(`@${m.name}`)
+    const link = `<a class="user_mention_editor router" href="https://${CUENTA_MONDAY}.monday.com/users/${m.id}" data-mention-type="User" data-mention-id="${m.id}" target="_blank" rel="noopener noreferrer">${nombre}</a>`
+    cuerpo = cuerpo.split(nombre).join(link)
+  }
   const body = `${COMENTARIO_TAG} ${firma}<br>${cuerpo || (archivos.length ? '<i>Adjuntó archivos</i>' : '')}`
   const data = await callMondayApi(CREATE_UPDATE_MUTATION, { itemId: String(itemId), body })
   const updateId = data.create_update?.id
   const fallidos = []
+  // El aviso a cada persona mencionada. Si falla, el comentario ya quedó: se informa.
+  const quien = autor?.name || 'Alguien'
+  const resumen = String(texto ?? '').replace(/\s+/g, ' ').trim().slice(0, 140)
+  for (const m of mencionesValidas) {
+    try {
+      await callMondayApi(CREATE_NOTIFICATION_MUTATION, {
+        userId: String(m.id),
+        targetId: String(updateId),
+        text: `${quien} te mencionó en un comentario: ${resumen}`,
+      })
+    } catch (err) {
+      fallidos.push(`aviso a ${m.name} (${err.message})`)
+    }
+  }
   for (const file of archivos) {
     try {
       const archivo = await prepararArchivoParaSubir(file)

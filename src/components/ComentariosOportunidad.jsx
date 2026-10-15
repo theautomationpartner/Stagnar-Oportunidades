@@ -14,6 +14,34 @@ import './ComentariosOportunidad.css'
 // El botón vive en el encabezado de la oportunidad, así está a mano en los 4 pasos, y
 // muestra cuántos comentarios hay.
 
+// A pedido: @menciones. Sin acentos ni mayúsculas, para buscar "@mat" y encontrar "Matías".
+const sinAcentos = (t) =>
+  String(t ?? '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+
+// La mención que se está escribiendo: "@" al principio o después de un espacio, hasta el
+// cursor, sin espacios dobles. Permite un espacio adentro ("@Matías St") para nombres
+// compuestos.
+const MENCION_EN_CURSO = /(^|\s)@([^\s@]*(?: [^\s@]*)?)$/
+
+// Resalta en el texto de un comentario las "@Nombre" de personas de monday.
+function conMenciones(texto, nombres) {
+  if (!nombres.length) return texto
+  const escapar = (t) => t.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+  const patron = new RegExp(`(@(?:${[...nombres].sort((a, b) => b.length - a.length).map(escapar).join('|')}))`, 'g')
+  return texto.split(patron).map((parte, i) =>
+    i % 2 === 1 ? (
+      <span key={i} className="comentarios__mencion">
+        {parte}
+      </span>
+    ) : (
+      parte
+    )
+  )
+}
+
 const fechaLarga = (iso) => {
   const d = new Date(iso)
   if (Number.isNaN(d.getTime())) return ''
@@ -48,6 +76,12 @@ export default function ComentariosOportunidad({ opportunityId, usuarioSesion, c
   const [cargando, setCargando] = useState(false)
   const [errorCarga, setErrorCarga] = useState(null)
   const [fotos, setFotos] = useState(new Map())
+  const [usuarios, setUsuarios] = useState([])
+  // Mención en curso mientras se escribe ("@ma…") y las personas ya elegidas.
+  const [mencion, setMencion] = useState(null) // { query, inicio }
+  const [mencionActiva, setMencionActiva] = useState(0)
+  const [menciones, setMenciones] = useState([]) // [{ id, name }]
+  const textoRef = useRef(null)
   const [texto, setTexto] = useState('')
   const [archivos, setArchivos] = useState([])
   const [publicando, setPublicando] = useState(false)
@@ -80,7 +114,10 @@ export default function ComentariosOportunidad({ opportunityId, usuarioSesion, c
   // Fotos de perfil de monday por id, para los avatares.
   useEffect(() => {
     fetchMondayUsers()
-      .then((usuarios) => setFotos(new Map(usuarios.map((u) => [u.id, u.photo]))))
+      .then((lista) => {
+        setFotos(new Map(lista.map((u) => [u.id, u.photo])))
+        setUsuarios(lista)
+      })
       .catch(() => {})
   }, [])
 
@@ -94,16 +131,69 @@ export default function ComentariosOportunidad({ opportunityId, usuarioSesion, c
     if (nuevos.length) setArchivos((prev) => [...prev, ...nuevos])
   }
 
+  const sugerencias = mencion
+    ? usuarios.filter((u) => sinAcentos(u.name).includes(sinAcentos(mencion.query))).slice(0, 6)
+    : []
+
+  const cambiarTexto = (valor, cursor) => {
+    setTexto(valor)
+    const antes = valor.slice(0, cursor)
+    const m = antes.match(MENCION_EN_CURSO)
+    if (m) {
+      setMencion({ query: m[2], inicio: antes.length - m[2].length - 1 })
+      setMencionActiva(0)
+    } else {
+      setMencion(null)
+    }
+  }
+
+  const elegirMencion = (u) => {
+    if (!mencion) return
+    const cursor = textoRef.current?.selectionStart ?? texto.length
+    const insertado = `@${u.name} `
+    const nuevo = texto.slice(0, mencion.inicio) + insertado + texto.slice(cursor)
+    setTexto(nuevo)
+    setMenciones((prev) => (prev.some((p) => p.id === u.id) ? prev : [...prev, { id: u.id, name: u.name }]))
+    setMencion(null)
+    const pos = mencion.inicio + insertado.length
+    requestAnimationFrame(() => {
+      textoRef.current?.focus()
+      textoRef.current?.setSelectionRange(pos, pos)
+    })
+  }
+
+  const teclaEnTexto = (e) => {
+    if (!mencion || sugerencias.length === 0) return
+    if (e.key === 'ArrowDown') {
+      e.preventDefault()
+      setMencionActiva((i) => (i + 1) % sugerencias.length)
+    } else if (e.key === 'ArrowUp') {
+      e.preventDefault()
+      setMencionActiva((i) => (i - 1 + sugerencias.length) % sugerencias.length)
+    } else if (e.key === 'Enter' || e.key === 'Tab') {
+      e.preventDefault()
+      elegirMencion(sugerencias[mencionActiva] ?? sugerencias[0])
+    } else if (e.key === 'Escape') {
+      e.preventDefault()
+      e.stopPropagation()
+      setMencion(null)
+    }
+  }
+
   const publicar = async () => {
     if (!texto.trim() && archivos.length === 0) return
     setPublicando(true)
     setErrorPublicar(null)
     try {
-      const { fallidos } = await crearComentario(opportunityId, { texto, autor, archivos })
+      // Solo las menciones que siguen en el texto (pudieron borrar el "@Nombre").
+      const vigentes = menciones.filter((m) => texto.includes(`@${m.name}`))
+      const { fallidos } = await crearComentario(opportunityId, { texto, autor, archivos, menciones: vigentes })
       setTexto('')
       setArchivos([])
+      setMenciones([])
+      setMencion(null)
       if (fallidos.length) {
-        setErrorPublicar(`El comentario se guardó, pero no se pudieron subir: ${fallidos.join(', ')}.`)
+        setErrorPublicar(`El comentario se guardó, pero falló: ${fallidos.join(', ')}.`)
       }
       await cargar()
     } catch (err) {
@@ -148,14 +238,48 @@ export default function ComentariosOportunidad({ opportunityId, usuarioSesion, c
                   <Avatar label={initialsOf(autor?.name ?? '')} foto={autor?.id ? fotos.get(String(autor.id)) : null} />
                   <span>{autor?.name ?? '…'}</span>
                 </div>
-                <textarea
-                  className="comentarios__texto"
-                  rows={3}
-                  placeholder="Escribí un comentario del trámite (ej. va a evaluar la compra, confirma cuándo lo retira)…"
-                  value={texto}
-                  onChange={(e) => setTexto(e.target.value)}
-                  disabled={publicando}
-                />
+                <div className="comentarios__texto-wrap">
+                  <textarea
+                    ref={textoRef}
+                    className="comentarios__texto"
+                    rows={3}
+                    placeholder="Escribí un comentario del trámite (ej. va a evaluar la compra). Usá @ para avisarle a alguien…"
+                    value={texto}
+                    onChange={(e) => cambiarTexto(e.target.value, e.target.selectionStart)}
+                    onKeyDown={teclaEnTexto}
+                    onBlur={() => setTimeout(() => setMencion(null), 150)}
+                    disabled={publicando}
+                  />
+                  {mencion && sugerencias.length > 0 && (
+                    <ul className="comentarios__sugerencias" role="listbox" aria-label="Personas para mencionar">
+                      {sugerencias.map((u, i) => (
+                        <li key={u.id} role="option" aria-selected={i === mencionActiva}>
+                          <button
+                            type="button"
+                            className={i === mencionActiva ? 'comentarios__sugerencia comentarios__sugerencia--activa' : 'comentarios__sugerencia'}
+                            onMouseDown={(e) => {
+                              e.preventDefault()
+                              elegirMencion(u)
+                            }}
+                            onMouseEnter={() => setMencionActiva(i)}
+                          >
+                            <Avatar label={initialsOf(u.name)} foto={u.photo} />
+                            <span>{u.name}</span>
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+                {menciones.some((m) => texto.includes(`@${m.name}`)) && (
+                  <p className="comentarios__avisar">
+                    Se le va a avisar en monday a:{' '}
+                    {menciones
+                      .filter((m) => texto.includes(`@${m.name}`))
+                      .map((m) => m.name)
+                      .join(', ')}
+                  </p>
+                )}
                 {archivos.length > 0 && (
                   <ul className="comentarios__adjuntos-nuevos">
                     {archivos.map((f, i) => (
@@ -233,7 +357,7 @@ export default function ComentariosOportunidad({ opportunityId, usuarioSesion, c
                           <strong>{c.autor.name}</strong>
                           <span>{fechaLarga(c.fecha)}</span>
                         </div>
-                        {c.texto && <p className="comentarios__mensaje">{c.texto}</p>}
+                        {c.texto && <p className="comentarios__mensaje">{conMenciones(c.texto, usuarios.map((u) => u.name))}</p>}
                         {c.archivos.length > 0 && (
                           <div className="comentarios__archivos">
                             {c.archivos.map((a, i) => {
