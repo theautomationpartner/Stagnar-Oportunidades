@@ -202,6 +202,14 @@ const JIRA_ESTADO_COLUMN_ID = 'color_mm83ybd0'
 const POSEE_VEHICULO_COLUMN_ID = 'color_mm51n4j'
 const ESTADO_LECTURA_COLUMN_ID = 'color_mm5rzrhk'
 const INCLUIR_PROPUESTA_COLUMN_ID = 'boolean_mm4wjdnw'
+// A pedido: "Seleccionada para enviar" (subitem), la selección del paso 2 guardada.
+const SELECCIONADA_ENVIAR_COLUMN_ID = 'boolean_mm85h6r6'
+// La selección con la que arranca el paso 2: la guardada; si no hay ninguna guardada
+// (cotizaciones de antes de esta columna), las que ya se enviaron, como hasta ahora.
+const seleccionInicial = (raws) => {
+  const guardadas = raws.filter((r) => r.seleccionadaEnviar)
+  return new Set((guardadas.length ? guardadas : raws.filter((r) => r.incluirPropuesta)).map((r) => r.id))
+}
 const LIBRETA_CONDUCIR_COLUMN_ID = 'file_mm51jy06'
 const CEDULA_COLUMN_ID = 'file_mm5pc008'
 const POLIZA_COLUMN_ID = 'file_mm5bzdd4'
@@ -449,7 +457,7 @@ export default function OpportunityDetail({
         // A pedido: sin la parcial de PORTO más cara (ver sinParcialPortoMasCara).
         const raws = sinParcialPortoMasCara(mapped)
         setRawQuotes(raws)
-        setSelectedIds(new Set(raws.filter((r) => r.incluirPropuesta).map((r) => r.id)))
+        setSelectedIds(seleccionInicial(raws))
 
         const estadoOportunidad = data.column_values.find(
           (cv) => cv.id === ESTADO_OPORTUNIDAD_COLUMN_ID
@@ -719,7 +727,7 @@ export default function OpportunityDetail({
 
         if (estadoCotizacion === 'Cotizado (Subitems)' && estadoOportunidad === 'Cotizacion Emitida') {
           setRawQuotes(raws)
-          setSelectedIds(new Set(raws.filter((r) => r.incluirPropuesta).map((r) => r.id)))
+          setSelectedIds(seleccionInicial(raws))
           setPolling(false)
           setActiveStep('comparar')
           // La cotización (o recotización) terminó bien de verdad — recién acá se
@@ -1139,12 +1147,24 @@ export default function OpportunityDetail({
     [groups, selectedIds]
   )
 
+  // A pedido: la selección se guarda en la cotización (SELECCIONADA_ENVIAR_COLUMN_ID)
+  // para que no se pierda al recargar. La pantalla cambia al instante; si monday no lo
+  // guarda, se vuelve atrás.
   const toggleSelected = (id) => {
-    setSelectedIds((prev) => {
-      const next = new Set(prev)
-      if (next.has(id)) next.delete(id)
-      else next.add(id)
-      return next
+    const marcar = !selectedIds.has(id)
+    const aplicar = (valor) =>
+      setSelectedIds((prev) => {
+        const next = new Set(prev)
+        if (valor) next.add(id)
+        else next.delete(id)
+        return next
+      })
+    aplicar(marcar)
+    setRawQuotes((prev) => prev.map((r) => (r.id === id ? { ...r, seleccionadaEnviar: marcar } : r)))
+    setSubitemCheckboxValue(id, SELECCIONADA_ENVIAR_COLUMN_ID, marcar).catch((err) => {
+      console.warn('No se pudo guardar la selección de la cotización', err)
+      aplicar(!marcar)
+      setRawQuotes((prev) => prev.map((r) => (r.id === id ? { ...r, seleccionadaEnviar: !marcar } : r)))
     })
   }
 

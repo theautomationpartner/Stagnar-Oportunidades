@@ -41,6 +41,10 @@ export function mapSubitemToRawQuote(subitem) {
     recargo8: textOf(cv, 'numeric_mm52xw0m'),
     recargo10: textOf(cv, 'numeric_mm52bnpa'),
     incluirPropuesta: boolOf(cv, 'boolean_mm4wjdnw'),
+    // A pedido: la tildada en "Comparar y enviar" para mandar. Se guarda para que la
+    // selección (y el filtro "Seleccionadas para enviar" del paso 3) no se pierda al
+    // recargar. No es lo mismo que incluirPropuesta, que marca las que YA salieron.
+    seleccionadaEnviar: boolOf(cv, 'boolean_mm85h6r6'),
     propuestaElegida: boolOf(cv, 'boolean_mm5bn41n'),
     // El costo y el deducible los cargó el vendedor a mano (ver CotizacionManualModal).
     costoManual: boolOf(cv, 'boolean_mm7n3mvm'),

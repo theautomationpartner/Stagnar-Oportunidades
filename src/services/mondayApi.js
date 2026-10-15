@@ -209,6 +209,7 @@ const SUBITEM_COLUMN_IDS = [
   'numeric_mm52xw0m', // Recargo 8 Cuotas
   'numeric_mm52bnpa', // Recargo 10 Cuotas
   'boolean_mm4wjdnw', // Incluir Propuesta
+  'boolean_mm85h6r6', // Seleccionada para enviar (paso 2, ver seleccionInicial en OpportunityDetail)
   'boolean_mm5bn41n', // Propuesta elegida
   'boolean_mm7n3mvm', // Costo cargado a mano (ver scripts/mon-costo-manual.mjs)
   'boolean_mm5fsr46', // Granizo (opcional PORTO)
